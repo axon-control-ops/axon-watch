@@ -186,6 +186,9 @@ export function useComposerDisplayState(options: UseComposerDisplayStateOptions)
         kairoDraft.value = value;
         return;
       }
+      if (shell.commandMutationError && value !== shell.ideComposerDraft) {
+        shell.commandMutationError = null;
+      }
       shell.ideComposerDraft = value;
     },
   });

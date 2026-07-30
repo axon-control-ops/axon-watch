@@ -14,6 +14,7 @@ from app.workspace_delivery.config import (
     is_protected_branch,
     load_workspace_delivery_policies,
 )
+from app.workspace_delivery.gh_cli import gh_missing_hint, resolve_gh_cli
 
 
 class WorkspaceDeliveryTests(unittest.TestCase):
@@ -149,6 +150,30 @@ class WorkspaceDeliveryTests(unittest.TestCase):
             self.assertEqual(policies["workspace_tps"].base_branch, "main")
             clear_config_cache_for_tests()
             self.assertIsNone(get_workspace_delivery_policy("workspace_tps"))
+
+    def test_resolve_gh_cli_honors_override(self) -> None:
+        import os
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as tmp:
+            fake = Path(tmp) / "gh"
+            fake.write_text("#!/bin/sh\necho ok\n", encoding="utf-8")
+            fake.chmod(0o755)
+            previous = os.environ.get("AXON_WATCH_GH_CLI_PATH")
+            os.environ["AXON_WATCH_GH_CLI_PATH"] = str(fake)
+            try:
+                self.assertEqual(resolve_gh_cli(), str(fake.resolve()))
+            finally:
+                if previous is None:
+                    os.environ.pop("AXON_WATCH_GH_CLI_PATH", None)
+                else:
+                    os.environ["AXON_WATCH_GH_CLI_PATH"] = previous
+
+    def test_gh_missing_hint_is_actionable(self) -> None:
+        hint = gh_missing_hint()
+        self.assertIn("cli.github.com", hint)
+        self.assertIn("AXON_WATCH_GH_CLI_PATH", hint)
+        self.assertIn("gh auth login", hint)
 
 
 if __name__ == "__main__":

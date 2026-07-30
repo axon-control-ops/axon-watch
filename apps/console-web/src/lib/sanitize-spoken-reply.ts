@@ -1,4 +1,4 @@
-import { OPERATOR_PERSONA_NAME } from './operator-persona-name';
+import { OPERATOR_PERSONA_NAME, OPERATOR_PERSONA_SPOKEN_NAME } from './operator-persona-name';
 import { stripLiteralSymbolWords } from './spoken-symbol-words';
 
 const STREAM_BLOCK_START_RE =
@@ -58,9 +58,31 @@ function stripMarkdownForSpeech(text: string): string {
     .replace(/'/g, "'");
 }
 
+/** Stop TTS from letter-spelling V-A-X-O-N; speak as Vekson (vek-son). */
+function preparePersonaNameForSpeech(text: string): string {
+  return text
+    .replace(
+      /\bV\s*[.\-]\s*A\s*[.\-]\s*X\s*[.\-]\s*O\s*[.\-]\s*N\b/gi,
+      OPERATOR_PERSONA_SPOKEN_NAME,
+    )
+    .replace(/\bV\s+A\s+X\s+O\s+N\b/gi, OPERATOR_PERSONA_SPOKEN_NAME)
+    .replace(/\bVAXON\b/gi, OPERATOR_PERSONA_SPOKEN_NAME)
+    // Sesotho name — keep the written form, but guide TTS to TA-bo.
+    .replace(/\bThabo\b/gi, 'Ta-bo')
+    // Zulu name — speak Sipho as SEE-po (not SIFO).
+    .replace(/\bSipho\b/gi, 'See-po');
+}
+
 /** Keep TTS from reading punctuation / symbol names aloud. */
 function softenSymbolsForSpeech(text: string): string {
   let out = text
+    // Speak readiness scores before slash stripping ("100/100" → "100 percent").
+    .replace(/\b(\d{1,3})\s*\/\s*100\b/g, '$1 percent')
+    .replace(/\b(\d{1,3})\s*\/\s*(\d{1,3})\b/g, '$1 out of $2')
+    // Expand acronyms before slash/hyphen softening so TTS does not say "see" / "fourlead".
+    .replace(/\bCI\/CD\b/g, 'C I C D')
+    .replace(/\bCI\b/g, 'C I')
+    // Keep Lead-team hyphenated — it forces a TTS break (Lead team → "forlead" after counts).
     // Emoji / pictographs (incl. many "smiley" ranges).
     .replace(/[\u{1F300}-\u{1FAFF}\u{2700}-\u{27BF}\u{2600}-\u{26FF}]/gu, ' ')
     .replace(/\\/g, ' ')
@@ -80,6 +102,39 @@ function softenSymbolsForSpeech(text: string): string {
   out = out.replace(/[<>{}[\]()`~^]/g, ' ');
   out = out.replace(/\s+,/g, ',').replace(/,\s*,+/g, ',');
   return out.replace(/\s+/g, ' ').trim();
+}
+
+/** Stop TTS from gluing "4 Lead" / "four Lead" into "forlead". */
+function prepareCountsForSpeech(text: string): string {
+  const numberWords: Record<string, string> = {
+    '0': 'zero',
+    '1': 'one',
+    '2': 'two',
+    '3': 'three',
+    '4': 'four',
+    '5': 'five',
+    '6': 'six',
+    '7': 'seven',
+    '8': 'eight',
+    '9': 'nine',
+    '10': 'ten',
+    '11': 'eleven',
+    '12': 'twelve',
+  };
+  const countWord = Object.values(numberWords).join('|');
+  // Count immediately before Lead → insert a comma + keep Lead-team hyphen for a clear break.
+  let out = text.replace(
+    new RegExp(`\\b(${countWord}|\\d{1,2})\\s+Lead(?:[- ]team)?\\b`, 'gi'),
+    (_full, raw: string) => {
+      const spoken = numberWords[String(raw).toLowerCase()] ?? numberWords[raw] ?? String(raw);
+      return `${spoken}, Lead-team`;
+    },
+  );
+  out = out.replace(/\b(\d{1,2})\s+([A-Z][A-Za-z-]+)\b/g, (_full, digits: string, word: string) => {
+    const spoken = numberWords[digits] ?? digits;
+    return `${spoken} ${word}`;
+  });
+  return out;
 }
 
 function stripPersonaPrefix(text: string): string {
@@ -165,7 +220,10 @@ export function formatConversationDisplayReply(raw: string, maxChars = MAX_DISPL
 /** Convert agent/model text into operator-facing speech (may still be long). */
 export function sanitizeSpokenReply(raw: string, maxChars = MAX_SPOKEN_CHARS): string {
   const display = formatConversationDisplayReply(raw, maxChars);
-  let spoken = softenSymbolsForSpeech(display.replace(/\n+/g, ' ').replace(/\s+/g, ' ').trim());
+  let spoken = display.replace(/\n+/g, ' ').replace(/\s+/g, ' ').trim();
+  spoken = preparePersonaNameForSpeech(spoken);
+  spoken = softenSymbolsForSpeech(spoken);
+  spoken = prepareCountsForSpeech(spoken);
   spoken = stripLiteralSymbolWords(spoken);
   if (spoken && !/[.!?]$/.test(spoken)) {
     spoken = `${spoken}.`;

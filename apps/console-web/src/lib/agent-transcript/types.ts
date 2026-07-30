@@ -27,4 +27,15 @@ export type AgentTranscriptSegment =
   | { kind: 'research'; query: string; items: ResearchTranscriptItem[]; open: boolean; provider?: string; kindLabel?: ResearchBlockKind }
   | { kind: 'terminal'; command: string; output: string; open: boolean }
   | { kind: 'image'; path: string; open: boolean }
-  | { kind: 'debug-reproduce'; steps: string[]; open: boolean };
+  | { kind: 'debug-reproduce'; steps: string[]; open: boolean }
+  | {
+      kind: 'lead-fan-out';
+      planId: string;
+      mode: string;
+      leadName: string;
+      title: string;
+      queued: number;
+      deferred: number;
+      assignments: Array<{ role: string; goal: string }>;
+      notes: string[];
+    };

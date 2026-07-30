@@ -5,6 +5,10 @@
 
 import type { CompanyEmployeeRecord } from '../contracts/canonical';
 import { isBuildPlanImplementPrompt } from './build-plan-prompt';
+import {
+  matchNamedAssignEmployee,
+  namedAssignRouteReason,
+} from './named-assign-route';
 
 export type TeammateRouteEmployee = Pick<
   CompanyEmployeeRecord,
@@ -254,6 +258,30 @@ export function shouldSoftRouteToTeammate(
   }
   if (isBuildPlanImplementPrompt(text)) {
     return { shouldRoute: false, reason: 'build_plan_implement', source: 'deterministic' };
+  }
+
+  const named = matchNamedAssignEmployee(text, employees);
+  if (named) {
+    const currentId = currentEmployee?.employee_id?.trim() ?? '';
+    const target = named.employee;
+    if (currentId && target.employee_id.trim() === currentId) {
+      return {
+        shouldRoute: false,
+        reason: 'already_owning',
+        employee: target,
+        source: 'deterministic',
+        routingReceipt: `named_assign;already_owning;as=${named.matchedAs}`,
+      };
+    }
+    return {
+      shouldRoute: true,
+      reason: namedAssignRouteReason(target),
+      employee: target,
+      fromEmployeeId: currentId || undefined,
+      fromName: currentEmployee?.name.trim() || (currentId ? 'teammate' : 'workspace'),
+      source: 'deterministic',
+      routingReceipt: `named_assign;as=${named.matchedAs};to=${target.employee_id}`,
+    };
   }
 
   const scored = scoreRoster(text, employees);

@@ -124,4 +124,9 @@ const showLiveOpsDock = computed(
   overflow: hidden;
   padding: 0;
 }
+
+.dock-stack--live-ops-only :deep(.mc-live-ops) {
+  min-height: 0;
+  max-height: 100%;
+}
 </style>

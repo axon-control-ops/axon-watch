@@ -3,6 +3,8 @@ import type { OperatorThreadEntry } from './operator-thread';
 export type ThreadSurface = 'operator' | 'ide';
 
 const LANE_B_SYSTEM_RE = /^Lane B \((ask|plan|agent|debug)\)/i;
+const FAN_OUT_SYSTEM_RE =
+  /^Lead fan-out (assigned task|materialized)/i;
 
 export function threadSurfaceForLayout(layoutMode: 'operator' | 'ide'): ThreadSurface {
   return layoutMode === 'ide' ? 'ide' : 'operator';
@@ -22,6 +24,10 @@ export function isActiveWorkspaceSurface(options: {
 
 function isLaneBSystemMessage(message: OperatorThreadEntry): boolean {
   return message.role === 'system' && LANE_B_SYSTEM_RE.test(message.content);
+}
+
+function isFanOutSystemMessage(message: OperatorThreadEntry): boolean {
+  return message.role === 'system' && FAN_OUT_SYSTEM_RE.test(message.content);
 }
 
 function isCommandSystemMessage(message: OperatorThreadEntry): boolean {
@@ -65,10 +71,8 @@ export function filterLegacyIdeThreadMessages(
   const filtered: OperatorThreadEntry[] = [];
   for (let index = 0; index < messages.length; index += 1) {
     const message = messages[index];
-    // Lane B dispatch receipts ("Lane B (agent) — streaming runtime reply…")
-    // are operator-facing plumbing; the IDE transcript shows only the
-    // conversational operator/agent turns, like a Cursor thread.
-    if (isLaneBSystemMessage(message)) {
+    // Lane B dispatch receipts and legacy fan-out SYSTEM assigns are plumbing.
+    if (isLaneBSystemMessage(message) || isFanOutSystemMessage(message)) {
       continue;
     }
     if (!isCommandSystemMessage(message)) {

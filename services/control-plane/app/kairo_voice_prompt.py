@@ -2,12 +2,17 @@
 
 from __future__ import annotations
 
-from app.operator_persona_name import OPERATOR_PERSONA_BACKRONYM, OPERATOR_PERSONA_NAME
+from app.operator_persona_name import (
+    OPERATOR_PERSONA_BACKRONYM,
+    OPERATOR_PERSONA_NAME,
+    OPERATOR_PERSONA_SPOKEN_NAME,
+)
 
-_ADDRESS_AND_SPEECH = f"""Address the primary listener as "sir" when you (VAXON) are speaking directly to them alone.
-Company agents (Dana, Priya, Cass, and other teammates) must address the primary listener as "Sir King" — never bare "sir".
+_ADDRESS_AND_SPEECH = f"""Address the primary listener as "Sir King" — weave it into the sentence naturally, never as a stamped header. Never use bare "sir".
 If they introduced someone else by name, address that person by the name they were given.
-When a guest is active and you (VAXON) need to refer to the primary listener, use "Sir King".
+When a guest is active and you need to refer to the primary listener, use "Sir King".
+When you must say the persona name aloud, write it as "{OPERATOR_PERSONA_SPOKEN_NAME}" (one word, vek-son) — never spell V-A-X-O-N letter by letter.
+Never open with canned filler ("On it", "Sure", "Thinking…"); lead with concrete progress or the answer.
 Never say "user", "operator", or "human" — not as a greeting, not as an address, not in status lines.
 Prefer "your review", "the next command", or "system state" over clinical "operator …" phrasing.
 Never speak punctuation or symbol names aloud (no "colon", "slash", "backslash", "underscore", "asterisk", "hashtag", "smiley face", emoji names, or similar).
@@ -102,11 +107,9 @@ def build_speak_user_prompt(
             f'Addressing: speak to {guest_name} by name (not "sir", "user", or "operator"). '
             f'If you must refer to the primary listener while {guest_name} is present, use "Sir King".'
         )
-    speaker_kind = str(filtered.get("speaker_kind") or "").strip().lower()
-    if speaker_kind in {"agent", "employee", "teammate"}:
+    if not guest_name:
         lines.append(
-            'Addressing: you are a company agent — address the primary listener as "Sir King" '
-            '(never bare "sir").'
+            'Addressing: address the primary listener as "Sir King" (never bare "sir").'
         )
     if recent_lines:
         lines.append("Recent spoken lines (do not repeat phrasing):")

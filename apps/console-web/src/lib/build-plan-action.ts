@@ -14,7 +14,7 @@ export type BuildPlanShell = {
   submitIdeComposer: (
     mode: IdeComposerMode,
     options?: { attachmentFiles?: File[] },
-  ) => Promise<void>;
+  ) => Promise<boolean | void>;
 };
 
 export type BuildPlanResult =

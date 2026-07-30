@@ -4,11 +4,13 @@ import { computed, nextTick, ref, watch } from 'vue';
 import AgentPersonaDock from './AgentPersonaDock.vue';
 import CompanyPresenceStrip from './CompanyPresenceStrip.vue';
 import VaxonRosterVoiceDock from './VaxonRosterVoiceDock.vue';
-import { useVaxonRosterVoiceDock } from '../../features/kairo-conversation/use-vaxon-roster-voice-dock';
+import {
+  shouldShowVaxonRosterVoiceDock,
+  useVaxonRosterVoiceDock,
+} from '../../features/kairo-conversation/use-vaxon-roster-voice-dock';
 import { resolveRosterSelectionForIdeThread } from '../../features/workspace-agents/active-ide-employee';
 import {
   buildCompanyRosterAlertBadge,
-  companyBusyEmployeesCount,
   companyHeadline,
   companyFailedEmployeesHint,
   companyFailedEmployeesHintTooltip,
@@ -19,11 +21,13 @@ import {
   employeeSpeakLine,
   firstFailedRosterEmployee,
   pickDefaultRosterEmployee,
+  resolveLiveBusyEmployeeIds,
 } from '../../features/workspace-agents/company-roster-view';
 import {
   markIntroSpokenToday,
   resolveTalkSpeakMode,
 } from '../../features/workspace-agents/company-roster-intro-prefs';
+import { resolveEmployeeManualHandoff } from '../../features/workspace-agents/employee-manual-handoff';
 import {
   employeeComposerOpenPayload,
   employeeQuickActions,
@@ -31,13 +35,13 @@ import {
   type TeamMemberQuickAction,
   type TeamMemberSurfaceAction,
 } from '../../features/workspace-agents/company-roster-actions';
-import { patchWorkspaceEmployeeEnabled } from '../../api/worker-scheduler-api';
-import { stopRun } from '../../api/runs-api';
 import type { CompanyEmployeeRecord } from '../../contracts/canonical';
 import { focusAgentDockComposerInput } from '../../lib/agent-dock-composer-focus';
 import { requestIdeComposerMode } from '../../lib/ide-composer-restore-request';
 import { employeeVoiceSpeaker } from '../../lib/kairo-voice-utterance';
+import { runEmployeeShiftRetry } from '../../lib/run-employee-shift-retry';
 import { navigateToSettingsSection } from '../../lib/settings-section-route';
+import { useCompanyRosterControlActions } from '../../composables/use-company-roster-control-actions';
 import { useShellStore } from '../../stores/shell';
 
 const shell = useShellStore();
@@ -45,6 +49,14 @@ const currentWorkspaceId = computed(() => shell.currentWorkspace?.workspace_id ?
 const vaxonVoiceDock = useVaxonRosterVoiceDock(
   computed(() => shell.kairoSpeechActive),
   currentWorkspaceId,
+);
+const showVaxonVoiceDock = computed(() =>
+  shouldShowVaxonRosterVoiceDock({
+    layoutMode: shell.layoutMode,
+    operatorBrainGalaxyActive: shell.operatorBrainGalaxyActive,
+    operatorCenterView: shell.operatorCenterView,
+    voiceDockVisible: vaxonVoiceDock.visible.value,
+  }),
 );
 /** Single roster source of truth — shell owns the poll; do not dual-poll here (causes IDE flicker). */
 const employees = computed(() => shell.companyEmployeesForCurrentWorkspace);
@@ -68,8 +80,11 @@ const dockRootRef = ref<HTMLElement | null>(null);
 const presenceStripRef = ref<{ focusEmployee: (employeeId: string | null | undefined) => void } | null>(
   null,
 );
-const controlBusyId = ref<string | null>(null);
-const controlError = ref<string | null>(null);
+const { controlBusyId, controlError, onControlAction } = useCompanyRosterControlActions({
+  shell,
+  currentWorkspaceId,
+  loadCompany,
+});
 
 function scrollDockIntoView(): void {
   void nextTick(() => {
@@ -164,54 +179,44 @@ const headline = computed(() =>
   ),
 );
 
-const hasFailedEmployees = computed(() => companyHasFailedEmployees(employees.value));
-
-const rosterAlertBadge = computed(() => buildCompanyRosterAlertBadge(employees.value));
-
 const liveBusyEmployeeIds = computed(() => {
-  const ids = new Set<string>();
-  for (const row of employees.value) {
-    if (employeeIsActivelyBusy(row)) {
-      ids.add(row.employee_id);
-    }
-  }
-  // Prefer the open IDE thread's owner — Lead can be "delegating" in chrome while
-  // a specialist thread is the one actually streaming.
-  if (shell.agentStreamActive) {
-    const threadEmployeeId = shell.activeIdeThread?.employee_id?.trim();
-    const recordEmployeeId = shell.activeIdeEmployeeRecord?.employee_id?.trim();
-    const primaryId =
-      employees.value.find((row) => row.primary)?.employee_id?.trim() ||
-      employees.value.find((row) => row.role === 'lead')?.employee_id?.trim() ||
-      null;
-    const streamOwnerId = threadEmployeeId || recordEmployeeId || primaryId;
-    if (streamOwnerId) {
-      ids.add(streamOwnerId);
-    }
-  }
-  return [...ids];
+  const focusedStreamEmployeeId = shell.agentStreamActive
+    ? shell.activeIdeThread?.employee_id?.trim() ||
+      shell.activeIdeEmployeeRecord?.employee_id?.trim() ||
+      null
+    : null;
+  const ids = resolveLiveBusyEmployeeIds({
+    employees: employees.value,
+    streamingThreadIds: shell.streamingIdeThreadIds,
+    threads: shell.ideThreadsForCurrentWorkspace,
+    focusedStreamEmployeeId,
+  });
+  return ids;
 });
 
-const busyCount = computed(() => {
-  const rosterBusy = companyBusyEmployeesCount(employees.value);
-  const liveExtra = liveBusyEmployeeIds.value.filter(
-    (id) => !employees.value.some((row) => row.employee_id === id && employeeIsActivelyBusy(row)),
-  ).length;
-  return rosterBusy + liveExtra;
-});
+const hasFailedEmployees = computed(() =>
+  companyHasFailedEmployees(employees.value, liveBusyEmployeeIds.value),
+);
+
+const rosterAlertBadge = computed(() =>
+  buildCompanyRosterAlertBadge(employees.value, liveBusyEmployeeIds.value),
+);
+
+const busyCount = computed(() => liveBusyEmployeeIds.value.length);
 
 const busyBadgeLabel = computed(() => {
-  const count = busyCount.value;
-  if (count <= 0) {
+  if (!employees.value.length) {
     return null;
   }
-  return `${count} BUSY`;
+  return `${busyCount.value} BUSY`;
 });
 
-const failedEmployeesHint = computed(() => companyFailedEmployeesHint(employees.value));
+const failedEmployeesHint = computed(() =>
+  companyFailedEmployeesHint(employees.value, liveBusyEmployeeIds.value),
+);
 
 const failedEmployeesHintTooltip = computed(() =>
-  companyFailedEmployeesHintTooltip(employees.value),
+  companyFailedEmployeesHintTooltip(employees.value, liveBusyEmployeeIds.value),
 );
 
 const selectedEmployee = computed(
@@ -219,8 +224,33 @@ const selectedEmployee = computed(
 );
 
 const selectedActions = computed(() =>
-  selectedEmployee.value ? employeeQuickActions(selectedEmployee.value) : [],
+  selectedEmployee.value
+    ? employeeQuickActions(selectedEmployee.value, {
+        autonomyMode: shell.operatorPresenceSettings.autonomy_mode,
+        tasks: shell.workspaceTasksForCurrentWorkspace,
+        runs: shell.runs,
+        liveBusy: liveBusyEmployeeIds.value.includes(selectedEmployee.value.employee_id),
+      })
+    : [],
 );
+
+const handoffWaitingEmployeeIds = computed(() => {
+  const mode = shell.operatorPresenceSettings.autonomy_mode;
+  const tasks = shell.workspaceTasksForCurrentWorkspace;
+  const runs = shell.runs;
+  const liveBusy = new Set(liveBusyEmployeeIds.value);
+  return employees.value
+    .filter((employee) =>
+      resolveEmployeeManualHandoff({
+        employee,
+        autonomyMode: mode,
+        tasks,
+        runs,
+        liveBusy: liveBusy.has(employee.employee_id),
+      }).waiting,
+    )
+    .map((employee) => employee.employee_id);
+});
 
 function selectEmployee(employee: CompanyEmployeeRecord): void {
   selectedEmployeeId.value = employee.employee_id;
@@ -259,13 +289,25 @@ function speakEmployeeLine(employee: CompanyEmployeeRecord, kind: TeamMemberChat
 
 async function startChat(employee: CompanyEmployeeRecord, kind: TeamMemberChatKind): Promise<void> {
   selectEmployee(employee);
-  // Talk / Status / Assign / Retry all land on that teammate's owned IDE thread.
+  if (kind === 'retry') {
+    controlError.value = null;
+    const result = await runEmployeeShiftRetry(shell, employee, {
+      keepActivityView: true,
+      focusThread: true,
+    });
+    if (!result.ok) {
+      controlError.value = result.reason;
+      return;
+    }
+    speakEmployeeLine(employee, kind);
+    return;
+  }
+  // Talk / Status / Assign land on that teammate's owned IDE thread.
   await shell.openOrFocusEmployeeIdeThread(employee);
   const { mode, draft } = employeeComposerOpenPayload(employee, kind);
-  requestIdeComposerMode(mode);
-  if (kind === 'retry') {
-    // Retry shift always needs tools — ignore consultative composer setting.
-    shell.setAgentExecutionAccess('full');
+  // Status is voice + focus only — never flip Ask/consultative (or any mode).
+  if (mode) {
+    requestIdeComposerMode(mode);
   }
   if (draft) {
     shell.openIdeComposerWithDraft(draft, { keepActivityView: true });
@@ -285,46 +327,6 @@ function openSurface(surface: TeamMemberSurfaceAction): void {
     return;
   }
   shell.focusKairoBriefing();
-}
-
-async function onControlAction(
-  employee: CompanyEmployeeRecord,
-  action: TeamMemberQuickAction,
-): Promise<void> {
-  if (action.control === 'toggle_enabled') {
-    const workspaceId = currentWorkspaceId.value?.trim();
-    if (!workspaceId) {
-      return;
-    }
-    controlBusyId.value = employee.employee_id;
-    controlError.value = null;
-    try {
-      await patchWorkspaceEmployeeEnabled(workspaceId, employee.employee_id, !employee.enabled);
-      await loadCompany();
-    } catch (error) {
-      controlError.value =
-        error instanceof Error ? error.message : 'Could not update agent enabled state';
-    } finally {
-      controlBusyId.value = null;
-    }
-    return;
-  }
-  if (action.control === 'stop') {
-    const runId = employee.active_run_id?.trim();
-    if (!runId) {
-      return;
-    }
-    controlBusyId.value = employee.employee_id;
-    controlError.value = null;
-    try {
-      await stopRun(runId);
-      await loadCompany();
-    } catch (error) {
-      controlError.value = error instanceof Error ? error.message : 'Could not stop shift';
-    } finally {
-      controlBusyId.value = null;
-    }
-  }
 }
 
 function onQuickAction(employee: CompanyEmployeeRecord, action: TeamMemberQuickAction): void {
@@ -396,6 +398,7 @@ async function onPresenceSelect(employee: CompanyEmployeeRecord): Promise<void> 
             <span
               v-if="busyBadgeLabel"
               class="company-roster__busy-badge"
+              :class="{ 'company-roster__busy-badge--idle': busyCount === 0 }"
               :title="`${busyCount} teammate${busyCount === 1 ? '' : 's'} currently busy`"
               :aria-label="`${busyCount} teammate${busyCount === 1 ? '' : 's'} currently busy`"
             >
@@ -438,7 +441,11 @@ async function onPresenceSelect(employee: CompanyEmployeeRecord): Promise<void> 
     </p>
 
     <template v-else>
-      <p v-if="controlError" class="company-roster__empty company-roster__empty--error">
+      <p
+        v-if="controlError"
+        class="company-roster__empty company-roster__empty--error"
+        role="alert"
+      >
         {{ controlError }}
       </p>
 
@@ -447,13 +454,14 @@ async function onPresenceSelect(employee: CompanyEmployeeRecord): Promise<void> 
         :employees="employees"
         :selected-employee-id="selectedEmployeeId"
         :live-busy-employee-ids="liveBusyEmployeeIds"
+        :handoff-waiting-employee-ids="handoffWaitingEmployeeIds"
         @select="onPresenceSelect"
       />
 
       <div :id="COMPANY_ROSTER_DOCK_ID" ref="dockRootRef" class="company-roster__dock-host">
-        <!-- IDE: KairoSidebarPanel owns VAXON speech — avoid a second speaking dock. -->
+        <!-- Mission Control uses the right LIVE OPERATIONS orb; IDE uses KairoSidebarPanel. -->
         <VaxonRosterVoiceDock
-          v-if="shell.layoutMode !== 'ide' && vaxonVoiceDock.visible.value"
+          v-if="showVaxonVoiceDock"
           :speaking="vaxonVoiceDock.speaking.value"
           :line="vaxonVoiceDock.line.value"
           :remaining-seconds="vaxonVoiceDock.remainingSeconds.value"
@@ -466,6 +474,8 @@ async function onPresenceSelect(employee: CompanyEmployeeRecord): Promise<void> 
           :employee="selectedEmployee"
           :actions="selectedActions"
           :control-busy="controlBusyId === selectedEmployee.employee_id"
+          :live-busy="liveBusyEmployeeIds.includes(selectedEmployee.employee_id)"
+          :handoff-waiting="handoffWaitingEmployeeIds.includes(selectedEmployee.employee_id)"
           @talk="void startChat(selectedEmployee, 'talk')"
           @action="onQuickAction(selectedEmployee, $event)"
         />

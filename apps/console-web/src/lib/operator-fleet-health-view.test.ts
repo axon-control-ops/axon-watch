@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   buildFleetHealthGridCells,
+  compactFleetHealthDetail,
   fleetHealthHeadline,
   sortFleetHealthRows,
   type FleetHealthSnapshot,
@@ -88,6 +89,24 @@ describe('operator-fleet-health-view', () => {
     expect(cells.find((cell) => cell.workspaceId === 'workspace_dashpro')?.summary).toContain(
       'review',
     );
+    expect(cells.find((cell) => cell.workspaceId === 'workspace_dashpro')?.isBusy).toBe(true);
+    expect(cells.find((cell) => cell.workspaceId === 'workspace_dashpro')?.openSignals).toBe(1);
+    expect(cells.find((cell) => cell.workspaceId === 'workspace_dashpro')?.reviewReady).toBe(1);
+    expect(cells.find((cell) => cell.workspaceId === 'workspace_dashpro')?.summary).toContain(
+      'active',
+    );
+  });
+
+  it('surfaces busy agents and live jobs in the headline', () => {
+    expect(fleetHealthHeadline(snapshot)).toContain('live');
+    expect(
+      buildFleetHealthGridCells({
+        snapshot,
+        workspaces: [{ workspace_id: 'workspace_dashpro', connection_kind: 'project_path' }],
+        selectedWorkspaceId: null,
+        busyEmployeeCountByWorkspace: { workspace_dashpro: 2 },
+      }).find((cell) => cell.workspaceId === 'workspace_dashpro')?.summary,
+    ).toContain('2 agents busy');
   });
 
   it('always keeps the selected workspace on the grid even past the cap', () => {
@@ -133,5 +152,21 @@ describe('operator-fleet-health-view', () => {
     });
     expect(cells.some((cell) => cell.workspaceId === 'workspace_tps')).toBe(true);
     expect(cells.find((cell) => cell.workspaceId === 'workspace_tps')?.isSelected).toBe(true);
+  });
+
+  it('compacts multi-line signal dumps into one card detail line', () => {
+    expect(
+      compactFleetHealthDetail(
+        'Email needs follow-up\naxon-watch: PR run\nFailed: CI\n(+6 more)',
+        'workspace_axon_watch',
+      ),
+    ).toBe('Email needs follow-up');
+
+    expect(
+      compactFleetHealthDetail(
+        'A'.repeat(80),
+        'workspace_axon_watch',
+      ),
+    ).toMatch(/…$/);
   });
 });

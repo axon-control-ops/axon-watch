@@ -6,7 +6,7 @@ from urllib.parse import urlparse
 
 from starlette.requests import Request
 
-from app.auth.settings import is_remotely_reachable
+from app.auth.settings import client_is_loopback, is_remotely_reachable
 from app.config import _public_base_url
 
 
@@ -34,6 +34,12 @@ def request_origin(request: Request) -> str | None:
     return None
 
 
+def _origin_host_is_loopback(origin: str | None) -> bool:
+    if not origin:
+        return False
+    return client_is_loopback(urlparse(origin).hostname)
+
+
 def reject_cross_origin_mutation(request: Request) -> str | None:
     """
     When the surface is remotely reachable, reject mutating calls whose Origin
@@ -42,6 +48,11 @@ def reject_cross_origin_mutation(request: Request) -> str | None:
     Returns an error detail string when the request should be blocked, else None.
     Requests with no Origin/Referer (CLI / server-to-server) are allowed — they
     still require the operator bearer token under local_token mode.
+
+    Loopback operator consoles (Vite :5173 / preview :4173) remain first-class
+    even when AXON_WATCH_PUBLIC_BASE_URL points at the public tunnel hostname.
+    Browsers set Origin to the page origin, so evil.com cannot forge a loopback
+    Origin; bearer auth still applies for remote clients.
     """
     if not is_remotely_reachable():
         return None
@@ -51,6 +62,8 @@ def reject_cross_origin_mutation(request: Request) -> str | None:
     presented = request_origin(request)
     if presented is None:
         return None
-    if presented != expected:
-        return f"cross-origin mutation blocked (origin {presented} != {expected})"
-    return None
+    if presented == expected:
+        return None
+    if _origin_host_is_loopback(presented):
+        return None
+    return f"cross-origin mutation blocked (origin {presented} != {expected})"

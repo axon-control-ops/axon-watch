@@ -24,6 +24,14 @@ interface CreateCompanyRosterSliceInput {
 export function createCompanyRosterSlice(input: CreateCompanyRosterSliceInput) {
   const companyEmployeesByWorkspaceId = ref<Record<string, CompanyEmployeeRecord[]>>({});
   let refreshTimer: ReturnType<typeof setInterval> | null = null;
+  let outcomeRefreshTimers: ReturnType<typeof setTimeout>[] = [];
+
+  function clearOutcomeRefreshTimers(): void {
+    for (const timer of outcomeRefreshTimers) {
+      clearTimeout(timer);
+    }
+    outcomeRefreshTimers = [];
+  }
 
   function stopRefreshTimer(): void {
     if (refreshTimer !== null) {
@@ -93,12 +101,15 @@ export function createCompanyRosterSlice(input: CreateCompanyRosterSliceInput) {
     }),
   );
 
-  const activeIdeEmployeeFailureLine = computed(() =>
-    resolveIdeThreadEmployeeFailure({
+  const activeIdeEmployeeFailureLine = computed(() => {
+    if (input.agentStreamActive?.value && activeIdeThread.value?.employee_id?.trim()) {
+      return null;
+    }
+    return resolveIdeThreadEmployeeFailure({
       thread: activeIdeThread.value,
       employees: companyEmployeesForCurrentWorkspace.value,
-    }),
-  );
+    });
+  });
 
   const activeIdeEmployeeShiftInterrupted = computed(() => {
     const row = activeIdeEmployeeRecord.value;
@@ -109,6 +120,7 @@ export function createCompanyRosterSlice(input: CreateCompanyRosterSliceInput) {
     () => input.currentWorkspace.value?.workspace_id ?? null,
     (workspaceId) => {
       stopRefreshTimer();
+      clearOutcomeRefreshTimers();
       if (workspaceId) {
         void loadCompanyEmployees(workspaceId);
         startRefreshTimer(workspaceId);
@@ -122,12 +134,25 @@ export function createCompanyRosterSlice(input: CreateCompanyRosterSliceInput) {
       const workspaceId = input.currentWorkspace.value?.workspace_id;
       if (!active && wasActive && workspaceId) {
         void loadCompanyEmployees(workspaceId);
+        clearOutcomeRefreshTimers();
+        // Message delivery can precede the persisted terminal run outcome.
+        // Re-fetch structured roster state instead of inferring success from text.
+        for (const delay of [1_000, 3_000]) {
+          outcomeRefreshTimers.push(
+            setTimeout(() => {
+              if (input.currentWorkspace.value?.workspace_id === workspaceId) {
+                void loadCompanyEmployees(workspaceId);
+              }
+            }, delay),
+          );
+        }
       }
     });
   }
 
   onScopeDispose(() => {
     stopRefreshTimer();
+    clearOutcomeRefreshTimers();
   });
 
   return {

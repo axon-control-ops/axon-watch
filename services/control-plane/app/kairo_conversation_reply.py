@@ -7,6 +7,7 @@ import re
 from typing import Any, Literal
 
 from app.kairo_smalltalk import self_intro_candidates
+from app.kairo_workspace_rename_intents import is_workspace_fleet_exempt_utterance
 from app.operator_briefing_signals import is_bootstrap_signal
 
 QuestionFocus = Literal[
@@ -22,20 +23,21 @@ QuestionFocus = Literal[
     "general",
     "followup",
 ]
-
 _OPEN_QUESTION_RE = re.compile(
     r"\b(why|how|explain|tell me (?:more|about)|what happened|what went wrong|"
     r"walk me through|can you elaborate)\b",
     re.IGNORECASE,
 )
-
 _APPROVAL_RE = re.compile(r"\b(approval|approvals|approve|awaiting)\b", re.IGNORECASE)
 _SIGNAL_RE = re.compile(r"\b(signal|signals|sentry|posthog|monitor|inbox|incident)\b", re.IGNORECASE)
 _RUN_RE = re.compile(r"\b(run|runs|running|executing|review|queue)\b", re.IGNORECASE)
 _FLEET_RE = re.compile(r"\b(fleet|workspace|workspaces|health|nominal)\b", re.IGNORECASE)
+# Bare "runtime" = CLI readiness; exclude canary/staging/production/prod/dev runtime.
 _RUNTIME_RE = re.compile(
-    r"\b(runtime|cli|cursor|codex|agent dispatch|lane b|vault|auth|login|api key)\b",
-    re.IGNORECASE,
+    r"\b(cli(?:\s+runtime)?|cursor(?:\s+cli)?|codex|agent\s+dispatch|lane\s+b|"
+    r"vault|auth|login|api\s+key|"
+    r"(?<!canary\s)(?<!staging\s)(?<!production\s)(?<!prod\s)(?<!dev\s)runtime)\b",
+    re.I,
 )
 _HEALTH_RE = re.compile(
     r"\b("
@@ -54,9 +56,8 @@ _FOLLOWUP_RE = re.compile(
 )
 _ACTIVITY_RE = re.compile(
     r"\b(just did|just do|doing|latest|recent|recently|last thing|last run|activity)\b",
-    re.IGNORECASE,
+    re.I,
 )
-
 def is_open_style_question(content: str) -> bool:
     return bool(_OPEN_QUESTION_RE.search(content.strip()))
 
@@ -80,12 +81,11 @@ def detect_question_focus(content: str, *, recent_user_turns: list[str]) -> Ques
         return "runtime"
     if _HEALTH_RE.search(lower):
         return "health"
-    if _FLEET_RE.search(lower):
+    if _FLEET_RE.search(lower) and not is_workspace_fleet_exempt_utterance(trimmed):
         return "fleet"
     if "degraded" in lower or "connectivity" in lower or "offline" in lower:
         return "degraded"
     return "general"
-
 
 def build_conversation_facts(pack: dict[str, Any]) -> dict[str, Any]:
     briefing = pack["briefing"]

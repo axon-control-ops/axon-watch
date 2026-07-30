@@ -27,14 +27,22 @@ def runtime_identity_snapshot(*, allow_stale: bool = False) -> StatusRecord:
         }
 
     family = str(selected.get("family") or "cursor")
-    provider_name = "Cursor CLI" if family == "cursor" else "Codex CLI"
-    model_name = (
-        os.environ.get("AXON_WATCH_CURSOR_MODEL", "cursor-default")
-        if family == "cursor"
-        else os.environ.get("AXON_WATCH_CODEX_MODEL", "gpt-5.5")
-    )
+    if family == "cursor":
+        provider_name = "Cursor CLI"
+        model_name = os.environ.get("AXON_WATCH_CURSOR_MODEL", "cursor-default")
+    elif family == "claude":
+        provider_name = "Claude Code CLI"
+        model_name = os.environ.get("AXON_WATCH_CLAUDE_MODEL", "sonnet")
+    else:
+        provider_name = "Codex CLI"
+        model_name = os.environ.get("AXON_WATCH_CODEX_MODEL", "gpt-5.5")
     if str(selected.get("target_type") or "") == "cloud":
-        provider_name = "Cursor Cloud Agent" if family == "cursor" else "Codex Cloud Task"
+        if family == "cursor":
+            provider_name = "Cursor Cloud Agent"
+        elif family == "claude":
+            provider_name = "Claude Cloud Agent"
+        else:
+            provider_name = "Codex Cloud Task"
 
     return {
         "provider_family": f"{family}_{selected.get('target_type')}",

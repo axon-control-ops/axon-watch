@@ -4,7 +4,11 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from app.vault.cli_runtime_probe import probe_codex_cli_subscription, probe_cursor_cli_subscription
+from app.vault.cli_runtime_probe import (
+    probe_claude_cli_subscription,
+    probe_codex_cli_subscription,
+    probe_cursor_cli_subscription,
+)
 from app.vault.credential_resolver import merge_monitor_env, vault_status
 from app.vault.import_contract import ALLOWED_IMPORT_KEYS
 
@@ -36,6 +40,16 @@ _VAULT_CONSUMERS: tuple[dict[str, object], ...] = (
         ),
     },
     {
+        "id": "claude_runtime",
+        "label": "Claude Code CLI runtime",
+        "optional_keys": ("ANTHROPIC_API_KEY",),
+        "subscription_probe": "claude",
+        "auth_note": (
+            "Pro/Max: sign in on the host with `claude auth login`. "
+            "Optional: ANTHROPIC_API_KEY in /vault for headless/API use."
+        ),
+    },
+    {
         "id": "codex_runtime",
         "label": "Codex CLI runtime",
         "any_of_keys": ("CODEX_API_KEY", "OPENAI_API_KEY"),
@@ -53,6 +67,16 @@ _VAULT_CONSUMERS: tuple[dict[str, object], ...] = (
         "required_keys": ("AZURE_SPEECH_KEY",),
         "optional_keys": ("AZURE_SPEECH_REGION", "azure_speech_key", "azure_speech_region"),
         "auth_note": "Store AZURE_SPEECH_KEY (or azure_speech_key) and optional region in /vault.",
+    },
+    {
+        "id": "github_api_health",
+        "label": "GitHub API health probes",
+        "any_of_keys": ("GITHUB_TOKEN", "GH_TOKEN", "AXON_GITHUB_TOKEN"),
+        "auth_note": (
+            "Store GITHUB_TOKEN (or GH_TOKEN / AXON_GITHUB_TOKEN) in /vault so monitor and "
+            "connector probes use authenticated GitHub quota. Without a token, frequent "
+            "checks can hit the public rate limit and raise a false warning."
+        ),
     },
     {
         "id": "vaxon_research",
@@ -92,6 +116,8 @@ def _subscription_probe(probe_name: str) -> dict[str, object]:
         return probe_cursor_cli_subscription()
     if probe_name == "codex":
         return probe_codex_cli_subscription()
+    if probe_name == "claude":
+        return probe_claude_cli_subscription()
     return {"installed": False, "logged_in": False, "account_label": "", "message": ""}
 
 
@@ -135,6 +161,11 @@ def _consumer_record(env: dict[str, str], spec: dict[str, object]) -> dict[str, 
             missing_required = ["subscription_or_api_key"]
         elif any_of and not satisfied_any:
             missing_required.append(f"one_of:{'|'.join(any_of)}")
+    elif not key_ready and any_of and not satisfied_any:
+        # e.g. GitHub API health probes: any one of GH_TOKEN / GITHUB_TOKEN / …
+        marker = f"one_of:{'|'.join(any_of)}"
+        if marker not in missing_required:
+            missing_required.append(marker)
 
     return {
         "id": str(spec.get("id") or ""),
@@ -152,8 +183,22 @@ def _consumer_record(env: dict[str, str], spec: dict[str, object]) -> dict[str, 
 
 
 def vault_operator_snapshot(*, project_root: Path | None = None) -> dict[str, object]:
+    """Operator vault snapshot. CLI subscription probes are cached/short-timeout."""
+    from concurrent.futures import ThreadPoolExecutor
+
     env = merge_monitor_env(project_root=project_root)
     base = vault_status(project_root=project_root)
+
+    # Warm cursor/codex probes in parallel so /vault/status stays under the UI budget.
+    probe_names = [
+        str(spec.get("subscription_probe") or "").strip()
+        for spec in _VAULT_CONSUMERS
+        if str(spec.get("subscription_probe") or "").strip()
+    ]
+    if probe_names:
+        with ThreadPoolExecutor(max_workers=min(4, len(probe_names))) as pool:
+            list(pool.map(_subscription_probe, probe_names))
+
     consumers = [_consumer_record(env, spec) for spec in _VAULT_CONSUMERS]
     return {
         **base,

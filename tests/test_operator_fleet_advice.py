@@ -171,6 +171,40 @@ class OperatorFleetAdviceTests(unittest.TestCase):
         line = build_fleet_coach_line(pack["winner"], scope_mode="fleet")
         self.assertEqual("Review the ready run in Finance.", line)
 
+    def test_github_api_warning_advise_points_at_vault(self) -> None:
+        line = build_fleet_coach_line(
+            {
+                "kind": "critical_signal",
+                "workspace_id": "workspace_dashpro",
+                "title": "DashPro GitHub API warning",
+                "summary": "HTTP 401 — invalid or placeholder probe token",
+            },
+            focused_workspace_id="workspace_alpha",
+            scope_mode="workspace",
+            display_names={"workspace_dashpro": "DashPro"},
+        )
+        self.assertIn("Vault", line)
+        self.assertIn("GH_TOKEN", line)
+        self.assertNotIn("needs review; switch there", line)
+
+    def test_generic_github_warning_does_not_invent_token_failure(self) -> None:
+        line = build_fleet_coach_line(
+            {
+                "kind": "critical_signal",
+                "workspace_id": "workspace_dashpro",
+                "title": "DashPro GitHub API warning",
+                "summary": "API rate limit is low",
+            },
+            focused_workspace_id="workspace_alpha",
+            scope_mode="workspace",
+            display_names={"workspace_dashpro": "DashPro"},
+        )
+        self.assertNotIn("GH_TOKEN", line)
+        self.assertEqual(
+            "Critical signal in DashPro needs review; switch there before continuing.",
+            line,
+        )
+
     def test_same_rank_prefers_focused_workspace(self) -> None:
         winner = select_fleet_advice_winner(
             [
@@ -193,6 +227,89 @@ class OperatorFleetAdviceTests(unittest.TestCase):
     def test_workspace_label_falls_back_to_readable_id(self) -> None:
         self.assertEqual("DashPro", workspace_advice_label("workspace_x", {"workspace_x": "DashPro"}))
         self.assertEqual("Alpha", workspace_advice_label("workspace_alpha"))
+
+    def test_open_handoff_ranks_above_degraded_runtime(self) -> None:
+        pack = build_fleet_advice_pack(
+            active_run_records=[],
+            pending_approval_records=[],
+            fleet_signals=[],
+            degraded={"active": True, "reasons": ["watch probe failed"]},
+            watch_connected=False,
+            display_names={"workspace_dashpro": "DashPro"},
+            focused_workspace_id="workspace_alpha",
+            scope_mode="workspace",
+            open_handoffs=[
+                {
+                    "handoff_id": "handoff-1",
+                    "source_workspace_id": "workspace_alpha",
+                    "target_workspace_id": "workspace_dashpro",
+                    "task": "Finish DashPro follow-up",
+                    "status": "routed",
+                    "target_task_id": "task-1",
+                }
+            ],
+        )
+        winner = pack["winner"]
+        assert winner is not None
+        self.assertEqual("open_handoff", winner["kind"])
+        advise = resolve_fleet_briefing_advise(
+            pack=pack,
+            display_names={
+                "workspace_dashpro": "DashPro",
+                "workspace_alpha": "axon-watch",
+            },
+        )
+        self.assertEqual(
+            "Handoff to DashPro is open — switch there and finish “Finish DashPro follow-up”."
+            " Pause more axon-watch work until that closes.",
+            advise,
+        )
+        from app.operator_fleet_advice import build_advise_ui_action
+
+        action = build_advise_ui_action(
+            winner,
+            focused_workspace_id="workspace_alpha",
+        )
+        self.assertEqual("switch_workspace", action["type"])
+        self.assertEqual("workspace_dashpro", action["workspace_id"])
+        self.assertTrue(action["focus_attention"])
+
+    def test_open_handoff_advice_keeps_the_complete_task(self) -> None:
+        task = (
+            "DashPro PostHog warning, PostHog API query failed, "
+            "The read operation timed out while loading project insights"
+        )
+        pack = build_fleet_advice_pack(
+            active_run_records=[],
+            pending_approval_records=[],
+            fleet_signals=[],
+            degraded={"active": False, "reasons": []},
+            watch_connected=True,
+            display_names={"workspace_dashpro": "DashPro"},
+            focused_workspace_id="workspace_axon_watch",
+            scope_mode="workspace",
+            open_handoffs=[
+                {
+                    "handoff_id": "handoff-long-task",
+                    "source_workspace_id": "workspace_axon_watch",
+                    "target_workspace_id": "workspace_dashpro",
+                    "task": task,
+                    "status": "routed",
+                    "target_task_id": "task-long",
+                }
+            ],
+        )
+
+        advise = resolve_fleet_briefing_advise(
+            pack=pack,
+            display_names={
+                "workspace_dashpro": "DashPro",
+                "workspace_axon_watch": "Axon Watch",
+            },
+        )
+
+        self.assertIn(f"finish “{task}”", advise)
+        self.assertNotIn("…", advise)
 
 
 if __name__ == "__main__":

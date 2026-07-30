@@ -10,7 +10,6 @@ from typing import Any
 
 from app.domain.run_state import is_terminal_phase
 from app.persistence import task_store, worker_scheduler_settings_store
-from app.runs.begin_execution import begin_execution
 from app.runs.service import (
     RunLifecycleError,
     create_run,
@@ -22,8 +21,11 @@ from app.runs.service import (
 )
 from app.runs.stale_reconcile import BUSY_EMPLOYEE_PHASES
 from app.workspace_agents.config_loader import EmployeeConfig, load_workspace_agent_configs
-from app.workspace_agents.failure_detail import is_runtime_auth_failure, is_usage_limit_failure
-from app.workspace_agents.run_outcome import latest_role_run_outcome
+from app.workspace_agents.scheduler_auto_start_gates import (
+    runtime_auth_blocks_auto_start,
+    usage_limit_blocks_auto_start,
+)
+from app.workspace_agents.scheduler_queued_fan_out import dispatch_queued_lead_fan_out_runs
 from app.workspace_agents.worker_dispatch import dispatch_continuous_worker_run, worker_dispatch_enabled
 
 logger = logging.getLogger(__name__)
@@ -108,24 +110,6 @@ def max_active_executing() -> int:
     )
 
 
-def _usage_limit_blocks_auto_start(workspace_id: str, role: str) -> bool:
-    """Skip auto-schedule when the last shift failed on Cursor usage limits."""
-    outcome = latest_role_run_outcome(workspace_id, role)
-    if not outcome or str(outcome.get("outcome") or "").strip().lower() != "failed":
-        return False
-    detail = str(outcome.get("detail") or "")
-    return is_usage_limit_failure(detail)
-
-
-def _runtime_auth_blocks_auto_start(workspace_id: str, role: str) -> bool:
-    """Skip auto-schedule when the last shift failed on missing CLI/vault auth."""
-    outcome = latest_role_run_outcome(workspace_id, role)
-    if not outcome or str(outcome.get("outcome") or "").strip().lower() != "failed":
-        return False
-    detail = str(outcome.get("detail") or "")
-    return is_runtime_auth_failure(detail)
-
-
 def _active_role_run_exists(workspace_id: str, role: str) -> bool:
     """True when a role already has in-flight work (not paused/review leftovers)."""
     cleaned_role = role.strip().lower()
@@ -207,60 +191,55 @@ def _dispatch_queued_lead_fan_out_runs(
     companies: dict[str, Any],
     starts_bound: int,
     active_bound: int,
+    target_run_id: str | None = None,
 ) -> list[dict[str, Any]]:
     """Promote Lead fan-out queued runs into Lane B without creating duplicate runs."""
-    if not worker_dispatch_enabled() or starts_bound <= 0:
+    return dispatch_queued_lead_fan_out_runs(
+        companies=companies,
+        starts_bound=starts_bound,
+        active_bound=active_bound,
+        executing_run_count=_executing_run_count,
+        employee_for_role=_employee_for_role,
+        dispatch_worker_run=_dispatch_worker_run,
+        target_run_id=target_run_id,
+    )
+
+
+def kick_lead_fan_out_dispatch(
+    *,
+    starts_bound: int = 3,
+    target_run_id: str | None = None,
+) -> list[dict[str, Any]]:
+    """Start queued Lead fan-out runs even when continuous workers are paused.
+
+    Operator Send / Lead decompose is an explicit handoff. Do not require
+    autonomy Full (scheduler_enabled) — only capacity + worker_dispatch_enabled.
+    """
+    if not worker_dispatch_enabled():
         return []
-    started: list[dict[str, Any]] = []
-    queued = [
-        run
-        for run in list_runs()
-        if str(run.get("phase") or "").strip() == "queued"
-        and str(run.get("employee_role") or "").strip()
-        and str(run.get("task_id") or "").strip()
-        and not is_terminal_phase(str(run.get("phase") or "").strip())
-    ]
-    queued.sort(key=lambda run: str(run.get("started_at") or run.get("updated_at") or ""))
-    for run in queued:
-        if len(started) >= starts_bound:
-            break
-        if _executing_run_count() + len(started) >= active_bound:
-            break
-        workspace_id = str(run.get("workspace_id") or "").strip()
-        role = str(run.get("employee_role") or "").strip().lower()
-        employee = _employee_for_role(companies, workspace_id, role)
-        if employee is None:
-            continue
-        if not worker_scheduler_settings_store.is_employee_enabled(
-            workspace_id,
-            role,
-            file_enabled=bool(employee.enabled),
-        ):
-            continue
-        try:
-            advanced = begin_execution(
-                str(run["run_id"]),
-                actor="workspace_scheduler",
-                receipt_summary="Queued fan-out run entered execution for dispatch",
-            )
-        except RunLifecycleError:
-            logger.exception("could not advance queued fan-out run %s", run.get("run_id"))
-            continue
-        started.append(advanced)
-        threading.Thread(
-            target=_dispatch_worker_run,
-            kwargs={
-                "workspace_id": workspace_id,
-                "employee": employee,
-                "run_record": advanced,
-            },
-            daemon=True,
-            name=f"worker-dispatch-queued-{advanced.get('run_id')}",
-        ).start()
-    return started
+    _configs, _defaults, companies, _staffing = load_workspace_agent_configs()
+    active_bound = max_active_executing()
+    executing = _executing_run_count()
+    free_slots = max(0, active_bound - executing)
+    if free_slots <= 0:
+        return []
+    try:
+        bound = max(1, int(starts_bound))
+    except (TypeError, ValueError):
+        bound = 1
+    bound = min(bound, free_slots)
+    return _dispatch_queued_lead_fan_out_runs(
+        companies=companies,
+        starts_bound=bound,
+        active_bound=active_bound,
+        target_run_id=target_run_id,
+    )
 
 
-def run_continuous_worker_tick() -> list[dict[str, Any]]:
+def run_continuous_worker_tick(
+    *,
+    starts_bound_override: int | None = None,
+) -> list[dict[str, Any]]:
     """Reconcile hung shifts, then start bounded role-tagged runs when enabled."""
     reaped = reap_stale_employee_runs()
     if reaped:
@@ -286,6 +265,7 @@ def run_continuous_worker_tick() -> list[dict[str, Any]]:
     except Exception:  # noqa: BLE001 — never block scheduler on delivery poll
         logger.exception("workspace delivery poll failed")
 
+    work_source_result: dict[str, Any] = {}
     try:
         from app.workspace_agents.company_work_sources import run_scheduled_work_sources
 
@@ -311,14 +291,24 @@ def run_continuous_worker_tick() -> list[dict[str, Any]]:
 
     _configs, _defaults, companies, _staffing = load_workspace_agent_configs()
     active_bound = max_active_executing()
-    if _executing_run_count() >= active_bound:
+    executing = _executing_run_count()
+    if executing >= active_bound:
         logger.info(
             "continuous worker tick skipped: executing debt bound reached (%s)",
             active_bound,
         )
         return []
 
-    starts_bound = max_starts_per_tick()
+    free_slots = max(0, active_bound - executing)
+    default_starts = max_starts_per_tick()
+    if starts_bound_override is not None:
+        try:
+            starts_bound = max(1, int(starts_bound_override))
+        except (TypeError, ValueError):
+            starts_bound = default_starts
+    else:
+        starts_bound = default_starts
+    starts_bound = min(starts_bound, free_slots)
     started: list[dict[str, Any]] = _dispatch_queued_lead_fan_out_runs(
         companies=companies,
         starts_bound=starts_bound,
@@ -346,14 +336,15 @@ def run_continuous_worker_tick() -> list[dict[str, Any]]:
                 continue
             if _active_role_run_exists(workspace_id, role):
                 continue
-            if _usage_limit_blocks_auto_start(workspace_id, role):
+            if usage_limit_blocks_auto_start(workspace_id, role):
                 logger.info(
-                    "continuous worker tick skipped role=%s workspace=%s: usage limits blocked last shift",
+                    "continuous worker tick skipped role=%s workspace=%s: "
+                    "Cursor usage limits blocked this role's last shift",
                     role,
                     workspace_id,
                 )
                 continue
-            if _runtime_auth_blocks_auto_start(workspace_id, role):
+            if runtime_auth_blocks_auto_start(workspace_id, role):
                 logger.info(
                     "continuous worker tick skipped role=%s workspace=%s: runtime auth blocked last shift",
                     role,
@@ -374,6 +365,33 @@ def run_continuous_worker_tick() -> list[dict[str, Any]]:
                     role,
                     workspace_id,
                 )
+                continue
+            from app.workspace_agents.autonomous_attention_policy import (
+                task_allows_autonomous_lease,
+            )
+
+            lease_decision = task_allows_autonomous_lease(claimed)
+            if lease_decision.tier != "auto_safe" or lease_decision.decision != "dispatch":
+                task_id = str(claimed.get("task_id") or "").strip()
+                logger.warning(
+                    "continuous worker tick refused gated task=%s role=%s reason=%s",
+                    task_id,
+                    role,
+                    lease_decision.reason,
+                )
+                if task_id:
+                    try:
+                        task_store.cancel_task(
+                            task_id,
+                            terminal_outcome=(
+                                f"autonomous lease refused: {lease_decision.reason}"
+                            ),
+                        )
+                    except task_store.TaskLedgerError:
+                        logger.exception(
+                            "could not cancel gated task after lease refuse: %s",
+                            task_id,
+                        )
                 continue
             task_id = str(claimed.get("task_id") or "").strip()
             goal = str(claimed.get("goal") or "").strip() or "leased task"

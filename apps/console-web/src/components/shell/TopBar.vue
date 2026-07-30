@@ -4,9 +4,11 @@ import { computed } from 'vue';
 import IdeInterruptPanel from '../ide/IdeInterruptPanel.vue';
 import KairoPresenceBar from './KairoPresenceBar.vue';
 import VoiceUnlockBanner from './VoiceUnlockBanner.vue';
+import WorkspacePickerMenu from './WorkspacePickerMenu.vue';
 import AxonProductLogo from '../../components/AxonProductLogo.vue';
 import { navigateToAppSurface, type AppSurface } from '../../lib/app-surface-route';
 import { useAppSurface } from '../../composables/useAppSurface';
+import { openOperatorStandup } from '../../features/kairo-conversation/open-operator-standup';
 import { useShellStore } from '../../stores/shell';
 
 const shell = useShellStore();
@@ -32,7 +34,7 @@ const topbarSubtitle = computed(() => {
   return shell.layoutMode === 'ide' ? 'IDE WORKSPACE' : 'OPERATOR CONSOLE';
 });
 const showTopbarKairoPresence = computed(
-  () => activeSurface.value === 'console',
+  () => activeSurface.value === 'console' && shell.layoutMode !== 'operator',
 );
 const showIdeInterruptTopbar = computed(
   () =>
@@ -47,6 +49,10 @@ function openSurface(surface: AppSurface): void {
 
 function openSettings(): void {
   navigateToAppSurface('settings');
+}
+
+async function openStandup(): Promise<void> {
+  await openOperatorStandup(shell);
 }
 </script>
 
@@ -94,6 +100,11 @@ function openSettings(): void {
       </div>
 
       <div class="topbar-mockup__controls">
+        <WorkspacePickerMenu
+          v-if="activeSurface === 'console'"
+          compact
+          class="topbar-mockup__workspace"
+        />
         <div
           class="layout-toggle layout-toggle--mockup topbar-mockup__surface-nav"
           role="group"
@@ -157,6 +168,15 @@ function openSettings(): void {
             IDE
           </button>
         </div>
+        <button
+          type="button"
+          class="layout-toggle__button topbar-mockup__standup"
+          aria-label="Open VAXON stand-up report"
+          title="Stand-up (REPORT)"
+          @click="openStandup"
+        >
+          STAND-UP
+        </button>
         <div class="topbar-mockup__settings-wrap">
           <button
             type="button"
@@ -181,9 +201,22 @@ function openSettings(): void {
   overflow: hidden;
 }
 
+.topbar-mockup__workspace {
+  margin-right: 0.45rem;
+  max-width: 12.5rem;
+  position: relative;
+  z-index: 70;
+}
+
 .topbar-mockup__settings-wrap {
   position: relative;
   z-index: 12;
+}
+
+.topbar-mockup__standup {
+  margin-right: 0.35rem;
+  letter-spacing: 0.06em;
+  font-size: 0.68rem;
 }
 
 .topbar-mockup__settings--active {

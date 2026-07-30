@@ -41,6 +41,11 @@ CURSOR_CLI_MODEL_OPTIONS: list[ModelRecord] = [
         "description": "Cursor Composer model (subscription routing).",
     },
     {
+        "id": "cursor-grok-4.5-high-fast",
+        "label": "Cursor Grok 4.5 Fast",
+        "description": "Grok 4.5 Fast via Cursor subscription routing (VAXON default).",
+    },
+    {
         "id": "claude-fable-5-thinking-high",
         "label": "claude-fable-5-thinking-high",
         "description": "Claude Fable 5 (high thinking) via Cursor subscription routing.",
@@ -133,7 +138,7 @@ def cursor_runtime_snapshot(*, force_refresh: bool = False) -> StatusPayload:
     vault_env_only = {
         key: value
         for key, value in merged_env.items()
-        if key in {"CURSOR_API_KEY", "CODEX_API_KEY", "OPENAI_API_KEY"}
+            if key in {"CURSOR_API_KEY", "CODEX_API_KEY", "OPENAI_API_KEY", "ANTHROPIC_API_KEY"}
         and value
         and not str(os.environ.get(key, "")).strip()
     }

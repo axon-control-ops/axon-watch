@@ -7,6 +7,10 @@ import type {
   TeammateRouteDecision,
   TeammateRouteEmployee,
 } from './composer-teammate-route';
+import {
+  matchNamedAssignEmployee,
+  rewriteNamedAssignPrompt,
+} from './named-assign-route';
 import { resolveEmployeeSpecialtyRoute } from './resolve-employee-specialty-route';
 import { clearTeammateRouteNotice } from './teammate-route-notice';
 
@@ -52,7 +56,17 @@ export async function routeEmployeeSpecialtyTask(input: {
       });
 
   const applied = await applyEmployeeSpecialtyRoute(input.shell, decision);
-  input.restorePrompt(input.prompt);
+  const namedAssign = matchNamedAssignEmployee(input.prompt, input.roster);
+  const shouldRewrite =
+    Boolean(namedAssign) &&
+    (applied.routed ||
+      (decision.reason === 'already_owning' &&
+        decision.employee?.employee_id === namedAssign?.employee.employee_id));
+  const promptForSubmit =
+    shouldRewrite && namedAssign
+      ? rewriteNamedAssignPrompt(input.prompt, namedAssign.employee.name)
+      : input.prompt;
+  input.restorePrompt(promptForSubmit);
   if (input.submit) {
     await input.submit();
   }

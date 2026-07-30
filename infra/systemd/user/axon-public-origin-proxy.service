@@ -1,0 +1,23 @@
+[Unit]
+Description=Axon-X public origin proxy :7734 -> :4173
+After=network.target console-web.service
+Wants=network-online.target console-web.service
+
+[Service]
+Type=simple
+EnvironmentFile=%h/.config/axon-watch/deployment.env
+Environment=AXON_X_ORIGIN=http://127.0.0.1:4173
+Environment=AXON_PUBLIC_ORIGIN_PORT=7734
+WorkingDirectory=%h
+ExecStart=/usr/bin/python3 %h/axon-nvme/repos/axon-watch/scripts/ops/public-origin-proxy.py
+Restart=always
+RestartSec=2
+TimeoutStopSec=5
+KillMode=mixed
+MemoryAccounting=yes
+MemoryHigh=128M
+MemoryMax=256M
+OOMPolicy=stop
+
+[Install]
+WantedBy=default.target

@@ -16,6 +16,29 @@ const DASHBOARD_THOUGHT =
   'I found the one concrete breakage left behind: the new teacher dashboard tests aren’t mocking useWindowDimensions, so they fail immediately, while the parent realtime tests already pass. I’m patching the test environment now so the new dashboard work can actually run.';
 
 describe('sanitizeAgentThinkingForOperator', () => {
+  it('rewrites teammate third-person self-narration into first person', () => {
+    expect(
+      sanitizeAgentThinkingForOperator(
+        'Lindi is planning activities and assignments for grades 1–4.',
+        { speakerName: 'Lindi' },
+      ),
+    ).toBe('I am planning activities and assignments for grades 1–4.');
+  });
+
+  it('strips persona-assumption meta and rewrites gendered shift possessives', () => {
+    expect(
+      sanitizeAgentThinkingForOperator(
+        'Assuming the Lindi persona for the EDP Excellence workspace. Reviewing her last shift receipts and planning docs.',
+        { speakerName: 'Lindi' },
+      ),
+    ).toBe('Reviewing my last shift receipts and planning docs.');
+    expect(
+      sanitizeAgentThinkingForOperator('Assuming the Lindi persona for the workspace.', {
+        speakerName: 'Lindi',
+      }),
+    ).toBe('');
+  });
+
   it('strips third-person user-asking meta commentary', () => {
     expect(sanitizeAgentThinkingForOperator('The user is asking whether')).toBe('');
     expect(sanitizeAgentThinkingForOperator('*The user is asking whether*')).toBe('');
@@ -26,14 +49,19 @@ describe('sanitizeAgentThinkingForOperator', () => {
     ).toBe('Checking the image preview path.');
   });
 
-  it('rewrites bare Thinking… lead-ins to I am thinking…', () => {
-    expect(sanitizeAgentThinkingForOperator('Thinking…')).toBe('I am thinking…');
-    expect(sanitizeAgentThinkingForOperator('Thinking...')).toBe('I am thinking…');
+  it('rewrites Thinking… lead-ins into concrete progress copy', () => {
+    expect(sanitizeAgentThinkingForOperator('Thinking…')).toBe('');
+    expect(sanitizeAgentThinkingForOperator('Thinking...')).toBe('');
     expect(sanitizeAgentThinkingForOperator("thinking I'll check Sentry next.")).toBe(
-      "I am thinking I'll check Sentry next.",
+      'Checking Sentry next.',
     );
+    expect(
+      sanitizeAgentThinkingForOperator(
+        "thinking I'll read the parent confirmation screen next.",
+      ),
+    ).toBe('Reading the parent confirmation screen next.');
     expect(sanitizeAgentThinkingForOperator('I am thinking about the next step.')).toBe(
-      'I am thinking about the next step.',
+      'Working on the next step.',
     );
   });
 

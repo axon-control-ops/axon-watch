@@ -9,7 +9,8 @@
     "operator_approval_required",
     "high_urgency_signal",
     "approval",
-    "execute"
+    "execute",
+    "runtime_degraded"
   ],
   "blocked_reasons": [
     "privacy_mode_active",

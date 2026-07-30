@@ -7,6 +7,7 @@ import subprocess
 from typing import Any
 
 from app.cli_runtime.catalog import (
+    find_claude_cli,
     find_codex_cli,
     find_cursor_cli,
     invalidate_runtime_snapshot_cache,
@@ -248,6 +249,108 @@ def start_codex_runtime_login() -> StatusRecord:
     return _action_result(
         status="browser_opened",
         message="Codex login started — complete the browser flow on this host, then refresh status.",
+        command_preview=" ".join(command),
+        force_refresh=False,
+    )
+
+
+def logout_claude_runtime() -> StatusRecord:
+    binary = find_claude_cli(os.environ.get("AXON_WATCH_CLAUDE_CLI_PATH", "").strip())
+    target = _runtime_target("claude", force_refresh=False)
+    auth = dict((target or {}).get("auth") or {})
+    if not binary:
+        return _action_result(
+            status="manual_required",
+            message="Claude Code CLI is not installed on this host.",
+        )
+    if auth.get("auth_method") in {"api_key", "vault_api_key"}:
+        return _action_result(
+            status="manual_required",
+            message="Claude is authenticated via API key. Remove ANTHROPIC_API_KEY from /vault or the shell env to sign out.",
+            command_preview=f"{binary} auth status",
+        )
+    if not auth.get("logged_in"):
+        return _action_result(
+            status="completed",
+            message="Claude Code CLI is already signed out.",
+            command_preview=f"{binary} auth status",
+        )
+    try:
+        proc = subprocess.run(
+            [binary, "auth", "logout"],
+            capture_output=True,
+            text=True,
+            timeout=12,
+            env={**os.environ, "NO_COLOR": "1"},
+        )
+    except subprocess.TimeoutExpired:
+        return _action_result(
+            status="error",
+            message="Claude sign-out timed out. Run `claude auth logout` on the host.",
+            command_preview=f"{binary} auth logout",
+        )
+    output = (proc.stdout or proc.stderr or "").strip()
+    if proc.returncode != 0:
+        return _action_result(
+            status="error",
+            message=output or "Claude sign-out failed.",
+            command_preview=f"{binary} auth logout",
+            output=output,
+        )
+    invalidate_runtime_snapshot_cache()
+    refreshed = _runtime_target("claude")
+    if bool(dict((refreshed or {}).get("auth") or {}).get("logged_in")):
+        return _action_result(
+            status="error",
+            message="Claude sign-out did not clear authentication.",
+            command_preview=f"{binary} auth status",
+            output=output,
+        )
+    return _action_result(
+        status="completed",
+        message="Claude Code CLI signed out.",
+        command_preview=f"{binary} auth status",
+        output=output,
+    )
+
+
+def start_claude_runtime_login() -> StatusRecord:
+    binary = find_claude_cli(os.environ.get("AXON_WATCH_CLAUDE_CLI_PATH", "").strip())
+    target = _runtime_target("claude", force_refresh=False)
+    auth = dict((target or {}).get("auth") or {})
+    if not binary:
+        return _action_result(
+            status="manual_required",
+            message="Install Claude Code CLI before signing in.",
+            force_refresh=False,
+        )
+    if auth.get("logged_in") and auth.get("auth_method") in {"oauth", "claude.ai"}:
+        account = str(auth.get("account_label") or "").strip()
+        return _action_result(
+            status="completed",
+            message=f"Claude Code CLI is already signed in{(': ' + account) if account else ''}.",
+            command_preview=f"{binary} auth status",
+            force_refresh=False,
+        )
+    command = [binary, "auth", "login"]
+    try:
+        subprocess.Popen(
+            command,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            start_new_session=True,
+            env={**os.environ, "NO_COLOR": "1"},
+        )
+    except OSError as exc:
+        return _action_result(
+            status="manual_required",
+            message=f"Could not start Claude login on this host: {exc}. Run `{' '.join(command)}` in a terminal.",
+            command_preview=" ".join(command),
+            force_refresh=False,
+        )
+    return _action_result(
+        status="browser_opened",
+        message="Claude login started — complete the browser flow on this host, then refresh status.",
         command_preview=" ".join(command),
         force_refresh=False,
     )

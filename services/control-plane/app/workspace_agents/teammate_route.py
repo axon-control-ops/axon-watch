@@ -168,6 +168,34 @@ def should_soft_route_to_teammate(
     if is_build_plan_implement_prompt(text):
         return TeammateRouteDecision(should_route=False, reason="build_plan_implement")
 
+    from app.workspace_agents.named_assign_route import match_named_assign_employee
+
+    named = match_named_assign_employee(text, employees)
+    if named is not None:
+        current_id = current_employee.employee_id.strip() if current_employee else ""
+        if current_id and named.employee_id.strip() == current_id:
+            return TeammateRouteDecision(
+                should_route=False,
+                reason="already_owning",
+                employee=named,
+                routing_receipt="named_assign;already_owning",
+            )
+        from_name = (
+            (current_employee.name.strip() if current_employee else "")
+            or ("teammate" if current_id else "workspace")
+        )
+        return TeammateRouteDecision(
+            should_route=True,
+            reason=f"named_assign_{normalize_teammate_role(named.role)}",
+            employee=named,
+            from_employee_id=current_id or None,
+            from_name=from_name,
+            routing_receipt=(
+                f"named_assign;role={normalize_teammate_role(named.role)};"
+                f"to={named.employee_id}"
+            ),
+        )
+
     scored = score_roster(text, employees)
     if not scored:
         return TeammateRouteDecision(should_route=False, reason="no_match")
@@ -286,73 +314,16 @@ def build_model_tiebreak_prompt(
 
 def dispatch_model_tiebreak(**kwargs: Any) -> dict[str, Any]:
     """Use the same runtime/model pool as VAXON for ambiguous specialty routing."""
-    import time as _agent_time
 
     from app.cli_runtime.router import dispatch_ide_composer
     from app.kairo.voice_dispatch import select_vaxon_runtime
 
     runtime_id, _runtime_label, model, _attempts = select_vaxon_runtime()
-    _tie_start = _agent_time.time()
-    # #region agent log
-    try:
-        with open(
-            "/home/edp/axon-nvme/repos/axon-watch/.cursor/debug-fc0b35.log",
-            "a",
-            encoding="utf-8",
-        ) as _dbg:
-            _dbg.write(
-                __import__("json").dumps(
-                    {
-                        "sessionId": "fc0b35",
-                        "runId": "send-delay",
-                        "hypothesisId": "H8a",
-                        "location": "teammate_route.py:dispatch_model_tiebreak",
-                        "message": "model tiebreak composer dispatch starting",
-                        "data": {
-                            "runtime_id": runtime_id,
-                            "model": model,
-                        },
-                        "timestamp": int(_tie_start * 1000),
-                    }
-                )
-                + "\n"
-            )
-    except Exception:
-        pass
-    # #endregion
     result = dispatch_ide_composer(
         **kwargs,
         runtime_target=runtime_id,
         runtime_model=model,
     )
-    # #region agent log
-    try:
-        with open(
-            "/home/edp/axon-nvme/repos/axon-watch/.cursor/debug-fc0b35.log",
-            "a",
-            encoding="utf-8",
-        ) as _dbg:
-            _dbg.write(
-                __import__("json").dumps(
-                    {
-                        "sessionId": "fc0b35",
-                        "runId": "send-delay",
-                        "hypothesisId": "H8a",
-                        "location": "teammate_route.py:dispatch_model_tiebreak",
-                        "message": "model tiebreak composer dispatch finished",
-                        "data": {
-                            "elapsedMs": int((_agent_time.time() - _tie_start) * 1000),
-                            "dispatched": bool(result.get("dispatched")),
-                            "runtime_model": result.get("runtime_model"),
-                        },
-                        "timestamp": int(_agent_time.time() * 1000),
-                    }
-                )
-                + "\n"
-            )
-    except Exception:
-        pass
-    # #endregion
     return result
 
 
@@ -473,6 +444,34 @@ def route_teammate_decision(
         current = next((row for row in roster if row.employee_id == cleaned_current), None)
 
     from app.workspace_agents.lead_task_plan import detect_fan_out_intent
+    from app.workspace_agents.named_assign_route import match_named_assign_employee
+
+    # Explicit "assign Cole / have Priya…" wins over fan-out and soft specialty scoring.
+    named = match_named_assign_employee(prompt, roster)
+    if named is not None:
+        cleaned_current = current.employee_id.strip() if current else ""
+        if cleaned_current and named.employee_id.strip() == cleaned_current:
+            return TeammateRouteDecision(
+                should_route=False,
+                reason="already_owning",
+                employee=named,
+                from_employee_id=cleaned_current,
+                from_name=current.name if current else None,
+                source="deterministic",
+                routing_receipt="named_assign;already_owning",
+            )
+        return TeammateRouteDecision(
+            should_route=True,
+            reason=f"named_assign_{normalize_teammate_role(named.role)}",
+            employee=named,
+            from_employee_id=cleaned_current or None,
+            from_name=(current.name if current else None) or ("teammate" if cleaned_current else "workspace"),
+            source="deterministic",
+            routing_receipt=(
+                f"named_assign;role={normalize_teammate_role(named.role)};"
+                f"to={named.employee_id}"
+            ),
+        )
 
     # Fan-out is Lead planner territory — never collapse to a single specialty winner.
     if detect_fan_out_intent(prompt):

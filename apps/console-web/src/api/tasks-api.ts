@@ -15,6 +15,8 @@ export type WorkspaceTaskRecord = {
   risk: string;
   owner_role: string;
   dependencies: string[];
+  exclusive_paths?: string[];
+  allowed_paths?: string[];
   status: WorkspaceTaskStatus;
   lease_holder: string | null;
   lease_expires_at: string | null;
@@ -24,6 +26,9 @@ export type WorkspaceTaskRecord = {
   run_id: string | null;
   created_at: string;
   updated_at: string;
+  /** Populated client-side from Lead plan mappings when available. */
+  plan_id?: string | null;
+  plan_key?: string | null;
 };
 
 export type WorkspaceTasksSnapshot = {
@@ -37,6 +42,8 @@ export type CreateWorkspaceTaskInput = {
   risk?: string;
   owner_role?: string;
   dependencies?: string[];
+  exclusive_paths?: string[];
+  allowed_paths?: string[];
   attempt_budget?: number;
 };
 
@@ -93,5 +100,53 @@ export async function cancelWorkspaceTask(
       body: JSON.stringify({ terminal_outcome: terminalOutcome }),
     },
     'cancel workspace task failed',
+  );
+}
+
+export type OperatorStartTaskResult = {
+  task: WorkspaceTaskRecord;
+  run: { run_id?: string; phase?: string; [key: string]: unknown };
+  thread_id: string | null;
+};
+
+export async function operatorStartWorkspaceTask(
+  taskId: string,
+): Promise<OperatorStartTaskResult> {
+  const encoded = encodeURIComponent(taskId);
+  return fetchJson<OperatorStartTaskResult>(
+    `/api/tasks/${encoded}/operator-start`,
+    { method: 'POST' },
+    'operator start task failed',
+  );
+}
+
+export type CancelWorkspaceTasksBatchResult = {
+  workspace_id: string;
+  cancelled_count: number;
+  cancelled: WorkspaceTaskRecord[];
+  errors: Array<{ task_id: string; detail: string }>;
+};
+
+export async function cancelWorkspaceTasksBatch(
+  workspaceId: string,
+  input: {
+    taskIds?: string[];
+    scope?: 'waiting' | 'duplicates' | '';
+    terminalOutcome?: string;
+  } = {},
+): Promise<CancelWorkspaceTasksBatchResult> {
+  const encoded = encodeURIComponent(workspaceId);
+  return fetchJson<CancelWorkspaceTasksBatchResult>(
+    `/api/workspaces/${encoded}/tasks/cancel-batch`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        task_ids: input.taskIds ?? [],
+        scope: input.scope ?? '',
+        terminal_outcome: input.terminalOutcome ?? 'cancelled by operator',
+      }),
+    },
+    'cancel workspace tasks batch failed',
   );
 }

@@ -92,6 +92,40 @@ class VaultSnapshotTests(unittest.TestCase):
                 self.assertEqual(["SENTRY_AUTH_TOKEN"], result["imported_keys"])
                 self.assertEqual(1, result["count"])
 
+    def test_github_api_health_missing_lists_one_of_keys(self) -> None:
+        # Host vault import may already have GH_TOKEN; isolate merge_monitor_env.
+        bare = {key: "" for key in ("GITHUB_TOKEN", "GH_TOKEN", "AXON_GITHUB_TOKEN")}
+        with patch("app.vault.snapshot.merge_monitor_env", return_value=bare):
+            with patch("app.vault.snapshot.vault_status", return_value={
+                "import_file_present": False,
+                "imported_keys": [],
+                "available_keys": [],
+            }):
+                snapshot = vault_operator_snapshot()
+        github = next(item for item in snapshot["consumers"] if item["id"] == "github_api_health")
+        self.assertEqual("missing", github["status"])
+        self.assertTrue(
+            any(str(item).startswith("one_of:") for item in github["missing_keys"]),
+            github["missing_keys"],
+        )
+        self.assertIn("GH_TOKEN", github["auth_note"])
+
+    def test_github_api_health_ready_with_gh_token(self) -> None:
+        with patch(
+            "app.vault.snapshot.merge_monitor_env",
+            return_value={"GH_TOKEN": "ghp_test_only"},
+        ):
+            with patch("app.vault.snapshot.vault_status", return_value={
+                "import_file_present": True,
+                "imported_keys": ["GH_TOKEN"],
+                "available_keys": ["GH_TOKEN"],
+            }):
+                snapshot = vault_operator_snapshot()
+        github = next(item for item in snapshot["consumers"] if item["id"] == "github_api_health")
+        self.assertEqual("ready", github["status"])
+        self.assertIn("GH_TOKEN", github["satisfied_keys"])
+        self.assertNotIn("ghp_test_only", str(snapshot))
+
 
 if __name__ == "__main__":
     unittest.main()

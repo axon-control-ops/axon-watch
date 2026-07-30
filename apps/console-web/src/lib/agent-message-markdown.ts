@@ -20,6 +20,39 @@ marked.use({
   },
 });
 
+/**
+ * Agents often emit key/value credential tables with empty/malformed headers:
+ *   | |
+ *   |---|---|
+ *   | Username | alice |
+ * marked/GFM will not parse that as a <table>, so pipes show as raw prose.
+ * Promote empty headers to Field/Value (or Col N) using the divider width.
+ */
+export function normalizeEmptyHeaderMarkdownTables(markdown: string): string {
+  const lines = String(markdown || '').split('\n');
+  const out: string[] = [];
+  for (let i = 0; i < lines.length; i += 1) {
+    const header = lines[i] ?? '';
+    const divider = lines[i + 1] ?? '';
+    const dividerCells = divider.match(/\|/g);
+    const dividerOk = /^\|\s*:?-{3,}:?\s*(\|\s*:?-{3,}:?\s*)+\|?\s*$/.test(divider);
+    const headerLooksEmpty = /^\|\s*(\|\s*)+$/.test(header.trim());
+    if (headerLooksEmpty && dividerOk && dividerCells && dividerCells.length >= 3) {
+      const columnCount = dividerCells.length - 1;
+      const labels =
+        columnCount === 2
+          ? ['Field', 'Value']
+          : Array.from({ length: columnCount }, (_, index) => `Col ${index + 1}`);
+      out.push(`| ${labels.join(' | ')} |`);
+      out.push(divider);
+      i += 1;
+      continue;
+    }
+    out.push(header);
+  }
+  return out.join('\n');
+}
+
 const MARKDOWN_HINT_PATTERN =
   /(^|\n)\s{0,3}(#{1,6}\s|[-*+]\s|\d+\.\s|```|>\s|\|.+\|)|(\*\*|__|`[^`]+`|\[[^\]]+\]\([^)]+\))/;
 
@@ -116,7 +149,8 @@ export function renderAgentMessageMarkdown(
   options: { workspaceId?: string | null } = {},
 ): string {
   const parts = splitAgentMessageForPreview(content);
-  const linked = linkifyWorkspacePathsInMarkdown(parts.markdownSource);
+  const normalized = normalizeEmptyHeaderMarkdownTables(parts.markdownSource);
+  const linked = linkifyWorkspacePathsInMarkdown(normalized);
   const html = marked.parse(linked, { async: false }) as string;
   return rewriteMarkdownImageSources(html, options);
 }

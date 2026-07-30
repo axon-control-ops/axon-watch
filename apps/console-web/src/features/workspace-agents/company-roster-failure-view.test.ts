@@ -45,6 +45,19 @@ function employee(overrides: Partial<CompanyEmployeeRecord> = {}): CompanyEmploy
 }
 
 describe('company-roster-failure-view', () => {
+  it('hides stale failures while the teammate is live-busy in IDE', () => {
+    const failed = employee({
+      status: 'idle',
+      last_outcome: 'failed',
+      last_outcome_detail:
+        'Critical Review Clause missing: final reply must end with Confidence: N/10',
+    });
+    expect(employeeFailureLine(failed)).toContain('closing Confidence line was missing');
+    expect(employeeFailureLine(failed, { liveBusy: true })).toBeNull();
+    expect(companyFailedEmployees([failed], [failed.employee_id])).toEqual([]);
+    expect(companyHasFailedEmployees([failed], [failed.employee_id])).toBe(false);
+  });
+
   it('surfaces last shift failure detail instead of bare FAILED', () => {
     expect(
       employeeFailureLine(
@@ -64,7 +77,7 @@ describe('company-roster-failure-view', () => {
           last_outcome_detail: 'vitest: assertion failed',
         }),
       ),
-    ).toBe('Jules — Last shift failed: vitest: assertion failed');
+    ).toBe('Jules — Last job failed: vitest: assertion failed');
     expect(
       employeeFailureBannerAriaLabel(
         employee({
@@ -74,7 +87,7 @@ describe('company-roster-failure-view', () => {
           last_outcome_detail: 'vitest: assertion failed',
         }),
       ),
-    ).toContain('Jules — Last shift failed: vitest: assertion failed');
+    ).toContain('Jules — Last job failed: vitest: assertion failed');
     expect(
       employeeTalkLine(
         employee({
@@ -83,7 +96,7 @@ describe('company-roster-failure-view', () => {
           last_outcome_detail: 'vitest: assertion failed',
         }),
       ),
-    ).toContain('Last shift failed');
+    ).toContain('Last job failed');
     expect(
       employeeDisplayStatus(
         employee({
@@ -123,11 +136,11 @@ describe('company-roster-failure-view', () => {
         "Lane B agent fallback reply generated (ActionRequiredError: Increase limits for faster responses You're out of usage.)",
     });
     const friendlyLine =
-      'Last shift could not start — usage limits blocked the agent runtime. Restore limits, then use Retry shift.';
+      'Last job hit a Cursor usage signal — Auto+Composer may still have headroom or on-demand spend. Check Usage in Settings → CLI runtime, then Try again.';
     expect(employeeFailureLine(usageBlocked)).toBe(friendlyLine);
     expect(employeeFailureBannerCopy(usageBlocked)).toBe(`Jules — ${friendlyLine}`);
     expect(employeeFailureBannerAriaLabel(usageBlocked)).toContain('Full detail:');
-    expect(employeeFailureBannerAriaLabel(usageBlocked)).toContain('out of usage');
+    expect(employeeFailureBannerAriaLabel(usageBlocked)).toMatch(/usage signal|Auto\+Composer|on-demand/i);
     expect(
       employeeFailureLine(
         employee({
@@ -145,7 +158,7 @@ describe('company-roster-failure-view', () => {
           last_outcome_detail: 'ActionRequiredError: out of usage',
         }),
       ),
-    ).toContain('usage limits blocked the agent runtime');
+    ).toMatch(/usage/i);
   });
 
   it('maps restart-interrupted failures to operator-friendly copy', () => {
@@ -158,7 +171,7 @@ describe('company-roster-failure-view', () => {
     expect(employeeShiftNeedsContinuation(interrupted)).toBe(true);
     expect(employeeDisplayStatus(interrupted)).toBe('interrupted');
     expect(employeeFailureLine(interrupted)).toBe(
-      'Last shift interrupted by server restart — use Continue shift to pick up where you left off.',
+      'Last job was interrupted when the server restarted — tap Continue to pick up where they left off.',
     );
     expect(employeeSpeakLine(interrupted, 'talk', { talkMode: 'callback', entropy: '1' })).toMatch(
       /server restarted and cut the shift short/i,
@@ -176,7 +189,7 @@ describe('company-roster-failure-view', () => {
       last_run_id: 'run_oom137',
     });
     expect(employeeFailureLine(oom)).toBe(
-      'Last shift was stopped to free memory — use Continue shift when the machine has headroom.',
+      'Last job was stopped to free memory — tap Continue when the machine has headroom.',
     );
   });
 
@@ -191,12 +204,29 @@ describe('company-roster-failure-view', () => {
       last_run_id: 'run_43ca086d22d4',
     });
     const friendlyLine =
-      'Last shift could not run — runtime auth is not ready. Run `cursor agent login` on the host or unlock /vault, then use Retry shift.';
+      'Last job could not run — login is not ready. Run `cursor agent login` on the host or unlock /vault, then tap Try again.';
     expect(employeeFailureLine(authBlocked)).toBe(friendlyLine);
     expect(employeeFailureBannerCopy(authBlocked)).toBe(`Rowan — ${friendlyLine}`);
     expect(
       employeeSpeakLine(authBlocked, 'talk', { talkMode: 'callback', entropy: '1' }),
     ).toMatch(/runtime auth is not ready/i);
+  });
+
+  it('maps Cursor auth probe timeouts to runtime-auth friendly copy', () => {
+    const probeTimedOut = employee({
+      name: 'Priya',
+      role: 'frontend',
+      status: 'idle',
+      last_outcome: 'failed',
+      last_outcome_detail:
+        'Lane B agent fallback reply generated (Cursor auth probe timed out. Run `cursor agent status` manually.; Cursor Cloud Agent unavailable)',
+      last_run_id: 'run_auth_probe',
+    });
+    const friendlyLine =
+      'Last job could not run — Cursor CLI auth timed out. Check runtime on the host, then tap Try again.';
+    expect(employeeFailureLine(probeTimedOut)).toBe(friendlyLine);
+    expect(employeeFailureDetailTooltip(probeTimedOut)).toContain('auth timed out');
+    expect(employeeFailureDetailTooltip(probeTimedOut)).not.toContain('Lane B');
   });
 
   it('maps operator-stopped failures to operator-friendly copy', () => {
@@ -210,12 +240,12 @@ describe('company-roster-failure-view', () => {
       last_run_id: 'run_51016bedcba4',
     });
     const friendlyLine =
-      'Last shift was stopped early — use Continue shift to pick up where you left off.';
+      'Last job was stopped early — tap Continue to pick up where they left off.';
     expect(employeeShiftNeedsContinuation(stopped)).toBe(true);
     expect(employeeDisplayStatus(stopped)).toBe('interrupted');
     expect(employeeFailureLine(stopped)).toBe(friendlyLine);
     expect(employeeFailureBannerCopy(stopped)).toBe(`Quinn — ${friendlyLine}`);
-    expect(employeeFailureRetryActionLabel(stopped)).toBe('Continue shift');
+    expect(employeeFailureRetryActionLabel(stopped)).toBe('Continue');
   });
 
   it('maps agent runtime fallback failures to operator-friendly copy', () => {
@@ -231,10 +261,10 @@ describe('company-roster-failure-view', () => {
     expect(employeeShiftNeedsContinuation(failed)).toBe(true);
     expect(employeeDisplayStatus(failed)).toBe('interrupted');
     expect(employeeFailureLine(failed)).toBe(
-      'Last shift interrupted before it could finish — use Continue shift to pick up where you left off.',
+      'Last job was interrupted before it could finish — tap Continue to pick up where they left off.',
     );
     expect(employeeFailureBannerCopy(failed)).toBe(
-      'Jules — Last shift interrupted before it could finish — use Continue shift to pick up where you left off.',
+      'Jules — Last job was interrupted before it could finish — tap Continue to pick up where they left off.',
     );
     expect(employeeFailureDetailTooltip(failed)).toBe('Cursor CLI exited with status 143.');
     expect(employeeSpeakLine(failed, 'talk', { talkMode: 'callback', entropy: '1' })).toMatch(
@@ -256,9 +286,9 @@ describe('company-roster-failure-view', () => {
       last_outcome: 'failed',
       last_outcome_detail: 'vitest assertion failed',
     });
-    expect(employeeFailureRetryActionLabel(interrupted)).toBe('Continue shift');
-    expect(employeeFailureRetryActionLabel(failed)).toBe('Retry shift');
-    expect(employeeFailureRetryActionLabel(employee({ status: 'idle' }))).toBe('Retry shift');
+    expect(employeeFailureRetryActionLabel(interrupted)).toBe('Continue');
+    expect(employeeFailureRetryActionLabel(failed)).toBe('Try again');
+    expect(employeeFailureRetryActionLabel(employee({ status: 'idle' }))).toBe('Try again');
   });
 
   it('normalizes lane b fallback wrappers and dispatch prefixes', () => {
@@ -281,10 +311,10 @@ describe('company-roster-failure-view', () => {
     expect(employeeShiftNeedsContinuation(failed)).toBe(false);
     expect(employeeDisplayStatus(failed)).toBe('failed');
     expect(employeeFailureLine(failed)).toBe(
-      'Last shift failed: CLI runtime timed out after 240s.',
+      'Last job failed: CLI runtime timed out after 240s.',
     );
     expect(employeeFailureBannerCopy(failed)).toBe(
-      'Reed — Last shift failed: CLI runtime timed out after 240s.',
+      'Reed — Last job failed: CLI runtime timed out after 240s.',
     );
     expect(employeeSpeakLine(failed, 'talk', { talkMode: 'callback', entropy: '1' })).toMatch(
       /240s/i,
@@ -318,29 +348,40 @@ describe('company-roster-failure-view', () => {
         last_outcome_detail: longDetail,
       }),
     );
-    expect(line).toContain('Last shift failed:');
+    expect(line).toContain('Last job failed:');
     expect(line!.length).toBeLessThan(longDetail.length + 24);
     expect(line).toMatch(/…$/);
   });
 
   it('exposes full failure detail for tooltips when the banner line is truncated', () => {
-    const longDetail = `${'ActionRequiredError: '.repeat(20)}out of usage`;
+    const longDetail = `${'verify:contracts assertion failed — '.repeat(8)}end`;
     const row = employee({
       status: 'idle',
       last_outcome: 'failed',
       last_outcome_detail: longDetail,
     });
-    expect(employeeFailureDetailTooltip(row)).toBe(longDetail);
+    expect(employeeFailureDetailTooltip(row)).toBe(longDetail.replace(/\s+/g, ' ').trim());
     expect(
       employeeFailureDetailTooltip(employee({ status: 'executing', last_outcome: 'failed' })),
     ).toBeUndefined();
     expect(employeeFailureBannerAriaLabel(row)).toContain('Full detail:');
-    expect(employeeFailureBannerAriaLabel(row)).toContain(longDetail);
+    expect(employeeFailureBannerAriaLabel(row)).toContain('verify:contracts');
     expect(employeeFailureBeatAriaLabel(row)).toContain('Full detail:');
-    expect(employeeFailureBeatAriaLabel(row)).toContain(longDetail);
-    expect(employeePresenceStripHoverTitle(row)).toBe(longDetail);
+    expect(employeeFailureBeatAriaLabel(row)).toContain('verify:contracts');
+    expect(employeePresenceStripHoverTitle(row)).toContain('verify:contracts');
     expect(employeePresenceSelectAriaLabel(row)).toContain('Full detail:');
-    expect(employeePresenceSelectAriaLabel(row)).toContain(longDetail);
+    expect(employeePresenceSelectAriaLabel(row)).toContain('verify:contracts');
+  });
+
+  it('uses operator-friendly tooltips for usage-limit failures', () => {
+    const row = employee({
+      status: 'idle',
+      last_outcome: 'failed',
+      last_outcome_detail: `${'ActionRequiredError: '.repeat(20)}out of usage`,
+    });
+    expect(employeeFailureDetailTooltip(row)).toBe(
+      'Cursor usage signal on this shift — Auto+Composer may still have headroom or on-demand spend. Check Usage, then retry.',
+    );
   });
 
   it('keeps short failure labels compact for hover and screen readers', () => {
@@ -350,9 +391,9 @@ describe('company-roster-failure-view', () => {
       last_outcome: 'failed',
       last_outcome_detail: 'timeout',
     });
-    expect(employeePresenceStripHoverTitle(row)).toBe('Jules — Last shift failed: timeout');
-    expect(employeePresenceSelectAriaLabel(row)).toBe('Select Jules, Last shift failed: timeout');
-    expect(employeeFailureBeatAriaLabel(row)).toBe('Last shift failed: timeout');
+    expect(employeePresenceStripHoverTitle(row)).toBe('Jules — Last job failed: timeout');
+    expect(employeePresenceSelectAriaLabel(row)).toBe('Select Jules, Last job failed: timeout');
+    expect(employeeFailureBeatAriaLabel(row)).toBe('Last job failed: timeout');
   });
 
   it('detects failed teammates for roster alerts', () => {
@@ -402,7 +443,7 @@ describe('company-roster-failure-view', () => {
           last_outcome_detail: 'vitest',
         }),
       ]),
-    ).toBe('Shell Craft — Last shift failed: vitest');
+    ).toBe('Shell Craft — Last job failed: vitest');
     expect(
       companyFailedEmployeesHint([
         employee({
@@ -413,7 +454,7 @@ describe('company-roster-failure-view', () => {
         }),
       ]),
     ).toBe(
-      'Jules — Last shift interrupted by server restart — use Continue shift to pick up where you left off.',
+      'Jules — Last job was interrupted when the server restarted — tap Continue to pick up where they left off.',
     );
     expect(
       companyFailedEmployeesHint([
@@ -426,7 +467,7 @@ describe('company-roster-failure-view', () => {
         }),
       ]),
     ).toBe(
-      'Jules — Last shift interrupted before it could finish — use Continue shift to pick up where you left off.',
+      'Jules — Last job was interrupted before it could finish — tap Continue to pick up where they left off.',
     );
     expect(
       companyFailedEmployeesHint([
@@ -446,19 +487,20 @@ describe('company-roster-failure-view', () => {
         }),
       ]),
     ).toBe(
-      '2 teammates need attention after a failed shift — select one for Retry shift, or click to talk it through.',
+      '2 teammates need attention after a failed job — select one and tap Try again, or click to talk it through.',
     );
   });
 
   it('exposes full failure detail on roster alert hint hover when truncated', () => {
-    const longDetail = `${'ActionRequiredError: '.repeat(20)}out of usage`;
+    const longDetail = `${'verify:contracts assertion failed — '.repeat(8)}end`;
     const row = employee({
       name: 'Jules',
       status: 'idle',
       last_outcome: 'failed',
       last_outcome_detail: longDetail,
     });
-    expect(companyFailedEmployeesHintTooltip([row])).toBe(`Jules — ${longDetail}`);
+    const normalized = longDetail.replace(/\s+/g, ' ').trim();
+    expect(companyFailedEmployeesHintTooltip([row])).toBe(`Jules — ${normalized}`);
     expect(companyFailedEmployeesHintTooltip([row, employee({ employee_id: 'e2', last_outcome: 'failed' })])).toBeNull();
     expect(
       companyFailedEmployeesHintTooltip([
@@ -471,7 +513,7 @@ describe('company-roster-failure-view', () => {
     ).toBeNull();
   });
 
-  it('builds stable peek keys for auto-expanding the agent dock after a failed shift', () => {
+  it('builds stable peek keys for auto-expanding the agent dock after a failed job', () => {
     expect(
       employeeFailurePeekKey(
         employee({
@@ -499,7 +541,7 @@ describe('company-roster-failure-view', () => {
       expect(buildCompanyRosterAlertBadge([employee({ status: 'idle' })])).toBeNull();
     });
 
-    it('labels a single interrupted shift distinctly from a hard failure', () => {
+    it('labels a single interrupted job distinctly from a hard failure', () => {
       expect(
         buildCompanyRosterAlertBadge([
           employee({

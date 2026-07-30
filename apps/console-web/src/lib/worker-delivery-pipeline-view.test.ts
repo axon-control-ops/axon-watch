@@ -15,10 +15,20 @@ describe('worker delivery pipeline view', () => {
     });
     expect(view?.label).toBe('CI pending');
     expect(view?.draftPrUrl).toContain('/pull/1');
+    expect(view?.ciUrl).toBe('https://github.com/org/repo/pull/1/checks');
     const pushed = view?.steps.find((step) => step.id === 'pushed');
     const pending = view?.steps.find((step) => step.id === 'ci_pending');
     expect(pushed?.state).toBe('done');
     expect(pending?.state).toBe('current');
+  });
+
+  it('prefers an explicit Actions run URL over the PR checks fallback', () => {
+    const view = buildWorkerDeliveryPipelineView({
+      stage: 'ci_pending',
+      draftPrUrl: 'https://github.com/org/repo/pull/1',
+      ciUrl: 'https://github.com/org/repo/actions/runs/99',
+    });
+    expect(view?.ciUrl).toBe('https://github.com/org/repo/actions/runs/99');
   });
 
   it('marks error stages on the CI step', () => {

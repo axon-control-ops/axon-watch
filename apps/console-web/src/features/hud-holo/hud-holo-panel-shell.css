@@ -164,6 +164,11 @@
   z-index: 2;
 }
 
+/* TopBar dropdowns (workspace picker) must paint above AgentDock / threads. */
+.console-shell--mockup.console-shell--glass3d > .topbar-mockup {
+  z-index: 60;
+}
+
 .hud-holo-voice-orb {
   position: relative;
   width: var(--voice-orb-size, 4.25rem);

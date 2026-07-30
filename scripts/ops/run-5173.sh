@@ -46,11 +46,30 @@ else
 fi
 
 if ! curl -fsS --max-time 2 "http://127.0.0.1:8787/api/health" >/dev/null 2>&1; then
-  echo "run-5173: control-plane :8787 is not healthy." >&2
-  echo "Start always-on backends first:" >&2
-  echo "  ./scripts/ops/install-user-always-on.sh" >&2
-  echo "  # or: ./scripts/dev/up.sh" >&2
-  exit 1
+  echo "run-5173: control-plane :8787 is not healthy — attempting start..." >&2
+  if systemctl --user start control-plane.service 2>/dev/null; then
+    recovered=0
+    for _ in $(seq 1 25); do
+      if curl -fsS --max-time 2 "http://127.0.0.1:8787/api/health" >/dev/null 2>&1; then
+        recovered=1
+        break
+      fi
+      sleep 0.4
+    done
+    if [[ "${recovered}" -ne 1 ]]; then
+      echo "run-5173: control-plane still unhealthy after start." >&2
+      echo "Try: systemctl --user status control-plane.service" >&2
+      echo "  or: ./scripts/ops/axonrevive.sh" >&2
+      exit 1
+    fi
+    echo "run-5173: control-plane recovered on :8787"
+  else
+    echo "run-5173: could not start control-plane.service." >&2
+    echo "Start always-on backends first:" >&2
+    echo "  ./scripts/ops/install-user-always-on.sh" >&2
+    echo "  # or: ./scripts/dev/up.sh" >&2
+    exit 1
+  fi
 fi
 
 if ss -ltn "( sport = :${PORT} )" 2>/dev/null | grep -q ":${PORT}"; then

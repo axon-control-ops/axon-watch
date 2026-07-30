@@ -154,6 +154,58 @@ describe('spoken alert delivery', () => {
     );
   });
 
+  it('bypasses voice deck for direct theater playback and keeps MC Azure defaults', async () => {
+    await unlockMediaForTests();
+    const handler = vi.fn().mockResolvedValue(true);
+    registerVoiceDeckSpokenAlertHandler(handler);
+    vi.mocked(speakKairoLine).mockResolvedValue({ engine: 'azure', reason: null });
+    const onPlaybackStart = vi.fn();
+    const storage = {
+      getItem: vi.fn().mockReturnValue(null),
+      setItem: vi.fn(),
+    };
+
+    const channel = await deliverSpokenOperatorAlert(
+      {
+        eligible: true,
+        reason: 'report_theater_turn',
+        signal_id: null,
+        message: 'Mira here. Lead reports complete.',
+      },
+      storage,
+      {
+        priority: 'alert',
+        dedupe: false,
+        queueUntilUnlock: false,
+        openFollowupWindow: false,
+        directPlayback: true,
+        allowDuringReportTheater: true,
+        azureVoiceId: 'en-US-JennyNeural',
+        speaker: {
+          kind: 'employee',
+          id: 'emp_mira',
+          name: 'Mira',
+          roleLabel: 'Lead',
+          azureVoiceId: 'en-US-JennyNeural',
+        },
+        onPlaybackStart,
+      },
+    );
+
+    expect(channel).toBe('azure');
+    expect(handler).not.toHaveBeenCalled();
+    expect(speakKairoLine).toHaveBeenCalledWith(
+      'Mira here. Lead reports complete.',
+      expect.objectContaining({
+        priority: 'alert',
+        allowDuringReportTheater: true,
+        azureVoiceId: 'en-US-JennyNeural',
+        onPlaybackStart,
+        ttsTimeoutMs: undefined,
+      }),
+    );
+  });
+
   it('reports browser fallback channel', async () => {
     await unlockMediaForTests();
     vi.mocked(speakKairoLine).mockResolvedValue({

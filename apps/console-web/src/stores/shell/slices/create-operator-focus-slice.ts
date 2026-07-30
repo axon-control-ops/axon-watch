@@ -6,16 +6,17 @@ import { persistOperatorCenterView } from '../../../lib/operator-brain-graph-vie
 import {
   resolveAttentionFocusScrollTarget,
   resolveDefaultHighlightedSignalId,
+  type AttentionTopSignal,
 } from '../../../lib/ide-attention-focus';
 import { persistIdeExplorerCollapsed } from '../../../lib/ide-layout-prefs';
 import type { DockSeamId } from '../../../lib/dock-seam-layout';
 import type { DockHeroMode } from '../../../lib/dock-hero-mode';
-import type { LeftSidebarMode } from '../../../lib/left-sidebar-mode';
 import type { LayoutMode } from '../types';
 
 interface CreateOperatorFocusSliceInput {
   layoutMode: Ref<LayoutMode>;
   operatorBriefing: Ref<OperatorBriefing | null>;
+  attentionSignals?: Readonly<Ref<readonly AttentionTopSignal[]>>;
   highlightedSignalId: Ref<string | null>;
   ideAttentionPanelOpen: Ref<boolean>;
   ideBriefingPanelOpen: Ref<boolean>;
@@ -28,10 +29,10 @@ interface CreateOperatorFocusSliceInput {
   dockHeroMode: Ref<DockHeroMode>;
   expandedDockSeams: Ref<Set<DockSeamId>>;
   dockThreadSeamTouched: Ref<boolean>;
-  setLeftSidebarMode: (mode: LeftSidebarMode) => void;
   setDockHeroMode: (mode: DockHeroMode) => void;
   restoreComposerDraft: (content: string) => void;
   setLayoutMode: (mode: LayoutMode) => void;
+  setCurrentWorkspace: (workspaceId: string) => void;
 }
 
 export function createOperatorFocusSlice(input: CreateOperatorFocusSliceInput) {
@@ -53,7 +54,23 @@ export function createOperatorFocusSlice(input: CreateOperatorFocusSliceInput) {
 
   function focusAttentionSidebar(signalId?: string | null): void {
     const topSignals = input.operatorBriefing.value?.top_signals ?? [];
-    input.highlightedSignalId.value = resolveDefaultHighlightedSignalId(topSignals, signalId);
+    const focusSignals: AttentionTopSignal[] = [];
+    const seenSignalIds = new Set<string>();
+    for (const signal of [...(input.attentionSignals?.value ?? []), ...topSignals]) {
+      const id = signal.signal_id?.trim();
+      if (!id || seenSignalIds.has(id)) {
+        continue;
+      }
+      seenSignalIds.add(id);
+      focusSignals.push(signal);
+    }
+    const spokenSignalId =
+      input.operatorBriefing.value?.operator_presence?.spoken_alert.signal_id ?? null;
+    input.highlightedSignalId.value = resolveDefaultHighlightedSignalId(
+      focusSignals,
+      signalId,
+      spokenSignalId,
+    );
 
     if (input.layoutMode.value === 'ide') {
       input.ideAttentionPanelOpen.value = true;
@@ -61,7 +78,20 @@ export function createOperatorFocusSlice(input: CreateOperatorFocusSliceInput) {
       input.ideExplorerCollapsed.value = false;
       persistIdeExplorerCollapsed(false);
     } else {
-      input.setLeftSidebarMode('attention');
+      // Mission Control Attention strip lives under Fleet Health (left rail hidden).
+      setOperatorCenterView('grid');
+      const highlightedId = input.highlightedSignalId.value;
+      const signalWorkspaceId =
+        (highlightedId
+          ? focusSignals.find((signal) => signal.signal_id === highlightedId)?.workspace_id
+          : null) ??
+        (signalId?.trim()
+          ? focusSignals.find((signal) => signal.signal_id === signalId.trim())?.workspace_id
+          : null) ??
+        null;
+      if (signalWorkspaceId?.trim()) {
+        input.setCurrentWorkspace(signalWorkspaceId.trim());
+      }
     }
 
     input.signalsSeamEmphasized.value = true;
@@ -70,8 +100,23 @@ export function createOperatorFocusSlice(input: CreateOperatorFocusSliceInput) {
       window.requestAnimationFrame(() => {
         document.getElementById(scrollTargetId)?.scrollIntoView({
           behavior: 'smooth',
-          block: 'nearest',
+          block: 'start',
         });
+        window.requestAnimationFrame(() => {
+          const highlightedId = input.highlightedSignalId.value;
+          const highlightedRow = highlightedId
+            ? [...document.querySelectorAll<HTMLElement>('[data-signal-id]')].find(
+                (row) => row.dataset.signalId === highlightedId,
+              )
+            : null;
+          highlightedRow?.scrollIntoView({
+            behavior: 'smooth',
+            block: 'center',
+          });
+        });
+        if (window.location.hash === '#operator-task-board') {
+          window.history.replaceState(null, '', window.location.pathname + window.location.search);
+        }
         window.setTimeout(() => {
           input.signalsSeamEmphasized.value = false;
         }, 1200);
@@ -86,6 +131,9 @@ export function createOperatorFocusSlice(input: CreateOperatorFocusSliceInput) {
 
   function focusMissionControl(): void {
     // Mission Control = fleet mosaic (Brain Graph is a separate center view).
+    if (input.layoutMode.value === 'ide') {
+      input.setLayoutMode('operator');
+    }
     setOperatorCenterView('grid');
     input.missionControlEmphasized.value = true;
     if (typeof window !== 'undefined') {
@@ -94,6 +142,26 @@ export function createOperatorFocusSlice(input: CreateOperatorFocusSliceInput) {
           behavior: 'smooth',
           block: 'nearest',
         });
+        window.setTimeout(() => {
+          input.missionControlEmphasized.value = false;
+        }, 1200);
+      });
+    }
+  }
+
+  function focusOperatorTaskBoard(): void {
+    setOperatorCenterView('grid');
+    input.missionControlEmphasized.value = true;
+    if (typeof window !== 'undefined') {
+      window.requestAnimationFrame(() => {
+        const board = document.getElementById('operator-task-board');
+        board?.scrollIntoView({
+          behavior: 'smooth',
+          block: 'nearest',
+        });
+        if (window.location.hash !== '#operator-task-board') {
+          window.history.replaceState(null, '', '#operator-task-board');
+        }
         window.setTimeout(() => {
           input.missionControlEmphasized.value = false;
         }, 1200);
@@ -135,8 +203,13 @@ export function createOperatorFocusSlice(input: CreateOperatorFocusSliceInput) {
     persistOperatorCenterView(view);
   }
 
-  function afterRunLifecycleMutation(): void {
-    focusMissionControl();
+  function afterRunLifecycleMutation(options: { preserveSurface?: boolean } = {}): void {
+    // IDE Continue / resume / stop must stay on the IDE surface. Never yank the
+    // operator into Mission Control mid-composer work.
+    const stayOnIde = options.preserveSurface === true || input.layoutMode.value === 'ide';
+    if (!stayOnIde) {
+      focusMissionControl();
+    }
     if (input.dockHeroMode.value === 'briefing' && typeof window !== 'undefined') {
       input.briefingSeamEmphasized.value = true;
       window.setTimeout(() => {
@@ -155,6 +228,32 @@ export function createOperatorFocusSlice(input: CreateOperatorFocusSliceInput) {
       const next = new Set(input.expandedDockSeams.value);
       next.delete('thread');
       input.expandedDockSeams.value = next;
+    }
+  }
+
+  /**
+   * Mission Control hosts VAXON in the LIVE OPERATIONS thread seam, not the
+   * briefing seam, so briefing focus would collapse the panel we want to show.
+   */
+  function focusLiveOperations(): void {
+    if (input.layoutMode.value === 'ide') {
+      input.setLayoutMode('operator');
+    }
+    if (input.operatorCenterView.value === 'graph') {
+      setOperatorCenterView('grid');
+    }
+    if (!input.expandedDockSeams.value.has('thread')) {
+      const next = new Set(input.expandedDockSeams.value);
+      next.add('thread');
+      input.expandedDockSeams.value = next;
+    }
+    if (typeof window !== 'undefined') {
+      window.requestAnimationFrame(() => {
+        document.getElementById('mission-control-live-ops')?.scrollIntoView({
+          behavior: 'smooth',
+          block: 'nearest',
+        });
+      });
     }
   }
 
@@ -211,11 +310,13 @@ export function createOperatorFocusSlice(input: CreateOperatorFocusSliceInput) {
 
   return {
     focusAttentionSidebar,
+    focusLiveOperations,
     closeIdeAttentionPanel,
     closeIdeBriefingPanel,
     openIdeBriefingPanel,
     toggleSignalDetails,
     focusMissionControl,
+    focusOperatorTaskBoard,
     focusWatchConnectors,
     setOperatorCenterView,
     afterRunLifecycleMutation,

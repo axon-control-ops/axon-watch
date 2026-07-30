@@ -167,6 +167,16 @@ import {
   streamingThreadIdsFromUiMap,
   workspaceStreamGlobalsFromState,
 } from '../lib/workspace-stream-ui';
+import { listReattachIdeStreamThreadIds, listStaleIdeStreamThreadIds } from '../lib/stale-ide-stream-ui';
+import { resolveStreamingAgentMessageId } from '../lib/follow-busy-employee-ide-streams';
+import { composerSubmitBlockReason } from '../lib/composer-submit-block-reason';
+import { rewriteComposerAskOptionAnswer } from '../lib/composer-ask-option-rewrite';
+import { markQuestionAnswered } from '../lib/answered-agent-questions';
+import { humanizeNetworkError } from '../lib/humanize-network-error';
+import {
+  localRuntimeDegradedActive,
+  remoteIngressAttentionActive,
+} from '../lib/runtime-degraded-scope';
 import { resolveKairoPresenceClickTarget } from '../lib/kairo-presence-action';
 import { isBootstrapSummarySignal } from '../lib/operator-signal-hints';
 import {
@@ -305,6 +315,7 @@ import { createThreadSurfaceSlice } from './shell/slices/create-thread-surface-s
 import { createCompanyRosterSlice } from './shell/slices/create-company-roster-slice';
 import { createBusyEmployeeIdeStreamSlice } from './shell/slices/create-busy-employee-ide-stream-slice';
 import { createWorkspaceTasksSlice } from './shell/slices/create-workspace-tasks-slice';
+import { createLeadPlansSlice } from './shell/slices/create-lead-plans-slice';
 import { createViewportCompactSlice } from './shell/slices/create-viewport-compact-slice';
 import { createKairoVoiceSlice } from './shell/slices/create-kairo-voice-slice';
 import { createChatStreamSessionSlice } from './shell/slices/create-chat-stream-session-slice';
@@ -420,6 +431,7 @@ export const useShellStore = defineStore('shell', () => {
   const operatorCommandDraft = ref('');
   const ideComposerDraft = ref('');
   let ideComposerDraftPersistTimer: ReturnType<typeof setTimeout> | null = null;
+  let suppressingIdeComposerDraftPersist = false;
   const kairoSpeechQueueActive = ref(false);
   const kairoVoiceEngineActive = ref(false);
   const kairoVoicePaused = ref(false);
@@ -566,6 +578,7 @@ export const useShellStore = defineStore('shell', () => {
     workspaces,
     runtimeSummary,
     runtimeSummaryLoadState,
+    runtimeStatus,
     activeRun,
     primaryActiveRun,
     layoutMode,
@@ -741,18 +754,18 @@ export const useShellStore = defineStore('shell', () => {
     return ideComposerActivity.value?.label ?? null;
   });
 
-  const kairoBriefingAttention = computed(() =>
-    resolveKairoBriefingAttention({
+  const kairoBriefingAttention = computed(() => {
+    const degraded =
+      operatorBriefing.value?.degraded ?? runtimeSummary.value?.degraded ?? null;
+    return resolveKairoBriefingAttention({
       pendingApprovals: pendingApprovalsCount.value,
       criticalSignals: runtimeSummary.value?.signals.critical_count ?? 0,
       highSignals: runtimeSummary.value?.signals.high_count ?? 0,
-      degraded:
-        operatorBriefing.value?.degraded.active ??
-        runtimeSummary.value?.degraded.active ??
-        false,
+      degraded: Boolean(degraded?.active),
+      remoteIngressOnly: remoteIngressAttentionActive(degraded),
       briefingLoaded: briefingLoadState.value === 'loaded',
-    }),
-  );
+    });
+  });
 
   const showKairoBriefingAttention = computed(() =>
     shouldShowBriefingAttentionInCommandMode(dockHeroMode.value, kairoBriefingAttention.value),
@@ -771,7 +784,7 @@ export const useShellStore = defineStore('shell', () => {
       criticalSignals: summary?.signals.critical_count ?? 0,
       highSignals: summary?.signals.high_count ?? 0,
       watchConnected: Boolean(summary?.watch.connected),
-      degradedActive: Boolean(summary?.degraded.active),
+      degradedActive: localRuntimeDegradedActive(summary?.degraded),
       primaryRunPhase: primaryActiveRun.value?.phase,
       agentStreamActive: agentStreamActive.value,
       voiceSessionActive:
@@ -861,6 +874,9 @@ export const useShellStore = defineStore('shell', () => {
     await loadIdeThreads(workspaceId);
     const threadId =
       getWorkspaceSurfaceThreadId(workspaceId, 'ide') ?? bootstrapIdeActiveThreadId(workspaceId);
+    if (threadId) {
+      setWorkspaceSurfaceThreadId(workspaceId, 'ide', threadId);
+    }
     ideStreamFocusThreadId.value = threadId;
     if (threadId) {
       applyWorkspaceStreamUiToGlobals(threadId);
@@ -873,6 +889,7 @@ export const useShellStore = defineStore('shell', () => {
         if (currentWorkspace.value?.workspace_id === workspaceId) {
           syncIdeComposerDraftForWorkspace(workspaceId);
         }
+        await rehydrateWorkspaceIdeStreams(workspaceId);
         return;
       }
     }
@@ -882,6 +899,7 @@ export const useShellStore = defineStore('shell', () => {
     if (currentWorkspace.value?.workspace_id === workspaceId) {
       syncIdeComposerDraftForWorkspace(workspaceId);
     }
+    await rehydrateWorkspaceIdeStreams(workspaceId);
   }
 
   function resetThreadContext(): void {
@@ -990,9 +1008,41 @@ export const useShellStore = defineStore('shell', () => {
     loadWorkspaceTasks,
     createCurrentWorkspaceTask,
     cancelCurrentWorkspaceTask,
+    cancelWaitingWorkspaceTasks,
+    clearDuplicateWaitingWorkspaceTasks,
+    startCurrentWorkspaceTask,
   } = createWorkspaceTasksSlice({
     currentWorkspace,
   });
+
+  const {
+    leadPlansByWorkspaceId,
+    leadPlansForCurrentWorkspace,
+    leadPlanIdByTaskId,
+    leadPlansError,
+    leadPlansMutating,
+    loadLeadPlans,
+    fanOutCurrentWorkspaceLeadPlan,
+    closeCurrentLeadPlanEngagement,
+    reopenCurrentLeadPlanEngagement,
+    synthesizeCurrentLeadPlan,
+  } = createLeadPlansSlice({
+    currentWorkspace,
+  });
+
+  const workspaceTasksWithPlanLinks = computed(() =>
+    workspaceTasksForCurrentWorkspace.value.map((task) => {
+      const link = leadPlanIdByTaskId.value.get(task.task_id);
+      if (!link) {
+        return task;
+      }
+      return {
+        ...task,
+        plan_id: link.planId,
+        plan_key: link.planKey,
+      };
+    }),
+  );
 
   /** Fleet-wide roster for cross-workspace speaker avatar resolution. */
   const companyEmployeesFleet = computed(() => {
@@ -1256,30 +1306,28 @@ export const useShellStore = defineStore('shell', () => {
   }
 
   /** Find or create a titled IDE thread owned by a company teammate, then focus it. */
-  async function openOrFocusEmployeeIdeThread(employee: {
-    employee_id: string;
-    name: string;
-    role: string;
-    role_label?: string;
-  }): Promise<string | null> {
+  async function openOrFocusEmployeeIdeThread(
+    employee: { employee_id: string; name: string; role: string; role_label?: string },
+    options?: { forceRefresh?: boolean },
+  ): Promise<string | null> {
     const workspaceId = currentWorkspace.value?.workspace_id;
     const employeeId = employee.employee_id?.trim();
     if (!workspaceId || !employeeId) {
       return null;
     }
-
     const title = employeeIdeThreadTitle(employee);
-
+    const forceRefresh = options?.forceRefresh !== false;
     try {
       await loadIdeThreads(workspaceId);
+      if (currentWorkspace.value?.workspace_id !== workspaceId) return null;
       const existing = (ideThreadsByWorkspaceId.value[workspaceId] ?? []).find(
         (thread) => (thread.employee_id ?? '').trim() === employeeId,
       );
       if (existing?.thread_id) {
         flushIdeComposerDraft();
-        // Continuous-worker / fan-out writes the teammate thread out-of-band — always
-        // refetch so AgentDock does not show a stale pre-shift cache.
-        await selectIdeThread(existing.thread_id, { forceRefresh: true });
+        // Continuous-worker / fan-out writes the teammate thread out-of-band — refetch
+        // so AgentDock does not show a stale pre-shift cache (unless send-path opts out).
+        await selectIdeThread(existing.thread_id, { forceRefresh });
         openIdeComposer({ keepActivityView: true });
         return existing.thread_id;
       }
@@ -1290,6 +1338,7 @@ export const useShellStore = defineStore('shell', () => {
         employeeId,
         employeeRole: employee.role,
       });
+      if (currentWorkspace.value?.workspace_id !== workspaceId) return null;
       ideThreadsByWorkspaceId.value = {
         ...ideThreadsByWorkspaceId.value,
         [workspaceId]: sortIdeThreadsNewestFirst([
@@ -1329,7 +1378,7 @@ export const useShellStore = defineStore('shell', () => {
     }
 
     if (previousThreadId && previousThreadId !== threadId) {
-      flushIdeComposerDraft();
+      flushIdeComposerDraft(previousThreadId);
       // Keep the previous thread's live SSE + message cache — do not disconnect.
       workspaceIdeThreadMessagesById.value = {
         ...workspaceIdeThreadMessagesById.value,
@@ -1478,6 +1527,7 @@ export const useShellStore = defineStore('shell', () => {
             setCurrentWorkspace,
             openWorkspaceFile,
             setLayoutMode,
+            focusAttentionSidebar,
             setVoiceOrbDock,
             requestVoiceOrbSmartDodge,
           },
@@ -1550,14 +1600,16 @@ export const useShellStore = defineStore('shell', () => {
     openIdeBriefingPanel,
     toggleSignalDetails,
     focusMissionControl,
+    focusOperatorTaskBoard,
     focusWatchConnectors,
     setOperatorCenterView,
     afterRunLifecycleMutation,
     focusKairoBriefing,
+    focusLiveOperations,
     focusCommandSeam,
   } = createOperatorFocusSlice({
     layoutMode,
-    operatorBriefing,
+    operatorBriefing, attentionSignals,
     highlightedSignalId,
     ideAttentionPanelOpen,
     ideBriefingPanelOpen,
@@ -1570,10 +1622,10 @@ export const useShellStore = defineStore('shell', () => {
     dockHeroMode,
     expandedDockSeams,
     dockThreadSeamTouched,
-    setLeftSidebarMode,
     setDockHeroMode,
     restoreComposerDraft,
     setLayoutMode,
+    setCurrentWorkspace,
   });
 
   const {
@@ -1583,9 +1635,11 @@ export const useShellStore = defineStore('shell', () => {
     pauseKairoSpeech,
     resumeKairoSpeech,
     interruptKairoVoice,
+    interruptKairoVoiceAndWait,
     speakKairoConversationLine,
     handleKairoPresenceAction,
     deliverKairoSpokenAlert,
+    speakSpokenLine,
     speakOperatorBriefing,
     maybeSpeakBootGreeting,
     kairoVoiceContext,
@@ -1609,6 +1663,7 @@ export const useShellStore = defineStore('shell', () => {
     currentThreadSurface,
     focusAttentionSidebar,
     focusKairoBriefing,
+    focusCommandSeam,
   });
 
   function attachChatStream(
@@ -1674,6 +1729,11 @@ export const useShellStore = defineStore('shell', () => {
       void refreshRunSurfaces().finally(() => {
         void flushIdeComposerQueueIfIdle();
       });
+      // Refresh roster immediately so failure banners clear when the backend
+      // already shows the latest completed outcome (do not wait for the 20s poll).
+      if (workspaceId) {
+        void loadCompanyEmployees(workspaceId);
+      }
     };
     const voiceContext = kairoVoiceContext();
     const voiceNarration = createAgentStreamVoiceSession({
@@ -1695,6 +1755,7 @@ export const useShellStore = defineStore('shell', () => {
         return employee ? employeeVoiceSpeaker(employee) : null;
       },
     });
+    voiceNarration.speakStartBookend();
     chatStreamSessionsByWorkspace.set(
       threadId,
       startChatStreamSession({
@@ -1773,6 +1834,7 @@ export const useShellStore = defineStore('shell', () => {
                   setCurrentWorkspace,
                   openWorkspaceFile,
                   setLayoutMode,
+                  focusAttentionSidebar,
                   setVoiceOrbDock,
                   requestVoiceOrbSmartDodge,
                 },
@@ -1820,7 +1882,7 @@ export const useShellStore = defineStore('shell', () => {
     );
   }
 
-  createBusyEmployeeIdeStreamSlice({
+  const { followBusyEmployeeIdeStreams } = createBusyEmployeeIdeStreamSlice({
     currentWorkspaceId: computed(() => currentWorkspace.value?.workspace_id ?? null),
     layoutMode,
     companyEmployees: companyEmployeesForCurrentWorkspace,
@@ -1830,7 +1892,110 @@ export const useShellStore = defineStore('shell', () => {
     ensureIdeThreadTabOpen,
     getWorkspaceStreamUi,
     attachChatStream,
+    hasLiveChatStreamSession: (threadId) => chatStreamSessionsByWorkspace.has(threadId),
   });
+
+  async function reattachIdeChatStream(threadId: string, workspaceId: string): Promise<void> {
+    const streamUi = getWorkspaceStreamUi(threadId);
+    const runId = streamUi.ideAgentRunId?.trim() || null;
+    let messages = workspaceIdeThreadMessagesById.value[threadId] ?? [];
+    let messageId = streamUi.messageId?.trim() || null;
+    if (!messageId && runId) {
+      messageId = resolveStreamingAgentMessageId(messages, runId);
+    }
+    if ((!messageId || !messages.length) && runId) {
+      try {
+        const history = await fetchThreadHistory(threadId);
+        messages = filterThreadMessagesForSurface(
+          history.items.map((item) => mapChatMessageRecord(item)),
+          'ide',
+        );
+        workspaceIdeThreadMessagesById.value = {
+          ...workspaceIdeThreadMessagesById.value,
+          [threadId]: messages,
+        };
+        messageId = resolveStreamingAgentMessageId(messages, runId) ?? messageId;
+      } catch {
+        return;
+      }
+    }
+    if (!messageId) {
+      return;
+    }
+    const operatorPrompt =
+      [...messages]
+        .reverse()
+        .find(
+          (message) =>
+            message.role === 'operator' &&
+            (!runId || (message.run_id ?? '').trim() === runId),
+        )?.content ??
+      streamUi.activity?.operatorPrompt ??
+      '';
+    attachChatStream(workspaceId, threadId, messageId, {
+      activity: streamUi.activity ?? {
+        label: buildIdeStreamActivityLabel('full', 'agent'),
+        mode: 'agent',
+        executionAccess: 'full',
+        operatorPrompt,
+      },
+      ideAgentRunId: runId,
+      seedMessages: messages,
+      preserveMessageCache: true,
+    });
+  }
+
+  async function rehydrateWorkspaceIdeStreams(workspaceId: string): Promise<void> {
+    const cleaned = workspaceId.trim();
+    if (!cleaned || currentWorkspace.value?.workspace_id !== cleaned) {
+      return;
+    }
+    await loadRuns({ sync: false });
+    const runPhaseById: Record<string, string | undefined> = {};
+    for (const run of runs.value) {
+      runPhaseById[run.run_id] = run.phase;
+    }
+    const workspaceThreadIds = new Set(
+      (ideThreadsByWorkspaceId.value[cleaned] ?? []).map((thread) => thread.thread_id),
+    );
+    const surfaceThreadId = getWorkspaceSurfaceThreadId(cleaned, 'ide');
+    if (surfaceThreadId) {
+      workspaceThreadIds.add(surfaceThreadId);
+    }
+    const decisionInput = {
+      streamUiByThreadId: Object.fromEntries(
+        Object.entries(workspaceStreamUiById.value).filter(([threadId]) =>
+          workspaceThreadIds.has(threadId),
+        ),
+      ),
+      liveSessionThreadIds: chatStreamSessionsByWorkspace.keys(),
+      runPhaseById,
+      runsLoaded: runsLoadState.value === 'loaded',
+    };
+    const reattachIds = listReattachIdeStreamThreadIds(decisionInput);
+    for (const threadId of reattachIds) {
+      await reattachIdeChatStream(threadId, cleaned);
+    }
+    // Also recover operator-initiated runs whose EventSource died while away.
+    for (const threadId of workspaceThreadIds) {
+      const streamUi = workspaceStreamUiById.value[threadId];
+      if (!streamUi?.ideAgentRunId || chatStreamSessionsByWorkspace.has(threadId)) {
+        continue;
+      }
+      const phase = runPhaseById[streamUi.ideAgentRunId];
+      if (
+        phase === 'executing' ||
+        phase === 'starting' ||
+        phase === 'planning' ||
+        phase === 'queued'
+      ) {
+        await reattachIdeChatStream(threadId, cleaned);
+      }
+    }
+    await followBusyEmployeeIdeStreams();
+    await autoContinueInterruptedIdeRun();
+  }
+
   function clearIdeAgentRunLink(): void {
     ideAgentRunId.value = null;
   }
@@ -1855,10 +2020,9 @@ export const useShellStore = defineStore('shell', () => {
   }
 
   function syncIdeComposerDraftForWorkspace(workspaceId: string | null | undefined): void {
-    const threadId =
-      (workspaceId && getWorkspaceSurfaceThreadId(workspaceId, 'ide')) ||
-      activeIdeThreadId.value ||
-      null;
+    // Only restore when this workspace already has a focused IDE thread — never borrow
+    // another workspace's active thread id (that wrote drafts under the wrong scope).
+    const threadId = (workspaceId && getWorkspaceSurfaceThreadId(workspaceId, 'ide')) || null;
     syncIdeComposerDraftForThread(workspaceId, threadId);
   }
 
@@ -1870,10 +2034,15 @@ export const useShellStore = defineStore('shell', () => {
       clearTimeout(ideComposerDraftPersistTimer);
       ideComposerDraftPersistTimer = null;
     }
-    ideComposerDraft.value = readStoredIdeComposerDraft(workspaceId, threadId);
+    suppressingIdeComposerDraftPersist = true;
+    try {
+      ideComposerDraft.value = readStoredIdeComposerDraft(workspaceId, threadId);
+    } finally {
+      suppressingIdeComposerDraftPersist = false;
+    }
   }
 
-  function flushIdeComposerDraft(): void {
+  function flushIdeComposerDraft(threadIdOverride?: string | null): void {
     if (typeof window === 'undefined') {
       return;
     }
@@ -1882,7 +2051,7 @@ export const useShellStore = defineStore('shell', () => {
       ideComposerDraftPersistTimer = null;
     }
     const workspaceId = currentWorkspace.value?.workspace_id ?? null;
-    const threadId = activeIdeThreadId.value;
+    const threadId = threadIdOverride !== undefined ? threadIdOverride : activeIdeThreadId.value || null;
     if (!workspaceId || !threadId) {
       return;
     }
@@ -1890,7 +2059,7 @@ export const useShellStore = defineStore('shell', () => {
   }
 
   function schedulePersistIdeComposerDraft(): void {
-    if (typeof window === 'undefined') {
+    if (typeof window === 'undefined' || suppressingIdeComposerDraftPersist) {
       return;
     }
     if (ideComposerDraftPersistTimer) {
@@ -1898,8 +2067,11 @@ export const useShellStore = defineStore('shell', () => {
     }
     ideComposerDraftPersistTimer = setTimeout(() => {
       ideComposerDraftPersistTimer = null;
+      if (suppressingIdeComposerDraftPersist) {
+        return;
+      }
       const workspaceId = currentWorkspace.value?.workspace_id ?? null;
-      const threadId = activeIdeThreadId.value;
+      const threadId = activeIdeThreadId.value || null;
       if (!workspaceId || !threadId) {
         return;
       }
@@ -1932,14 +2104,17 @@ export const useShellStore = defineStore('shell', () => {
       attachmentFiles?: File[];
     } = {},
   ): Promise<boolean> {
-    const workspaceId = currentWorkspace.value?.workspace_id ?? null;
-    const content = (options.contentOverride ?? ideComposerDraft.value).trim();
-    if (
-      commandMutationState.value === 'submitting' ||
-      agentStreamActive.value ||
-      !workspaceId ||
-      !content
-    ) {
+    const workspaceId = currentWorkspace.value?.workspace_id ?? '';
+    let content = (options.contentOverride ?? ideComposerDraft.value).trim();
+    // Bare "1"/"2"/"3" against an open ask card → same Continue payload the card sends.
+    const askRewrite = rewriteComposerAskOptionAnswer(content, threadMessages.value);
+    if (askRewrite) {
+      content = askRewrite.content;
+      markQuestionAnswered(askRewrite.ask.messageId, askRewrite.ask.prompt);
+    }
+    const blockedReason = composerSubmitBlockReason(workspaceId, content, commandMutationState.value, agentStreamActive.value);
+    if (blockedReason) {
+      commandMutationError.value = blockedReason;
       return false;
     }
 
@@ -1981,9 +2156,7 @@ export const useShellStore = defineStore('shell', () => {
       if (isRunLinkedComposerMode(composerMode)) {
         try {
           controlPlaneBootId = await fetchControlPlaneBootId();
-        } catch {
-          // Recovery remains manual when the boot identity cannot be captured.
-        }
+        } catch {}
       }
       const response = await postChatMessage({
         workspace_id: workspaceId,
@@ -2023,6 +2196,8 @@ export const useShellStore = defineStore('shell', () => {
           {
             setCurrentWorkspace,
             openWorkspaceFile,
+            setLayoutMode,
+            focusAttentionSidebar,
             setVoiceOrbDock,
             requestVoiceOrbSmartDodge,
           },
@@ -2064,27 +2239,24 @@ export const useShellStore = defineStore('shell', () => {
         return true;
       }
       commandMutationState.value = 'idle';
+      // Chat landed; a failed follow-up refresh must not turn the send into an error.
+      try {
+        if (response.run || response.run_id || response.dispatched) {
+          await refreshRunSurfaces({ light: true });
+        }
+      } catch {}
+      const next = new Set(expandedDockSeams.value);
+      next.add('thread');
       if (response.run || response.run_id) {
-        await refreshRunSurfaces();
-        const next = new Set(expandedDockSeams.value);
         next.add('run');
-        next.add('thread');
-        expandedDockSeams.value = next;
-      } else if (response.dispatched) {
-        await refreshRunSurfaces();
-        const next = new Set(expandedDockSeams.value);
-        next.add('thread');
-        expandedDockSeams.value = next;
-      } else {
-        const next = new Set(expandedDockSeams.value);
-        next.add('thread');
-        expandedDockSeams.value = next;
       }
+      expandedDockSeams.value = next;
       return true;
     } catch (error) {
       commandMutationState.value = 'error';
-      commandMutationError.value =
-        error instanceof Error ? error.message : 'Failed to submit IDE composer message';
+      commandMutationError.value = humanizeNetworkError(error, {
+        action: 'Chat send',
+      });
       return false;
     } finally {
       if (!agentStreamActive.value) {
@@ -2229,11 +2401,13 @@ export const useShellStore = defineStore('shell', () => {
 
   async function submitIdeComposer(
     composerMode: IdeComposerMode,
-    options: { attachmentFiles?: File[] } = {},
-  ): Promise<void> {
-    const content = ideComposerDraft.value.trim();
-    if (!content || !currentWorkspace.value?.workspace_id) {
-      return;
+    options: { attachmentFiles?: File[]; contentOverride?: string } = {},
+  ): Promise<boolean> {
+    const content = (options.contentOverride ?? ideComposerDraft.value).trim();
+    const blockedReason = composerSubmitBlockReason(currentWorkspace.value?.workspace_id, content);
+    if (blockedReason) {
+      commandMutationError.value = blockedReason;
+      return false;
     }
 
     if (
@@ -2246,10 +2420,10 @@ export const useShellStore = defineStore('shell', () => {
       enqueueIdeComposerMessage(composerMode, content);
       ideComposerDraft.value = '';
       commandMutationError.value = null;
-      return;
+      return true;
     }
 
-    await dispatchIdeComposerMessage(composerMode, options);
+    return dispatchIdeComposerMessage(composerMode, options);
   }
 
   async function runOperatorCommand(content: string): Promise<void> {
@@ -3026,7 +3200,6 @@ export const useShellStore = defineStore('shell', () => {
     setLastViewportCompactRequested,
   });
   briefingLoader.load = loadOperatorBriefing;
-
   const {
     loadOperatorPresenceSettings,
     saveOperatorPresenceSettingsPatch,
@@ -3040,8 +3213,9 @@ export const useShellStore = defineStore('shell', () => {
     operatorPresenceSettingsError,
     operatorPresenceSettingsSavedAt,
     loadOperatorBriefing: () => loadOperatorBriefing(),
+    agentExecutionAccess,
+    setAgentExecutionAccess,
   });
-
   const {
     loadInbox,
     dismissInboxSignalIds,
@@ -3093,6 +3267,50 @@ export const useShellStore = defineStore('shell', () => {
     dispatchIdeComposerMessage,
   });
 
+  function clearStaleIdeStreamUi(): void {
+    const runPhaseById: Record<string, string | undefined> = {};
+    for (const run of runs.value) {
+      runPhaseById[run.run_id] = run.phase;
+    }
+    const decisionInput = {
+      streamUiByThreadId: workspaceStreamUiById.value,
+      liveSessionThreadIds: chatStreamSessionsByWorkspace.keys(),
+      runPhaseById,
+      runsLoaded: runsLoadState.value === 'loaded',
+    };
+    const reattachThreadIds = listReattachIdeStreamThreadIds(decisionInput);
+    const staleThreadIds = listStaleIdeStreamThreadIds(decisionInput);
+    const workspaceId = currentWorkspace.value?.workspace_id ?? null;
+    const currentThreadIds = new Set(
+      workspaceId
+        ? (ideThreadsByWorkspaceId.value[workspaceId] ?? []).map((thread) => thread.thread_id)
+        : [],
+    );
+    if (workspaceId) {
+      const surfaceThreadId = getWorkspaceSurfaceThreadId(workspaceId, 'ide');
+      if (surfaceThreadId) {
+        currentThreadIds.add(surfaceThreadId);
+      }
+    }
+    for (const threadId of reattachThreadIds) {
+      if (workspaceId && currentThreadIds.has(threadId)) {
+        void reattachIdeChatStream(threadId, workspaceId);
+      }
+    }
+    if (!staleThreadIds.length) {
+      return;
+    }
+    for (const threadId of staleThreadIds) {
+      disconnectChatStreamSession(threadId);
+      setWorkspaceStreamUi(threadId, {
+        active: false,
+        messageId: null,
+        activity: null,
+        ideAgentRunId: null,
+      });
+    }
+  }
+
   async function refreshRunSurfaces(options?: { light?: boolean; forceFull?: boolean }): Promise<void> {
     // During an active stream/run, full surface refresh (CLI status + briefing +
     // fleet + brain) routinely takes 5–8s and trips Chrome "Page Unresponsive".
@@ -3110,6 +3328,7 @@ export const useShellStore = defineStore('shell', () => {
       // Live SSE ticks must stay cheap: skip CLI status/summary AND watch inbox
       // (inbox watch probe regularly hits a ~5s timeout and freezes the console).
       await loadRuns({ sync: false });
+      clearStaleIdeStreamUi();
       await autoContinueInterruptedIdeRun();
       await flushIdeComposerQueueIfIdle();
       return;
@@ -3129,6 +3348,7 @@ export const useShellStore = defineStore('shell', () => {
         loadRuns({ sync: false }),
         loadInbox({ background: true }),
       ]);
+      clearStaleIdeStreamUi();
       await loadRunHistory(
         resolveRunHistoryRunId(workspaceRuns.value, ideAgentRunId.value),
       );
@@ -3148,6 +3368,7 @@ export const useShellStore = defineStore('shell', () => {
         ? loadOperatorBrainGraph({ background: true })
         : Promise.resolve(),
     ]);
+    clearStaleIdeStreamUi();
     await loadRunHistory(
       resolveRunHistoryRunId(workspaceRuns.value, ideAgentRunId.value),
     );
@@ -3327,7 +3548,7 @@ export const useShellStore = defineStore('shell', () => {
       });
       if (dispatched) {
         await refreshRunSurfaces();
-        afterRunLifecycleMutation();
+        afterRunLifecycleMutation({ preserveSurface: true });
         return;
       }
 
@@ -3576,12 +3797,25 @@ export const useShellStore = defineStore('shell', () => {
     companyEmployeesFleet,
     loadCompanyEmployees,
     workspaceTasksById,
-    workspaceTasksForCurrentWorkspace,
+    workspaceTasksForCurrentWorkspace: workspaceTasksWithPlanLinks,
     workspaceTasksError,
     workspaceTasksMutating,
     loadWorkspaceTasks,
     createCurrentWorkspaceTask,
     cancelCurrentWorkspaceTask,
+    cancelWaitingWorkspaceTasks,
+    clearDuplicateWaitingWorkspaceTasks,
+    startCurrentWorkspaceTask,
+    leadPlansByWorkspaceId,
+    leadPlansForCurrentWorkspace,
+    leadPlanIdByTaskId,
+    leadPlansError,
+    leadPlansMutating,
+    loadLeadPlans,
+    fanOutCurrentWorkspaceLeadPlan,
+    closeCurrentLeadPlanEngagement,
+    reopenCurrentLeadPlanEngagement,
+    synthesizeCurrentLeadPlan,
     ideThreadsForCurrentWorkspace,
     openIdeThreadTabsForCurrentWorkspace,
     activeTerminalSession,
@@ -3652,6 +3886,7 @@ export const useShellStore = defineStore('shell', () => {
     hydrateWorkspaceIdeChat,
     createIdeThread,
     openOrFocusEmployeeIdeThread,
+    rehydrateWorkspaceIdeStreams,
     selectIdeThread,
     closeIdeThreadTab,
     loadTerminalSessions,
@@ -3788,15 +4023,19 @@ export const useShellStore = defineStore('shell', () => {
     openIdeComposerWithDraft,
     focusAttentionSidebar,
     focusMissionControl,
+    focusOperatorTaskBoard,
     focusWatchConnectors,
     focusKairoBriefing,
+    focusLiveOperations,
     deliverKairoSpokenAlert,
+    speakSpokenLine,
     speakOperatorBriefing,
     speakKairoConversationLine,
     stopKairoSpeech,
     pauseKairoSpeech,
     resumeKairoSpeech,
     interruptKairoVoice,
+    interruptKairoVoiceAndWait,
     handleKairoPresenceAction,
     kairoSpeechActive,
     kairoSpeechSessionId,

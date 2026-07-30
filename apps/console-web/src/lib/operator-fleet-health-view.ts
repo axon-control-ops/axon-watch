@@ -43,6 +43,14 @@ export type FleetHealthGridCell = {
   detail: string;
   isSelected: boolean;
   isBoundProject: boolean;
+  /** True when runs or teammates are actively working in this workspace. */
+  isBusy: boolean;
+  activeRuns: number;
+  busyAgents: number;
+  openSignals: number;
+  criticalSignals: number;
+  pendingApprovals: number;
+  reviewReady: number;
 };
 
 const PRODUCTION_WORKSPACE_ORDER = [
@@ -89,11 +97,30 @@ export function sortFleetHealthRows(
   });
 }
 
+/** Keep fleet card detail to one compact line (API titles can be multi-signal dumps). */
+export function compactFleetHealthDetail(
+  topSignalTitle: string | null | undefined,
+  workspaceId: string,
+): string {
+  const raw = topSignalTitle?.trim() || workspaceId;
+  const firstLine =
+    raw
+      .split(/\r?\n| · | \| /)
+      .map((part) => part.trim())
+      .find((part) => part.length > 0) ?? workspaceId;
+  if (firstLine.length <= 72) {
+    return firstLine;
+  }
+  return `${firstLine.slice(0, 69).trimEnd()}…`;
+}
+
 export function buildFleetHealthGridCells(input: {
   snapshot: FleetHealthSnapshot | null;
   workspaces: WorkspaceRecord[];
   selectedWorkspaceId: string | null;
   maxRows?: number;
+  /** Actively busy teammates keyed by workspace_id. */
+  busyEmployeeCountByWorkspace?: Record<string, number>;
 }): FleetHealthGridCell[] {
   if (!input.snapshot) {
     return [];
@@ -122,23 +149,34 @@ export function buildFleetHealthGridCells(input: {
     }
   }
 
+  const busyByWorkspace = input.busyEmployeeCountByWorkspace ?? {};
+
   return limited.map((row) => {
+    const busyAgents = Math.max(0, busyByWorkspace[row.workspace_id] ?? 0);
     const parts: string[] = [];
+    if (row.active_runs > 0) {
+      parts.push(`${row.active_runs} active`);
+    }
+    if (row.executing_count > 0) {
+      parts.push(`${row.executing_count} running`);
+    }
+    if (busyAgents > 0) {
+      parts.push(`${busyAgents} agent${busyAgents === 1 ? '' : 's'} busy`);
+    }
     if (row.open_signals_count > 0) {
       parts.push(`${row.open_signals_count} signal${row.open_signals_count === 1 ? '' : 's'}`);
     }
     if (row.review_ready_count > 0) {
       parts.push(`${row.review_ready_count} review`);
     }
-    if (row.executing_count > 0) {
-      parts.push(`${row.executing_count} running`);
-    }
     if (row.pending_approvals_count > 0) {
       parts.push(`${row.pending_approvals_count} approval`);
     }
 
+    const isBusy =
+      row.active_runs > 0 || row.executing_count > 0 || busyAgents > 0;
     const summary = parts.length > 0 ? parts.join(' · ') : 'Nominal';
-    const detail = row.top_signal_title?.trim() || row.workspace_id;
+    const detail = compactFleetHealthDetail(row.top_signal_title, row.workspace_id);
 
     return {
       workspaceId: row.workspace_id,
@@ -148,6 +186,13 @@ export function buildFleetHealthGridCells(input: {
       detail,
       isSelected: row.workspace_id === selectedId,
       isBoundProject: boundIds.has(row.workspace_id),
+      isBusy,
+      activeRuns: row.active_runs,
+      busyAgents,
+      openSignals: row.open_signals_count,
+      criticalSignals: row.critical_signals_count,
+      pendingApprovals: row.pending_approvals_count,
+      reviewReady: row.review_ready_count,
     };
   });
 }
@@ -157,10 +202,38 @@ export function fleetHealthHeadline(snapshot: FleetHealthSnapshot | null): strin
     return 'Loading fleet health…';
   }
 
+  const activeRuns = snapshot.items.reduce((sum, row) => sum + row.active_runs, 0);
+  const executing = snapshot.items.reduce((sum, row) => sum + row.executing_count, 0);
+  const inMotion = activeRuns + executing;
   const attention = snapshot.items.filter((row) => row.health !== 'nominal').length;
+
+  if (inMotion > 0 && attention === 0) {
+    return `${inMotion} live job${inMotion === 1 ? '' : 's'} · fleet in motion`;
+  }
+  if (inMotion > 0) {
+    return `${inMotion} live · ${attention} need attention · ${snapshot.connectors.ok}/${snapshot.connectors.configured} connectors ok`;
+  }
   if (attention === 0) {
     return `${snapshot.count} workspace${snapshot.count === 1 ? '' : 's'} · systems nominal`;
   }
 
   return `${attention} workspace${attention === 1 ? '' : 's'} need attention · ${snapshot.connectors.ok}/${snapshot.connectors.configured} connectors ok`;
+}
+
+/** Headline when company roster busy counts are available (Mission Control). */
+export function fleetHealthHeadlineWithCompanyBusy(
+  snapshot: FleetHealthSnapshot | null,
+  busyAgents: number,
+): string {
+  const base = fleetHealthHeadline(snapshot);
+  if (!snapshot || busyAgents <= 0) {
+    return base;
+  }
+  if (base.includes('fleet in motion') || base.includes('live ·')) {
+    return `${busyAgents} agent${busyAgents === 1 ? '' : 's'} busy · ${base}`;
+  }
+  if (base.includes('systems nominal')) {
+    return `${busyAgents} agent${busyAgents === 1 ? '' : 's'} busy · ${snapshot.count} workspace${snapshot.count === 1 ? '' : 's'} live`;
+  }
+  return `${busyAgents} agent${busyAgents === 1 ? '' : 's'} busy · ${base}`;
 }

@@ -92,7 +92,7 @@ describe('resolveIdeThreadEmployeeFailure', () => {
         }),
       ],
     });
-    expect(hint).toContain('Last shift failed');
+    expect(hint).toContain('Last job failed');
     expect(hint).toContain('assertion failed');
   });
 
@@ -105,6 +105,22 @@ describe('resolveIdeThreadEmployeeFailure', () => {
             status: 'executing',
             last_outcome: 'failed',
             last_outcome_detail: 'timeout',
+          }),
+        ],
+      }),
+    ).toBeNull();
+  });
+
+  it('clears the failure line when a stale failed tag has a success detail', () => {
+    expect(
+      resolveIdeThreadEmployeeFailure({
+        thread: { employee_id: 'employee-workspace_axon_watch-integrations-4' },
+        employees: [
+          employee({
+            status: 'idle',
+            last_outcome: 'failed',
+            last_outcome_detail: 'Run completed',
+            last_run_id: 'run_133bac69735e',
           }),
         ],
       }),
@@ -197,7 +213,9 @@ describe('resolveIdeThreadEmployeeFailureDetailTooltip', () => {
       thread: { employee_id: 'employee-workspace_axon_watch-frontend-2' },
       employees: [failed],
     });
-    expect(tooltip).toBe(longDetail);
+    expect(tooltip).toBe(
+      'Cursor usage signal on this shift — Auto+Composer may still have headroom or on-demand spend. Check Usage, then retry.',
+    );
   });
 });
 

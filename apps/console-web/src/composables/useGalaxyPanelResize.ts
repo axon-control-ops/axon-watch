@@ -62,6 +62,16 @@ export function useGalaxyPanelResize(options: UseGalaxyPanelResizeOptions) {
       (speechCollapseActive.value && !holdOpenDuringSpeech.value),
   );
 
+  function resolveWorkbench(): HTMLElement | null {
+    const stage = options.stageRef.value;
+    return (
+      (stage?.closest('.region-center-workbench') as HTMLElement | null) ??
+      (typeof document !== 'undefined'
+        ? (document.querySelector('.region-center-workbench') as HTMLElement | null)
+        : null)
+    );
+  }
+
   function applyCssVars(): void {
     const stage = options.stageRef.value;
     const leftWidth = leftCollapsed.value
@@ -78,16 +88,23 @@ export function useGalaxyPanelResize(options: UseGalaxyPanelResizeOptions) {
       }
     }
     // Mirror onto the center workbench so floating captions share insets.
-    const workbench =
-      (stage?.closest('.region-center-workbench') as HTMLElement | null) ??
-      (typeof document !== 'undefined'
-        ? (document.querySelector('.region-center-workbench') as HTMLElement | null)
-        : null);
+    const workbench = resolveWorkbench();
     if (workbench) {
       for (const [name, value] of vars) {
         workbench.style.setProperty(name, value);
       }
     }
+  }
+
+  function clearMirroredWorkbenchVars(): void {
+    const workbench = resolveWorkbench();
+    if (!workbench) {
+      return;
+    }
+    workbench.style.removeProperty('--galaxy-left-width');
+    workbench.style.removeProperty('--galaxy-right-width');
+    workbench.style.removeProperty('--galaxy-inspector-width');
+    workbench.style.removeProperty('--galaxy-bottom-reserve');
   }
 
   function setWidth(kind: GalaxyPanelKind, next: number, persist = true): void {
@@ -216,6 +233,7 @@ export function useGalaxyPanelResize(options: UseGalaxyPanelResizeOptions) {
 
   onBeforeUnmount(() => {
     window.removeEventListener('resize', syncViewport);
+    clearMirroredWorkbenchVars();
     if (resizing.value) {
       document.body.style.cursor = '';
       document.body.style.userSelect = '';

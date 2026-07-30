@@ -89,6 +89,30 @@ describe('runtime strip helpers', () => {
     ]);
   });
 
+  it('shows remote ingress warning instead of local degraded for public tunnel failures', () => {
+    expect(
+      buildTopbarChips({
+        runtimeSummary: {
+          ...runtimeSummary,
+          degraded: {
+            active: true,
+            reasons: ['process up; public health failed (Name or service not known)'],
+          },
+        },
+        runtimeSummaryLoadState: 'loaded',
+        primaryActiveRun: null,
+      }),
+    ).toEqual([
+      { id: 'watch', label: 'watch connected', tone: 'success' },
+      {
+        id: 'remote',
+        label:
+          'remote ingress · process up; public health failed (Name or service not known)',
+        tone: 'warning',
+      },
+    ]);
+  });
+
   it('keeps status bar segments short and count-focused', () => {
     expect(
       buildStatusBarSegments({

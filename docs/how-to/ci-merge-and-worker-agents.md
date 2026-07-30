@@ -1,14 +1,18 @@
 # CI, merge workflow, and worker agents
 
-**Updated:** 2026-07-22
+**Updated:** 2026-07-30
 
 This chapter explains how Axon-X lands code through GitHub CI, how that relates
 to the `dev` branch, and how **company employee agents** (the roster in IDE /
 Mission Control) work — including how to tell whether they are actually running
 and how good the automation is today.
 
+It also covers **DashPro self-hosted CI** (plain English + RAM) and why
+**canary OTA** is not an “EAS Build” in the Expo UI.
+
 **Related:** [`docs/CI_GATES.md`](../CI_GATES.md), [`docs/planning/EXECUTION_PLAN.md`](../planning/EXECUTION_PLAN.md),
-[`recent-operator-features.md`](recent-operator-features.md)
+[`recent-operator-features.md`](recent-operator-features.md),
+[`docs/planning/DASHPRO_CI_AGENT_PLAYBOOK.md`](../planning/DASHPRO_CI_AGENT_PLAYBOOK.md)
 
 ---
 
@@ -69,6 +73,21 @@ gh run view --log-failed
 **Axon-X company ownership:** Rowan (watcher) + Mira (Lead) own Fast Gate for
 `workspace_axon_watch`. Quinn (integrations) supports Actions wiring.
 
+### How to know older red runs are “fixed”
+
+GitHub **never** flips a finished red run green. Older failures on the same
+branch stay red forever. The only merge signal that matters is the **tip of the
+branch**:
+
+1. `git rev-parse HEAD` matches the green Fast Gate run’s `headSha`.
+2. `gh run list --branch <branch> --workflow "Axon-X Fast Gate" --limit 1`
+   shows `conclusion=success`.
+3. Or Actions UI: newest Fast Gate on that branch is green for the same commit.
+
+Typical early fails: hard **file-size ratchets**, planning **manifest hash**
+drift, or missing **workspace bindings**. Fix tip → push → watch Fast Gate.
+Uncommitted local WIP is not CI-proven until it is committed, pushed, and green.
+
 ### What Fast Gate runs (~2–3 minutes)
 
 1. **`npm run verify:contracts`** — shared types, control-plane/watch contract
@@ -107,7 +126,22 @@ is green. Always read the check on the **PR** itself.
 npm run verify:preflight   # via scripts/sc on commit — blocks bad commits locally
 npm run verify:contracts   # fastest backend + ratchet signal
 cd apps/console-web && npm run typecheck && npm run test
+git status --short         # must contain no source changes or local runtime artifacts
 ```
+
+Before opening a PR, fetch `dev`, integrate it on the feature branch, rerun the
+preflight, and inspect the complete branch diff:
+
+```bash
+git fetch origin dev
+git merge origin/dev
+git diff --check
+git diff --stat origin/dev...HEAD
+```
+
+Do not merge the feature branch directly into protected `dev`, force-push, or
+hide a failing check. Local runtime artifacts (`control-plane.sqlite3`, debug
+logs, shell completion dumps) are not source and must remain ignored.
 
 Full local bundle (slower):
 
@@ -173,6 +207,7 @@ Guards (so one restart cannot flood the fleet):
 | `AXON_WATCH_WORKER_SCHEDULER_DISPATCH` | `1` | Lane B dispatch after `create_run` |
 | `AXON_WATCH_WORKER_SCHEDULER_INTERVAL_SECONDS` | `45` | Tick interval |
 | `AXON_WATCH_WORKER_RUN_STALE_SECONDS` | `720` | Fail/cancel idle role-tagged shifts older than this |
+| `AXON_WATCH_LEAD_RUN_STALE_SECONDS` | `1800` | Lead-role idle TTL (defaults to at least 30m so fan-out / board work survives) |
 | `AXON_WATCH_EMPLOYEE_RUN_RETENTION_PER_ROLE` | `8` | Keep this many finished role-tagged runs per workspace/role |
 | `AXON_WATCH_REVIEW_READY_STALE_SECONDS` | `14400` | Auto-complete idle untagged `review_ready` checkpoints older than this |
 
@@ -230,6 +265,62 @@ for r in runs:
 **Bad sign (phantom worker):** `executing` forever with **no** `cursor-agent`
 process and **no** `runtime_dispatch` receipt on the run history.
 
+### When Team says “last job failed” (verify before retrying)
+
+The red Team badge is a **roster projection**, not the authoritative run result.
+Before tapping **Try again** on the agent review strip (above the composer), compare these three surfaces:
+
+```bash
+# 1. Current roster projection
+curl -sS http://127.0.0.1:8787/api/workspaces/workspace_axon_watch/company \
+  | python3 -m json.tool
+
+# 2. Authoritative run record
+curl -sS http://127.0.0.1:8787/api/runs/<run_id> | python3 -m json.tool
+
+# 3. Transition/receipt history (the reason, not only the red label)
+curl -sS http://127.0.0.1:8787/api/runs/<run_id>/history \
+  | python3 -m json.tool
+```
+
+Interpret the result:
+
+- `phase=completed` plus `operator_complete` is success. Do **not** retry it
+  because an older red badge or a sentence inside the transcript says “failed”.
+- `phase=failed` plus `run_failed` is a real run failure. Read its receipt.
+- `finalization_error` after `run_failed` is usually a **late-result race**:
+  the scheduler failed the run first; Cursor returned later and could no longer
+  complete a run already in `failed`.
+- A Lead rollup saying `0 completed · 2 failed` can mean **two specialist
+  assignments failed**, not that the Lead process failed twice.
+- `missing or failing acceptance_evidence (Gate 6)` means the specialist did
+  work but did not deliver a passing acceptance receipt.
+- `Critical Review Clause missing` means the final answer omitted the required
+  terminal `Confidence: N/10` line. This is a delivery-contract failure, not
+  proof that the implementation itself was wrong.
+- If roster says failed but the newest role run is completed, refresh/reopen
+  Team and wait for the next company poll. Do not create another retry loop.
+
+#### Mira incident receipt — 29 Jul 2026
+
+What looked like “Mira failed twice” was three different facts:
+
+1. Lead plan `lead-plan-78bfcac685b74588` had **two failed specialist tasks**
+   (Quinn/integrations and Rowan/watcher). Both exhausted their three-attempt
+   budgets. The surfaced blockers were Gate 6 acceptance evidence and the
+   missing Confidence clause.
+2. Mira retry runs `run_dc05055ef75f` and `run_fa7cc11f311e` did **not** fail:
+   both reached `completed`; Critical Review recorded 7/10 and 8/10.
+3. The real older Mira failure was `run_333574cdce66`: the scheduler marked it
+   failed after `753s > 720s` without progress. Cursor returned about two
+   minutes later, so finalization also logged
+   `complete requires ... found failed`. That is one timed-out run with a late
+   finalization error, not two independent implementation failures.
+
+The safe operator response is: open run history, identify whether the failure
+belongs to Lead or a specialist, fix the named delivery contract, then retry
+**once**. Confirm the retry reaches `completed` before trying again.
+
 ### 3. Live CLI processes
 
 ```bash
@@ -281,6 +372,103 @@ branches, or SA-2 coaching — that is the next execution slices on `dev`.
 
 ---
 
+## DashPro self-hosted CI — plain English
+
+### The one-sentence version
+
+GitHub Actions for DashPro’s heavy Android / Quality pipeline does **not** rent
+GitHub’s cloud machines by default. It asks **your PC** (a registered “runner”
+named like `edudashpro-dashpro-2`) to do the work. If that runner is offline or
+busy, the Actions UI shows **Queued**.
+
+### How it works (kitchen analogy)
+
+1. You push a branch or open a PR → GitHub posts a job on the Actions board.
+2. The workflow says: “Only a machine tagged `self-hosted` + `dashpro` may take this.”
+3. The runner service on this host (`actions-runner-dashpro.service`) is the waiter
+   that claims those jobs and runs the scripts (npm, Jest, Android tools, …).
+4. When the waiter is asleep (GitHub status **offline**) or already serving another
+   table (**busy**), new jobs wait in line — that is the yellow **Queued** state.
+5. Axon company agents (Cass / Soren / Dana) are **not** the GitHub runner. They
+   are separate Cursor workers. The Actions “Agents” tab on github.com is also
+   unrelated GitHub product UI.
+
+### Will this drain our RAM?
+
+**It can — and it has before.** Quality Gates previously peaked near ~18G RAM /
+heavy swap and froze the desktop. That is why the runner unit is capped:
+
+| Limit | Value | Meaning |
+|-------|-------|---------|
+| `MemoryHigh` | 8G | Soft pressure — kernel starts reclaiming |
+| `MemoryMax` | 10G | Hard kill ceiling for the runner cgroup |
+| `MemorySwapMax` | 4G | Cap on swap the runner may use |
+
+Idle listener is usually well under **1G**. A Quality Gates / Unit Tests /
+Android job can climb toward the cap. **Do not** stack a full Android CI graph
+with Cursor open **and** a local Expo/EAS OTA export (OTA scripts also set
+`NODE_OPTIONS=--max-old-space-size=8192`). Prefer one heavy job at a time.
+
+Check live pressure:
+
+```bash
+systemctl --user status actions-runner-dashpro.service
+free -h
+gh api repos/axon-control-ops/dashpro/actions/runners --jq '.runners[] | {name,status,busy}'
+```
+
+If systemd shows the service **running** but GitHub still says **offline**, the
+listener lost its session — restart the user unit, then confirm GitHub status
+flips to `online`:
+
+```bash
+systemctl --user restart actions-runner-dashpro.service
+```
+
+### What “worker / run_…” means in the Actions header
+
+That string is usually the **git branch name** from a company worker
+(`worker/run_<id>`), not proof that a runner is currently executing the job.
+
+---
+
+## DashPro canary OTA vs EAS Build — why you may not see a build
+
+### Plain English
+
+**Canary OTA** (`npm run ota:canary` in the DashPro project) publishes a
+**JavaScript/asset update** to the Expo **`operator-canary`** branch via
+`eas update`. That is **not** a native store binary rebuild.
+
+| You might look for | What canary OTA actually is |
+|--------------------|-----------------------------|
+| **EAS Build** (new APK/AAB/IPA) | **No** — not this path |
+| **EAS Update** / Updates feed for branch `operator-canary` | **Yes** — after local export finishes |
+| GitHub Actions “Android CI/CD Pipeline” | Separate — PR/push CI on the self-hosted runner |
+| Team dock “Watch CI” / draft PR chips | GitHub delivery receipts — **not** Expo Update URLs |
+
+### Why Dana’s thread looks busy but Expo still shows no build
+
+Typical sequence for `ota:canary`:
+
+1. Release guard checks the branch/gates.
+2. `eas update …` starts → **local** `expo export` (iOS + Android) with a large
+   Node heap — this can take many minutes and uses ~1G+ RSS on the host.
+3. Only after export succeeds does the update upload to Expo’s cloud.
+4. Until step 3, the Expo dashboard has **no new Update** (and never an EAS Build
+   for this command).
+
+Watch progress on:
+
+- Dana’s **IDE thread / terminal** (the live `expo export` / `eas update` lines)
+- Expo dashboard → **Updates** (branch `operator-canary`), not Builds
+- Host processes: `pgrep -af 'eas update|expo export'`
+
+Axon Mission Control does **not** currently mirror Expo Update URLs the way it
+mirrors GitHub PR/CI links on the Team dock.
+
+---
+
 ## Quick reference commands
 
 ```bash
@@ -293,6 +481,10 @@ gh pr create --base dev --head feat/my-slice --title "..." --body "..."
 
 # PR checks
 gh pr checks
+
+# DashPro self-hosted runner (this PC)
+systemctl --user status actions-runner-dashpro.service
+gh api repos/axon-control-ops/dashpro/actions/runners --jq '.runners[] | {name,status,busy}'
 
 # Worker scheduler tests
 PYTHONPATH=services/control-plane python3 -B -m unittest tests.test_workspace_agent_scheduler -q

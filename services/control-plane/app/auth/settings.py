@@ -62,5 +62,21 @@ def is_remotely_reachable() -> bool:
     return not _host_is_loopback(host)
 
 
+def vault_auto_unlock_allowed() -> bool:
+    """
+    Whether control-plane may enable / rely on vault auto-unlock.
+
+    Remotely reachable hosts refuse by default. Trusted always-on operator hosts
+    may set AXON_WATCH_ALLOW_VAULT_AUTO_UNLOCK=1 without weakening local_token /
+    origin / internal-service-token containment.
+    """
+    raw = os.environ.get("AXON_WATCH_ALLOW_VAULT_AUTO_UNLOCK", "").strip().lower()
+    if raw in {"1", "true", "yes", "on"}:
+        return True
+    if raw in {"0", "false", "no", "off"}:
+        return False
+    return not is_remotely_reachable()
+
+
 def client_is_loopback(host: str | None) -> bool:
     return _host_is_loopback(host)

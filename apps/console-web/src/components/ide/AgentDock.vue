@@ -3,7 +3,6 @@ import { computed, onMounted, ref } from 'vue';
 
 import ConversationSeamPanel from '../ConversationSeamPanel.vue';
 import { useRightDockResize } from '../../composables/useRightDockResize';
-import { useVerticalPanelResize } from '../../composables/useVerticalPanelResize';
 import {
   agentDockCollapseTitle,
   agentDockReopenAlive,
@@ -14,7 +13,6 @@ import {
 } from '../../lib/agent-dock-reopen-view';
 import AgentDockComposer from './AgentDockComposer.vue';
 import AgentDockThreadTabbar from './AgentDockThreadTabbar.vue';
-import AgentDockWorkspaceMenu from './AgentDockWorkspaceMenu.vue';
 import IdeAgentReviewStrip from './IdeAgentReviewStrip.vue';
 import { useShellStore } from '../../stores/shell';
 
@@ -56,25 +54,6 @@ const {
   collapsed: computed(() => shell.agentDockCollapsed),
 });
 
-const {
-  panelSize: composerHeight,
-  userSized: composerUserSized,
-  resizing: composerResizing,
-  ariaValueMin: composerHeightMin,
-  ariaValueMax: composerHeightMax,
-  resetSize: resetComposerHeight,
-  startResize: startComposerResize,
-  onResizeKeydown: onComposerResizeKeydown,
-} = useVerticalPanelResize({
-  rootRef: dockRef,
-  cssVariable: '--agent-dock-composer-height',
-  storageKey: 'axon-shell-agent-dock-composer-height',
-  defaultSize: (height) => Math.min(Math.round(height * 0.34), 280),
-  minSize: 160,
-  maxSize: (height) => Math.round(height * 0.62),
-  growsUp: true,
-});
-
 function collapseDock(): void {
   shell.toggleAgentDock();
 }
@@ -102,8 +81,6 @@ onMounted(() => {
     class="region region-right-dock agent-dock"
     :class="{
       'agent-dock--resizing': resizing,
-      'agent-dock--composer-resizing': composerResizing,
-      'agent-dock--composer-user-sized': composerUserSized,
       'agent-dock--alive': dockAlive,
       'agent-dock--streaming': shell.agentStreamActive,
     }"
@@ -125,16 +102,16 @@ onMounted(() => {
       <span class="agent-dock__resize-grip" aria-hidden="true" />
     </div>
 
-    <header class="agent-dock__header agent-dock__header--compact agent-dock__header--ide">
-      <div class="agent-dock__head-row">
-        <div class="agent-dock__head-main">
-          <AgentDockWorkspaceMenu />
-          <div v-if="shell.pendingApprovalsCount" class="agent-dock__head-pills" aria-label="Agent attention">
-            <span v-if="shell.pendingApprovalsCount" class="agent-dock__pill agent-dock__pill--approvals">
-              {{ shell.pendingApprovalsCount }} approval{{ shell.pendingApprovalsCount === 1 ? '' : 's' }}
-            </span>
-          </div>
-        </div>
+    <header class="agent-dock__header agent-dock__header--compact agent-dock__header--ide agent-dock__header--chat">
+      <div class="agent-dock__chat-chrome">
+        <AgentDockThreadTabbar />
+        <span
+          v-if="shell.pendingApprovalsCount"
+          class="agent-dock__pill agent-dock__pill--approvals"
+          :title="`${shell.pendingApprovalsCount} pending approval${shell.pendingApprovalsCount === 1 ? '' : 's'}`"
+        >
+          {{ shell.pendingApprovalsCount }}
+        </span>
         <button
           type="button"
           class="agent-dock__collapse"
@@ -145,39 +122,13 @@ onMounted(() => {
           ×
         </button>
       </div>
-      <div class="agent-dock__head-tabs">
-        <AgentDockThreadTabbar />
-      </div>
     </header>
 
     <section class="agent-dock__thread">
-      <div
-        v-if="shell.threadStateLabel"
-        class="agent-dock__section-header agent-dock__section-header--compact"
-      >
-        <p class="agent-dock__section-meta">{{ shell.threadStateLabel }}</p>
-      </div>
       <div class="agent-dock__transcript">
         <ConversationSeamPanel />
       </div>
     </section>
-
-    <div
-      class="agent-dock__composer-resize-handle"
-      role="separator"
-      aria-orientation="horizontal"
-      aria-label="Resize agent composer"
-      title="Drag the top of the composer up or down. Double-click to reset."
-      tabindex="0"
-      :aria-valuemin="composerHeightMin"
-      :aria-valuemax="composerHeightMax"
-      :aria-valuenow="composerHeight"
-      @mousedown="startComposerResize"
-      @keydown="onComposerResizeKeydown"
-      @dblclick="resetComposerHeight"
-    >
-      <span class="agent-dock__composer-resize-grip" aria-hidden="true" />
-    </div>
 
     <footer class="agent-dock__composer">
       <IdeAgentReviewStrip />

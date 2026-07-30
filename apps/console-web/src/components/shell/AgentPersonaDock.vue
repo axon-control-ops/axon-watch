@@ -20,12 +20,16 @@ import {
   employeeShiftNeedsContinuation,
   employeeStatusLabel,
   employeeTalkLine,
+  employeeTalkLineDetailTooltip,
 } from '../../features/workspace-agents/company-roster-view';
+import { resolveEmployeeDeliveryLinks } from '../../features/workspace-agents/employee-delivery-handoff-view';
 
 const props = defineProps<{
   employee: CompanyEmployeeRecord;
   actions: TeamMemberQuickAction[];
   controlBusy: boolean;
+  liveBusy?: boolean;
+  handoffWaiting?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -33,11 +37,32 @@ const emit = defineEmits<{
   talk: [];
 }>();
 
-const avatar = computed(() => buildEmployeeAvatar(props.employee));
-const failure = computed(() => employeeFailureLine(props.employee));
-const interruptedShift = computed(() => employeeShiftNeedsContinuation(props.employee));
+const avatar = computed(() =>
+  buildEmployeeAvatar(props.employee, {
+    liveBusy: props.liveBusy,
+    handoffWaiting: props.handoffWaiting,
+  }),
+);
+const failure = computed(() =>
+  employeeFailureLine(props.employee, { liveBusy: props.liveBusy }),
+);
+const interruptedShift = computed(() =>
+  Boolean(failure.value) && employeeShiftNeedsContinuation(props.employee),
+);
 const failureDetailTooltip = computed(() => employeeFailureDetailTooltip(props.employee));
 const failureBeatAriaLabel = computed(() => employeeFailureBeatAriaLabel(props.employee));
+const beatDetailTooltip = computed(
+  () => failureDetailTooltip.value || employeeTalkLineDetailTooltip(props.employee),
+);
+const deliveryLinks = computed(() =>
+  resolveEmployeeDeliveryLinks({
+    stage: props.employee.pipeline_stage,
+    detail: props.employee.pipeline_detail,
+    draftPrUrl: props.employee.draft_pr_url,
+    ciRunUrl: props.employee.ci_run_url,
+    ciStatus: props.employee.ci_status,
+  }),
+);
 const liveBeat = computed(() => {
   if (failure.value) {
     return failure.value;
@@ -81,8 +106,9 @@ const displayActions = computed(() =>
           :data-lead="avatar.lead ? 'true' : undefined"
         >
           <span
-            v-if="avatar.presence === 'working'"
+            v-if="avatar.presence === 'working' || avatar.presence === 'handoff'"
             class="agent-persona-dock__busy-ring"
+            :class="{ 'agent-persona-dock__busy-ring--handoff': avatar.presence === 'handoff' }"
             aria-hidden="true"
           />
           <img
@@ -138,7 +164,7 @@ const displayActions = computed(() =>
         'agent-persona-dock__beat--failed': !!failure && !interruptedShift,
         'agent-persona-dock__beat--interrupted': !!failure && interruptedShift,
       }"
-      :title="failureDetailTooltip"
+      :title="beatDetailTooltip ?? undefined"
       :aria-label="failureBeatAriaLabel ?? undefined"
       :aria-live="failure ? 'polite' : undefined"
       role="status"
@@ -146,8 +172,38 @@ const displayActions = computed(() =>
       {{ liveBeat }}
     </p>
 
+    <div
+      v-if="deliveryLinks"
+      class="agent-persona-dock__delivery-links"
+      aria-label="Open pull request and CI"
+    >
+      <a
+        v-if="deliveryLinks.draftPrUrl"
+        class="agent-persona-dock__delivery-link"
+        :href="deliveryLinks.draftPrUrl"
+        target="_blank"
+        rel="noopener noreferrer"
+      >
+        {{
+          deliveryLinks.prNumber
+            ? `Open PR #${deliveryLinks.prNumber}`
+            : 'Open draft PR'
+        }}
+        <template v-if="deliveryLinks.running"> · running</template>
+      </a>
+      <a
+        v-if="deliveryLinks.ciRunUrl"
+        class="agent-persona-dock__delivery-link"
+        :href="deliveryLinks.ciRunUrl"
+        target="_blank"
+        rel="noopener noreferrer"
+      >
+        Watch CI
+      </a>
+    </div>
+
     <section v-if="receiptDetail || receiptRunId" class="agent-persona-dock__receipt">
-      <p class="agent-persona-dock__receipt-label">Last shift</p>
+      <p class="agent-persona-dock__receipt-label">Last job</p>
       <p v-if="receiptDetail" class="agent-persona-dock__receipt-detail">
         {{ receiptDetail }}
       </p>
@@ -160,7 +216,7 @@ const displayActions = computed(() =>
           type="button"
           class="agent-persona-dock__receipt-run-btn"
           :title="receiptRunId"
-          :aria-label="`Explain receipts for ${receiptRunLabel || receiptRunId}`"
+          :aria-label="`Explain what happened for ${receiptRunLabel || receiptRunId}`"
           @click="emit('action', receiptsAction)"
         >
           {{ receiptRunLabel || receiptRunId }}
@@ -185,6 +241,7 @@ const displayActions = computed(() =>
           'company-roster__action--retry': action.id === 'retry',
           'company-roster__action--receipts': action.id === 'receipts',
           'company-roster__action--control': action.kind === 'control',
+          'company-roster__action--start-now': action.id === 'start_now',
         }"
         :disabled="controlBusy && action.kind === 'control'"
         @click="emit('action', action)"

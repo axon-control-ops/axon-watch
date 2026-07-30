@@ -7,7 +7,10 @@ import {
   filterSlashPaletteRows,
   isComposerSkillFilePath,
   listComposerSkillFileTokens,
+  longestCommonSlashPrefix,
   prependComposerSkillFileTokens,
+  resolveSlashTabAction,
+  SLASH_STATUS_PROMPT,
   stripComposerSkillFileTokens,
 } from './composer-slash-skills-view';
 
@@ -33,16 +36,74 @@ const skills = [
 ];
 
 describe('composer-slash-skills-view', () => {
-  it('builds skill and mode rows', () => {
+  it('lists modes before skills so / opens with Ask/Agent first', () => {
     const rows = buildSlashPaletteCatalog(skills, 'workspace_axon_watch');
+    expect(rows[0]?.command).toBe('/ask');
+    expect(rows.some((row) => row.command === '/status')).toBe(true);
     expect(rows.some((row) => row.command === '/super-coder')).toBe(true);
-    expect(rows.some((row) => row.command === '/agent')).toBe(true);
+    expect(rows.findIndex((row) => row.command === '/ask')).toBeLessThan(
+      rows.findIndex((row) => row.command === '/super-coder'),
+    );
   });
 
-  it('filters by query prefix', () => {
+  it('clarifies Lead Ask vs Agent fan-out copy', () => {
+    const rows = buildSlashPaletteCatalog(skills, 'workspace_axon_watch', {
+      leadThread: true,
+    });
+    expect(rows.find((row) => row.command === '/ask')?.detail).toMatch(/no specialist/i);
+    expect(rows.find((row) => row.command === '/agent')?.detail).toMatch(/fan out/i);
+  });
+
+  it('ranks command prefix matches ahead of weak includes', () => {
+    const rows = filterSlashPaletteRows(buildSlashPaletteCatalog(skills), 'ask');
+    expect(rows[0]?.command).toBe('/ask');
+  });
+
+  it('filters skill query by prefix', () => {
     const rows = filterSlashPaletteRows(buildSlashPaletteCatalog(skills), 'super');
     expect(rows).toHaveLength(1);
     expect(rows[0]?.command).toBe('/super-coder');
+  });
+
+  it('computes longest common slash prefix for Tab', () => {
+    expect(longestCommonSlashPrefix(['/ask', '/agent'])).toBe('a');
+    expect(longestCommonSlashPrefix(['/status', '/status'])).toBe('status');
+    expect(longestCommonSlashPrefix(['/ask', '/plan'])).toBe('');
+  });
+
+  it('resolves Tab to complete before apply', () => {
+    expect(
+      resolveSlashTabAction({
+        query: '',
+        selectedCommand: '/ask',
+        filteredCommands: ['/ask', '/agent'],
+      }),
+    ).toBe('complete-common');
+    expect(
+      resolveSlashTabAction({
+        query: 'a',
+        selectedCommand: '/ask',
+        filteredCommands: ['/ask', '/agent'],
+      }),
+    ).toBe('complete-selected');
+    expect(
+      resolveSlashTabAction({
+        query: 'as',
+        selectedCommand: '/ask',
+        filteredCommands: ['/ask'],
+      }),
+    ).toBe('complete-selected');
+    expect(
+      resolveSlashTabAction({
+        query: 'ask',
+        selectedCommand: '/ask',
+        filteredCommands: ['/ask'],
+      }),
+    ).toBe('apply');
+  });
+
+  it('keeps status prompt constant for /status', () => {
+    expect(SLASH_STATUS_PROMPT).toMatch(/status of everything/i);
   });
 
   it('applies slash skill without dumping raw @file into the draft', () => {

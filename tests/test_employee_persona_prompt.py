@@ -33,6 +33,8 @@ class EmployeePersonaPromptTests(unittest.TestCase):
         self.assertIn("You are Quinn. Your role is integrations for workspace workspace_axon_watch.", line)
         self.assertIn("You own: connectors, watch service, and cross-repo wiring.", line)
         self.assertIn("Always speak in first person", line)
+        self.assertIn("never hallucinate", line)
+        self.assertIn("20+ years", line)
 
     def test_appendix_none_without_employee_id(self) -> None:
         self.assertIsNone(
@@ -108,8 +110,43 @@ class EmployeePersonaPromptTests(unittest.TestCase):
         assert appendix is not None
         self.assertIn("You are Dana. Your role is lead", appendix)
         self.assertIn("never rediscover staffing by searching the tree", appendix)
+        self.assertIn("Here's where things stand and what I changed.", appendix)
         self.assertIn("Priya (Frontend / frontend)", appendix)
         self.assertIn("Do NOT Glob, Grep, or Read", appendix)
+
+    def test_specialist_appendix_requires_lead_handoff_without_name_stamping(self) -> None:
+        roster_row = {
+            "employee_id": "employee-workspace_dashpro-frontend-1",
+            "name": "Priya",
+            "role": "frontend",
+            "role_label": "Frontend",
+            "owns": "payments UI",
+        }
+        with patch(
+            "app.workspace_agents.employee_persona_prompt.find_roster_employee",
+            return_value=roster_row,
+        ), patch(
+            "app.workspace_agents.employee_persona_prompt.build_team_roster_context",
+            return_value="",
+        ):
+            appendix = build_employee_persona_appendix(
+                workspace_id="workspace_dashpro",
+                employee_id="employee-workspace_dashpro-frontend-1",
+                employee_role="frontend",
+            )
+        assert appendix is not None
+        self.assertIn("report finished work to your company Lead", appendix)
+        self.assertIn("Never announce your name or role mid-reply", appendix)
+        self.assertIn("Sir King", appendix)
+        self.assertIn("On it", appendix)
+        self.assertIn("short first-person progress line", appendix)
+        self.assertIn("Never announce assuming a persona", appendix)
+        self.assertNotIn('e.g. "Pulling Priya\'s shift receipts now, Sir King."', appendix)
+        self.assertIn("Never speak about yourself in the third person", appendix)
+        self.assertIn("I am doing this as Priya", appendix)
+        self.assertIn("I am wiring Copy Link", appendix)
+        self.assertIn("Priya is planning", appendix)
+        self.assertIn("I am planning activities and assignments", appendix)
 
     def test_appendix_fallback_when_roster_misses(self) -> None:
         with patch(

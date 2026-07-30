@@ -6,6 +6,7 @@ from app.persistence import handoff_store
 from app.runs.service import is_background_employee_run, list_operator_facing_runs
 from app.workspace_agents import get_workspace_agent_record
 from app.workspace_catalog import WorkspaceNotFoundError, get_workspace_record
+from app.workspace_handoff_routing import route_cross_workspace_ticket
 
 
 class WorkspaceHandoffError(ValueError):
@@ -72,6 +73,8 @@ def create_workspace_handoff(
         task=task_text,
         reason=reason,
     )
+    # Automatic ticket routing: target task + specialty route + team communication.
+    handoff = route_cross_workspace_ticket(handoff)
     target_workspace = get_workspace_record(target_id)
     target_workspace_summary = build_target_workspace_summary(target_id)
 
@@ -79,6 +82,9 @@ def create_workspace_handoff(
         "handoff": handoff,
         "target_workspace": target_workspace,
         "target_workspace_summary": target_workspace_summary,
+        "target_task_id": handoff.get("target_task_id"),
+        "routed_role": handoff.get("routed_role") or "",
+        "communication_thread_id": handoff.get("communication_thread_id"),
         "source_agent": get_workspace_agent_record(source_id),
         "target_agent": get_workspace_agent_record(target_id),
     }

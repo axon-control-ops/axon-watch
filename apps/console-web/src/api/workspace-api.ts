@@ -22,6 +22,14 @@ export interface WorkspaceHandoffCreateResponse {
   handoff: Record<string, unknown>;
   target_workspace: WorkspaceRecord;
   target_workspace_summary: Record<string, unknown>;
+  target_task_id?: string | null;
+  routed_role?: string;
+  communication_thread_id?: string | null;
+}
+
+export interface WorkspaceHandoffListSnapshot {
+  items: Array<Record<string, unknown>>;
+  count: number;
 }
 
 export interface WorkspaceFileEntry {
@@ -88,6 +96,17 @@ export async function createWorkspaceHandoff(
   );
 }
 
+export async function listWorkspaceHandoffs(
+  workspaceId: string,
+): Promise<WorkspaceHandoffListSnapshot> {
+  const encoded = encodeURIComponent(workspaceId);
+  return fetchJson<WorkspaceHandoffListSnapshot>(
+    `/api/workspaces/${encoded}/handoffs`,
+    {},
+    'workspace handoffs request failed',
+  );
+}
+
 export async function fetchWorkspaces(options?: {
   scope?: 'all' | 'operator';
 }): Promise<WorkspaceListSnapshot> {
@@ -134,6 +153,39 @@ export async function fetchWorkspace(workspaceId: string): Promise<WorkspaceReco
     `/api/workspaces/${workspaceId}`,
     {},
     'workspace request failed',
+  );
+}
+
+export type WorkspaceComposerPrefs = {
+  workspace_id: string;
+  cursor_cli_model: string;
+  updated_at: string | null;
+};
+
+export async function fetchWorkspaceComposerPrefs(
+  workspaceId: string,
+): Promise<WorkspaceComposerPrefs> {
+  const encoded = encodeURIComponent(workspaceId);
+  return fetchJson<WorkspaceComposerPrefs>(
+    `/api/workspaces/${encoded}/composer-prefs`,
+    {},
+    'workspace composer prefs request failed',
+  );
+}
+
+export async function saveWorkspaceComposerPrefs(
+  workspaceId: string,
+  body: { cursor_cli_model: string },
+): Promise<WorkspaceComposerPrefs> {
+  const encoded = encodeURIComponent(workspaceId);
+  return fetchJson<WorkspaceComposerPrefs>(
+    `/api/workspaces/${encoded}/composer-prefs`,
+    {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    },
+    'workspace composer prefs save failed',
   );
 }
 
@@ -295,5 +347,36 @@ export async function deleteWorkspaceTerminalSession(
     `/api/workspaces/${encodedWorkspaceId}/terminal/sessions/${encodedSessionId}`,
     { method: 'DELETE' },
     'workspace terminal session delete failed',
+  );
+}
+
+export type AgentTerminalJobRecord = {
+  job_id: string;
+  workspace_id: string;
+  session_id: string;
+  run_id: string | null;
+  command: string;
+  status: string;
+  created_at: string;
+  receipt: string;
+  agent_terminal_session: TerminalSessionRecord;
+};
+
+export async function enqueueWorkspaceAgentTerminalJob(
+  workspaceId: string,
+  options: { command: string; run_id?: string | null },
+): Promise<AgentTerminalJobRecord> {
+  const encodedWorkspaceId = encodeURIComponent(workspaceId);
+  return fetchJson<AgentTerminalJobRecord>(
+    `/api/workspaces/${encodedWorkspaceId}/terminal/agent-jobs`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        command: options.command,
+        run_id: options.run_id ?? null,
+      }),
+    },
+    'workspace agent terminal job enqueue failed',
   );
 }

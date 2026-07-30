@@ -233,8 +233,8 @@ assert_port_free() {
 
   if port_in_use "${port}"; then
     echo "Configured port ${port} for ${name} is already in use." >&2
-    echo "Run ./scripts/dev/down.sh if this is a stale Axon-Watch stack, or free the port before retrying." >&2
-    echo "If always-on systemd units own the ports, health should pass and ./scripts/dev/up.sh will reuse them." >&2
+    echo "Run ./scripts/dev/down.sh --systemd (or ./scripts/dev/restart.sh) if always-on units own it." >&2
+    echo "Plain ./scripts/dev/down.sh only stops .local/pids bootstrap — not systemd." >&2
     return 1
   fi
 }
@@ -408,4 +408,133 @@ AXON_WATCH_CONSOLE_WEB_PORT=${AXON_WATCH_CONSOLE_WEB_PORT}
 AXON_WATCH_CONTROL_PLANE_PORT=${AXON_WATCH_CONTROL_PLANE_PORT}
 AXON_WATCH_WATCH_SERVICE_PORT=${AXON_WATCH_WATCH_SERVICE_PORT}
 EOF
+}
+
+systemd_unit_for_service() {
+  case "$1" in
+    console-web) printf '%s' "console-web.service" ;;
+    control-plane) printf '%s' "control-plane.service" ;;
+    axon-watch) printf '%s' "axon-watch.service" ;;
+    *)
+      echo "Unknown service: $1" >&2
+      return 1
+      ;;
+  esac
+}
+
+systemd_user_available() {
+  command -v systemctl >/dev/null 2>&1 || return 1
+  systemctl --user show-environment >/dev/null 2>&1
+}
+
+describe_port_owner() {
+  local port="$1"
+  local pids
+  pids="$(list_listener_pids "${port}" | tr '\n' ' ' | sed 's/[[:space:]]*$//')"
+  if [[ -z "${pids}" ]]; then
+    printf 'none'
+    return 0
+  fi
+
+  local pid
+  pid="$(printf '%s\n' ${pids} | head -1)"
+  local unit="bootstrap/orphan"
+  if listener_managed_externally "${pid}"; then
+    local cgroup
+    cgroup="$(grep -oE '[^/]+\.service' "/proc/${pid}/cgroup" 2>/dev/null | tail -1 || true)"
+    unit="${cgroup:-systemd}"
+  elif [[ -f "$(service_pid_file "control-plane")" ]] || [[ -f "$(service_pid_file "console-web")" ]]; then
+    unit="dev-bootstrap"
+  fi
+  local cmd
+  cmd="$(ps -o comm= -p "${pid}" 2>/dev/null | tr -d ' ' || true)"
+  printf 'pid=%s cmd=%s owner=%s' "${pids}" "${cmd:-?}" "${unit}"
+}
+
+control_plane_boot_id() {
+  curl -fsS --max-time 3 "$(service_health_url "control-plane")" 2>/dev/null \
+    | python3 -c 'import json,sys; print(json.load(sys.stdin).get("boot_id",""))' 2>/dev/null \
+    || true
+}
+
+print_stack_ownership() {
+  echo "Port ownership:"
+  echo "  console-web   :${AXON_WATCH_CONSOLE_WEB_PORT}  $(describe_port_owner "${AXON_WATCH_CONSOLE_WEB_PORT}")"
+  echo "  control-plane :${AXON_WATCH_CONTROL_PLANE_PORT}  $(describe_port_owner "${AXON_WATCH_CONTROL_PLANE_PORT}")"
+  echo "  axon-watch    :${AXON_WATCH_WATCH_SERVICE_PORT}  $(describe_port_owner "${AXON_WATCH_WATCH_SERVICE_PORT}")"
+  if port_in_use 5173; then
+    echo "  vite-dev      :5173  $(describe_port_owner 5173)  (IDE often uses this; /api proxies to :8787)"
+  fi
+  local boot_id
+  boot_id="$(control_plane_boot_id)"
+  if [[ -n "${boot_id}" ]]; then
+    echo "  control-plane boot_id=${boot_id}"
+  fi
+}
+
+stop_systemd_stack() {
+  systemd_user_available || {
+    echo "systemctl --user unavailable; cannot stop always-on units." >&2
+    return 1
+  }
+  local name unit
+  # Stop console first, then CP, then watch (reverse of dependency).
+  for name in console-web control-plane axon-watch; do
+    unit="$(systemd_unit_for_service "${name}")"
+    if systemctl --user is-active --quiet "${unit}" 2>/dev/null; then
+      echo "Stopping systemd --user ${unit}..."
+      systemctl --user stop "${unit}" || true
+    fi
+  done
+}
+
+restart_systemd_stack() {
+  systemd_user_available || {
+    echo "systemctl --user unavailable; cannot restart always-on units." >&2
+    return 1
+  }
+  local name unit
+  # Start watch → control-plane → console-web.
+  for name in axon-watch control-plane console-web; do
+    unit="$(systemd_unit_for_service "${name}")"
+    echo "Restarting systemd --user ${unit}..."
+    systemctl --user restart "${unit}"
+  done
+
+  local name
+  for name in axon-watch control-plane console-web; do
+    wait_for_http "${name}" "$(service_ready_url "${name}")" 45
+  done
+}
+
+parse_dev_stack_args() {
+  # Sets: DEV_FORCE_RESTART DEV_INCLUDE_SYSTEMD DEV_SKIP_SOFT_CUTOVER
+  DEV_FORCE_RESTART=0
+  DEV_INCLUDE_SYSTEMD=0
+  DEV_SKIP_SOFT_CUTOVER=0
+  local arg
+  for arg in "$@"; do
+    case "${arg}" in
+      --force|--restart|-f)
+        DEV_FORCE_RESTART=1
+        DEV_INCLUDE_SYSTEMD=1
+        ;;
+      --systemd|--all)
+        DEV_INCLUDE_SYSTEMD=1
+        ;;
+      --no-soft-cutover)
+        DEV_SKIP_SOFT_CUTOVER=1
+        AXON_WATCH_SKIP_SOFT_PUBLIC_CUTOVER=1
+        export AXON_WATCH_SKIP_SOFT_PUBLIC_CUTOVER
+        ;;
+      -h|--help)
+        return 2
+        ;;
+      *)
+        echo "Unknown argument: ${arg}" >&2
+        return 2
+        ;;
+    esac
+  done
+  return 0
 }

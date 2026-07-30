@@ -24,7 +24,6 @@
     "layout_mode_attr": "data-layout-mode"
   },
   "ide_dock_markers": {
-    "ide_dock_component": "AgentDock",
-    "thread_section_meta": "agent-dock__section-meta"
+    "ide_dock_component": "AgentDock"
   }
 }

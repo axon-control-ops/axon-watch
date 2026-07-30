@@ -22,6 +22,8 @@ import { useVoiceCockpitPresence } from './features/voice-deck/use-voice-cockpit
 import { useKairoAppVoice } from './features/kairo-conversation/use-kairo-app-voice';
 import MobileVoiceCockpitStrip from './components/shell/MobileVoiceCockpitStrip.vue';
 import VoiceOrbHost from './features/brain-galaxy/VoiceOrbHost.vue';
+import ReportTheaterOverlay from './features/report-theater/ReportTheaterOverlay.vue';
+import './features/report-theater/report-theater.css';
 import HudHoloAtmosphere from './features/hud-holo/HudHoloAtmosphere.vue';
 import { useShellStore } from './stores/shell';
 
@@ -107,6 +109,7 @@ watch(
         return shell.refreshOperatorPresence();
       },
       onSpokenBriefing: () => shell.speakOperatorBriefing(),
+      onSpokenLine: (event) => shell.speakSpokenLine(event),
     });
   },
   { immediate: true },
@@ -144,6 +147,8 @@ onUnmounted(() => {
         'console-shell--operator': shell.layoutMode === 'operator',
         'console-shell--brain-galaxy':
           shell.layoutMode === 'operator' && shell.operatorBrainGalaxyActive,
+        'console-shell--mission-control':
+          shell.layoutMode === 'operator' && !shell.operatorBrainGalaxyActive,
         'console-shell--glass3d': !isFoundationSurface,
         'console-shell--vault': isVaultSurface,
         'console-shell--data': isDataSurface,
@@ -170,5 +175,6 @@ onUnmounted(() => {
       <StatusBar />
     </div>
     <VoiceOrbHost v-if="bootComplete && !isFoundationSurface" />
+    <ReportTheaterOverlay v-if="bootComplete && !isFoundationSurface" />
   </template>
 </template>

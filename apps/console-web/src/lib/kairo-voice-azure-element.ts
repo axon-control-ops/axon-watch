@@ -2,9 +2,12 @@
 
 import { isDesktopWebView, unlockKairoAudioPlayback } from './kairo-audio-unlock';
 
-const AUDIO_PREROLL_MS = 280;
+const AUDIO_PREROLL_MS = 160;
+const DEFAULT_ENCODED_LEAD_IN_MS = 1100;
+// Live 48 kHz MP3 inspection adds codec / neural onset after the SSML silence.
+const AZURE_CODEC_ONSET_MS = 280;
 /** Data/blob URLs sometimes never fire canplaythrough — never block forever. */
-const AUDIO_READY_TIMEOUT_MS = 2500;
+const AUDIO_READY_TIMEOUT_MS = 3500;
 
 function delay(ms: number): Promise<void> {
   return new Promise((resolve) => {
@@ -13,8 +16,8 @@ function delay(ms: number): Promise<void> {
 }
 
 async function waitForAudioReady(audio: HTMLAudioElement): Promise<void> {
-  // Prefer HAVE_FUTURE_DATA so the first phonemes are buffered before play().
-  const readyEnough = (): boolean => audio.readyState >= HTMLMediaElement.HAVE_FUTURE_DATA;
+  // Prefer HAVE_ENOUGH_DATA so the leading guard silence is actually buffered.
+  const readyEnough = (): boolean => audio.readyState >= HTMLMediaElement.HAVE_ENOUGH_DATA;
   if (readyEnough()) {
     return;
   }
@@ -33,7 +36,7 @@ async function waitForAudioReady(audio: HTMLAudioElement): Promise<void> {
       reject(error ?? new Error('audio preload failed'));
     };
     const onReady = (): void => {
-      if (readyEnough() || audio.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
+      if (readyEnough() || audio.readyState >= HTMLMediaElement.HAVE_FUTURE_DATA) {
         finish(true);
       }
     };
@@ -72,7 +75,10 @@ export function playbackErrorReason(error: unknown): string {
   return 'audio_playback_failed';
 }
 
-async function playOnceToCompletion(audio: HTMLAudioElement): Promise<void> {
+async function playOnceToCompletion(
+  audio: HTMLAudioElement,
+  onElementPlaying?: () => void,
+): Promise<void> {
   await new Promise<void>((resolve, reject) => {
     let settled = false;
     const finish = (): void => {
@@ -97,11 +103,27 @@ async function playOnceToCompletion(audio: HTMLAudioElement): Promise<void> {
     };
     audio.onended = finish;
     audio.onerror = () => fail(new Error('audio element error'));
-    void audio.play().then(undefined, (error: unknown) => fail(error));
+    void audio.play().then(onElementPlaying, (error: unknown) => fail(error));
   });
 }
 
-export async function playAzureAudioToCompletion(audio: HTMLAudioElement): Promise<void> {
+export async function playAzureAudioToCompletion(
+  audio: HTMLAudioElement,
+  onAudibleStart?: () => void,
+  encodedLeadInMs = DEFAULT_ENCODED_LEAD_IN_MS,
+): Promise<void> {
+  let audibleStartSent = false;
+  let audibleStartTimer: ReturnType<typeof globalThis.setTimeout> | null = null;
+  const scheduleAudibleStart = (): void => {
+    if (audibleStartSent || !onAudibleStart) {
+      return;
+    }
+    audibleStartSent = true;
+    audibleStartTimer = globalThis.setTimeout(() => {
+      audibleStartTimer = null;
+      onAudibleStart();
+    }, Math.max(0, encodedLeadInMs + AZURE_CODEC_ONSET_MS));
+  };
   // Best-effort unlock for Tauri/WebKit; never block Azure playback on unlock failure.
   if (isDesktopWebView()) {
     try {
@@ -120,17 +142,32 @@ export async function playAzureAudioToCompletion(audio: HTMLAudioElement): Promi
   // Do not seek to 0 after buffering — that can discard the primed start and clip.
   await delay(AUDIO_PREROLL_MS);
   try {
-    await playOnceToCompletion(audio);
+    audio.muted = false;
+    audio.volume = 1;
+  } catch {
+    // ignore
+  }
+  try {
+    await playOnceToCompletion(audio, scheduleAudibleStart);
   } catch (firstError) {
+    if (audibleStartTimer !== null) {
+      globalThis.clearTimeout(audibleStartTimer);
+      audibleStartTimer = null;
+      audibleStartSent = false;
+    }
     // WebKitGTK often rejects the first play() until a media-element unlock
     // lands under a gesture. Retry once after a fresh unlock before falling back.
     if (isDesktopWebView()) {
       try {
         await unlockKairoAudioPlayback();
         await delay(80);
-        await playOnceToCompletion(audio);
+        await playOnceToCompletion(audio, scheduleAudibleStart);
         return;
       } catch (retryError) {
+        if (audibleStartTimer !== null) {
+          globalThis.clearTimeout(audibleStartTimer);
+          audibleStartTimer = null;
+        }
         throw new Error(playbackErrorReason(retryError));
       }
     }

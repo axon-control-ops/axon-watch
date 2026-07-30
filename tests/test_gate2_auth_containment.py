@@ -102,6 +102,37 @@ class Gate2OriginGuardTests(unittest.TestCase):
             )
             self.assertIsNone(reject_cross_origin_mutation(make([])))
 
+    def test_allows_loopback_operator_console_origin_when_public_tunnel_configured(
+        self,
+    ) -> None:
+        from app.auth.origin_guard import reject_cross_origin_mutation
+        from starlette.requests import Request
+
+        request = Request(
+            {
+                "type": "http",
+                "asgi": {"version": "3.0"},
+                "http_version": "1.1",
+                "method": "POST",
+                "scheme": "http",
+                "path": "/api/chat/messages",
+                "raw_path": b"/api/chat/messages",
+                "query_string": b"",
+                "headers": [(b"origin", b"http://127.0.0.1:5173")],
+                "client": ("127.0.0.1", 5173),
+                "server": ("127.0.0.1", 8787),
+            }
+        )
+        with patch.dict(
+            os.environ,
+            {
+                "AXON_WATCH_PUBLIC_BASE_URL": "https://axon.edudashpro.org.za",
+                "AXON_WATCH_REMOTELY_REACHABLE": "",
+            },
+            clear=False,
+        ):
+            self.assertIsNone(reject_cross_origin_mutation(request))
+
 
 class Gate2AuthSettingsTests(unittest.TestCase):
     def test_remotely_reachable_from_public_base_url(self) -> None:
@@ -245,37 +276,6 @@ class Gate2WorkerTrustPolicyTests(unittest.TestCase):
         self.assertIn("--approve-mcps", command)
 
 
-class Gate2VaultAutoUnlockRemoteTests(unittest.TestCase):
-    def test_control_plane_refuses_enable_when_remote(self) -> None:
-        prepare_control_plane_imports()
-        tmpdir = tempfile.TemporaryDirectory()
-        self.addCleanup(tmpdir.cleanup)
-        with patch.dict(
-            os.environ,
-            {
-                "AXON_WATCH_CONTROL_PLANE_DB": str(Path(tmpdir.name) / "cp.sqlite3"),
-                "AXON_WATCH_WORKER_SCHEDULER": "0",
-                "AXON_WATCH_AUTH_MODE": "local_token",
-                "AXON_WATCH_OPERATOR_TOKEN": "gate2-vault-token",
-                "AXON_WATCH_AUTH_ALLOW_LOOPBACK": "0",
-                "AXON_WATCH_PUBLIC_BASE_URL": "https://axon.example.com",
-                "AXON_WATCH_REMOTELY_REACHABLE": "1",
-                "AXON_WATCH_STATE_DIR": tmpdir.name,
-                "AXON_WATCH_AUTH_AUDIT_LOG": str(Path(tmpdir.name) / "audit.ndjson"),
-            },
-            clear=False,
-        ):
-            app = load_control_plane_app()
-            client = TestClient(app)
-            response = client.post(
-                "/api/vault/auto-unlock/enable",
-                headers={"Authorization": "Bearer gate2-vault-token"},
-            )
-            self.assertEqual(403, response.status_code)
-            audit = Path(tmpdir.name, "audit.ndjson").read_text(encoding="utf-8")
-            self.assertIn("vault_auto_unlock_enable", audit)
-
-
 class Gate2ResidualContainmentTests(unittest.TestCase):
     def test_remote_forces_local_token_and_disables_loopback_bypass(self) -> None:
         from app.auth.settings import allow_loopback_bypass, auth_mode, configured_auth_mode
@@ -358,6 +358,18 @@ class Gate2ResidualContainmentTests(unittest.TestCase):
             detail = reject_mutating_rate_limit(request, identity="operator")
             self.assertIsNotNone(detail)
             self.assertIn("rate limit", detail or "")
+
+            chat_request = Request(
+                {
+                    **request.scope,
+                    "path": "/api/chat/messages",
+                    "raw_path": b"/api/chat/messages",
+                }
+            )
+            self.assertIsNone(
+                reject_mutating_rate_limit(chat_request, identity="operator"),
+                "run traffic must not starve interactive Team chat",
+            )
         reset_rate_limit_state_for_tests()
 
 

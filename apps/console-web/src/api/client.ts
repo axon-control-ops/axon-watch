@@ -1,3 +1,5 @@
+import { humanizeNetworkError } from '../lib/humanize-network-error';
+
 /** Default budget for control-plane JSON calls so hung CLI probes cannot stall the shell forever. */
 export const DEFAULT_FETCH_TIMEOUT_MS = 12_000;
 
@@ -12,6 +14,12 @@ export const RUNTIME_STATUS_FETCH_TIMEOUT_MS = 30_000;
 
 /** Thread history can include dozens of large agent transcripts; keep above normalize+transfer. */
 export const THREAD_HISTORY_FETCH_TIMEOUT_MS = 45_000;
+
+/**
+ * Chat message POST can queue behind long runtime force-refresh probes on the same origin.
+ * Keep well above DEFAULT so Enter/Send does not falsely fail with a bare label.
+ */
+export const CHAT_MESSAGE_FETCH_TIMEOUT_MS = 60_000;
 
 export class ApiRequestError extends Error {
   readonly status: number;
@@ -83,10 +91,17 @@ export async function fetchJson<T>(
   try {
     const response = await fetch(apiUrl(path), { ...init, signal });
     if (!response.ok) {
-      throw new ApiRequestError(
-        errorLabel ?? `request failed with status ${response.status}`,
-        response.status,
-      );
+      const fallback = errorLabel ?? `request failed with status ${response.status}`;
+      let detail = '';
+      try {
+        const payload = (await response.json()) as { detail?: unknown };
+        if (typeof payload?.detail === 'string' && payload.detail.trim()) {
+          detail = payload.detail.trim();
+        }
+      } catch {
+        // Keep the labeled fallback when the body is not JSON.
+      }
+      throw new ApiRequestError(detail ? `${fallback}: ${detail}` : fallback, response.status);
     }
     return (await response.json()) as T;
   } catch (error) {
@@ -94,16 +109,24 @@ export async function fetchJson<T>(
       throw error;
     }
     if (error instanceof DOMException && error.name === 'TimeoutError') {
-      throw new Error(errorLabel ?? `request timed out after ${timeoutMs}ms`);
+      throw new Error(
+        errorLabel
+          ? `${errorLabel}: timed out after ${timeoutMs}ms`
+          : `request timed out after ${timeoutMs}ms`,
+      );
     }
     if (error instanceof Error && error.name === 'AbortError') {
       // Caller-supplied cancellation must not be mislabeled as a timeout.
       if (init.signal?.aborted) {
         throw error;
       }
-      throw new Error(errorLabel ?? `request timed out after ${timeoutMs}ms`);
+      throw new Error(
+        errorLabel
+          ? `${errorLabel}: timed out after ${timeoutMs}ms`
+          : `request timed out after ${timeoutMs}ms`,
+      );
     }
-    throw error;
+    throw new Error(humanizeNetworkError(error, { action: errorLabel ?? 'Request' }));
   } finally {
     clear();
   }
@@ -124,13 +147,21 @@ export async function fetchBlob(
     return response.blob();
   } catch (error) {
     if (error instanceof DOMException && error.name === 'TimeoutError') {
-      throw new Error(errorLabel ?? `request timed out after ${timeoutMs}ms`);
+      throw new Error(
+        errorLabel
+          ? `${errorLabel}: timed out after ${timeoutMs}ms`
+          : `request timed out after ${timeoutMs}ms`,
+      );
     }
     if (error instanceof Error && error.name === 'AbortError') {
       if (init.signal?.aborted) {
         throw error;
       }
-      throw new Error(errorLabel ?? `request timed out after ${timeoutMs}ms`);
+      throw new Error(
+        errorLabel
+          ? `${errorLabel}: timed out after ${timeoutMs}ms`
+          : `request timed out after ${timeoutMs}ms`,
+      );
     }
     throw error;
   } finally {

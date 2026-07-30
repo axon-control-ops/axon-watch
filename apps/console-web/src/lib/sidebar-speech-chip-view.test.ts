@@ -49,7 +49,12 @@ describe('resolveSidebarSpeechChipView', () => {
 
   it('offers expansion only for transcript copy that exceeds the compact card', () => {
     expect(sidebarSpeechCanExpand('Short spoken update.')).toBe(false);
-    expect(sidebarSpeechCanExpand('Line 1\nLine 2\nLine 3\nLine 4\nLine 5')).toBe(true);
-    expect(sidebarSpeechCanExpand('A'.repeat(181))).toBe(true);
+    expect(
+      sidebarSpeechCanExpand(
+        Array.from({ length: 13 }, (_, index) => `Line ${index + 1}`).join('\n'),
+      ),
+    ).toBe(true);
+    expect(sidebarSpeechCanExpand('A'.repeat(421))).toBe(true);
+    expect(sidebarSpeechCanExpand('A'.repeat(180))).toBe(false);
   });
 });

@@ -1,9 +1,13 @@
 /**
- * Visibility for Cursor-parity "Background" on in-thread agent shell cards.
+ * Visibility for watching an in-thread Cursor-owned shell in the terminal dock.
  *
- * Cursor shows this only while a Shell tool is in-flight (open `:::terminal`
- * block). Pressing it reveals the bottom terminal and mirrors that shell card
- * into the vaxon tab.
+ * Cursor shows **Move to background** only while a Shell tool call is still
+ * running. Finished shell cards are history — Cursor does not offer "run again"
+ * on them, and neither do we.
+ *
+ * The Cursor CLI protocol used by Axon does not expose true process handoff, so
+ * Axon labels the available in-flight operation "Watch in terminal" and mirrors
+ * the shell without pretending it detached.
  *
  * True process detach (shell continues in a real Axon PTY; agent continues other
  * work) is **not available**: Cursor CLI owns the shell subprocess and exposes
@@ -39,8 +43,11 @@ export function agentTerminalMirrorBadgeLabel(input: {
   segmentOpen: boolean;
   mirrorActive: boolean;
 }): string | null {
-  if (!input.segmentOpen || !input.mirrorActive) {
+  if (!input.mirrorActive) {
     return null;
   }
-  return CURSOR_SHELL_PROCESS_DETACH_AVAILABLE ? 'backgrounded' : 'mirrored in vaxon';
+  if (CURSOR_SHELL_PROCESS_DETACH_AVAILABLE && input.segmentOpen) {
+    return 'backgrounded';
+  }
+  return input.segmentOpen ? 'watching in terminal' : 'shown in terminal';
 }

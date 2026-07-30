@@ -42,8 +42,10 @@ Default connectors:
 | ID | Target | Required |
 |---|---|---|
 | `control_plane` | `${AXON_WATCH_CONTROL_PLANE_BASE_URL}/api/health` | yes |
-| `console_web` | `${AXON_WATCH_PUBLIC_BASE_URL}/api/health` | yes |
-| `axon_local` | `http://127.0.0.1:7734/api/health` | no |
+| `console_web` | `${AXON_WATCH_CONSOLE_WEB_BASE_URL}/` (loopback `:4173`) | yes |
+| `public_ingress` | `${AXON_WATCH_PUBLIC_BASE_URL}/api/health` (Cloudflare / public) | no |
+
+**Stability rule:** required probes stay on loopback. Cloudflare/public reachability is optional (`public_ingress`) so a tunnel flap cannot mark Mission Control degraded while the PC-local stack is healthy. Legacy axon-local `:7734` is **not** probed — source retained for parity only.
 
 ## Watch service routes
 

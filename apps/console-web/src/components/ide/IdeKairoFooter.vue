@@ -66,7 +66,7 @@ const chipPresenceHint = computed(() => {
   if (!chipEmployeeFailed.value) {
     return null;
   }
-  return shell.activeIdeEmployeeShiftInterrupted ? 'shift interrupted' : 'last shift failed';
+  return shell.activeIdeEmployeeShiftInterrupted ? 'job interrupted' : 'last job failed';
 });
 const chipTitle = computed(() => {
   const row = shell.activeIdeEmployeeRecord;
@@ -76,7 +76,7 @@ const chipTitle = computed(() => {
   return employeeFailureDetailTooltip(row) ?? shell.activeIdeEmployeeFailureLine;
 });
 const chipOpenHint = computed(() =>
-  chipEmployeeFailed.value ? 'Open team roster for retry and receipts' : null,
+  chipEmployeeFailed.value ? 'Open team roster to try again or see what happened' : null,
 );
 
 function handleKairoPresenceOpen(): void {

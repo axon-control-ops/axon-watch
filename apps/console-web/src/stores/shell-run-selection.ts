@@ -6,6 +6,20 @@ export function isActiveRun(run: RunRecord): boolean {
   return !TERMINAL_PHASES.has(run.phase);
 }
 
+/** Lower rank = higher priority for the workspace status-bar / run seam. */
+const PRIMARY_PHASE_RANK: Record<string, number> = {
+  review_ready: 0,
+  executing: 1,
+  starting: 2,
+  planning: 3,
+  queued: 4,
+  awaiting_approval: 5,
+};
+
+function primaryPhaseRank(phase: string): number {
+  return PRIMARY_PHASE_RANK[phase] ?? 6;
+}
+
 /** Prefer the run that needs operator action; deprioritize approval-bound runs for the run seam. */
 export function selectPrimaryRun(items: RunRecord[]): RunRecord | null {
   const activeRuns = items.filter(isActiveRun);
@@ -13,13 +27,17 @@ export function selectPrimaryRun(items: RunRecord[]): RunRecord | null {
     return null;
   }
 
-  const reviewReady = activeRuns.find((run) => run.phase === 'review_ready');
-  if (reviewReady) {
-    return reviewReady;
-  }
-
-  const nonApprovalRun = activeRuns.find((run) => run.phase !== 'awaiting_approval');
-  return nonApprovalRun ?? activeRuns[0] ?? null;
+  // Do not let an older queued row hide an executing handoff (status bar looked stuck
+  // on RUN PHASE: QUEUED after Start now succeeded).
+  return [...activeRuns].sort((left, right) => {
+    const rankDelta = primaryPhaseRank(left.phase) - primaryPhaseRank(right.phase);
+    if (rankDelta !== 0) {
+      return rankDelta;
+    }
+    return (right.updated_at || right.started_at || '').localeCompare(
+      left.updated_at || left.started_at || '',
+    );
+  })[0] ?? null;
 }
 
 /** Dedicated approval target so guarded runs stay visible when another run is active. */

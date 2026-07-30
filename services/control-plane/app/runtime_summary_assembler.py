@@ -211,6 +211,16 @@ def assemble_runtime_summary(
     # Always SWR for CLI auth — cold `cursor agent status` must not stall topbar.
     cli_status_snapshot = runtime_status_snapshot(allow_stale=True)
     schedule_runtime_status_refresh()
+    try:
+        from app.cli_runtime.catalog_snapshot import (
+            heal_cursor_auth_probe_timeout,
+            snapshot_has_auth_probe_timeout,
+        )
+
+        if snapshot_has_auth_probe_timeout(cli_status_snapshot):
+            heal_cursor_auth_probe_timeout()
+    except Exception:
+        pass
 
     degraded_reasons: list[str] = []
     if not watch_connected and watch_degraded_reason:

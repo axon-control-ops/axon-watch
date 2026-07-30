@@ -22,6 +22,36 @@
       "workspace_id": "workspace_axon_watch",
       "max_new_tasks_per_tick": 1,
       "task_goal_prefix": "File-size patrol:"
+    },
+    {
+      "id": "lead_team_checkin",
+      "label": "Lead team check-in + role assignment",
+      "enabled": true,
+      "trigger": "scheduler_tick",
+      "owner_role": "lead",
+      "min_interval_seconds": 900,
+      "max_assignments_per_workspace": 2,
+      "task_goal_prefix": "Lead assigned:"
+    },
+    {
+      "id": "ci_stale_signal_sweep",
+      "label": "Clear confirmed-stale CI / Fast Gate alerts",
+      "enabled": true,
+      "trigger": "scheduler_tick",
+      "owner_role": "watcher",
+      "include_drills": true,
+      "confirm_with_gh": true,
+      "max_resolve": 40
+    },
+    {
+      "id": "autonomous_attention",
+      "label": "VAXON Mission Control attend (Full autonomy)",
+      "enabled": true,
+      "trigger": "scheduler_tick",
+      "owner_role": "lead",
+      "max_dispatch_per_workspace": 3,
+      "max_escalations_per_workspace": 5,
+      "task_goal_prefix": "VAXON attend:"
     }
   ]
 }

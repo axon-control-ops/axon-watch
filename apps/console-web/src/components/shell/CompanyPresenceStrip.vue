@@ -20,6 +20,8 @@ const props = defineProps<{
   selectedEmployeeId: string | null;
   /** Employee ids currently mid IDE/agent stream (client-side busy overlay). */
   liveBusyEmployeeIds?: readonly string[];
+  /** Manual-mode handoff waiters — amber glow until Start now. */
+  handoffWaitingEmployeeIds?: readonly string[];
 }>();
 
 const emit = defineEmits<{
@@ -29,19 +31,41 @@ const emit = defineEmits<{
 const stripRef = ref<HTMLElement | null>(null);
 
 const liveBusySet = computed(() => new Set(props.liveBusyEmployeeIds ?? []));
+const handoffWaitingSet = computed(() => new Set(props.handoffWaitingEmployeeIds ?? []));
 
 const items = computed(() => {
   const next = sortEmployeesForPresenceStrip(props.employees).map((employee) => {
-    const failed = Boolean(employeeFailureLine(employee));
     const liveBusy = liveBusySet.value.has(employee.employee_id);
-    const avatar = buildEmployeeAvatar(employee, { liveBusy });
+    const handoffWaiting = !liveBusy && handoffWaitingSet.value.has(employee.employee_id);
+    const failed = Boolean(employeeFailureLine(employee, { liveBusy }));
+    const avatar = buildEmployeeAvatar(employee, { liveBusy, handoffWaiting });
+    const interrupted = failed && employeeShiftNeedsContinuation(employee);
+    const paused = !employee.enabled && !failed && !liveBusy;
+    const working = avatar.presence === 'working' || liveBusy;
+    const handoff = avatar.presence === 'handoff' || handoffWaiting;
+    let presenceLabel = 'Idle';
+    if (working) {
+      presenceLabel = 'Busy';
+    } else if (handoff) {
+      presenceLabel = 'Handoff';
+    } else if (interrupted) {
+      presenceLabel = 'Retry';
+    } else if (failed) {
+      presenceLabel = 'Failed';
+    } else if (paused) {
+      presenceLabel = 'Paused';
+    } else if (avatar.lead) {
+      presenceLabel = 'Lead';
+    }
     return {
       employee,
       avatar,
       failed,
-      interrupted: failed && employeeShiftNeedsContinuation(employee),
-      paused: !employee.enabled && !failed,
-      working: avatar.presence === 'working',
+      interrupted,
+      paused,
+      working,
+      handoff,
+      presenceLabel,
       optionId: presenceStripOptionId(employee.employee_id),
     };
   });
@@ -170,6 +194,7 @@ function onKeydown(event: KeyboardEvent): void {
           'company-presence-strip__btn--selected':
             selectedEmployeeId === item.employee.employee_id,
           'company-presence-strip__btn--busy': item.working,
+          'company-presence-strip__btn--handoff': item.handoff,
           'company-presence-strip__btn--lead': item.avatar.lead,
         }"
         :data-presence="item.avatar.presence"
@@ -190,8 +215,9 @@ function onKeydown(event: KeyboardEvent): void {
           :data-lead="item.avatar.lead ? 'true' : undefined"
         >
           <span
-            v-if="item.working"
+            v-if="item.working || item.handoff"
             class="company-presence-strip__busy-ring"
+            :class="{ 'company-presence-strip__busy-ring--handoff': item.handoff && !item.working }"
             aria-hidden="true"
           />
           <img
@@ -211,10 +237,18 @@ function onKeydown(event: KeyboardEvent): void {
             ★
           </span>
           <span
-            v-if="item.interrupted"
+            v-if="item.working"
+            class="company-presence-strip__busy-mark"
+            aria-hidden="true"
+            title="Busy"
+          >
+            ●
+          </span>
+          <span
+            v-else-if="item.interrupted"
             class="company-presence-strip__interrupt-mark"
             aria-hidden="true"
-            title="Shift interrupted — retry to continue"
+            title="Job interrupted — retry to continue"
           >
             ↻
           </span>
@@ -222,7 +256,7 @@ function onKeydown(event: KeyboardEvent): void {
             v-else-if="item.failed"
             class="company-presence-strip__fail-mark"
             aria-hidden="true"
-            title="Last shift failed"
+            title="Last job failed"
           >
             !
           </span>
@@ -234,18 +268,18 @@ function onKeydown(event: KeyboardEvent): void {
           >
             ⏸
           </span>
-          <span
-            v-else-if="item.working"
-            class="company-presence-strip__busy-mark"
-            aria-hidden="true"
-            title="Busy"
-          >
-            ●
-          </span>
         </span>
         <span class="company-presence-strip__name">{{ item.employee.name }}</span>
-        <span v-if="item.avatar.lead" class="company-presence-strip__role">Lead</span>
-        <span v-else-if="item.working" class="company-presence-strip__role company-presence-strip__role--busy">Busy</span>
+        <span
+          class="company-presence-strip__role"
+          :class="{
+            'company-presence-strip__role--busy': item.working,
+            'company-presence-strip__role--failed': item.failed && !item.working,
+            'company-presence-strip__role--paused': item.paused,
+          }"
+        >
+          {{ item.presenceLabel }}
+        </span>
       </button>
     </li>
   </ul>

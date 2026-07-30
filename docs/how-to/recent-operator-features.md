@@ -1,10 +1,14 @@
 # Recent operator features (Gate 3–5 + console UX)
 
-**Updated:** 2026-07-22  
+**Updated:** 2026-07-27  
 **Audience:** operators and agents who need plain-language “what changed and how to use it.”
 
 Companion to [`docs/HOW-TO-HANDBOOK.md`](../HOW-TO-HANDBOOK.md) and
 [`autonomy-gates-and-service-identity.md`](autonomy-gates-and-service-identity.md).
+
+**Mission Control second brain (2026-07-27):** Transmission card, open vs focus workspace,
+fleet busy presence, and **`REPORT`** hotword — see
+[`mission-control-transmission-and-report.md`](mission-control-transmission-and-report.md).
 
 ---
 
@@ -170,7 +174,24 @@ Proof:
 
 ---
 
-## 5. After every push — watch Fast Gate
+## 4b. Continuous Lead takeover (specialist → Dana)
+
+When a specialist shift ends (continuous worker **or** IDE Lane B), Dana now
+posts a **Lead takeover** rollup in the Lead IDE tab even if the shift was not
+linked to a formal Lead fan-out plan. Missing `task_id` no longer drops the
+handoff.
+
+| Piece | Location |
+| --- | --- |
+| Takeover report | `lead_takeover.post_lead_takeover_report` |
+| Notify hook | `notify_lead_after_worker_task` (+ Lane B finalize) |
+| Follow-up | Open `Lead follow-up after …` task for Decide / next assign |
+
+Full multi-specialist synthesis still waits until every plan task is terminal;
+single specialist completions get an immediate Dana report so the loop stays
+continuous.
+
+---
 
 ### Why
 
@@ -209,6 +230,26 @@ When Fast Gate fails, control-plane can ingest GitHub `workflow_run` events
 (HMAC webhook), raise an inbox signal, lease a repair task to **Rowan**, and
 report the outcome. See [`ci-remediation-gate9.md`](ci-remediation-gate9.md).
 Fallback poller: `./scripts/ops/poll-fast-gate-remediation.sh`.
+
+---
+
+## 5b. Lead team check-in scheduler (clocked)
+
+Company Leads run a **cooldown-gated check-in** on the continuous worker clock
+(same tick family as file-size patrol — axon-local-style interval work).
+
+| Piece | Location |
+| --- | --- |
+| Work source | `lead_team_checkin` in `config/autonomy-work-sources.json` |
+| Logic | `services/control-plane/app/workspace_agents/lead_team_checkin.py` |
+| Hierarchy + close-out | [`company-hierarchy-and-lead-checkin.md`](company-hierarchy-and-lead-checkin.md) |
+
+Failed shifts and degraded monitors/connectors become `Lead assigned:` tasks for
+the matching specialist. Usage/auth/restart failures escalate to the Lead IDE
+only (no bogus repair task).
+
+External HTTP health probes: `http_health` checks in
+`config/axon-x-monitor-slice.json` and `config/dashpro-monitor-slice.json`.
 
 ---
 

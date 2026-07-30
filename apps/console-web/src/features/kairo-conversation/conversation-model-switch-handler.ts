@@ -34,7 +34,7 @@ export async function handleConversationModelSwitchIntent(input: {
     })
   ) {
     await input.deliverVoiceReply(
-      'Select a workspace first, then I can switch the brain model.',
+      'I could not update the VAXON brain model right now.',
       input.voiceCaptureMode,
     );
     return true;

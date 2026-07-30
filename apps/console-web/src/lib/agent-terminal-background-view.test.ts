@@ -26,6 +26,15 @@ describe('agent terminal background visibility', () => {
     ).toBe(true);
   });
 
+  it('hides once the shell tool has finished (Cursor: no re-run on history cards)', () => {
+    expect(
+      shouldShowAgentTerminalBackgroundControl({
+        canStopIdeAgentRun: true,
+        terminalBlockRunning: false,
+      }),
+    ).toBe(false);
+  });
+
   it('hides for a busy agent with no open shell block', () => {
     expect(
       shouldShowAgentTerminalBackgroundControl({
@@ -43,14 +52,20 @@ describe('agent terminal background visibility', () => {
     expect(agentTranscriptHasOpenTerminalBlock(':::thinking\nstill going')).toBe(false);
   });
 
-  it('labels mirrored in-flight shells honestly while process detach is unavailable', () => {
+  it('labels watching shells honestly while process detach is unavailable', () => {
     expect(CURSOR_SHELL_PROCESS_DETACH_AVAILABLE).toBe(false);
     expect(
       agentTerminalMirrorBadgeLabel({
         segmentOpen: true,
         mirrorActive: true,
       }),
-    ).toBe('mirrored in vaxon');
+    ).toBe('watching in terminal');
+    expect(
+      agentTerminalMirrorBadgeLabel({
+        segmentOpen: false,
+        mirrorActive: true,
+      }),
+    ).toBe('shown in terminal');
     expect(
       agentTerminalMirrorBadgeLabel({
         segmentOpen: true,

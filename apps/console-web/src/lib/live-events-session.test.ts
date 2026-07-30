@@ -19,7 +19,7 @@ describe('live events session helpers', () => {
     );
   });
 
-  it('parses connected, runtime_refresh, presence_refresh, spoken_briefing, and material_change payloads', () => {
+  it('parses connected, runtime_refresh, presence_refresh, spoken_briefing, spoken_line, and material_change payloads', () => {
     expect(parseLiveEventData('{"type":"connected"}')).toEqual({ type: 'connected' });
     expect(parseLiveEventData('{"type":"runtime_refresh"}')).toEqual({
       type: 'runtime_refresh',
@@ -29,6 +29,16 @@ describe('live events session helpers', () => {
     });
     expect(parseLiveEventData('{"type":"spoken_briefing"}')).toEqual({
       type: 'spoken_briefing',
+    });
+    expect(
+      parseLiveEventData(
+        '{"type":"spoken_line","line":"Dana here.","receipt_id":"lead_takeover_voice_1","speaker_role":"lead"}',
+      ),
+    ).toEqual({
+      type: 'spoken_line',
+      line: 'Dana here.',
+      receipt_id: 'lead_takeover_voice_1',
+      speaker_role: 'lead',
     });
     expect(parseLiveEventData('{"type":"material_change"}')).toEqual({
       type: 'material_change',
@@ -210,6 +220,46 @@ describe('startLiveEventsSession', () => {
     messageHandler!({ data: '{"type":"spoken_briefing"}' } as MessageEvent);
     await Promise.resolve();
     expect(onSpokenBriefing).toHaveBeenCalledTimes(1);
+    session.disconnect();
+  });
+
+  it('routes spoken_line events to the spoken line handler and refreshes material surfaces', async () => {
+    const onSpokenLine = vi.fn();
+    const onMaterialChange = vi.fn();
+    let messageHandler: ((event: MessageEvent) => void) | null = null;
+
+    class MockEventSource {
+      onmessage: ((event: MessageEvent) => void) | null = null;
+      onerror: (() => void) | null = null;
+
+      constructor(_url: string) {
+        messageHandler = (event) => {
+          this.onmessage?.(event);
+        };
+      }
+
+      close(): void {}
+    }
+
+    const session = startLiveEventsSession({
+      onRefresh: vi.fn(),
+      onSpokenLine,
+      onMaterialChange,
+      EventSourceImpl: MockEventSource as unknown as typeof EventSource,
+      documentRef: {
+        visibilityState: 'visible',
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+      },
+    });
+
+    messageHandler!({
+      data: '{"type":"spoken_line","line":"Dana here. Soren completed.","receipt_id":"r1"}',
+    } as MessageEvent);
+    await Promise.resolve();
+    expect(onSpokenLine).toHaveBeenCalledTimes(1);
+    expect(onSpokenLine.mock.calls[0]?.[0]?.line).toContain('Dana here');
+    expect(onMaterialChange).toHaveBeenCalledTimes(1);
     session.disconnect();
   });
 

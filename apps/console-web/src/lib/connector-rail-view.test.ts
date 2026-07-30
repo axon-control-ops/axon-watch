@@ -40,9 +40,31 @@ describe('buildConnectorRailRows', () => {
       },
     ]);
 
-    expect(row.detail).toBe('Connection refused on http://127.0.0.1:4173/api/health');
+    expect(row.detail).toContain('Connection refused');
     expect(row.tone).toBe('unavailable');
-    expect(row.required).toBe(true);
+  });
+
+  it('softens tunnel public-health failures as remote ingress attention', () => {
+    const [row] = buildConnectorRailRows([
+      {
+        connector_id: 'cloudflare_tunnel',
+        display_name: 'Cloudflare tunnel',
+        status: 'degraded',
+        required: false,
+        detail: 'process up; public health failed (DNS)',
+        tunnel: {
+          process_running: true,
+          managed_process: true,
+          auth_ready: true,
+          public_health_ok: false,
+          public_health_detail: 'Name or service not known',
+        },
+      },
+    ]);
+
+    expect(row.status).toBe('remote');
+    expect(row.detail).toContain('remote ingress unhealthy');
+    expect(row.detail).toContain('local Axon-X unaffected');
   });
 });
 

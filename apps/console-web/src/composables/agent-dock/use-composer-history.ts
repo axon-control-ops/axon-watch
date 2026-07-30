@@ -6,20 +6,25 @@ import {
   recordAgentComposerHistoryEntry,
   stepAgentComposerHistory,
 } from '../../lib/agent-dock-composer-history';
-import { useShellStore } from '../../stores/shell';
-
-type ShellStore = ReturnType<typeof useShellStore>;
 
 type UseComposerHistoryOptions = {
-  shell: ShellStore;
   inputRef: Ref<HTMLTextAreaElement | null>;
   syncComposerHeight: () => void;
   clearComposerImages: () => void;
   composerImages: Ref<unknown[]>;
+  getDraft: () => string;
+  setDraft: (value: string) => void;
 };
 
 export function useComposerHistory(options: UseComposerHistoryOptions) {
-  const { shell, inputRef, syncComposerHeight, clearComposerImages, composerImages } = options;
+  const {
+    inputRef,
+    syncComposerHeight,
+    clearComposerImages,
+    composerImages,
+    getDraft,
+    setDraft,
+  } = options;
 
   const composerHistory = ref<string[]>([]);
   const composerHistoryWorkspaceId = ref<string | null>(null);
@@ -48,8 +53,9 @@ export function useComposerHistory(options: UseComposerHistoryOptions) {
 
   function applyHistoryDraft(draft: string): void {
     applyingHistoryDraft.value = true;
-    shell.restoreComposerDraft(draft);
+    setDraft(draft);
     void nextTick(() => {
+      applyingHistoryDraft.value = false;
       syncComposerHeight();
       if (!inputRef.value) {
         return;
@@ -60,11 +66,15 @@ export function useComposerHistory(options: UseComposerHistoryOptions) {
   }
 
   function handleHistory(direction: 'previous' | 'next'): void {
+    // Refresh from storage so prompts sent from the VAXON operator bar are included.
+    if (composerHistoryWorkspaceId.value) {
+      composerHistory.value = readStoredAgentComposerHistory(composerHistoryWorkspaceId.value);
+    }
     const step = stepAgentComposerHistory({
       entries: composerHistory.value,
       index: composerHistoryIndex.value,
       scratch: composerHistoryScratch.value,
-      currentDraft: shell.ideComposerDraft,
+      currentDraft: getDraft(),
       direction,
     });
     composerHistoryIndex.value = step.index;
@@ -76,11 +86,14 @@ export function useComposerHistory(options: UseComposerHistoryOptions) {
     if (composerImages.value.length) {
       clearComposerImages();
     }
-    if (draft && !shell.ideComposerDraft.trim() && shell.commandMutationState === 'idle') {
-      composerHistory.value = recordAgentComposerHistoryEntry(composerHistory.value, draft);
-      persistCurrentComposerHistory();
-      resetComposerHistoryNavigation();
+    const trimmed = draft.trim();
+    if (!trimmed) {
+      return;
     }
+    // Record whenever a prompt was consumed (sent or queued).
+    composerHistory.value = recordAgentComposerHistoryEntry(composerHistory.value, trimmed);
+    persistCurrentComposerHistory();
+    resetComposerHistoryNavigation();
   }
 
   return {

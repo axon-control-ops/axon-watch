@@ -4,6 +4,7 @@ import type { ChatUiAction } from '../lib/chat-ui-action';
 
 import {
   apiUrl,
+  CHAT_MESSAGE_FETCH_TIMEOUT_MS,
   controlPlaneBaseUrl,
   fetchJson,
   THREAD_HISTORY_FETCH_TIMEOUT_MS,
@@ -137,6 +138,7 @@ export async function postChatMessage(body: PostChatMessageRequest): Promise<Pos
       body: JSON.stringify(body),
     },
     'chat message submit failed',
+    CHAT_MESSAGE_FETCH_TIMEOUT_MS,
   );
 }
 

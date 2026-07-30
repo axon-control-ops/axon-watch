@@ -4,6 +4,12 @@ import { normalizePersonaSttAliases } from './operator-persona-stt-aliases';
 
 export const OPERATOR_PERSONA_NAME = 'VAXON';
 
+/**
+ * Phonetic form for TTS so neural voices do not letter-spell V-A-X-O-N.
+ * Spoken as “vek-son” / “Vaxon” — never “V A X O N”.
+ */
+export const OPERATOR_PERSONA_SPOKEN_NAME = 'Vekson';
+
 /** Expanded name shown on boot / persona surfaces. */
 export const OPERATOR_PERSONA_BACKRONYM = 'Voice AI Assistant';
 

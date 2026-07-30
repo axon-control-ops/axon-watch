@@ -43,9 +43,34 @@ type the handoff.
 | Gate 9 CI remediation (webhook → repair task) | **Proven for Axon-X** | Reactive self-heal when Fast Gate goes red |
 | Per-task `allowed_paths` guardrails | **Ready (new)** | Hard scope for writes/publish + prompt anchors |
 | File-size patrol work source | **Plumbing ready** | Scheduler can enqueue bounded hygiene tasks when enabled |
-| Continuous worker scheduler | **Off by default** | Intentional — turn on only for watched drills |
-| Unattended overnight multi-project loop | **Not ready** | Still needs human dig-in / retry / Critical Review hygiene |
+| Mission Control **AUTONOMOUS** attend | **Implemented; live drill pending** | Orb toggle → `autonomy_mode=full`; safe findings dispatch; guarded findings require an exact approve/reject decision |
+| Continuous worker scheduler | **Off by default** | Intentional — turn on via AUTONOMOUS ON / Settings Full |
+| Unattended overnight multi-project loop | **Not ready** | Still needs human dig-in for Decide gates |
 | Staging / production deploy autonomy | **Not ready** | Remains human-gated |
+
+### Mission Control AUTONOMOUS button (orb)
+
+| Control | Meaning |
+| --- | --- |
+| **AUTONOMOUS ON** | After confirmation, sets `autonomy_mode=full`; workers run only when the host brake and dispatch gates allow |
+| **AUTONOMOUS OFF** | Calls the hard-kill path: demotes to `semi`, pauses new starts, and attempts to stop active worker shifts |
+| **Hard-kill** | Same emergency path; partial stop failures are reported and must be reviewed in active runs |
+| **Needs you** receipts | Critical / secrets / production / protected merge / spend stay pending until **Approve exact task** or **Reject** |
+
+**Auto-allowed while ON:** inspect, retry idempotent checks, route internal handoffs, create bounded specialist tasks, edit disposable worktrees, run tests.
+
+**Always ask before mutation:** critical severity, secrets/credentials, destructive filesystem/git/database, production deploy/release, protected merge/push, external/public communication, permissions/policy changes, approval-gated runs, raising usage/spend caps. Approval creates one `risk=approved`, attempt-bounded task linked to the decision receipt; rejection creates no task.
+
+Findings dedupe while an open/leased task exists, while a decision is pending,
+or for a 15-minute receipt cooldown. Routed handoffs reuse their existing
+target task; only a handoff missing target routing may create a new attend task.
+
+Status feed:
+
+```bash
+curl -sS http://127.0.0.1:8787/api/operator/autonomy/status \
+  | jq '{autonomy_mode, autonomous_enabled, effective_autonomy, scheduler, last_scan, pending: (.pending_critical_decisions|length)}'
+```
 
 Check the scheduler before assuming anything is looping:
 

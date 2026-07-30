@@ -15,13 +15,7 @@ Use it to:
 - **Upgrade** the stack after pulls or dependency changes
 - **Debug** when the UI, API, or tests misbehave
 
-**Last verified:** 2026-07-25 — Gates 0–5 closed; Gate 6 verifier + draft-PR
-delivery + Gate 9 CI remediation proven for Axon-X; per-task `allowed_paths` and
-file-size patrol plumbing landed. **Not yet a closed unattended auto-loop** —
-scheduler stays **off** by default; Mission Control still needs Retry / dig-in.
-Read [`how-to/auto-loop-and-credits.md`](how-to/auto-loop-and-credits.md) first
-for status + Cursor credit budgets. After every push run
-`./scripts/ops/watch-fast-gate.sh`.
+**Last verified:** 2026-07-29 — IDE Soft Attention actions (**Try again** / **Explain** / **Open team**) live on the agent review strip with **Review N files**; **Try again** hides after a successful shift. Claude Code CLI is a local runtime target. After every push: `./scripts/ops/watch-fast-gate.sh`.
 
 **PDF (Desktop):** After every edit to this handbook or `docs/how-to/*.md`, rebuild:
 `./scripts/docs/build-howto-handbook-pdf.sh` → `~/Desktop/Axon-X-How-To-Handbook.pdf`
@@ -30,18 +24,17 @@ for status + Cursor credit budgets. After every push run
 
 **Layered onboarding (shorter):** [`docs/AXON-X-STARTER-GUIDE.md`](AXON-X-STARTER-GUIDE.md)
 
----
-
 ## Table of Contents
 
 1. [Quick Start](#quick-start) — first 5 minutes
 2. [Handbook map](#handbook-map) — who reads what
 3. [Operator manual](#operator-manual) — daily rituals
 3.5. [Runtime auth, CLI, and tools](#runtime-auth-cli-and-tools) — Pro vs API key, native vs Cursor
-3.6. [CI, merge, and worker agents](how-to/ci-merge-and-worker-agents.md) — Fast Gate, `dev`, roster; [Gate 9 CI remediation](how-to/ci-remediation-gate9.md)
+3.6. [CI, merge, and worker agents](how-to/ci-merge-and-worker-agents.md) — Fast Gate, `dev`, roster; DashPro self-hosted CI + RAM; canary OTA vs EAS Build; [Gate 9 CI remediation](how-to/ci-remediation-gate9.md)
 3.65. [Autonomy gates & service identity](how-to/autonomy-gates-and-service-identity.md) — Gate 4 tasks, scheduler off, watch token + mTLS
 3.66. [Recent operator features](how-to/recent-operator-features.md) — task board, concurrent tabs, galaxy labels, Lead planner, CI watch
 3.67. [Auto-loop status & credits](how-to/auto-loop-and-credits.md) — are we autonomous yet? Cursor / API budget for multi-project
+3.68. [Company hierarchy & Lead check-in](how-to/company-hierarchy-and-lead-checkin.md) — VAXON attend loop + AUTONOMOUS ON safety matrix
 3.7. [VAXON Desktop](#vaxon-desktop) — packaged Linux install
 4. [Teaching Axon-X](#teaching-axon-x-to-someone-else) — explain it to others
 5. [Codebase in plain English](#codebase-in-plain-english) — what happens under the hood
@@ -59,8 +52,6 @@ for status + Cursor credit budgets. After every push run
 17. [Tips, hints & tricks](#tips-hints-and-tricks)
 18. [Upgrading & updating](#upgrading-and-updating) — pulls, deps, planning sync
 19. [Next slices](#what-a-good-next-slice-looks-like) — what to build next
-
----
 
 ## Handbook map
 
@@ -91,14 +82,21 @@ This section is the living operator onboarding guide.
 | `axonhealth` | Probe console + control-plane + watch (+ key APIs) |
 | `axonrestart` | Soft restart of systemd user units, then health check |
 | `axonrevive` | **Use when the shell is empty** (Runtime unavailable / No workspace). Force-kills a wedged control-plane, restarts all three units, health-checks |
+| `axonfixconnectors` | **Use when** Mission Control shows **REQUIRED CONNECTOR DOWN** / **tunnel token missing** / vault unlock **HTTP 503** about `AXON_WATCH_INTERNAL_SERVICE_TOKEN` |
 
 ```bash
 axonhealth          # is everything up?
 axonrevive          # empty shell / hung API — fix it
+axonfixconnectors  # required connector / tunnel / vault 503 — diagnose (+ optional fix)
 # then hard-refresh http://127.0.0.1:4173
 ```
 
 These are on your PATH (`~/.local/bin` → `bin/` in this repo). See [Snippet cookbook](#snippet-cookbook).
+
+### Reliability and deliberate controls
+
+See [Reliability and deliberate controls](how-to/reliability-and-deliberate-controls.md)
+for Vite recovery, manual STAND-UP, speech onset, and AgentDock hover actions.
 
 **Dev bootstrap (alternate, not used when systemd owns the ports):**
 
@@ -223,6 +221,11 @@ else happens.
 finished; Mission Control is asking you to **COMPLETE** (usual) or **RESUME** (if more
 steps expected).
 
+### Mission Control AUTONOMOUS (bounded)
+
+In **OPERATOR → Mission Control**, use **AUTONOMOUS ON/OFF** for bounded worker control.
+See [Auto-loop status & credits](how-to/auto-loop-and-credits.md) for the complete safety matrix, approval behavior, dedupe rules, and emergency procedure.
+
 ### “2 runs are ready for operator review” — what that means
 
 This is a **count of paused jobs**, not a failure. Each command you ran (`health`,
@@ -327,12 +330,41 @@ Axon-X probes subscription auth live:
 
 **Pro without vault key:** if `cursor agent status` prints `Logged in as …@…` and vault search shows no `CURSOR_API_KEY`, you are on the **subscription path** — correct for daily Pro use.
 
+### GitHub CLI (`gh`) for draft-PR delivery
+
+Worker shifts that finish with `push_policy=draft_pr` need the **GitHub CLI** on the
+**control-plane host** (not inside the chat UI). If Team shows
+`Delivery blocked: gh CLI is required to open a draft PR`, fix the host:
+
+1. Install: https://cli.github.com/ (or `sudo apt install gh` / package manager).
+2. Auth once as the operator user: `gh auth login` (HTTPS or SSH matching the repo remotes).
+3. Confirm control-plane can see it:
+   - `command -v gh` and `gh auth status`
+   - If systemd PATH omits `~/.local/bin`, either restart after
+     `scripts/ops/run-service.sh` (it prepends `~/.local/bin`) **or** set
+     `AXON_WATCH_GH_CLI_PATH=/absolute/path/to/gh` in
+     `~/.config/axon-watch/deployment.env`, then
+     `systemctl --user restart control-plane`.
+4. Retry the teammate (**Try again** / **Continue** on the agent review strip above the composer — only when the last job failed or was interrupted; succeeded shifts hide that CTA).
+
+Source: `services/control-plane/app/workspace_delivery/gh_cli.py`,
+`publish.py` (`_open_or_update_draft_pr`).
+
 ### Codex / OpenAI auth
 
 | Path | Setup |
 | --- | --- |
 | **Codex CLI login** | `codex login` on the host; vault consumer probes `codex login status` |
 | **API keys in vault** | `CODEX_API_KEY` or `OPENAI_API_KEY` in /vault (either satisfies the codex consumer) |
+
+### Claude Code auth
+
+| Path | Setup |
+| --- | --- |
+| **Claude Code CLI login** | `claude auth login` on the host; vault consumer probes `claude auth status` |
+| **API key in vault** | Optional `ANTHROPIC_API_KEY` for headless; subscription login preferred for Max/Pro |
+
+Select **Claude Code CLI (local)** in the composer runtime picker (or set `AXON_WATCH_IDE_RUNTIME_TARGET=claude_local`) so workers burn Claude usage instead of Cursor credits.
 
 ### Vault consumers vs runtime dispatch
 
@@ -341,6 +373,7 @@ Axon-X probes subscription auth live:
 | Consumer | Ready when | Optional / fallback |
 | --- | --- | --- |
 | `cursor_runtime` | CLI subscription **or** `CURSOR_API_KEY` in vault | API key only needed for headless |
+| `claude_runtime` | `claude auth login` **or** `ANTHROPIC_API_KEY` in vault | Max/Pro subscription preferred |
 | `codex_runtime` | `codex login` **or** Codex/OpenAI vault keys | |
 | `openai_provider` | `OPENAI_API_KEY` in vault | Direct OpenAI fallback |
 | DashPro monitor consumers | Required monitor keys in vault/import | |
@@ -375,11 +408,22 @@ Axon-X has **two execution lanes** — do not mix them when debugging.
 | **Plan** | `--mode plan` | Step mapping before execution |
 | **Agent** | Default consultative; **Full Access** in composer → approval → Cursor `--mode agent` / Codex workspace-write | `execution_access: full` + G3.3 approval gate |
 
+**Agent review strip (above the composer input):**
+
+| Control | When it appears |
+| --- | --- |
+| **N files** / **Review N files** | Agent edited files in the current thread |
+| **Try again** / **Continue** | Soft Attention only — last teammate job **failed** or was **interrupted**. Hidden after a successful shift |
+| **Explain** / **Open team** | Same Soft Attention window (Explain needs a linked run receipt) |
+| **Stop** / **Resume** / **Apply all** | Live run control and review-ready apply |
+
+The soft Attention **Try again** / **Explain** / **Open team** actions live on this strip with **Review N files**. Succeeded shifts hide the retry CTA.
+
 ### Choosing runtime target and model
 
 Open the **model picker** (⚡ chip) in the IDE agent dock:
 
-1. **Runtime target** — `Cursor CLI (local)`, `Codex CLI (local)`, or cloud placeholders. Preference persists in shell local storage via `shell.setSelectedRuntimeTarget`.
+1. **Runtime target** — `Cursor CLI (local)`, `Claude Code CLI (local)`, `Codex CLI (local)`, or cloud placeholders. Preference persists in shell local storage via `shell.setSelectedRuntimeTarget`.
 2. **Auto toggle** — when ON, Cursor picks the best model per request (no `--model` flag). When OFF, your pinned catalog model is passed to the CLI.
 3. **Add models** — browse live output of `cursor agent --list-models` (cached ~5 min). Badges like **Fast** / **High** come from CLI labels when present.
 4. **Auth line** — shows `CLI subscription · you@domain` or vault/API-key status; **Open Vault** only when auth is actually blocked (vault locked or missing keys **and** CLI not signed in).
@@ -389,7 +433,10 @@ Environment overrides:
 | Variable | Purpose |
 | --- | --- |
 | `AXON_WATCH_CURSOR_CLI_PATH` | Non-default `cursor` binary path |
+| `AXON_WATCH_CLAUDE_CLI_PATH` | Non-default `claude` binary path |
 | `AXON_WATCH_CODEX_CLI_PATH` | Non-default `codex` binary path |
+| `AXON_WATCH_IDE_RUNTIME_TARGET` | Force default target (`claude_local`, `cursor_local`, …) |
+| `AXON_WATCH_IDE_RUNTIME_FAMILY` | Prefer family when choosing default (`claude`, `cursor`, `codex`) |
 | `AXON_WATCH_LANE_B_STREAMING` | `1` (default) SSE streaming for IDE composer; `0` in tests |
 
 API endpoints:
@@ -973,8 +1020,7 @@ If you need to understand the current implementation quickly, read these first:
 Use these from the repo root.
 
 **CI, merge to `dev`, and employee agents:** see
-**[docs/how-to/ci-merge-and-worker-agents.md](how-to/ci-merge-and-worker-agents.md)**
-(Fast Gate workflow, PR workflow, roster/scheduler, how to tell if workers are live).
+**[CI, merge, and worker agents](how-to/ci-merge-and-worker-agents.md)**.
 
 ## Shared contract verification
 
@@ -1173,13 +1219,152 @@ Use this order when something breaks:
 1. **Stack health** — `axonhealth` (or `./scripts/dev/check-health.sh`).
 2. **Empty shell / Runtime unavailable** — `axonrevive`, then hard-refresh `:4173`. Do **not** rely on `./scripts/dev/down.sh` when systemd owns the ports.
 3. **Soft refresh** — `axonrestart` after backend route changes (if the API still answers).
-4. **Stale UI on `:4173`** — rebuild console-web (`npm run build -w @axon-watch/console-web`), `systemctl --user restart console-web.service`, then hard-refresh. Source-only / `:5173` Vite edits do **not** update the systemd bundle.
-5. **Browser cache** — hard refresh `:4173` (`Ctrl+Shift+R`) after console-web bundle changes.
-6. **Connectors truth** — Mission Control → **Connectors** rail or `GET /api/connectors`.
-7. **Gate scripts** — `npm run verify:production-operator`, then the slice gate (`verify:testN` / `verify:shell-commands`).
-8. **Logs** — `journalctl --user -u control-plane.service -n 80` (always-on) or `.local/logs/` (dev bootstrap).
+4. **Required connector / tunnel / vault 503** — `axonfixconnectors` (see below). Local `axonhealth` can still be green while the **public** console probe is red.
+5. **Stale UI on `:4173`** — rebuild console-web (`npm run build -w @axon-watch/console-web`), `systemctl --user restart console-web.service`, then hard-refresh. Source-only / `:5173` Vite edits do **not** update the systemd bundle.
+6. **Browser cache** — hard refresh `:4173` (`Ctrl+Shift+R`) after console-web bundle changes.
+7. **Connectors truth** — Mission Control → **Connectors** rail or `GET /api/connectors`.
+8. **Gate scripts** — `npm run verify:production-operator`, then the slice gate (`verify:testN` / `verify:shell-commands`).
+9. **Logs** — `journalctl --user -u control-plane.service -n 80` (always-on) or `.local/logs/` (dev bootstrap).
 
 Symptom-specific fixes continue in the sections below.
+
+## Problem: REQUIRED CONNECTOR DOWN / tunnel token missing / Vault unlock HTTP 503
+
+### What you see
+
+- Mission Control chip: **1 REQUIRED CONNECTOR DOWN**, **degraded**, **tunnel token missing**
+- Connectors rail: **Console web** `REQUIRED` → unavailable / probe failed
+- Cloudflare tunnel row: `tunnel token missing (auth=missing)`
+- Vault page (`/vault`): unlock fails with red banner  
+  `Watch vault API HTTP 503: AXON_WATCH_INTERNAL_SERVICE_TOKEN is required when the operator surface is remotely reachable`
+- Status line may still say **WATCH CONNECTED** and `axonhealth` can still pass — because **local** `:4173` / `:8787` are fine.
+
+**Current rule:** required `console_web` probes **loopback** (`AXON_WATCH_CONSOLE_WEB_BASE_URL`, usually `:4173`). Cloudflare/public reachability is optional `public_ingress`. A tunnel flap alone must not mark Mission Control degraded.
+
+**Older builds** probed required `console_web` against `AXON_WATCH_PUBLIC_BASE_URL` (e.g. `https://axon.edudashpro.org.za/api/health`), which incorrectly tied local ONLINE to Cloudflare.
+
+### Why it happens (failure chain)
+
+1. `AXON_WATCH_PUBLIC_BASE_URL` is a non-loopback hostname → deployment is **remotely reachable**.
+2. Remotely reachable hosts **require** a shared `AXON_WATCH_INTERNAL_SERVICE_TOKEN` on both control-plane and axon-watch (same value in `~/.config/axon-watch/deployment.env`).
+3. If that token is missing, control-plane → watch **mutating** calls (vault unlock, tunnel start) return **HTTP 503**.
+4. Vault stays **locked** → tunnel token cannot resolve from encrypted vault secrets → managed `cloudflared` will not start → public health returns Cloudflare **1033** → optional `public_ingress` goes soft (local required connectors should still be green).
+5. Auto-unlock keyfile may show as enabled on `/vault`, but **auto-unlock is refused by default** when remotely reachable. On this trusted always-on host set `AXON_WATCH_ALLOW_VAULT_AUTO_UNLOCK=1` in `~/.config/axon-watch/deployment.env`, then `axonrestart` (or Enable auto-unlock in `/vault`).
+6. Separately: a slow `/api/vault/status` (Cursor/Codex CLI probes) used to exceed the console’s **12s** fetch budget and show a false **SETUP REQUIRED** — probes are now short-timeout + cached.
+
+Also see [`docs/how-to/autonomy-gates-and-service-identity.md`](how-to/autonomy-gates-and-service-identity.md) and [`docs/NATIVE_TUNNEL_CONTROL.md`](NATIVE_TUNNEL_CONTROL.md).
+
+### Fix (copy-paste)
+
+**One-word path (preferred):**
+
+```bash
+# 1) Only if vault unlock shows INTERNAL_SERVICE_TOKEN HTTP 503:
+axonfixconnectors --ensure-internal-token --restart
+
+# 2) Browser: /vault → master password + 2FA → Remember me → UNLOCK
+#    Confirm secret name: cloudflare_tunnel_token
+#    (aliases: AXON_CLOUDFLARE_TUNNEL_TOKEN / CLOUDFLARE_TUNNEL_TOKEN / TUNNEL_TOKEN)
+
+# 3) Start tunnel + reprobe (reads AXON_WATCH_OPERATOR_TOKEN from deployment.env)
+axonfixconnectors
+```
+
+**Do not** restart `axon-watch` after a successful vault unlock unless auto-unlock is permitted on this host (`AXON_WATCH_ALLOW_VAULT_AUTO_UNLOCK=1` + keyfile) or you are ready to unlock again. Vault unlock is **in-process** on the watch service; without auto-unlock a watch restart drops the session. Managed `cloudflared` can also stop with the watch unit.
+
+Other facts for this host:
+
+- Mutating CP routes (`POST /api/tunnel/start`, `reprobe_connector`) need
+  `Authorization: Bearer <AXON_WATCH_OPERATOR_TOKEN>` under `local_token`
+  (forced when the public URL is non-loopback). `axonfixconnectors` loads that
+  token from `~/.config/axon-watch/deployment.env`. Mission Control can mutate
+  via a desktop session cookie instead.
+- Auto-unlock is refused by default while remotely reachable. Trusted always-on host override:
+  `AXON_WATCH_ALLOW_VAULT_AUTO_UNLOCK=1` in `deployment.env`, then `axonrestart`.
+  Confirm `/vault` no longer shows the remote-disable banner after Enable.
+- Soft cutover (`remote=http://localhost:7734` via public-origin-proxy) is healthy but not final.
+  To point Cloudflare directly at Axon-X `:4173`:
+
+```bash
+# Needs Cloudflare API token with Account → Cloudflare Tunnel → Edit
+# Store as CF_API_TOKEN in deployment.env or vault, then:
+./scripts/ops/set-tunnel-ingress-4173.sh
+# Reprobe Cloudflare tunnel — expect ingress_matches_axon (no soft-cutover chip)
+```
+
+### Voice says “open Runtime or vault” but the job failed for everyone
+
+That line was a **misclassified Cursor usage-limit failure**. Lane B used to append
+“Open Runtime or `/vault`” on every CLI failure, so VAXON treated usage blocks as vault
+problems. Copy now distinguishes:
+
+| Real cause | Spoken / roster next step |
+| --- | --- |
+| `ActionRequiredError` / hit usage limit | Raise Cursor limit or switch model |
+| Auth probe timeout | Check `cursor agent status` |
+| Not signed in / vault locked | Login or unlock `/vault` |
+
+Guard-rails: continuous scheduler skips the whole workspace after any role hits usage
+limits (Cursor quota is account-wide). Pause Fleet Controls when burning quota on a
+known limit.
+- `cloudflare_tunnel` / `public_ingress` are **optional** (`required: false`). **REQUIRED CONNECTOR DOWN**
+  is driven by required **loopback** probes — `control_plane` + local `console_web`.
+- Soft cutover is normal: remote ingress may still target `http://localhost:7734`
+  while `axon-public-origin-proxy` forwards to `:4173`. Healthy tunnel detail:
+  **active soft cutover**.
+- Connector probes must use a non-default User-Agent. Cloudflare returns **403**
+  to stock `Python-urllib`, which used to surface as generic `probe failed`
+  even when `curl` and the tunnel probe succeeded (fixed in connector probe headers).
+
+Install / refresh the PATH wrapper if needed:
+
+```bash
+./scripts/ops/install-bin-wrappers.sh
+# or without PATH:
+./scripts/ops/axonfixconnectors.sh --ensure-internal-token --restart
+```
+
+**Manual path (same outcome):**
+
+```bash
+# Add shared internal token only if missing (do not commit this file)
+echo "AXON_WATCH_INTERNAL_SERVICE_TOKEN=$(openssl rand -hex 24)" >> ~/.config/axon-watch/deployment.env
+axonrestart
+
+# Unlock Vault in the UI (Remember me), then:
+source ~/.config/axon-watch/deployment.env   # or export OPERATOR token another way
+curl -sS -X POST http://127.0.0.1:8787/api/tunnel/start \
+  -H "Authorization: Bearer ${AXON_WATCH_OPERATOR_TOKEN}" | python3 -m json.tool
+curl -sS -X POST http://127.0.0.1:8787/api/watch/commands \
+  -H "Authorization: Bearer ${AXON_WATCH_OPERATOR_TOKEN}" \
+  -H 'Content-Type: application/json' \
+  -d '{"command_type":"reprobe_connector","target_type":"connector","target_id":"console_web","requested_by":"operator"}'
+```
+
+**Durable tunnel auth (survives watch restart):** put the named-tunnel token in env
+(or keep unlocking after every watch restart):
+
+```bash
+# ~/.config/axon-watch/deployment.env
+AXON_CLOUDFLARE_TUNNEL_TOKEN=<named-tunnel-token-from-cloudflare>
+axonrestart
+axonfixconnectors
+```
+
+Accepted vault/env names: `AXON_CLOUDFLARE_TUNNEL_TOKEN`, `CLOUDFLARE_TUNNEL_TOKEN`,
+`cloudflare_tunnel_token`, `TUNNEL_TOKEN`. When the vault secret
+`cloudflare_tunnel_token` is loaded, status may show `auth_source=settings`
+(resolver labels a non-empty stored value that way) — that still means a token
+is available.
+
+### Verify
+
+```bash
+axonfixconnectors          # required_unavailable should be 0
+curl -sS http://127.0.0.1:8787/api/tunnel/status | python3 -m json.tool
+curl -sS --max-time 15 https://axon.edudashpro.org.za/api/health
+# hard-refresh Mission Control — degraded / REQUIRED CONNECTOR DOWN chips should clear
+```
 
 ## Problem: Runtime unavailable / No workspace selected / Briefing unavailable
 
@@ -1192,11 +1377,14 @@ axonrevive
 
 Why `./scripts/dev/down.sh` / `up.sh` fail here: this host runs **user systemd units** (`control-plane.service`, etc.). Dev down/up skip those listeners. Soft `systemctl --user restart` can also hang on a stuck worker — `axonrevive` force-kills first.
 
+## Problem: Vite reports `ECONNREFUSED 127.0.0.1:8787`
+
+Use `scripts/ops/run-5173.sh`; follow the
+[restart playbook](how-to/reliability-and-deliberate-controls.md#vite-control-plane-recovery).
+
 ## Problem: online research falls back / Google search returns 403
 
-See **[docs/how-to/searxng-research.md](how-to/searxng-research.md)** for SearXNG
-setup, provider order (SearXNG → legacy Google → DuckDuckGo), and Google 403
-troubleshooting.
+See **[SearXNG research](how-to/searxng-research.md)** for provider order and Google 403 recovery.
 
 ## Problem: `./scripts/dev/up.sh` fails or the frontend does not start
 
@@ -1375,11 +1563,14 @@ Installed on PATH via `~/.local/bin` → repo `bin/`:
 | **`axonhealth`** | `./scripts/dev/check-health.sh` | Quick “is the stack OK?” |
 | **`axonrestart`** | `systemctl --user restart` axon-watch + control-plane + console-web, then health | Soft restart when APIs still respond |
 | **`axonrevive`** | Force-kill control-plane → restart all three → health | Empty shell, hung health, wedged worker |
+| **`axonfixconnectors`** | Diagnose tunnel/connectors; optional `--ensure-internal-token --restart` | REQUIRED CONNECTOR DOWN, tunnel token missing, vault unlock HTTP 503 |
 
 ```bash
 axonhealth
 axonrestart
 axonrevive
+axonfixconnectors --ensure-internal-token --restart   # vault 503 / missing internal token
+axonfixconnectors                                     # after vault unlock: start tunnel + reprobe
 ```
 
 Repo scripts (same behavior without PATH):
@@ -1388,9 +1579,12 @@ Repo scripts (same behavior without PATH):
 ./scripts/ops/axonhealth.sh
 ./scripts/ops/axonrestart.sh
 ./scripts/ops/axonrevive.sh
+./scripts/ops/axonfixconnectors.sh
 ```
 
 Open console after revive: **http://127.0.0.1:4173** (hard-refresh).
+
+Full connector/tunnel recovery write-up: [Problem: REQUIRED CONNECTOR DOWN](#problem-required-connector-down--tunnel-token-missing--vault-unlock-http-503).
 
 ### Console-web rebuild (always-on `:4173`)
 

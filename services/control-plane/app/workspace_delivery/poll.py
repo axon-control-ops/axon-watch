@@ -10,6 +10,7 @@ from typing import Any
 from app.workspace_delivery import store as delivery_store
 from app.workspace_delivery.ci_status import apply_ci_status_to_delivery
 from app.workspace_delivery.config import get_workspace_delivery_policy
+from app.workspace_delivery.gh_cli import resolve_gh_cli
 
 logger = logging.getLogger(__name__)
 
@@ -89,9 +90,7 @@ def poll_pending_deliveries(*, limit: int = 20) -> list[dict[str, Any]]:
 
 
 def shutil_which_gh() -> bool:
-    from shutil import which
-
-    return which("gh") is not None
+    return resolve_gh_cli() is not None
 
 
 def _gh_latest_conclusion(
@@ -100,10 +99,13 @@ def _gh_latest_conclusion(
     branch: str,
     sha: str,
 ) -> dict[str, str] | None:
+    gh_bin = resolve_gh_cli()
+    if not gh_bin:
+        return None
     try:
         completed = subprocess.run(
             [
-                "gh",
+                gh_bin,
                 "run",
                 "list",
                 "--workflow",

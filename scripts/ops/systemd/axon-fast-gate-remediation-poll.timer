@@ -1,0 +1,12 @@
+[Unit]
+Description=Poll GitHub Fast Gate failures into local CI remediation when public webhook is unreachable
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=3min
+AccuracySec=30s
+Persistent=true
+Unit=axon-fast-gate-remediation-poll.service
+
+[Install]
+WantedBy=timers.target

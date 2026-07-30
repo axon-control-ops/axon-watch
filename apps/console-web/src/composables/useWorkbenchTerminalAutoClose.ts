@@ -1,87 +1,31 @@
 import { onBeforeUnmount, watch, type Ref } from 'vue';
 
-import {
-  resolveWorkbenchTerminalAutoClose,
-  WORKBENCH_TERMINAL_AUTO_CLOSE_IDLE_RESET_MS,
-} from '../lib/workbench-terminal-auto-close';
+import { resolveWorkbenchTerminalAutoClose } from '../lib/workbench-terminal-auto-close';
 
-/** Auto-hide the workbench terminal after idle; interaction resets the timer. */
+/**
+ * Previously auto-hid the workbench terminal after idle.
+ * That path is disabled — keep the hook so call sites stay stable, but never hide.
+ */
 export function useWorkbenchTerminalAutoClose(input: {
   terminalPanelVisible: Ref<boolean>;
   onHideTerminal: () => void;
-  /** Selector for the dock root used to reset idle on operator interaction. */
+  /** Unused — retained for call-site compatibility. */
   dockSelector?: string;
 }): void {
-  const { terminalPanelVisible, onHideTerminal, dockSelector = '.center-workbench__terminal-panel' } =
-    input;
-
-  let closeTimer: number | null = null;
-
-  function clearCloseTimer(): void {
-    if (closeTimer !== null) {
-      window.clearTimeout(closeTimer);
-      closeTimer = null;
-    }
-  }
-
-  function armCloseTimer(): void {
-    clearCloseTimer();
-    const decision = resolveWorkbenchTerminalAutoClose({
-      terminalVisible: terminalPanelVisible.value,
-    });
-    if (!decision.shouldArm) {
-      return;
-    }
-    closeTimer = window.setTimeout(() => {
-      closeTimer = null;
-      if (terminalPanelVisible.value) {
-        onHideTerminal();
-      }
-    }, decision.delayMs);
-  }
-
-  function onDockActivity(event: Event): void {
-    const target = event.target;
-    if (!(target instanceof Element)) {
-      return;
-    }
-    if (!target.closest(dockSelector)) {
-      return;
-    }
-    if (!terminalPanelVisible.value) {
-      return;
-    }
-    clearCloseTimer();
-    closeTimer = window.setTimeout(() => {
-      closeTimer = null;
-      if (terminalPanelVisible.value) {
-        onHideTerminal();
-      }
-    }, WORKBENCH_TERMINAL_AUTO_CLOSE_IDLE_RESET_MS);
-  }
+  const { terminalPanelVisible, onHideTerminal } = input;
+  void onHideTerminal;
+  void input.dockSelector;
 
   watch(
     terminalPanelVisible,
     (visible) => {
-      if (!visible) {
-        clearCloseTimer();
-        return;
-      }
-      armCloseTimer();
+      // Explicit no-op: resolveWorkbenchTerminalAutoClose never arms.
+      void resolveWorkbenchTerminalAutoClose({ terminalVisible: visible });
     },
     { immediate: true },
   );
 
-  if (typeof window !== 'undefined') {
-    window.addEventListener('pointerdown', onDockActivity, true);
-    window.addEventListener('keydown', onDockActivity, true);
-  }
-
   onBeforeUnmount(() => {
-    clearCloseTimer();
-    if (typeof window !== 'undefined') {
-      window.removeEventListener('pointerdown', onDockActivity, true);
-      window.removeEventListener('keydown', onDockActivity, true);
-    }
+    /* nothing to clear — timers are not armed */
   });
 }

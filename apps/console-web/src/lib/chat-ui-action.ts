@@ -2,6 +2,10 @@ export interface SwitchWorkspaceUiAction {
   type: 'switch_workspace';
   workspace_id: string;
   open_file_path?: string | null;
+  layout_mode?: 'operator' | 'ide';
+  focus_attention?: boolean;
+  signal_id?: string | null;
+  cta_label?: string | null;
 }
 
 export interface OpenSourceUiAction {
@@ -48,10 +52,17 @@ export function parseChatUiAction(value: unknown): ChatUiAction | null {
     }
 
     const openFilePath = String(record.open_file_path ?? '').trim();
+    const layoutMode = String(record.layout_mode ?? '').trim().toLowerCase();
+    const ctaLabel = String(record.cta_label ?? '').trim();
+    const signalId = String(record.signal_id ?? '').trim();
     return {
       type: 'switch_workspace',
       workspace_id: workspaceId,
       open_file_path: openFilePath || null,
+      layout_mode: layoutMode === 'ide' || layoutMode === 'operator' ? layoutMode : undefined,
+      focus_attention: record.focus_attention === true,
+      signal_id: signalId || null,
+      cta_label: ctaLabel || null,
     };
   }
 
@@ -122,6 +133,7 @@ export interface WorkspaceSwitchShell {
   setCurrentWorkspace: (workspaceId: string) => void;
   openWorkspaceFile: (path: string) => Promise<void>;
   setLayoutMode?: (mode: 'operator' | 'ide') => void;
+  focusAttentionSidebar?: (signalId?: string | null) => void;
   handoffSignalToIde?: (
     signal: {
       signal_id: string;
@@ -143,6 +155,12 @@ export function applyChatUiAction(
 ): void {
   if (action.type === 'switch_workspace') {
     shell.setCurrentWorkspace(action.workspace_id);
+    if (action.layout_mode) {
+      shell.setLayoutMode?.(action.layout_mode);
+    }
+    if (action.focus_attention) {
+      shell.focusAttentionSidebar?.(action.signal_id ?? null);
+    }
     if (action.open_file_path) {
       void shell.openWorkspaceFile(action.open_file_path);
     }

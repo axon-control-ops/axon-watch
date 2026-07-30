@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import os
 import sqlite3
+from contextlib import contextmanager
 from datetime import UTC, datetime
 from typing import Any
 from uuid import uuid4
@@ -18,6 +19,15 @@ def _configured_db_path() -> str | None:
 
 def _connect() -> sqlite3.Connection:
     return run_store_sqlite.connect(_configured_db_path())
+
+
+@contextmanager
+def _managed_connection():
+    connection = _connect()
+    try:
+        yield connection
+    finally:
+        connection.close()
 
 
 def _ensure_voice_log_table(connection: sqlite3.Connection) -> None:
@@ -81,7 +91,7 @@ def append_voice_transcript(
     entry_id = f"voice_{uuid4().hex[:12]}"
     created_at = datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
     receipt_json = json.dumps(model_receipt) if model_receipt else None
-    with _connect() as connection:
+    with _managed_connection() as connection:
         _ensure_voice_log_table(connection)
         connection.execute(
             """
@@ -122,7 +132,7 @@ def list_recent_voice_transcripts(
 ) -> list[dict[str, Any]]:
     capped = max(1, min(int(limit), 100))
     clean_session_id = str(session_id or "").strip()
-    with _connect() as connection:
+    with _managed_connection() as connection:
         _ensure_voice_log_table(connection)
         if clean_session_id:
             rows = connection.execute(
@@ -171,7 +181,7 @@ def list_recent_spoken_lines(*, session_id: str, limit: int = 5) -> list[str]:
     if not clean_session_id:
         return []
     capped = max(1, min(int(limit), 20))
-    with _connect() as connection:
+    with _managed_connection() as connection:
         _ensure_voice_log_table(connection)
         rows = connection.execute(
             """

@@ -1,0 +1,128 @@
+import type { CompanyEmployeeRecord, RunRecord } from '../../contracts/canonical';
+import type { WorkspaceTaskRecord } from '../../api/tasks-api';
+import { normalizeAutonomyMode } from '../../lib/operator-presence-settings';
+
+import { employeeIsActivelyBusy } from './company-roster-busy';
+
+export type EmployeeManualHandoff = {
+  waiting: boolean;
+  taskId: string | null;
+  reason: 'open_task' | 'assigned' | null;
+};
+
+function roleKey(value: string | null | undefined): string {
+  return String(value || '')
+    .trim()
+    .toLowerCase();
+}
+
+function taskIsUnblocked(
+  task: WorkspaceTaskRecord,
+  byId: Map<string, WorkspaceTaskRecord>,
+): boolean {
+  const deps = Array.isArray(task.dependencies) ? task.dependencies : [];
+  return deps.every((depId) => {
+    const dep = byId.get(depId);
+    const status = dep?.status ?? 'open';
+    return status === 'completed' || status === 'cancelled';
+  });
+}
+
+const IN_FLIGHT_STATUSES = new Set([
+  'executing',
+  'working',
+  'running',
+  'starting',
+  'planning',
+  'verifying',
+]);
+
+/**
+ * Manual autonomy: handoffs wait for an explicit Start. Semi/Full hide Start Now
+ * (Full auto-leases; Semi still uses Mission Control START / Lead Send).
+ *
+ * Start now only when there is a real handoff wait and the teammate is not busy
+ * (roster mid-shift or live IDE stream). Busy + no handoff both hide the button.
+ */
+export function resolveEmployeeManualHandoff(input: {
+  employee: CompanyEmployeeRecord;
+  autonomyMode: string | null | undefined;
+  tasks: readonly WorkspaceTaskRecord[];
+  runs?: readonly Pick<RunRecord, 'run_id' | 'task_id'>[];
+  /** True when this teammate owns an active IDE stream (Team BUSY badge). */
+  liveBusy?: boolean;
+}): EmployeeManualHandoff {
+  if (normalizeAutonomyMode(input.autonomyMode) !== 'manual') {
+    return { waiting: false, taskId: null, reason: null };
+  }
+  if (!input.employee.enabled) {
+    return { waiting: false, taskId: null, reason: null };
+  }
+
+  const role = roleKey(input.employee.role);
+  if (!role) {
+    return { waiting: false, taskId: null, reason: null };
+  }
+
+  const status = roleKey(input.employee.status);
+  // Never offer Start now while a run is already in flight or the IDE is streaming.
+  if (
+    input.liveBusy ||
+    employeeIsActivelyBusy(input.employee) ||
+    IN_FLIGHT_STATUSES.has(status)
+  ) {
+    return { waiting: false, taskId: null, reason: null };
+  }
+
+  const byId = new Map(input.tasks.map((task) => [task.task_id, task]));
+  const activeRunId = input.employee.active_run_id?.trim() ?? '';
+  const activeRunTaskId =
+    input.runs?.find((run) => run.run_id.trim() === activeRunId)?.task_id?.trim() ?? '';
+  const assignedTask =
+    input.tasks.find(
+      (task) =>
+        roleKey(task.owner_role) === role &&
+        task.status === 'leased' &&
+        ((activeRunId && task.run_id?.trim() === activeRunId) ||
+          (activeRunTaskId && task.task_id === activeRunTaskId)),
+    ) ?? null;
+
+  // An assigned employee's bound run is authoritative. Never let an unrelated
+  // newer open task steal this Start button.
+  if (status === 'assigned' && (assignedTask || activeRunTaskId)) {
+    return {
+      waiting: true,
+      taskId: assignedTask?.task_id ?? activeRunTaskId,
+      reason: 'assigned',
+    };
+  }
+
+  const openTask = [...input.tasks]
+    .filter(
+      (task) =>
+        roleKey(task.owner_role) === role &&
+        task.status === 'open' &&
+        taskIsUnblocked(task, byId),
+    )
+    .sort((left, right) => right.updated_at.localeCompare(left.updated_at))[0];
+
+  if (openTask) {
+    return { waiting: true, taskId: openTask.task_id, reason: 'open_task' };
+  }
+
+  const leasedQueued = [...input.tasks]
+    .filter(
+      (task) =>
+        roleKey(task.owner_role) === role &&
+        task.status === 'leased' &&
+        Boolean(task.run_id?.trim()),
+    )
+    .sort((left, right) => right.updated_at.localeCompare(left.updated_at))[0];
+
+  if (leasedQueued && status === 'assigned') {
+    return { waiting: true, taskId: leasedQueued.task_id, reason: 'assigned' };
+  }
+
+  // Do not show a handoff glow that has no actionable task behind it.
+  return { waiting: false, taskId: null, reason: null };
+}

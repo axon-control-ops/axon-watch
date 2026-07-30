@@ -2,10 +2,15 @@
 
 from __future__ import annotations
 
+import os
 import sqlite3
+import threading
 from pathlib import Path
 
 _DEFAULT_DB = "./.local/state/control-plane.sqlite3"
+_DEFAULT_BUSY_TIMEOUT_MS = 30_000
+_SCHEMA_LOCK = threading.Lock()
+_INITIALIZED_DATABASES: set[Path] = set()
 
 
 def _repo_root() -> Path:
@@ -13,8 +18,6 @@ def _repo_root() -> Path:
 
 
 def resolve_db_path(configured_path: str | None) -> Path:
-    import os
-
     raw_path = (configured_path or _DEFAULT_DB).strip() or _DEFAULT_DB
     path = Path(raw_path)
     if path.is_absolute():
@@ -28,12 +31,42 @@ def resolve_db_path(configured_path: str | None) -> Path:
     return (_repo_root() / path).resolve()
 
 
+def _busy_timeout_ms() -> int:
+    raw = os.environ.get(
+        "AXON_WATCH_SQLITE_BUSY_TIMEOUT_MS",
+        str(_DEFAULT_BUSY_TIMEOUT_MS),
+    ).strip()
+    try:
+        return max(1_000, min(int(raw), 120_000))
+    except ValueError:
+        return _DEFAULT_BUSY_TIMEOUT_MS
+
+
 def connect(configured_path: str | None) -> sqlite3.Connection:
     db_path = resolve_db_path(configured_path)
     db_path.parent.mkdir(parents=True, exist_ok=True)
-    connection = sqlite3.connect(str(db_path))
+    busy_timeout_ms = _busy_timeout_ms()
+    connection = sqlite3.connect(
+        str(db_path),
+        timeout=busy_timeout_ms / 1_000,
+    )
     connection.row_factory = sqlite3.Row
-    ensure_schema(connection)
+    connection.execute(f"PRAGMA busy_timeout = {busy_timeout_ms}")
+    connection.execute("PRAGMA foreign_keys = ON")
+    connection.execute("PRAGMA synchronous = NORMAL")
+    try:
+        with _SCHEMA_LOCK:
+            if db_path not in _INITIALIZED_DATABASES:
+                # WAL lets readers continue while one writer commits. SQLite
+                # still serializes writers; busy_timeout makes them wait instead
+                # of failing agent/chat/voice requests during short bursts.
+                connection.execute("PRAGMA journal_mode = WAL")
+                ensure_schema(connection)
+                connection.commit()
+                _INITIALIZED_DATABASES.add(db_path)
+    except Exception:
+        connection.close()
+        raise
     return connection
 
 
@@ -106,6 +139,11 @@ def ensure_schema(connection: sqlite3.Connection) -> None:
             task TEXT NOT NULL,
             reason TEXT NOT NULL DEFAULT '',
             status TEXT NOT NULL DEFAULT 'recorded',
+            target_task_id TEXT,
+            routed_role TEXT NOT NULL DEFAULT '',
+            routed_employee_id TEXT NOT NULL DEFAULT '',
+            communication_thread_id TEXT,
+            source_communication_thread_id TEXT,
             created_at TEXT NOT NULL,
             updated_at TEXT NOT NULL
         );
@@ -131,6 +169,12 @@ def ensure_schema(connection: sqlite3.Connection) -> None:
         CREATE TABLE IF NOT EXISTS worker_scheduler_settings (
             settings_key TEXT PRIMARY KEY,
             settings_json TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS workspace_composer_prefs (
+            workspace_id TEXT PRIMARY KEY,
+            cursor_cli_model TEXT NOT NULL,
             updated_at TEXT NOT NULL
         );
 

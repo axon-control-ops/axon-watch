@@ -27,7 +27,7 @@ import { useShellStore } from '../../stores/shell';
 const props = withDefaults(
   defineProps<{
     variant?: 'sidebar' | 'dock';
-    sections?: 'all' | 'run-only';
+    sections?: 'all' | 'run-only' | 'attention-only';
   }>(),
   {
     variant: 'dock',
@@ -162,9 +162,11 @@ function approvalExplanation(): OperatorAlertExplanation {
       'attention-stack--sidebar': variant === 'sidebar',
       'attention-stack--dock': variant === 'dock',
       'attention-stack--run-only': sections === 'run-only',
+      'attention-stack--attention-only': sections === 'attention-only',
     }"
   >
     <HudSeamCard
+      v-if="sections !== 'attention-only'"
       seam-id="dock-seam-run"
       :title="
         shell.dockSeamState('run')?.title ??
@@ -287,7 +289,7 @@ function approvalExplanation(): OperatorAlertExplanation {
     </HudSeamCard>
 
     <HudSeamCard
-      v-if="sections === 'all'"
+      v-if="sections === 'all' || sections === 'attention-only'"
       seam-id="dock-seam-approvals"
       :title="shell.dockSeamState('approvals')?.title ?? 'Approvals'"
       seam-class="dock-seam dock-seam--approvals"
@@ -356,7 +358,7 @@ function approvalExplanation(): OperatorAlertExplanation {
     </HudSeamCard>
 
     <HudSeamCard
-      v-if="sections === 'all'"
+      v-if="sections === 'all' || sections === 'attention-only'"
       seam-id="dock-seam-signals"
       :title="shell.dockSeamState('signals')?.title ?? 'Signals'"
       seam-class="dock-seam dock-seam--signals"
@@ -386,6 +388,7 @@ function approvalExplanation(): OperatorAlertExplanation {
           :key="signal.signal_id"
           class="dock-list__item dock-signal-row"
           :class="{ 'dock-signal-row--expanded': isSignalExpanded(signal.signal_id) }"
+          :data-signal-id="signal.signal_id"
         >
           <div class="dock-signal-row__main">
             <button

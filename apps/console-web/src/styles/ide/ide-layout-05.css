@@ -52,80 +52,31 @@
   font-size: 0.6rem;
 }
 
-.agent-dock__composer-resize-handle {
-  position: relative;
-  z-index: 220;
-  flex: 0 0 0.85rem;
-  width: 100%;
-  height: 0.85rem;
-  margin: 0;
-  padding: 0;
-  border: 0;
-  border-top: 1px solid rgba(138, 154, 173, 0.12);
-  background: linear-gradient(
-    180deg,
-    rgba(8, 14, 22, 0.98),
-    rgba(6, 10, 16, 0.96)
-  );
-  cursor: row-resize;
-  touch-action: none;
-}
-
-.agent-dock__composer-resize-grip {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  width: 2.75rem;
-  height: 3px;
-  border-radius: 999px;
-  background: rgba(122, 235, 255, 0.38);
-  transform: translate(-50%, -50%);
-  transition:
-    width 120ms ease,
-    background 120ms ease,
-    box-shadow 120ms ease;
-}
-
-.agent-dock__composer-resize-handle:hover .agent-dock__composer-resize-grip,
-.agent-dock__composer-resize-handle:focus-visible .agent-dock__composer-resize-grip,
-.agent-dock--composer-resizing .agent-dock__composer-resize-grip {
-  width: 4rem;
-  background: rgba(122, 235, 255, 0.9);
-  box-shadow: 0 0 10px rgba(90, 159, 255, 0.5);
-}
-
-.agent-dock__composer-resize-handle:focus-visible {
-  outline: 1px solid rgba(122, 235, 255, 0.55);
-  outline-offset: -1px;
-}
-
 .agent-dock__composer {
   --agent-dock-composer-overlay-z: 1200;
   flex: 0 0 auto;
   display: flex;
   flex-direction: column;
+  justify-content: flex-end;
   gap: 0;
   min-width: 0;
   max-width: 100%;
   min-height: 0;
-  height: var(--agent-dock-composer-height, auto);
-  max-height: var(--agent-dock-composer-height, none);
-  /* Menus open upward over the transcript — must not clip or sit under threads. */
-  overflow: hidden;
+  /* Menus / typeahead open upward over the transcript — never clip them. */
+  overflow: visible;
   position: relative;
   z-index: 200;
   isolation: isolate;
   /* Flush to dock bottom / status bar — no floating bottom gutter. */
-  padding: 0.45rem 0.55rem 0;
+  padding: 0.35rem 0.55rem 0;
   margin: 0;
   border-top: 1px solid rgba(138, 154, 173, 0.1);
   background: rgba(6, 10, 16, 0.72);
 }
 
-.agent-dock--composer-user-sized .agent-dock__composer,
-.agent-dock--composer-resizing .agent-dock__composer {
-  overflow: auto;
-  overscroll-behavior: contain;
+.agent-dock__composer:has(.agent-dock-composer__menu),
+.agent-dock__composer:has(.agent-dock-composer__typeahead) {
+  overflow: visible;
 }
 
 .agent-dock__composer > .agent-dock-composer {
@@ -350,6 +301,41 @@
   border-color: rgba(120, 220, 160, 0.45);
   background: rgba(16, 48, 32, 0.72);
   color: rgba(180, 255, 210, 0.95);
+}
+
+.ide-agent-review-strip__btn--retry {
+  border-color: rgba(248, 113, 113, 0.42);
+  background: rgba(72, 28, 32, 0.95);
+  color: rgba(255, 220, 220, 0.96);
+  font-weight: 650;
+}
+
+.ide-agent-review-strip__btn--link {
+  border-color: transparent;
+  background: transparent;
+  color: rgba(186, 198, 214, 0.92);
+  text-decoration: underline;
+  text-underline-offset: 0.12em;
+  padding-inline: 0.35rem;
+}
+
+.ide-agent-review-strip__btn--link:hover:not(:disabled) {
+  color: rgba(230, 236, 244, 0.98);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.ide-agent-review-strip--attention {
+  border-color: rgba(248, 113, 113, 0.28);
+}
+
+.ide-agent-review-strip--interrupted {
+  border-color: rgba(251, 191, 36, 0.32);
+}
+
+.ide-agent-review-strip--interrupted .ide-agent-review-strip__btn--retry {
+  border-color: rgba(251, 191, 36, 0.45);
+  background: rgba(64, 48, 18, 0.95);
+  color: rgba(255, 236, 190, 0.96);
 }
 
 .agent-dock-composer {

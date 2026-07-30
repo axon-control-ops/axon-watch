@@ -40,6 +40,17 @@ class FailureDetailTests(unittest.TestCase):
             ),
         )
 
+    def test_usage_limit_preferred_over_unavailable_peers(self) -> None:
+        wrapped = (
+            "Lane B agent fallback reply generated "
+            "(Codex CLI (local) unavailable; Running as unit: axon-agent.scope; "
+            "Invocation ID: abc; ActionRequiredError: You're out of usage.)"
+        )
+        normalized = normalize_operator_failure_detail(wrapped)
+        self.assertIn("ActionRequiredError", normalized)
+        self.assertNotIn("Codex CLI (local) unavailable", normalized)
+        self.assertTrue(is_usage_limit_failure(wrapped))
+
     def test_usage_limit_detected_after_normalization(self) -> None:
         wrapped = (
             "Lane B agent fallback reply generated "
@@ -47,6 +58,9 @@ class FailureDetailTests(unittest.TestCase):
         )
         self.assertTrue(is_usage_limit_failure(wrapped))
         self.assertFalse(is_usage_limit_failure("verify:contracts — assertion failed"))
+        self.assertFalse(is_usage_limit_failure("ActionRequiredError"))
+        self.assertFalse(is_usage_limit_failure("ActionRequiredError: Please accept the terms"))
+        self.assertTrue(is_usage_limit_failure("ActionRequiredError: You're out of usage."))
 
     def test_runtime_auth_detected_after_normalization(self) -> None:
         wrapped = (
@@ -56,6 +70,18 @@ class FailureDetailTests(unittest.TestCase):
         )
         self.assertTrue(is_runtime_auth_failure(wrapped))
         self.assertFalse(is_runtime_auth_failure("verify:contracts — assertion failed"))
+
+    def test_auth_probe_timeout_is_runtime_auth(self) -> None:
+        wrapped = (
+            "Lane B agent fallback reply generated "
+            "(Cursor auth probe timed out. Run `cursor agent status` manually.; "
+            "Cursor Cloud Agent unavailable)"
+        )
+        self.assertTrue(is_runtime_auth_failure(wrapped))
+        self.assertEqual(
+            "Cursor auth probe timed out. Run `cursor agent status` manually.",
+            normalize_operator_failure_detail(wrapped),
+        )
 
     def test_session_interrupted_detected_for_sigterm(self) -> None:
         wrapped = (

@@ -43,7 +43,7 @@ const view = computed(() =>
 );
 
 function openMissionControlGrid(): void {
-  shell.setOperatorCenterView('grid');
+  shell.focusOperatorTaskBoard();
 }
 
 async function onActivateAction(action: BriefingAction): Promise<void> {

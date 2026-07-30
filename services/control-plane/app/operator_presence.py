@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import time
+
 from app.kairo_persona import build_persona_voice_line
 from app.operator_briefing_signals import first_actionable_signal, is_bootstrap_signal
 from app.spoken_alert_policy import (
@@ -26,6 +28,57 @@ def resolve_presence_state(
     if briefing_loaded and watch_connected:
         return "observing"
     return "idle"
+
+
+def _autonomy_mode(settings: dict[str, object]) -> str:
+    mode = str(settings.get("autonomy_mode") or "manual").strip().lower()
+    return mode if mode in {"manual", "semi", "full"} else "manual"
+
+
+def _maybe_autonomy_advisory(
+    *,
+    spoken_alert: dict[str, object],
+    settings: dict[str, object],
+    notice: str,
+    advise: str,
+) -> dict[str, object]:
+    """Semi/Full: speak advisory when no interruptive alert (15-minute cadence bucket)."""
+    if spoken_alert.get("eligible"):
+        return spoken_alert
+    if _autonomy_mode(settings) not in {"semi", "full"}:
+        return spoken_alert
+    if settings.get("privacy_mode"):
+        return spoken_alert
+    if not settings.get("spoken_alerts_enabled", True):
+        return spoken_alert
+
+    parts: list[str] = []
+    if notice:
+        parts.append(notice)
+    if advise and advise not in parts:
+        parts.append(advise)
+    # Never speak readiness alone — "Production is 100%" is a badge, not an advisory.
+    line = " ".join(parts).strip()
+    if not line:
+        return spoken_alert
+
+    persona_enabled = bool(settings.get("operator_persona_enabled", True))
+    if persona_enabled and not line.upper().startswith("VAXON"):
+        line = f"VAXON: {line}"
+
+    bucket = int(time.time() // 900)
+    return {
+        "eligible": True,
+        "reason": "autonomy_advisory",
+        "signal_id": f"advisory:{bucket}",
+        "message": line,
+        "explanation": {
+            "what": "Periodic autonomy advisory",
+            "you_do": "Acknowledge, ask a follow-up, or switch autonomy mode in Settings → Agents.",
+            "agent_do": "VAXON keeps watching and will interrupt for approvals or critical signals.",
+            "spoken": line,
+        },
+    }
 
 
 def build_operator_presence(
@@ -54,6 +107,11 @@ def build_operator_presence(
     )
     degraded = briefing.get("degraded")
     degraded_active = bool(degraded.get("active")) if isinstance(degraded, dict) else False
+    degraded_reason = None
+    if isinstance(degraded, dict):
+        reasons = degraded.get("reasons")
+        if isinstance(reasons, list) and reasons:
+            degraded_reason = str(reasons[0] or "").strip() or None
     connectivity = briefing.get("connectivity")
     watch_connected = (
         bool(connectivity.get("watch_connected"))
@@ -76,6 +134,15 @@ def build_operator_presence(
         settings=resolved_settings,
         pending_approvals=pending_approvals,
         top_signal=top_signal,
+        degraded_active=degraded_active,
+        degraded_reason=degraded_reason,
+    )
+    readiness = briefing.get("production_readiness")
+    spoken_alert = _maybe_autonomy_advisory(
+        spoken_alert=spoken_alert,
+        settings=resolved_settings,
+        notice=str(briefing.get("notice") or "").strip(),
+        advise=str(briefing.get("advise") or "").strip(),
     )
     top_meta = top_signal.get("meta") if top_signal else None
     voice_line = build_persona_voice_line(

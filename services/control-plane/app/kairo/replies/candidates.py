@@ -156,31 +156,34 @@ def health_candidates(facts: dict[str, Any], *, followup: bool) -> list[str]:
             f"{prefix}No — agent dispatch is blocked: {lead}.".strip(),
             f"{prefix}Not nominal — {lead}.".strip(),
         ]
+    note = ""
     if facts["degraded"]:
-        return [
-            f"{prefix}Not fully nominal — runtime is degraded.".strip(),
-            f"{prefix}We're degraded — check watch/runtime health first.".strip(),
-        ]
+        note = " Public tunnel health is degraded, but local control-plane is up — local work can continue."
     pending = int(facts["pending_approvals"])
     if pending > 0:
         noun = "job" if pending == 1 else "jobs"
         return [
-            f"{prefix}Not fully clear — {pending} {noun} waiting for your yes or no.".strip(),
+            f"{prefix}Not fully clear — {pending} {noun} waiting for your yes or no.{note}".strip(),
         ]
     severity = facts["top_signal_severity"]
     if facts["top_signal_title"] and severity in {"high", "critical"}:
         return [
-            f"{prefix}Mostly fine, but heads up on {facts['top_signal_title']}.".strip(),
+            f"{prefix}Mostly fine, but heads up on {facts['top_signal_title']}.{note}".strip(),
         ]
     review_ready = int(facts.get("review_ready_count") or 0)
     if review_ready > 0:
         suffix = "" if review_ready == 1 else "s"
         return [
-            f"{prefix}CLI is ready, but {review_ready} run{suffix} still need review in Mission Control.".strip(),
+            f"{prefix}CLI is ready, but {review_ready} run{suffix} still need review in Mission Control.{note}".strip(),
         ]
     if int(facts["active_run_count"]) > 0:
         return [
-            f"{prefix}Yes — operational with {facts['active_run_count']} active run(s); nothing critical flagged.".strip(),
+            f"{prefix}Yes — operational with {facts['active_run_count']} active run(s).{note}".strip(),
+        ]
+    if facts["degraded"]:
+        return [
+            f"{prefix}Local systems are up; public tunnel health is degraded — local charters and IDE work can proceed.{note}".strip(),
+            f"{prefix}Not fully green publicly, but I'm operational locally — ready for your next order.{note}".strip(),
         ]
     return [
         f"{prefix}Yes — systems look nominal from my side.".strip(),
@@ -193,62 +196,131 @@ def fleet_candidates(facts: dict[str, Any], *, followup: bool) -> list[str]:
     critical = int(facts["critical_workspaces"])
     attention = int(facts["attention_workspaces"])
     total = int(facts["workspace_count"])
+    tunnel_note = (
+        " Public tunnel is degraded (local fleet still operable)."
+        if facts["degraded"]
+        else ""
+    )
     if critical > 0:
         suffix = "" if critical == 1 else "s"
         return [
-            f"{prefix}{critical} workspace{suffix} in critical state across {total} bound.".strip(),
-            f"{prefix}Fleet scan: {critical} critical workspace{suffix} need you.".strip(),
+            f"{prefix}{critical} workspace{suffix} in critical state across {total} bound — I'd start there.{tunnel_note}".strip(),
+            f"{prefix}Fleet scan: {critical} critical workspace{suffix} need you.{tunnel_note}".strip(),
         ]
     if attention > 0:
         suffix = "" if attention == 1 else "s"
         return [
-            f"{prefix}{attention} workspace{suffix} need attention; nothing critical.".strip(),
-            f"{prefix}Fleet is stable-ish — {attention} workspace{suffix} flagged.".strip(),
+            f"{prefix}{attention} workspace{suffix} need attention; nothing critical — want me to prioritize?{tunnel_note}".strip(),
+            f"{prefix}Fleet is stable-ish — {attention} workspace{suffix} flagged.{tunnel_note}".strip(),
         ]
     suffix = "" if total == 1 else "s"
+    if facts["advise"]:
+        return [
+            f"{prefix}Fleet looks healthy across {total} workspace{suffix}. Next: {facts['advise']}{tunnel_note}".strip(),
+        ]
+    if facts["degraded"]:
+        return [
+            f"{prefix}Fleet is operable locally across {total} workspace{suffix}; public tunnel health is degraded — I can still take charters.{tunnel_note}".strip(),
+        ]
     return [
-        f"{prefix}Fleet nominal — {total} workspace{suffix} look healthy.".strip(),
-        f"{prefix}All bound workspaces look green from here.".strip(),
+        f"{prefix}Fleet nominal — {total} workspace{suffix} look healthy. I'm watching; say if you want a deeper pass.".strip(),
+        f"{prefix}Bound workspaces look green from here — standing by.".strip(),
     ]
 
 
 def general_candidates(facts: dict[str, Any], *, followup: bool) -> list[str]:
-    prefix = "Still " if followup else ""
-    if not facts["cli_dispatch_ready"]:
-        blockers = facts["cli_blockers"]
-        lead = blockers[0] if blockers else "CLI runtime is not dispatch-ready"
-        return [
-            f"{prefix}Not nominal on my side — {lead}.".strip(),
-            f"{prefix}Agent dispatch is blocked — {lead}. Check Runtime or /vault.".strip(),
-        ]
-    if facts["degraded"]:
-        return [
-            f"{prefix}Runtime is degraded — I'd fix connectivity before dispatching more.".strip(),
-            f"{prefix}We're in degraded mode — check watch/runtime health first.".strip(),
-        ]
-    chunks: list[str] = []
-    if facts["notice"]:
-        chunks.append(facts["notice"])
-    if int(facts["pending_approvals"]) > 0:
-        chunks.append(f"{facts['pending_approvals']} approval(s) waiting")
+    """Conversational second-brain brief — never semicolon dumps."""
+    return status_report_candidates(facts, followup=followup)
+
+
+def status_report_candidates(facts: dict[str, Any], *, followup: bool) -> list[str]:
+    """Categorized JARVIS-style stand-up in plain English."""
+    prefix = "Still on it — " if followup else ""
+    attention_bits: list[str] = []
+    work_bits: list[str] = []
+    next_bits: list[str] = []
+
+    pending = int(facts["pending_approvals"])
+    if pending > 0:
+        noun = "approval" if pending == 1 else "approvals"
+        attention_bits.append(f"{pending} {noun} waiting for your yes or no")
+
+    notice = str(facts.get("notice") or "").strip().rstrip(".")
+    if notice:
+        attention_bits.append(notice)
+
     if facts["top_signal_title"]:
-        chunks.append(f"top signal {facts['top_signal_title']}")
-    elif int(facts["active_run_count"]) > 0:
-        chunks.append(f"{facts['active_run_count']} active run(s)")
-    if facts["advise"] and facts["advise"] not in " ".join(chunks):
-        chunks.append(facts["advise"])
-    if not chunks:
+        title = str(facts["top_signal_title"]).strip()
+        severity = str(facts.get("top_signal_severity") or "").strip().lower()
+        if severity in {"high", "critical"}:
+            attention_bits.append(f"the loud one is {title}")
+        else:
+            attention_bits.append(f"inbox is waving {title}")
+
+    if facts["degraded"]:
+        attention_bits.append("public tunnel health is soft, but local control is up")
+
+    active = int(facts["active_run_count"])
+    if active > 0:
+        summary = facts["primary_run_summary"] or "a live run"
+        phase = str(facts.get("primary_run_phase") or "").replace("_", " ").strip()
+        if phase:
+            work_bits.append(f"{summary} is {phase}")
+        else:
+            work_bits.append(f"{summary} is in flight")
+        if active > 1:
+            work_bits.append(f"{active - 1} more run{'s' if active > 2 else ''} behind it")
+
+    review_ready = int(facts.get("review_ready_count") or 0)
+    if review_ready > 0:
+        work_bits.append(
+            f"{review_ready} run{'s' if review_ready != 1 else ''} ready for your review"
+        )
+
+    advise = str(facts.get("advise") or "").strip().rstrip(".")
+    if advise:
+        next_bits.append(advise)
+    elif facts["top_signal_title"]:
+        next_bits.append(f"I'd open Attention and inspect {facts['top_signal_title']}")
+    elif pending > 0:
+        next_bits.append("I'd clear Approvals before starting anything new")
+    elif not facts["cli_dispatch_ready"]:
+        blockers = facts.get("cli_blockers") or []
+        lead = blockers[0] if blockers else "CLI runtime is not dispatch-ready"
+        next_bits.append(f"I'd unblock agent dispatch first — {lead}")
+    else:
+        next_bits.append("Nothing urgent — I can roll the fleet, check DashPro, or take your next order")
+
+    if not attention_bits and not work_bits:
         return [
-            f"{prefix}All quiet on the board — standing by for your next move.".strip(),
-            f"{prefix}Nothing urgent from my scan — what shall we tackle?".strip(),
-            f"{prefix}Systems look nominal — I'm here when you need me.".strip(),
+            (
+                f"{prefix}Quiet board, sir. Systems look nominal from here. "
+                f"{next_bits[0]}."
+            ).strip(),
+            (
+                f"{prefix}Nothing I'd interrupt you for. "
+                f"{next_bits[0]}."
+            ).strip(),
         ]
-    body = "; ".join(chunks[:3])
+
+    attention = (
+        f"Attention: {', '.join(attention_bits[:3])}."
+        if attention_bits
+        else "Attention: nothing screaming."
+    )
+    work = (
+        f" Work in flight: {', '.join(work_bits[:3])}."
+        if work_bits
+        else " Work in flight: idle."
+    )
+    nxt = f" Next: {next_bits[0]}."
+    body = f"{attention}{work}{nxt}"
     return [
-        f"{prefix}{body}.".strip(),
-        f"{prefix}Quick read: {body}.".strip(),
-        f"{prefix}From the briefing — {body}.".strip(),
+        f"{prefix}Here's the stand-up. {body}".strip(),
+        f"{prefix}Quick second-brain pass. {body}".strip(),
+        f"{prefix}Plain English, sir — {body}".strip(),
     ]
+
 
 CANDIDATE_BUILDERS = {
     "approvals": approval_candidates,
@@ -260,6 +332,7 @@ CANDIDATE_BUILDERS = {
     "runtime": runtime_candidates,
     "health": health_candidates,
     "degraded": lambda f, *, followup: general_candidates(f, followup=followup),
+    "status_report": status_report_candidates,
     "general": general_candidates,
     "followup": general_candidates,
 }

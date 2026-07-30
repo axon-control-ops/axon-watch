@@ -105,7 +105,7 @@ describe('useIdeEditorStatusBar', () => {
     };
     const shell = mockShell({
       activeIdeEmployeeFailureLine:
-        'Last shift interrupted before it could finish — use Continue shift to pick up where you left off.',
+        'Last job was interrupted before it could finish — tap Continue to pick up where they left off.',
       activeIdeEmployeeShiftInterrupted: true,
       activeIdeEmployeeRecord: employee,
     });
@@ -124,10 +124,10 @@ describe('useIdeEditorStatusBar', () => {
     });
 
     expect(ideQuickGuide.value?.tone).toBe('interrupted');
-    expect(ideQuickGuide.value?.title).toContain('Shift interrupted');
+    expect(ideQuickGuide.value?.title).toContain('Job interrupted');
     expect(ideQuickGuide.value?.actions).toContainEqual({
       id: 'retry-employee-shift',
-      label: 'Continue shift',
+      label: 'Continue',
     });
   });
 
@@ -164,7 +164,7 @@ describe('useIdeEditorStatusBar', () => {
     });
 
     expect(ideQuickGuide.value?.tone).toBe('failure');
-    expect(ideQuickGuide.value?.title).toContain('Teammate shift failed');
+    expect(ideQuickGuide.value?.title).toContain("Teammate's last job failed");
     expect(ideQuickGuide.value?.actions.map((action) => action.id)).toContain('open-team');
   });
 
@@ -225,7 +225,7 @@ describe('useIdeEditorStatusBar', () => {
     expect(expanded.ideEditorStatusTeamChip.value).toBeNull();
   });
 
-  it('uses interrupted quick-guide styling when another teammate has an interrupted shift', () => {
+  it('uses interrupted quick-guide styling when another teammate has an interrupted job', () => {
     const shell = mockShell({
       companyEmployeesForCurrentWorkspace: [
         {
@@ -258,8 +258,8 @@ describe('useIdeEditorStatusBar', () => {
     });
 
     expect(ideQuickGuide.value?.tone).toBe('interrupted');
-    expect(ideQuickGuide.value?.title).toContain('Teammate shift interrupted');
-    expect(ideQuickGuide.value?.steps.join(' ')).toContain('Continue shift');
+    expect(ideQuickGuide.value?.title).toContain("Teammate's job was interrupted");
+    expect(ideQuickGuide.value?.steps.join(' ')).toContain('Continue');
   });
 
   it('surfaces unsaved-file guidance from dirty editor tabs', () => {

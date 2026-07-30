@@ -12,6 +12,7 @@ from app.adapters.watch_client import (
     fetch_watch_tunnel,
     get_watch_command,
     post_watch_command,
+    post_watch_sentry_issue_attend,
     post_watch_sentry_issue_resolve,
     post_watch_sentry_probe_write,
     post_watch_tunnel_action,
@@ -20,6 +21,7 @@ from app.inbox_projection import WatchInboxUnavailableError, build_inbox_respons
 from app.inbox_signals import acknowledge_inbox_signals
 from app.routes.schemas import (
     AcknowledgeInboxSignalsRequest,
+    SentryAttendRequest,
     SentryResolveRequest,
     WatchCommandRequest,
 )
@@ -64,6 +66,23 @@ def sentry_issue_resolve(issue_id: str, body: SentryResolveRequest | None = None
     )
     if payload is None:
         raise HTTPException(status_code=503, detail="watch sentry resolve unavailable")
+    if not payload.get("ok"):
+        raise HTTPException(status_code=400, detail=payload)
+    return payload
+
+
+@router.post("/api/sentry/issues/{issue_id}/attend")
+def sentry_issue_attend(issue_id: str, body: SentryAttendRequest | None = None) -> dict[str, object]:
+    request = body or SentryAttendRequest()
+    payload = post_watch_sentry_issue_attend(
+        issue_id,
+        confirm_release=request.confirm_release,
+        requested_by=request.requested_by,
+        mark_resolved_in_next_release=request.mark_resolved_in_next_release,
+        workspace_id=request.workspace_id,
+    )
+    if payload is None:
+        raise HTTPException(status_code=503, detail="watch sentry attend unavailable")
     if not payload.get("ok"):
         raise HTTPException(status_code=400, detail=payload)
     return payload

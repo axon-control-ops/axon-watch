@@ -1,5 +1,9 @@
 import type { CursorCatalogRow } from '../../lib/cursor-catalog-view';
 import { isCursorAutoModel } from '../../lib/cursor-catalog-view';
+import {
+  DEFAULT_VAXON_MODEL_ID,
+  VAXON_MODEL_OPTIONS,
+} from '../../lib/operator-presence-settings';
 import type { useShellStore } from '../../stores/shell';
 
 type ShellStore = ReturnType<typeof useShellStore>;
@@ -25,20 +29,26 @@ export function ensureCursorRuntimeForBrainModel(shell: ShellStore): void {
   }
 }
 
+/**
+ * Apply a spoken "change VAXON's brain" intent to the operator-global VAXON
+ * model setting — never to the workspace Agent Dock composer preference.
+ */
 export function applyBrainModelSwitch(
   shell: ShellStore,
   input: { modelId: string; rows: CursorCatalogRow[] },
 ): boolean {
-  if (!shell.currentWorkspace?.workspace_id) {
-    return false;
-  }
-
-  if (!input.modelId || isCursorAutoModel(input.modelId)) {
-    shell.setSelectedComposerModel('auto');
-    return true;
-  }
+  void input.rows;
+  const allowlist = new Set<string>(VAXON_MODEL_OPTIONS.map((row) => row.id));
+  const nextId =
+    !input.modelId || isCursorAutoModel(input.modelId)
+      ? DEFAULT_VAXON_MODEL_ID
+      : allowlist.has(input.modelId)
+        ? input.modelId
+        : /^[a-z0-9][a-z0-9._-]{1,118}$/i.test(input.modelId)
+          ? input.modelId.slice(0, 120)
+          : DEFAULT_VAXON_MODEL_ID;
 
   ensureCursorRuntimeForBrainModel(shell);
-  shell.setSelectedComposerModel(input.modelId);
+  void shell.saveOperatorPresenceSettingsPatch({ vaxon_model_id: nextId });
   return true;
 }

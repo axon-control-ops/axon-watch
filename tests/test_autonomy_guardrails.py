@@ -174,6 +174,8 @@ class CompanyWorkSourceTests(unittest.TestCase):
         ids = {str(item.get("id")) for item in sources}
         self.assertIn("ci_remediation", ids)
         self.assertIn("file_size_patrol", ids)
+        self.assertIn("lead_team_checkin", ids)
+        self.assertIn("ci_stale_signal_sweep", ids)
 
     def test_run_scheduled_work_sources_recovers_orphans(self) -> None:
         created = task_store.create_task(
@@ -192,6 +194,12 @@ class CompanyWorkSourceTests(unittest.TestCase):
         ), patch(
             "app.workspace_agents.file_size_patrol.classify_file_size_findings",
             return_value=[],
+        ), patch(
+            "app.workspace_agents.lead_team_checkin.run_lead_team_checkin",
+            return_value={"work_source": "lead_team_checkin", "created_tasks": []},
+        ), patch(
+            "app.ci_remediation.stale_sweep.sweep_stale_ci_signals",
+            return_value={"work_source": "ci_stale_signal_sweep", "resolved_count": 0},
         ):
             result = run_scheduled_work_sources(root=REPO_ROOT)
         self.assertEqual(1, len(result["recovered_leases"]))

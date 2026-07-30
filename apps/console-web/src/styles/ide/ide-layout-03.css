@@ -1,4 +1,4 @@
-.agent-dock-workspace-menu__trigger {
+.workspace-picker-menu__trigger {
   display: inline-flex;
   align-items: center;
   justify-content: space-between;
@@ -19,47 +19,47 @@
   cursor: pointer;
 }
 
-.agent-dock-workspace-menu__trigger--active {
+.workspace-picker-menu__trigger--active {
   border-color: rgba(0, 242, 255, 0.34);
   background: rgba(0, 242, 255, 0.1);
   box-shadow: inset 0 0 0 1px rgba(0, 242, 255, 0.08);
   color: #edf8ff;
 }
 
-.agent-dock-workspace-menu__trigger-main {
+.workspace-picker-menu__trigger-main {
   display: inline-flex;
   align-items: center;
   gap: 0.38rem;
   min-width: 0;
 }
 
-.agent-dock-workspace-menu__trigger-copy {
+.workspace-picker-menu__trigger-copy {
   display: flex;
   flex-direction: column;
   gap: 0.04rem;
   min-width: 0;
 }
 
-.agent-dock-workspace-menu__icon,
-.agent-dock-workspace-menu__item-icon {
+.workspace-picker-menu__icon,
+.workspace-picker-menu__item-icon {
   flex-shrink: 0;
   color: rgba(191, 219, 254, 0.88);
 }
 
-.agent-dock-workspace-menu__trigger:hover,
-.agent-dock-workspace-menu__trigger[aria-expanded='true'] {
+.workspace-picker-menu__trigger:hover,
+.workspace-picker-menu__trigger[aria-expanded='true'] {
   border-color: rgba(0, 242, 255, 0.22);
   background: rgba(0, 242, 255, 0.06);
 }
 
-.agent-dock-workspace-menu__label {
+.workspace-picker-menu__label {
   overflow: hidden;
   min-width: 0;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.agent-dock-workspace-menu__meta {
+.workspace-picker-menu__meta {
   overflow: hidden;
   min-width: 0;
   color: rgba(138, 154, 173, 0.82);
@@ -71,18 +71,18 @@
   white-space: nowrap;
 }
 
-.agent-dock-workspace-menu__chevron {
+.workspace-picker-menu__chevron {
   flex-shrink: 0;
   color: rgba(138, 154, 173, 0.88);
   font-size: 0.68rem;
   transition: transform 120ms ease;
 }
 
-.agent-dock-workspace-menu__chevron--open {
+.workspace-picker-menu__chevron--open {
   transform: rotate(180deg);
 }
 
-.agent-dock-workspace-menu__panel {
+.workspace-picker-menu__panel {
   position: absolute;
   top: calc(100% + 0.35rem);
   left: 0;
@@ -101,7 +101,11 @@
   isolation: isolate;
 }
 
-.agent-dock-workspace-menu__item {
+.workspace-picker-menu--compact .workspace-picker-menu__panel {
+  z-index: 1300;
+}
+
+.workspace-picker-menu__item {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -118,27 +122,27 @@
   cursor: pointer;
 }
 
-.agent-dock-workspace-menu__item-main {
+.workspace-picker-menu__item-main {
   display: inline-flex;
   align-items: center;
   gap: 0.45rem;
   min-width: 0;
 }
 
-.agent-dock-workspace-menu__item-copy {
+.workspace-picker-menu__item-copy {
   display: flex;
   flex-direction: column;
   gap: 0.08rem;
   min-width: 0;
 }
 
-.agent-dock-workspace-menu__item-label {
+.workspace-picker-menu__item-label {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.agent-dock-workspace-menu__item-meta {
+.workspace-picker-menu__item-meta {
   overflow: hidden;
   color: rgba(138, 154, 173, 0.84);
   font-family: var(--font-mono);
@@ -148,7 +152,7 @@
   white-space: nowrap;
 }
 
-.agent-dock-workspace-menu__item-active-dot {
+.workspace-picker-menu__item-active-dot {
   width: 0.38rem;
   height: 0.38rem;
   flex-shrink: 0;
@@ -157,18 +161,18 @@
   box-shadow: 0 0 0 1px rgba(125, 211, 252, 0.16);
 }
 
-.agent-dock-workspace-menu__item--active {
+.workspace-picker-menu__item--active {
   background: rgba(0, 242, 255, 0.08);
 }
 
-.agent-dock-workspace-menu__item--add {
+.workspace-picker-menu__item--add {
   margin-top: 0.25rem;
   border-top: 1px solid rgba(0, 242, 255, 0.12);
   border-radius: 0;
   color: rgba(120, 220, 255, 0.9);
 }
 
-.agent-dock-workspace-menu__add-form {
+.workspace-picker-menu__add-form {
   padding: 0.45rem;
 }
 
@@ -178,9 +182,10 @@
   width: 100%;
   min-width: 0;
   max-width: 100%;
+  min-height: 1.85rem;
   border-bottom: 0;
   background: transparent;
-  padding-inline: 0.35rem 0.45rem;
+  padding-inline: 0.1rem 0.2rem;
 }
 
 /* flex-basis 0 forces a bounded width so overflow-x can scroll (not grow/clip). */
@@ -516,8 +521,8 @@
   }
 }
 
-.agent-dock-workspace-menu__item:hover,
-.agent-dock-workspace-menu__item--active {
+.workspace-picker-menu__item:hover,
+.workspace-picker-menu__item--active {
   background: rgba(0, 242, 255, 0.08);
   color: #edf4fb;
 }

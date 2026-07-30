@@ -126,6 +126,32 @@
   text-transform: uppercase;
 }
 
+.agent-block__terminal-expand {
+  border: 0;
+  background: transparent;
+  color: rgba(150, 190, 220, 0.85);
+  font-size: 0.55rem;
+  letter-spacing: 0.03em;
+  cursor: pointer;
+  padding: 0.1rem 0.25rem;
+}
+
+.agent-block__terminal-expand:hover {
+  color: rgba(210, 235, 255, 0.95);
+}
+
+.agent-block__terminal-hint {
+  margin: 0;
+  padding: 0.25rem 0.55rem 0.45rem;
+  font-size: 0.55rem;
+  line-height: 1.4;
+  color: rgba(150, 178, 200, 0.82);
+}
+
+.agent-block--terminal-mirrored .agent-block__terminal-header {
+  margin-bottom: 0;
+}
+
 .agent-block__terminal-output {
   margin: 0;
   padding: 0.45rem 0.55rem;

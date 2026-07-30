@@ -1,3 +1,4 @@
+@import './ide-layout-07-typeahead.css';
 
 .agent-dock-composer__image-card:hover {
   border-color: rgba(0, 242, 255, 0.28);
@@ -12,9 +13,9 @@
 
 .agent-dock-composer__image-card--file {
   width: auto;
-  min-width: 5.5rem;
-  max-width: 9.5rem;
-  height: 4.5rem;
+  min-width: 3.6rem;
+  max-width: 6.5rem;
+  height: 2.75rem;
 }
 
 .agent-dock-composer__file-preview {
@@ -22,11 +23,11 @@
   flex-direction: column;
   align-items: flex-start;
   justify-content: center;
-  gap: 0.28rem;
+  gap: 0.12rem;
   box-sizing: border-box;
   width: 100%;
   height: 100%;
-  padding: 0.55rem 0.6rem;
+  padding: 0.28rem 0.4rem;
   text-align: left;
 }
 
@@ -34,12 +35,12 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 2.1rem;
-  padding: 0.12rem 0.35rem;
-  border-radius: 4px;
+  min-width: 1.7rem;
+  padding: 0.08rem 0.28rem;
+  border-radius: 3px;
   background: rgba(0, 242, 255, 0.12);
   color: rgba(125, 241, 255, 0.95);
-  font-size: 0.62rem;
+  font-size: 0.52rem;
   font-weight: 700;
   letter-spacing: 0.04em;
   line-height: 1.2;
@@ -49,11 +50,11 @@
   display: -webkit-box;
   overflow: hidden;
   color: rgba(226, 232, 240, 0.9);
-  font-size: 0.68rem;
-  line-height: 1.25;
+  font-size: 0.55rem;
+  line-height: 1.2;
   word-break: break-word;
   -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
+  -webkit-line-clamp: 1;
 }
 
 .agent-dock-composer__image-remove {
@@ -171,28 +172,6 @@
   align-items: center;
   gap: 0.35rem;
   max-width: 100%;
-}
-
-.agent-dock-composer__typeahead {
-  position: absolute;
-  bottom: calc(100% + 0.35rem);
-  left: 0.65rem;
-  right: 0.65rem;
-  z-index: var(--agent-dock-composer-overlay-z, 120);
-  max-height: min(18rem, 45vh);
-  overflow-x: hidden;
-  overflow-y: auto;
-  padding: 0.45rem;
-  border: 1px solid rgba(138, 154, 173, 0.16);
-  border-radius: 10px;
-  background: rgba(10, 14, 20, 0.98);
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
-}
-
-.agent-dock-composer__typeahead .agent-dock-composer__menu-item strong {
-  font-family: var(--font-mono);
-  font-size: 0.72rem;
-  font-weight: 600;
 }
 
 .agent-dock-composer__input {
@@ -373,8 +352,8 @@
 .agent-dock-composer__tool-group:has(.agent-dock-composer__tool--mode) .agent-dock-composer__menu {
   right: 0;
   left: auto;
-  width: 16.5rem;
-  max-height: min(24rem, 60vh);
+  width: 17.5rem;
+  max-height: min(32rem, 72vh);
   overflow-x: hidden;
   overflow-y: auto;
 }
@@ -392,6 +371,19 @@
   text-transform: uppercase;
 }
 
+.agent-dock-composer__menu-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.05rem;
+  margin-top: 0.4rem;
+  padding-top: 0.4rem;
+  border-top: 1px solid rgba(138, 154, 173, 0.16);
+}
+
+.agent-dock-composer__menu-section > .agent-dock-composer__menu-caption {
+  margin-bottom: 0.35rem;
+}
+
 .agent-dock-composer__menu-item {
   display: flex;
   width: 100%;
@@ -405,6 +397,16 @@
   color: rgba(233, 239, 245, 0.96);
   text-align: left;
   cursor: pointer;
+}
+
+.agent-dock-composer__menu-item-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  min-width: 0;
+  font-size: 0.72rem;
+  font-weight: 600;
+  line-height: 1.25;
 }
 
 .agent-dock-composer__menu-item:hover,

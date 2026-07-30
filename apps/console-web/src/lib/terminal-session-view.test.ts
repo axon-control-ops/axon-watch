@@ -23,7 +23,7 @@ describe('terminal session view', () => {
     expect(terminalSessionTabLabel(session)).toBe(DEFAULT_VAXON_TERMINAL_TITLE);
   });
 
-  it('keeps explicit vaxon titles', () => {
+  it('keeps explicit vaxon titles marked as agent', () => {
     const session: TerminalSessionRecord = {
       session_id: 'terminal-agent-abc',
       workspace_id: 'workspace_axon_watch',
@@ -33,10 +33,10 @@ describe('terminal session view', () => {
       created_at: '2026-07-07T12:00:00Z',
     };
 
-    expect(terminalSessionTabLabel(session)).toBe('vaxon');
+    expect(terminalSessionTabLabel(session)).toBe('vaxon · agent');
   });
 
-  it('labels generic operator Terminal tabs as bash', () => {
+  it('labels generic operator Terminal tabs as local zsh', () => {
     const session: TerminalSessionRecord = {
       session_id: DEFAULT_OPERATOR_TERMINAL_SESSION_ID,
       workspace_id: 'workspace_axon_watch',
@@ -46,7 +46,20 @@ describe('terminal session view', () => {
       created_at: '2026-07-07T10:00:00Z',
     };
 
-    expect(terminalSessionTabLabel(session)).toBe('bash');
+    expect(terminalSessionTabLabel(session)).toBe('zsh · local');
+  });
+
+  it('labels zsh operator tabs as local', () => {
+    const session: TerminalSessionRecord = {
+      session_id: DEFAULT_OPERATOR_TERMINAL_SESSION_ID,
+      workspace_id: 'workspace_axon_watch',
+      role: 'operator',
+      title: 'zsh',
+      run_id: null,
+      created_at: '2026-07-07T10:00:00Z',
+    };
+
+    expect(terminalSessionTabLabel(session)).toBe('zsh · local');
   });
 
   it('keeps the operator session first', () => {

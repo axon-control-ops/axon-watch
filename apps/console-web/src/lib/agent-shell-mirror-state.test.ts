@@ -29,7 +29,7 @@ describe('agent shell mirror state', () => {
     clearAgentShellMirror();
   });
 
-  it('queues Continue in background commands and clears the mirror', () => {
+  it('queues commands into the agent terminal and clears the mirror', () => {
     armAgentShellMirror();
     queueAgentShellMirrorText('$ npm run ota:canary\nbuilding…');
     expect(agentShellMirrorActive.value).toBe(true);

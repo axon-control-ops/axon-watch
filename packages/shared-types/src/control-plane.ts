@@ -17,7 +17,12 @@ export interface WorkspaceHandoffRecord {
   target_workspace_id: string;
   task: string;
   reason: string;
-  status: 'recorded' | string;
+  status: 'recorded' | 'routed' | string;
+  target_task_id?: string | null;
+  routed_role?: string;
+  routed_employee_id?: string;
+  communication_thread_id?: string | null;
+  source_communication_thread_id?: string | null;
   created_at: string;
   updated_at: string;
 }

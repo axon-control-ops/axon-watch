@@ -179,12 +179,33 @@
   position: relative;
 }
 
+.terminal-tabbar__new-group {
+  display: inline-flex;
+  align-items: stretch;
+  border-radius: 0.22rem;
+}
+
+.terminal-tabbar__new-group:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.terminal-tabbar--mockup
+  .terminal-tabbar__action-button.terminal-tabbar__action-button--new {
+  width: 1.45rem;
+}
+
+.terminal-tabbar--mockup
+  .terminal-tabbar__action-button.terminal-tabbar__action-button--profile {
+  width: 1.05rem;
+  margin-left: -0.1rem;
+}
+
 .terminal-tabbar__new-menu {
   position: absolute;
   top: calc(100% + 0.25rem);
   right: 0;
   z-index: 40;
-  min-width: 7.5rem;
+  min-width: 8.75rem;
   padding: 0.25rem;
   border: 1px solid rgba(0, 242, 255, 0.18);
   border-radius: 0.35rem;
@@ -200,7 +221,9 @@
 }
 
 .terminal-tabbar__new-menu-item {
-  display: block;
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
   width: 100%;
   border: 0;
   border-radius: 0.25rem;
@@ -212,7 +235,7 @@
   font-size: 0.62rem;
   letter-spacing: 0.04em;
   line-height: 1.2;
-  padding: 0.38rem 0.5rem;
+  padding: 0.4rem 0.5rem;
   text-align: left;
 }
 
@@ -239,6 +262,15 @@
 
 .terminal-tabbar--mockup .terminal-tabbar__action-button:hover .terminal-tabbar__action {
   color: rgba(0, 242, 255, 0.92);
+}
+
+.terminal-tabbar--mockup .terminal-tabbar__action-button:disabled {
+  cursor: default;
+  opacity: 0.38;
+}
+
+.terminal-tabbar--mockup .terminal-tabbar__action-button:disabled:hover .terminal-tabbar__action {
+  color: inherit;
 }
 
 .terminal-tabbar--mockup .terminal-tabbar__action {

@@ -29,6 +29,7 @@ export function useKairoGalaxyOrbViewModel(input: {
   gateFeedback: ComputedRef<string | null> | Ref<string | null>;
   voiceBlocked: ComputedRef<boolean> | Ref<boolean>;
   selectedComposerModel: ComputedRef<string | null> | Ref<string | null> | string | null;
+  vaxonModelId?: ComputedRef<string | null> | Ref<string | null> | string | null;
 }): {
   captureMode: ComputedRef<string>;
   orbStateClass: ComputedRef<string>;
@@ -57,7 +58,9 @@ export function useKairoGalaxyOrbViewModel(input: {
   );
   const orbModeClass = computed(() => galaxyOrbModeClass(unwrap(input.handsFreeEnabled)));
   const modelLabel = computed(() =>
-    galaxyOrbModelLabel(unwrap(input.selectedComposerModel) ?? null),
+    galaxyOrbModelLabel(
+      unwrap(input.vaxonModelId) ?? unwrap(input.selectedComposerModel) ?? null,
+    ),
   );
   const hint = computed(() =>
     galaxyOrbHint(

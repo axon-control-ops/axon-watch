@@ -104,13 +104,13 @@ describe('shouldAutoPeekAgentDockForEmployeeFailure', () => {
   const base = {
     layoutMode: 'ide' as const,
     agentDockCollapsed: true,
-    employeeFailureLine: 'Last shift failed: vitest assertion failed',
+    employeeFailureLine: 'Last job failed: vitest assertion failed',
     employeeFailurePeekKey: 'e1:run_abc',
     agentStreamActive: false,
     alreadyPeekedFailureKeys: new Set<string>(),
   };
 
-  it('opens the dock once per failed shift in IDE mode', () => {
+  it('opens the dock once per failed job in IDE mode', () => {
     expect(shouldAutoPeekAgentDockForEmployeeFailure(base)).toBe(true);
     expect(
       shouldAutoPeekAgentDockForEmployeeFailure({

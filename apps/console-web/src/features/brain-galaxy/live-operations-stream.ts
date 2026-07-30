@@ -3,14 +3,29 @@ import type {
   OperatorBriefing,
   RunRecord,
 } from '../../contracts/canonical';
+import { employeeFailureLine } from '../workspace-agents/company-roster-view';
 import { getKairoVoiceUtteranceState } from '../../lib/kairo-voice-utterance';
 import type { GalaxyPresencePhase } from './galaxy-presence-state';
+
+export type LiveOperationsAutonomyReceipt = {
+  receipt_id?: string;
+  kind?: string;
+  decision?: string;
+  title?: string;
+  detail?: string;
+  ask_operator?: boolean;
+  status?: string;
+  resolution?: string;
+  risk?: string;
+  created_at?: string;
+  payload?: Record<string, unknown>;
+};
 
 export type LiveOperationsStreamItem = {
   id: string;
   text: string;
   tone: 'nominal' | 'attention' | 'critical' | 'info';
-  kind: 'spoken' | 'signal' | 'run' | 'employee' | 'connectivity' | 'routing';
+  kind: 'spoken' | 'signal' | 'run' | 'employee' | 'connectivity' | 'routing' | 'autonomy';
   agent: string;
   at: string;
 };
@@ -48,6 +63,8 @@ export function projectLiveOperationsStream(input: {
   presencePhase: GalaxyPresencePhase;
   routingReceipt?: string | null;
   degradedReasons?: string[];
+  autonomyReceipts?: LiveOperationsAutonomyReceipt[] | null;
+  autonomyMode?: string | null;
   now?: Date;
 }): LiveOperationsStreamItem[] {
   const stamp = clockStamp(input.now ?? new Date());
@@ -61,6 +78,70 @@ export function projectLiveOperationsStream(input: {
       kind: 'spoken',
       agent: 'VAXON',
       at: stamp,
+    });
+  }
+
+  const mode = String(input.autonomyMode || '').trim().toLowerCase();
+  if (mode === 'full' && input.presencePhase === 'autonomous') {
+    pushItem(items, {
+      id: 'autonomy-mode',
+      text: 'AUTONOMOUS ON · attending Mission Control',
+      tone: 'info',
+      kind: 'autonomy',
+      agent: 'VAXON',
+      at: stamp,
+    });
+  }
+
+  for (const receipt of (input.autonomyReceipts ?? []).slice(0, 4)) {
+    const title = String(receipt.title || receipt.detail || receipt.kind || '').trim();
+    if (!title) {
+      continue;
+    }
+    const ask =
+      Boolean(receipt.ask_operator) &&
+      String(receipt.status || 'pending').toLowerCase() === 'pending';
+    const decision = String(receipt.decision || '').trim().toLowerCase();
+    const resolution = String(receipt.resolution || '').trim().toLowerCase();
+    const taskStatus = String(receipt.payload?.task_status || '').trim().toLowerCase();
+    const createdAt = new Date(String(receipt.created_at || ''));
+    const receiptStamp = Number.isNaN(createdAt.getTime()) ? stamp : clockStamp(createdAt);
+    pushItem(items, {
+      id: `auton-${receipt.receipt_id || title}`,
+      text: truncate(
+        ask
+          ? `Needs you · ${title}`
+          : resolution === 'approved'
+            ? `Approved · ${title}`
+            : resolution === 'rejected'
+              ? `Rejected · ${title}`
+          : taskStatus === 'completed'
+            ? `Completed · ${title}`
+            : taskStatus === 'failed' || taskStatus === 'cancelled'
+              ? `${taskStatus === 'failed' ? 'Failed' : 'Cancelled'} · ${title}`
+          : decision === 'dispatch'
+            ? `Dispatched · ${title}`
+            : decision === 'escalate'
+              ? `Escalated · ${title}`
+              : title,
+      ),
+      tone:
+        ask || String(receipt.risk || '').toLowerCase() === 'critical'
+          ? 'critical'
+          : resolution === 'approved'
+            ? 'info'
+            : resolution === 'rejected'
+              ? 'nominal'
+          : taskStatus === 'completed'
+            ? 'nominal'
+            : taskStatus === 'failed' || taskStatus === 'cancelled'
+              ? 'attention'
+          : decision === 'dispatch'
+            ? 'info'
+            : 'attention',
+      kind: 'autonomy',
+      agent: 'VAXON',
+      at: receiptStamp,
     });
   }
 
@@ -122,14 +203,11 @@ export function projectLiveOperationsStream(input: {
       continue;
     }
     const agent = name.split(/\s+/)[0]?.toUpperCase() || 'TEAM';
-    if (employee.last_outcome === 'failed') {
+    const failureLine = employeeFailureLine(employee);
+    if (failureLine) {
       pushItem(items, {
         id: `emp-fail-${employee.employee_id}`,
-        text: truncate(
-          `Last shift failed${
-            employee.last_outcome_detail ? `: ${employee.last_outcome_detail}` : ''
-          }`,
-        ),
+        text: truncate(failureLine),
         tone: 'critical',
         kind: 'employee',
         agent,

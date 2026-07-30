@@ -1,13 +1,17 @@
-import type { CompanyEmployeeRecord } from '../../contracts/canonical';
+import type { CompanyEmployeeRecord, RunRecord } from '../../contracts/canonical';
+import type { WorkspaceTaskRecord } from '../../api/tasks-api';
 import type { IdeComposerRestoreMode } from '../../lib/ide-composer-restore-request';
 import { SERVER_RESTART_CONTINUATION_PROMPT } from '../../lib/ide-run-recovery';
+import { resolveEmployeeManualHandoff } from './employee-manual-handoff';
 import {
   employeeDockReceiptRunId,
   employeeFailureLine,
   employeeFailureRetryActionLabel,
   isRuntimeAuthFailure,
+  isRuntimeAuthProbeFailure,
   isShiftContinuationFailure,
   isUsageLimitFailure,
+  looksLikeSuccessfulOutcomeDetail,
   normalizeOperatorFailureDetail,
 } from './company-roster-view';
 
@@ -15,7 +19,7 @@ export type TeamMemberChatKind = 'talk' | 'status' | 'assign' | 'retry' | 'recei
 
 export type TeamMemberSurfaceAction = 'briefing' | 'attention';
 
-export type TeamMemberControlAction = 'toggle_enabled' | 'stop';
+export type TeamMemberControlAction = 'toggle_enabled' | 'stop' | 'start_now';
 
 export interface TeamMemberQuickAction {
   id: TeamMemberChatKind | TeamMemberSurfaceAction | TeamMemberControlAction;
@@ -25,6 +29,8 @@ export interface TeamMemberQuickAction {
   surface?: TeamMemberSurfaceAction;
   control?: TeamMemberControlAction;
   composerMode?: IdeComposerRestoreMode;
+  /** Task id for Manual Start Now handoffs. */
+  taskId?: string;
 }
 
 function ownsSnippet(employee: CompanyEmployeeRecord): string {
@@ -48,77 +54,103 @@ export function employeeAssignDraft(employee: CompanyEmployeeRecord): string {
 }
 
 export function employeeRetryDraft(employee: CompanyEmployeeRecord): string {
-  const name = employee.name.trim() || 'Teammate';
   const owns = ownsSnippet(employee);
   const detail = normalizeOperatorFailureDetail(employee.last_outcome_detail);
   const voiceLock =
-    `Speak in first person as ${name} only — never say you are "acting as" a role, ` +
-    `Lane B, or VAXON.`;
+    'Speak in first person only — never say you are "acting as" a role, ' +
+    'Lane B, or VAXON, and never refer to yourself by name in the third person.';
   if (isShiftContinuationFailure(detail)) {
     return (
-      `I am ${name} (${owns}). ${SERVER_RESTART_CONTINUATION_PROMPT} ` +
+      `Continue my interrupted shift on ${owns}. ${SERVER_RESTART_CONTINUATION_PROMPT} ` +
       `${voiceLock} Summarize what I changed and include receipts.`
     );
   }
   if (isUsageLimitFailure(employee.last_outcome_detail)) {
     return (
-      `I am ${name} (${owns}). Usage limits blocked my last shift. Once limits are restored, ` +
+      `A Cursor usage signal blocked my last shift on ${owns}. ` +
+      `Auto+Composer or on-demand may still have headroom — check Usage, then ` +
       `I will retry my bounded continuous shift. ${voiceLock} ` +
+      `Summarize what I changed and include receipts.`
+    );
+  }
+  if (isRuntimeAuthProbeFailure(employee.last_outcome_detail)) {
+    return (
+      `Cursor CLI auth probe timed out on my last shift on ${owns}. After checking ` +
+      `\`cursor agent status\` on the host, I will retry my bounded continuous shift. ${voiceLock} ` +
       `Summarize what I changed and include receipts.`
     );
   }
   if (isRuntimeAuthFailure(employee.last_outcome_detail)) {
     return (
-      `I am ${name} (${owns}). Runtime auth blocked my last shift. After \`cursor agent login\` ` +
+      `Runtime auth blocked my last shift on ${owns}. After \`cursor agent login\` ` +
       `on the host or /vault unlock, I will retry my bounded continuous shift. ${voiceLock} ` +
       `Summarize what I changed and include receipts.`
     );
   }
   const errorHint = detail ? ` Last error: ${detail}` : '';
   return (
-    `I am ${name} (${owns}). My last continuous shift failed.${errorHint} ` +
+    `My last continuous shift on ${owns} failed.${errorHint} ` +
     `Retry that bounded shift now as me. ${voiceLock} ` +
     `Summarize what I changed and include receipts.`
   );
 }
 
 export function employeeReceiptsDraft(employee: CompanyEmployeeRecord): string {
-  const name = employee.name.trim() || 'this teammate';
   const runId = employeeDockReceiptRunId(employee);
   const detail = normalizeOperatorFailureDetail(employee.last_outcome_detail);
-  if (isShiftContinuationFailure(detail)) {
-    const runHint = runId ? ` (${runId})` : '';
+  const outcome = (employee.last_outcome ?? '').trim().toLowerCase();
+  const runHint = runId ? ` (${runId})` : '';
+  const completed =
+    outcome === 'completed' ||
+    outcome === 'done' ||
+    outcome === 'succeeded' ||
+    looksLikeSuccessfulOutcomeDetail(detail);
+
+  if (completed) {
     return (
-      `Walk me through what was in progress when the server restarted for ${name}'s shift${runHint}. ` +
+      `Walk me through what I shipped on my last job${runHint}. ` +
+      `This run completed successfully — do not treat it as a failure. ` +
+      `Summarize what changed, what was verified, any blockers or Lead next items, and suggest the next move.`
+    );
+  }
+  if (isShiftContinuationFailure(detail)) {
+    return (
+      `Walk me through what was in progress when the server restarted on my job${runHint}. ` +
       `${SERVER_RESTART_CONTINUATION_PROMPT} Summarize what was incomplete, cite commands, and suggest next steps.`
     );
   }
   if (isUsageLimitFailure(employee.last_outcome_detail)) {
-    const runHint = runId ? ` (${runId})` : '';
     return (
-      `Walk me through receipts for ${name}'s last shift${runHint}. ` +
-      `The shift never started because usage limits blocked the agent runtime. ` +
-      `Summarize what was attempted and suggest next steps once limits are restored.`
+      `Walk me through what happened on my last job${runHint}. ` +
+      `The job hit a Cursor usage signal — do not claim the whole account is exhausted. ` +
+      `Check live Usage pools (Auto+Composer vs API) and whether on-demand is enabled, then suggest the next move.`
+    );
+  }
+  if (isRuntimeAuthProbeFailure(employee.last_outcome_detail)) {
+    return (
+      `Walk me through what happened on my last job${runHint}. ` +
+      `The job could not run because the Cursor CLI auth probe timed out. ` +
+      `Summarize what was attempted and suggest next steps after \`cursor agent status\` is healthy.`
     );
   }
   if (isRuntimeAuthFailure(employee.last_outcome_detail)) {
-    const runHint = runId ? ` (${runId})` : '';
     return (
-      `Walk me through receipts for ${name}'s last shift${runHint}. ` +
-      `The shift could not run because runtime auth is not ready. ` +
+      `Walk me through what happened on my last job${runHint}. ` +
+      `The job could not run because login is not ready. ` +
       `Summarize what was attempted and suggest next steps once auth is fixed.`
     );
   }
-  const detailHint = detail ? ` Error: ${detail}` : '';
+  const detailHint = detail ? ` Reported issue: ${detail}.` : '';
   if (runId) {
     return (
-      `Walk me through receipts for ${name}'s last shift (${runId}).${detailHint} ` +
-      `Summarize what failed, cite commands or assertions, and suggest next steps.`
+      `Walk me through the receipts for my last job (${runId}).${detailHint} ` +
+      `Use that run id / control-plane history — do not dig stale autoloop terminal logs. ` +
+      `Summarize what went wrong, cite commands or checks, and suggest next steps.`
     );
   }
   return (
-    `Walk me through receipts for ${name}'s last failed shift.${detailHint} ` +
-    `Summarize what failed and suggest next steps.`
+    `Walk me through the receipts for my last failed job.${detailHint} ` +
+    `Summarize what went wrong and suggest next steps.`
   );
 }
 
@@ -141,8 +173,17 @@ export function employeeChatDraft(
   return employeeTalkDraft(employee);
 }
 
-export function employeeChatComposerMode(kind: TeamMemberChatKind): IdeComposerRestoreMode {
-  if (kind === 'status' || kind === 'receipts') {
+/**
+ * Composer mode to open for a roster chat action.
+ * `null` = keep the current mode (Status is voice + focus only).
+ */
+export function employeeChatComposerMode(
+  kind: TeamMemberChatKind,
+): IdeComposerRestoreMode | null {
+  if (kind === 'status') {
+    return null;
+  }
+  if (kind === 'receipts') {
     return 'ask';
   }
   return 'agent';
@@ -151,7 +192,7 @@ export function employeeChatComposerMode(kind: TeamMemberChatKind): IdeComposerR
 export function employeeComposerOpenPayload(
   employee: CompanyEmployeeRecord,
   kind: TeamMemberChatKind,
-): { mode: IdeComposerRestoreMode; draft: string } {
+): { mode: IdeComposerRestoreMode | null; draft: string } {
   return {
     mode: employeeChatComposerMode(kind),
     draft: employeeChatDraft(employee, kind).trim(),
@@ -182,7 +223,15 @@ export function employeeDockDisplayActions(
   return actions.filter((action) => action.id !== 'receipts');
 }
 
-export function employeeQuickActions(employee: CompanyEmployeeRecord): TeamMemberQuickAction[] {
+export function employeeQuickActions(
+  employee: CompanyEmployeeRecord,
+  options?: {
+    autonomyMode?: string | null;
+    tasks?: readonly WorkspaceTaskRecord[];
+    runs?: readonly Pick<RunRecord, 'run_id' | 'task_id'>[];
+    liveBusy?: boolean;
+  },
+): TeamMemberQuickAction[] {
   const failed = Boolean(employeeFailureLine(employee));
   const talkAction: TeamMemberQuickAction = {
     id: 'talk',
@@ -191,6 +240,9 @@ export function employeeQuickActions(employee: CompanyEmployeeRecord): TeamMembe
     chatKind: 'talk',
     composerMode: 'agent',
   };
+  // Always keep a real retry control on failed jobs. Usage-limit cases still warn in
+  // the failure line copy — do not swap retry for receipts (that id is stripped when
+  // the dock already links the failed run).
   const retryAction: TeamMemberQuickAction = {
     id: 'retry',
     label: employeeFailureRetryActionLabel(employee),
@@ -200,7 +252,7 @@ export function employeeQuickActions(employee: CompanyEmployeeRecord): TeamMembe
   };
   const receiptsAction: TeamMemberQuickAction = {
     id: 'receipts',
-    label: 'Explain receipts',
+    label: 'Explain what happened',
     kind: 'chat',
     chatKind: 'receipts',
     composerMode: 'ask',
@@ -218,7 +270,7 @@ export function employeeQuickActions(employee: CompanyEmployeeRecord): TeamMembe
       label: 'Status',
       kind: 'chat',
       chatKind: 'status',
-      composerMode: 'ask',
+      // No composerMode — Status speaks locally and must not demote Full Access to Ask.
     },
     {
       id: 'assign',
@@ -235,10 +287,27 @@ export function employeeQuickActions(employee: CompanyEmployeeRecord): TeamMembe
     },
   ];
 
+  const handoff = resolveEmployeeManualHandoff({
+    employee,
+    autonomyMode: options?.autonomyMode,
+    tasks: options?.tasks ?? [],
+    runs: options?.runs,
+    liveBusy: options?.liveBusy,
+  });
+  if (handoff.waiting && handoff.taskId) {
+    actions.unshift({
+      id: 'start_now',
+      label: 'Start now',
+      kind: 'control',
+      control: 'start_now',
+      taskId: handoff.taskId,
+    });
+  }
+
   if (employee.active_run_id) {
     actions.push({
       id: 'stop',
-      label: 'Stop shift',
+      label: 'Stop',
       kind: 'control',
       control: 'stop',
     });
@@ -263,3 +332,4 @@ export function employeeQuickActions(employee: CompanyEmployeeRecord): TeamMembe
 
   return actions;
 }
+

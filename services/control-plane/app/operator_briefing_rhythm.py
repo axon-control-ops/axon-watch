@@ -20,6 +20,24 @@ def _review_ready_runs(active_runs: list[dict[str, object]]) -> list[dict[str, o
     return [run for run in active_runs if run.get("phase") == "review_ready"]
 
 
+def _count_words(count: int) -> str:
+    words = {
+        1: "One",
+        2: "Two",
+        3: "Three",
+        4: "Four",
+        5: "Five",
+        6: "Six",
+        7: "Seven",
+        8: "Eight",
+        9: "Nine",
+        10: "Ten",
+        11: "Eleven",
+        12: "Twelve",
+    }
+    return words.get(int(count), str(int(count)))
+
+
 def build_briefing_notice(
     *,
     active_runs: list[dict[str, object]],
@@ -44,8 +62,13 @@ def build_briefing_notice(
         return f"{len(review_ready)} runs are ready for your review."
 
     if lead_awaiting_engagement_count > 0:
-        noun = "Lead plan" if lead_awaiting_engagement_count == 1 else "Lead plans"
-        return f"{lead_awaiting_engagement_count} {noun} awaiting engagement in VAXON."
+        # Never put a count word immediately before "Lead" — Azure glues "four Lead" into "forlead".
+        count_word = _count_words(lead_awaiting_engagement_count)
+        if lead_awaiting_engagement_count == 1:
+            return "A Lead-team plan is waiting for you in Mission Control."
+        return (
+            f"Lead-team plans are waiting for you in Mission Control — {count_word} of them."
+        )
 
     cli = cli_runtime if isinstance(cli_runtime, dict) else {}
     if not bool(cli.get("dispatch_ready", True)):
@@ -111,7 +134,7 @@ def build_briefing_advise(
         return "Review execution evidence in Command or Active Run when ready."
 
     if lead_awaiting_engagement_count > 0:
-        return "Open VAXON for the Lead rollup, then decide the next handoff."
+        return "Open Mission Control for the Lead rollup, then decide the next handoff."
 
     return ""
 

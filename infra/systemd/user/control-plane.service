@@ -1,16 +1,23 @@
 [Unit]
 Description=Axon-X Control Plane (user always-on)
 After=network.target axon-watch.service
-Wants=network-online.target
-Requires=axon-watch.service
+Wants=network-online.target axon-watch.service
+# Soft dependency only — if watch flaps, CP must keep serving :8787
+# (Requires= used to stop CP with watch and flood Vite with ECONNREFUSED).
 
 [Service]
 Type=simple
 EnvironmentFile=%h/.config/axon-watch/deployment.env
 WorkingDirectory=%h
 ExecStart=%h/axon-nvme/repos/axon-watch/scripts/ops/run-service.sh control-plane
-Restart=on-failure
-RestartSec=15
+Restart=always
+RestartSec=2
+# Speak / live-event connections used to block graceful stop for ~90s (default
+# TimeoutStopSec), leaving :8787 dead and Vite logging ECONNREFUSED. Cap stop
+# so restarts reclaim the port quickly; uvicorn also gets --timeout-graceful-shutdown.
+TimeoutStopSec=8
+KillMode=mixed
+KillSignal=SIGTERM
 # Do not death-spiral: systemd-oomd / OOMPolicy stop with SIGKILL must stay down
 # until an operator restarts the unit intentionally.
 RestartPreventExitStatus=SIGKILL
@@ -23,4 +30,3 @@ OOMPolicy=stop
 
 [Install]
 WantedBy=default.target
-

@@ -114,16 +114,16 @@ describe('ide activity bar view', () => {
     expect(buildIdeActivityBarTeamAttention(failed)).toEqual({
       count: 1,
       tone: 'failure',
-      hint: '1 teammate needs attention after a failed shift',
+      hint: '1 teammate needs attention after a failed job',
     });
     expect(ideActivityBarTeamTitle(false, failed)).toBe(
-      'Workspace team · 1 teammate needs attention after a failed shift',
+      'Workspace team · 1 teammate needs attention after a failed job',
     );
     expect(ideActivityBarTeamTitle(true, [failed[0], { ...failed[0], employee_id: 'e2' }])).toBe(
-      'Workspace team · Click to collapse · 2 teammates need attention after a failed shift',
+      'Workspace team · Click to collapse · 2 teammates need attention after a failed job',
     );
     expect(ideActivityBarTeamAriaLabel(false, failed)).toBe(
-      'Expand workspace team sidebar, 1 teammate needs attention after a failed shift',
+      'Expand workspace team sidebar, 1 teammate needs attention after a failed job',
     );
   });
 
@@ -138,10 +138,10 @@ describe('ide activity bar view', () => {
     expect(buildIdeActivityBarTeamAttention(interrupted)).toEqual({
       count: 1,
       tone: 'interrupted',
-      hint: '1 teammate has an interrupted shift — select them for Continue shift',
+      hint: '1 teammate has an interrupted job — select them and tap Continue',
     });
-    expect(ideActivityBarTeamTitle(false, interrupted)).toContain('interrupted shift');
-    expect(ideActivityBarTeamTitle(false, interrupted)).toContain('Continue shift');
+    expect(ideActivityBarTeamTitle(false, interrupted)).toContain('interrupted job');
+    expect(ideActivityBarTeamTitle(false, interrupted)).toContain('Continue');
   });
 
   it('surfaces mixed attention when both failed and interrupted teammates need help', () => {
@@ -162,9 +162,9 @@ describe('ide activity bar view', () => {
     expect(buildIdeActivityBarTeamAttention(mixed)).toEqual({
       count: 2,
       tone: 'mixed',
-      hint: '2 teammates need attention after a failed or interrupted shift',
+      hint: '2 teammates need attention after a failed or interrupted job',
     });
-    expect(ideActivityBarTeamTitle(false, mixed)).toContain('failed or interrupted shift');
+    expect(ideActivityBarTeamTitle(false, mixed)).toContain('failed or interrupted job');
   });
 
   it('surfaces unsaved-file attention on the Source Control activity button', () => {

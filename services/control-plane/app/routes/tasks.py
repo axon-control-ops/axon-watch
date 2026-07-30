@@ -129,13 +129,20 @@ def renew_task_lease(task_id: str, body: TaskLeaseRequest) -> dict[str, Any]:
 @router.post("/api/tasks/{task_id}/complete")
 def complete_task(task_id: str, body: TaskCompleteRequest) -> dict[str, Any]:
     try:
-        return task_store.complete_task(
+        completed = task_store.complete_task(
             task_id,
             terminal_outcome=body.terminal_outcome,
             run_id=body.run_id,
         )
     except task_store.TaskLedgerError as exc:
         raise _http_error(exc) from exc
+    try:
+        from app.workspace_agents.task_duplicate_cleanup import cleanup_after_task_completed
+
+        cleanup_after_task_completed(completed)
+    except Exception:  # noqa: BLE001 — completion response must still return
+        pass
+    return completed
 
 
 @router.post("/api/tasks/{task_id}/fail")
@@ -155,6 +162,98 @@ def fail_task(task_id: str, body: TaskFailRequest) -> dict[str, Any]:
 def cancel_task(task_id: str, body: TaskCancelRequest | None = None) -> dict[str, Any]:
     payload = body or TaskCancelRequest()
     try:
-        return task_store.cancel_task(task_id, terminal_outcome=payload.terminal_outcome)
+        cancelled = task_store.cancel_task(task_id, terminal_outcome=payload.terminal_outcome)
     except task_store.TaskLedgerError as exc:
         raise _http_error(exc) from exc
+    run_id = str(cancelled.get("run_id") or "").strip()
+    if run_id:
+        try:
+            from app.runs.restart_reconcile import interrupt_run_on_restart
+
+            interrupt_run_on_restart(run_id)
+        except Exception:  # noqa: BLE001 — task cancel must succeed even if run is already terminal
+            pass
+    return cancelled
+
+
+@router.post("/api/tasks/{task_id}/operator-start")
+def operator_start(task_id: str) -> dict[str, Any]:
+    """Lease a Waiting task and queue a specialist run (operator Start)."""
+    from app.workspace_agents.operator_start_task import (
+        OperatorStartTaskError,
+        operator_start_task,
+    )
+
+    try:
+        return operator_start_task(task_id)
+    except OperatorStartTaskError as exc:
+        detail = str(exc)
+        lowered = detail.lower()
+        if "not found" in lowered:
+            raise HTTPException(status_code=404, detail=detail) from exc
+        if (
+            "blocked" in lowered
+            or "only open" in lowered
+            or "remains queued" in lowered
+            or "already in progress" in lowered
+            or "already has active run" in lowered
+            or "paused in fleet controls" in lowered
+        ):
+            raise HTTPException(status_code=409, detail=detail) from exc
+        raise HTTPException(status_code=400, detail=detail) from exc
+    except task_store.TaskLedgerError as exc:
+        raise _http_error(exc) from exc
+
+
+class TaskCancelBatchRequest(BaseModel):
+    task_ids: list[str] = Field(default_factory=list)
+    # "waiting" = all open tasks; "duplicates" = Lead reconcile (done clones + open twins)
+    scope: str = ""
+    terminal_outcome: str = "cancelled by operator"
+
+
+@router.post("/api/workspaces/{workspace_id}/tasks/cancel-batch")
+def cancel_tasks_batch(workspace_id: str, body: TaskCancelBatchRequest) -> dict[str, Any]:
+    workspace = workspace_id.strip()
+    if not workspace:
+        raise HTTPException(status_code=400, detail="workspace_id is required")
+    outcome = (body.terminal_outcome or "cancelled by operator").strip() or "cancelled by operator"
+    scope = (body.scope or "").strip().lower()
+    if scope == "duplicates":
+        from app.workspace_agents.task_duplicate_cleanup import (
+            reconcile_workspace_waiting_duplicates,
+        )
+
+        result = reconcile_workspace_waiting_duplicates(workspace_id=workspace)
+        cancelled = list(result.get("cancelled_vs_completed") or []) + list(
+            result.get("cancelled_open_clones") or []
+        )
+        return {
+            "workspace_id": workspace,
+            "cancelled_count": int(result.get("cancelled_count") or len(cancelled)),
+            "cancelled": cancelled,
+            "errors": [],
+            "scope": "duplicates",
+        }
+    target_ids: list[str] = []
+    if scope == "waiting":
+        for row in task_store.list_tasks(workspace_id=workspace, limit=500):
+            if str(row.get("status") or "").strip().lower() == "open":
+                task_id = str(row.get("task_id") or "").strip()
+                if task_id:
+                    target_ids.append(task_id)
+    else:
+        target_ids = [str(item).strip() for item in body.task_ids if str(item).strip()]
+    cancelled: list[dict[str, Any]] = []
+    errors: list[dict[str, str]] = []
+    for task_id in target_ids:
+        try:
+            cancelled.append(cancel_task(task_id, TaskCancelRequest(terminal_outcome=outcome)))
+        except HTTPException as exc:
+            errors.append({"task_id": task_id, "detail": str(exc.detail)})
+    return {
+        "workspace_id": workspace,
+        "cancelled_count": len(cancelled),
+        "cancelled": cancelled,
+        "errors": errors,
+    }

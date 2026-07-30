@@ -11,11 +11,11 @@
       "rule": "operator shell presentation only; split by surface"
     },
     "apps/console-web/src/stores/shell.ts": {
-      "max_lines": 3900,
+      "max_lines": 4085,
       "soft_limit": 350,
       "hard_limit": 500,
       "target": "apps/console-web/src/stores/shell/slices/*",
-      "rule": "FS-003 in progress: dock/connectors/probes/briefing/presence/inbox/catalog + viewport/thread/chrome/composer-prefs/operator-focus/display + busy-employee IDE stream follow slices extracted; employee stream voice wiring added."
+      "rule": "FS-003 in progress: dock/connectors/probes/briefing/presence/inbox/catalog + viewport/thread/chrome/composer-prefs/operator-focus/display + busy-employee IDE stream follow slices extracted; stream reconnect across workspace switches."
     },
     "apps/console-web/src/styles/ide-layout.css": {
       "max_lines": 15,
@@ -41,14 +41,14 @@
   },
   "ratcheted_oversize_files": {
     "apps/console-web/src/components/ide/AgentDockComposer.vue": {
-      "max_lines": 151,
+      "max_lines": 152,
       "soft_limit": 350,
       "hard_limit": 500,
       "target": "apps/console-web/src/components/ide/agent-dock/*",
-      "note": "FS-005: thin orchestrator; Plan soft-switch offer accept/decline + teammate soft-route bindings"
+      "note": "FS-005: thin orchestrator; Plan soft-switch + typeahead empty-hint wiring"
     },
     "apps/console-web/src/api/control-plane.ts": {
-      "max_lines": 13,
+      "max_lines": 15,
       "soft_limit": 350,
       "hard_limit": 500,
       "target": "apps/console-web/src/api/*-api.ts",
@@ -60,17 +60,26 @@
       "hard_limit": 500,
       "target": "apps/console-web/src/styles/tokens/* + feature CSS"
     },
-    "services/control-plane/app/kairo_conversation.py": {
-      "max_lines": 410,
+    "apps/console-web/src/lib/kairo-voice-playback.ts": {
+      "max_lines": 535,
       "soft_limit": 350,
       "hard_limit": 500,
-      "target": "services/control-plane/app/kairo/*"
+      "target": "apps/console-web/src/lib/kairo-voice-*",
+      "note": "Voice playback orchestration after audible-start synchronization; extract next"
+    },
+    "services/control-plane/app/kairo_conversation.py": {
+      "max_lines": 417,
+      "soft_limit": 350,
+      "hard_limit": 500,
+      "target": "services/control-plane/app/kairo/*",
+      "note": "VAXON attachment path pass-through; extract early-intent next"
     },
     "apps/console-web/src/components/ConversationSeamPanel.vue": {
-      "max_lines": 531,
+      "max_lines": 262,
       "soft_limit": 350,
       "hard_limit": 500,
-      "target": "apps/console-web/src/components/conversation/*"
+      "target": "apps/console-web/src/components/conversation/*",
+      "note": "Artifact block extracted; ratchet lowered after under-budget verify"
     },
     "services/control-plane/app/cli_runtime/research_stream_blocks.py": {
       "max_lines": 311,
@@ -79,39 +88,40 @@
       "target": "services/control-plane/app/cli_runtime/stream_blocks/*"
     },
     "apps/console-web/src/components/shell/CenterWorkbench.vue": {
-      "max_lines": 658,
+      "max_lines": 660,
       "soft_limit": 350,
       "hard_limit": 500,
       "target": "apps/console-web/src/components/workbench/*"
     },
     "services/control-plane/app/kairo_conversation_reply.py": {
-      "max_lines": 325,
+      "max_lines": 330,
       "soft_limit": 350,
       "hard_limit": 500,
       "target": "services/control-plane/app/kairo/replies/*"
     },
     "services/control-plane/app/cli_runtime/catalog.py": {
-      "max_lines": 82,
+      "max_lines": 44,
       "soft_limit": 350,
       "hard_limit": 500,
       "target": "services/control-plane/app/cli_runtime/catalog/*",
-      "note": "CLI discovery only; snapshot cache in catalog_snapshot.py"
+      "note": "CLI discovery only; snapshot cache in catalog_snapshot.py; Lead ratchet after under-budget verify"
     },
     "services/control-plane/app/cli_runtime/catalog_snapshot.py": {
-      "max_lines": 270,
+      "max_lines": 228,
       "soft_limit": 350,
       "hard_limit": 500,
       "target": "services/control-plane/app/cli_runtime/catalog/*",
       "note": "Runtime status snapshot cache and probe assembly"
     },
     "docs/HOW-TO-HANDBOOK.md": {
-      "max_lines": 1546,
+      "max_lines": 1740,
       "soft_limit": 400,
-      "hard_limit": 1546,
-      "target": "docs/how-to/* chapters"
+      "hard_limit": 1713,
+      "target": "docs/how-to/* chapters",
+      "note": "Raised for GitHub CLI draft-PR delivery section"
     },
     "docs/HOW-TO-HANDBOOK.html": {
-      "max_lines": 3079,
+      "max_lines": 3800,
       "soft_limit": 250,
       "hard_limit": 400,
       "target": "docs/how-to/* generated HTML"
@@ -153,10 +163,11 @@
       "target": "docs/how-to/* print styles"
     },
     "apps/console-web/src/components/vault/VaultSurface.vue": {
-      "max_lines": 554,
+      "max_lines": 562,
       "soft_limit": 350,
       "hard_limit": 500,
-      "target": "apps/console-web/src/features/vault/components/*"
+      "target": "apps/console-web/src/features/vault/components/*",
+      "note": "Vault surface; extract connector rows next"
     },
     "docs/AXON-X-STARTER-GUIDE.html": {
       "max_lines": 544,
@@ -184,13 +195,13 @@
       "target": "apps/console-web/src/components/settings/useEmailSettingsMailbox.ts"
     },
     "apps/console-web/src/features/kairo-conversation/use-kairo-conversation.ts": {
-      "max_lines": 264,
+      "max_lines": 400,
       "soft_limit": 350,
       "hard_limit": 500,
       "target": "apps/console-web/src/features/kairo-conversation/*"
     },
     "apps/console-web/src/lib/agent-transcript-blocks.ts": {
-      "max_lines": 172,
+      "max_lines": 181,
       "soft_limit": 350,
       "hard_limit": 500,
       "target": "apps/console-web/src/lib/agent-transcript/*"
@@ -202,7 +213,7 @@
       "target": "apps/console-web/src/styles/shell/mockup-shell-13a.css + mockup-shell-13b.css"
     },
     "apps/console-web/src/components/shell/OperatorStatusRadarPanel.vue": {
-      "max_lines": 700,
+      "max_lines": 702,
       "soft_limit": 350,
       "hard_limit": 500,
       "target": "apps/console-web/src/components/shell/operator-status-radar/*",
@@ -216,10 +227,11 @@
       "note": "Lowered after explorer/activity panel CSS extraction"
     },
     "apps/console-web/src/styles/ide/ide-layout-08.css": {
-      "max_lines": 557,
+      "max_lines": 565,
       "soft_limit": 350,
       "hard_limit": 500,
-      "target": "apps/console-web/src/styles/ide/*"
+      "target": "apps/console-web/src/styles/ide/*",
+      "note": "Raised for Cursor-soft agent-dock notice styles"
     },
     "apps/console-web/src/styles/shell/mockup-shell-07.css": {
       "max_lines": 182,
@@ -228,7 +240,7 @@
       "target": "apps/console-web/src/styles/shell/*"
     },
     "apps/console-web/src/styles/shell/mockup-shell-18.css": {
-      "max_lines": 346,
+      "max_lines": 347,
       "soft_limit": 350,
       "hard_limit": 500,
       "target": "apps/console-web/src/styles/shell/*"
@@ -258,11 +270,11 @@
       "target": "tests/test_signal_consistency_* slices"
     },
     "apps/console-web/src/features/workspace-agents/company-roster-view.ts": {
-      "max_lines": 353,
+      "max_lines": 299,
       "soft_limit": 350,
       "hard_limit": 500,
       "target": "apps/console-web/src/features/workspace-agents/*",
-      "note": "Roster view after speech/presence"
+      "note": "Roster view after talk-line extract to company-roster-talk-view.ts"
     },
     "apps/console-web/src/features/workspace-agents/company-roster-view.test.ts": {
       "max_lines": 291,
@@ -272,7 +284,7 @@
       "note": "Roster view tests after speech/presence"
     },
     "apps/console-web/src/features/workspace-agents/company-roster-failure-view.test.ts": {
-      "max_lines": 571,
+      "max_lines": 613,
       "soft_limit": 350,
       "hard_limit": 500,
       "target": "apps/console-web/src/features/workspace-agents/*",
@@ -286,14 +298,14 @@
       "note": "Explorer + activity stub panels; extract per-panel components next"
     },
     "services/control-plane/app/adapters/watch_client.py": {
-      "max_lines": 406,
+      "max_lines": 449,
       "soft_limit": 350,
       "hard_limit": 500,
       "target": "services/control-plane/app/adapters/watch_*",
       "note": "Watch inbox/connector client cache; extract cache helpers next"
     },
     "apps/console-web/src/styles/shell/agent-persona-dock.css": {
-      "max_lines": 663,
+      "max_lines": 675,
       "soft_limit": 350,
       "hard_limit": 500,
       "target": "apps/console-web/src/styles/shell/agent-persona-*",
@@ -313,7 +325,7 @@
       "note": "Autonomy readiness assessment; split chapters when revising"
     },
     "tests/test_run_stale_reconcile.py": {
-      "max_lines": 563,
+      "max_lines": 600,
       "soft_limit": 350,
       "hard_limit": 500,
       "target": "tests/test_run_stale_* slices"
@@ -326,11 +338,11 @@
       "note": "Terminal dock; pending command flush extracted to workbench-terminal-pending-commands.ts"
     },
     "apps/console-web/src/components/shell/OperatorBrainGraphPanel.vue": {
-      "max_lines": 569,
+      "max_lines": 562,
       "soft_limit": 350,
       "hard_limit": 500,
       "target": "apps/console-web/src/components/shell/*",
-      "note": "Brain graph panel; extract next"
+      "note": "Brain graph panel; presence inputs extracted to use-operator-brain-galaxy-presence.ts"
     },
     "apps/console-web/src/features/brain-galaxy/brain-galaxy-scene.ts": {
       "max_lines": 565,
@@ -340,11 +352,18 @@
       "note": "Galaxy scene; extract next"
     },
     "apps/console-web/src/styles/ide/ide-layout-03.css": {
-      "max_lines": 526,
+      "max_lines": 529,
       "soft_limit": 350,
       "hard_limit": 500,
       "target": "apps/console-web/src/styles/ide/*",
-      "note": "IDE layout-03 after dock chrome"
+      "note": "IDE layout-03 after workspace picker + slim dock chrome"
+    },
+    "apps/console-web/src/styles/ide/ide-layout-02.css": {
+      "max_lines": 537,
+      "soft_limit": 350,
+      "hard_limit": 537,
+      "target": "apps/console-web/src/styles/ide/*",
+      "note": "IDE layout-02 after AgentDock chat chrome; extract next"
     },
     "services/control-plane/app/cli_runtime/router.py": {
       "max_lines": 562,
@@ -354,32 +373,137 @@
       "note": "CLI runtime router; long-running shell clause extracted"
     },
     "services/control-plane/app/workspace_agents/teammate_route.py": {
-      "max_lines": 524,
+      "max_lines": 523,
       "soft_limit": 350,
-      "hard_limit": 500,
+      "hard_limit": 523,
       "target": "services/control-plane/app/workspace_agents/*",
-      "note": "Teammate route after specialty routing; fan-out short-circuits to Lead"
+      "note": "Teammate route after specialty routing; fan-out short-circuits to Lead; extract next"
+    },
+    "services/control-plane/app/chat/lane_b_post_message.py": {
+      "max_lines": 509,
+      "soft_limit": 350,
+      "hard_limit": 509,
+      "target": "services/control-plane/app/chat/*",
+      "note": "Lane B post_message orchestration; extract stream helpers next"
+    },
+    "tests/test_operator_deterministic_report.py": {
+      "max_lines": 595,
+      "soft_limit": 350,
+      "hard_limit": 595,
+      "target": "tests/test_operator_deterministic_report_* slices",
+      "note": "Deterministic report regression matrix after push-failure advice coverage; split next"
     },
     "services/control-plane/app/runs/service.py": {
-      "max_lines": 527,
+      "max_lines": 528,
       "soft_limit": 350,
-      "hard_limit": 527,
+      "hard_limit": 528,
       "target": "services/control-plane/app/runs/*",
       "note": "Gate 4 leased-task create_run binding; extract next"
     },
     "services/control-plane/app/persistence/task_store.py": {
-      "max_lines": 800,
+      "max_lines": 830,
       "soft_limit": 350,
       "hard_limit": 500,
       "target": "services/control-plane/app/persistence/*",
       "note": "Gate 4/5 task ledger + exclusive-path lease conflicts"
     },
     "services/control-plane/app/workspace_delivery/publish.py": {
-      "max_lines": 600,
+      "max_lines": 601,
       "soft_limit": 350,
       "hard_limit": 500,
       "target": "services/control-plane/app/workspace_delivery/*",
-      "note": "Autonomy publish path-scope + receipts; extract next"
+      "note": "Autonomy publish path-scope + receipts; gh resolve extracted to gh_cli.py"
+    },
+    "apps/console-web/src/components/shell/OperatorTaskBoardPanel.vue": {
+      "max_lines": 590,
+      "soft_limit": 350,
+      "hard_limit": 500,
+      "target": "apps/console-web/src/components/shell/operator-task-board/*",
+      "note": "Mission Control Task Board; Start now + Engage review open/dismiss/reopen"
+    },
+    "apps/console-web/src/features/report-theater/report-theater.css": {
+      "max_lines": 550,
+      "soft_limit": 350,
+      "hard_limit": 500,
+      "target": "apps/console-web/src/features/report-theater/*",
+      "note": "REPORT theater presentation; split seat/stage/action layers next"
+    },
+    "apps/console-web/src/styles/shell/operator-task-board.css": {
+      "max_lines": 651,
+      "soft_limit": 350,
+      "hard_limit": 500,
+      "target": "apps/console-web/src/styles/shell/operator-task-board/*",
+      "note": "Task Board core; plans/handoffs + waiting-queue density extracted"
+    },
+    "services/control-plane/app/kairo/operator_deterministic_report.py": {
+      "max_lines": 587,
+      "soft_limit": 350,
+      "hard_limit": 587,
+      "target": "services/control-plane/app/kairo/report_*",
+      "note": "Deterministic REPORT lane; next-move selection extracted to report_next_move.py"
+    },
+    "apps/console-web/src/stores/shell/slices/create-kairo-voice-slice.ts": {
+      "max_lines": 525,
+      "soft_limit": 350,
+      "hard_limit": 500,
+      "target": "apps/console-web/src/stores/shell/slices/kairo-voice-*",
+      "note": "Spoken alert + theater lock; extract walk-fix recovery next"
+    },
+    "tests/test_run_outcome.py": {
+      "max_lines": 239,
+      "soft_limit": 350,
+      "hard_limit": 500,
+      "target": "tests/test_run_outcome_*.py",
+      "note": "Core roster outcome selection; confidence + roster API split to sibling modules"
+    },
+    "services/control-plane/app/workspace_agents/lead_vaxon_handoff.py": {
+      "max_lines": 454,
+      "soft_limit": 350,
+      "hard_limit": 500,
+      "target": "services/control-plane/app/workspace_agents/lead_vaxon_*",
+      "note": "Lead\u2192VAXON handoffs; message builders in lead_vaxon_messages.py"
+    },
+    "services/control-plane/app/workspace_agents/lead_team_checkin.py": {
+      "max_lines": 510,
+      "soft_limit": 350,
+      "hard_limit": 500,
+      "target": "services/control-plane/app/workspace_agents/lead_team_*",
+      "note": "Lead team check-in orchestration; extract prompt builders next"
+    },
+    "apps/console-web/src/components/conversation/ConversationSeamThreadMessage.vue": {
+      "max_lines": 537,
+      "soft_limit": 350,
+      "hard_limit": 500,
+      "target": "apps/console-web/src/components/conversation/*",
+      "note": "Thread message body/actions; extract attachment chrome next"
+    },
+    "apps/console-web/src/components/shell/MissionControlAutonomyControl.vue": {
+      "max_lines": 679,
+      "soft_limit": 350,
+      "hard_limit": 500,
+      "target": "apps/console-web/src/components/shell/mission-control-*",
+      "note": "VAXON orb HUD autonomy controls; split confirm/critical sheets next"
+    },
+    "apps/console-web/src/styles/shell/mockup-shell-11.css": {
+      "max_lines": 586,
+      "soft_limit": 350,
+      "hard_limit": 500,
+      "target": "apps/console-web/src/styles/shell/*",
+      "note": "Mission Control left-rail hide + center expand; split MC layout next"
+    },
+    "services/control-plane/app/chat/lane_b_stream_execute.py": {
+      "max_lines": 512,
+      "soft_limit": 350,
+      "hard_limit": 512,
+      "target": "services/control-plane/app/chat/*",
+      "note": "Ratchet after VAXON Attend / Axon terminal jobs slice"
+    },
+    "apps/console-web/src/components/ide/KairoSidebarPanel.vue": {
+      "max_lines": 530,
+      "soft_limit": 350,
+      "hard_limit": 530,
+      "target": "apps/console-web/src/components/ide/*",
+      "note": "Ratchet after VAXON Attend / Axon terminal jobs slice"
     }
   }
 }

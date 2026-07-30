@@ -14,13 +14,65 @@ from app.workspace_agents.lead_task_persist import persist_lead_task_plan
 from app.workspace_agents.lead_task_plan import (
     LeadPlanRosterMember,
     PlanMode,
-    build_lead_task_plan,
     detect_fan_out_intent,
+)
+from app.workspace_agents.lead_plan_model import resolve_lead_task_plan
+from app.workspace_agents.task_goal_overlap import (
+    goals_overlap,
+    normalize_goal_core,
+    token_set,
 )
 
 
 class LeadFanOutError(ValueError):
     """Operator-facing fan-out / plan materialize failure."""
+
+
+def supersede_stale_queue_for_new_lead_goal(
+    *,
+    workspace_id: str,
+    goal: str,
+) -> list[dict[str, Any]]:
+    """Cancel older open/leased specialist tasks that overlap this Lead ask.
+
+    Prevents retry spam ("Please confirm if we did this job…") from filling the
+    fleet queue so Leads cannot get new work started.
+    """
+    workspace = workspace_id.strip()
+    core = normalize_goal_core(goal)
+    if not workspace or len(core) < 12:
+        return []
+    core_tokens = token_set(core)
+    if len(core_tokens) < 2:
+        return []
+    cancelled: list[dict[str, Any]] = []
+    for record in task_store.list_tasks(workspace_id=workspace, limit=500):
+        status = str(record.get("status") or "").strip().lower()
+        if status not in {"open", "leased"}:
+            continue
+        other_goal = str(record.get("goal") or "")
+        if not goals_overlap(goal, other_goal, threshold=0.45):
+            continue
+        task_id = str(record.get("task_id") or "").strip()
+        if not task_id:
+            continue
+        try:
+            row = task_store.cancel_task(
+                task_id,
+                terminal_outcome="superseded by newer Lead ask",
+            )
+        except task_store.TaskLedgerError:
+            continue
+        run_id = str(row.get("run_id") or record.get("run_id") or "").strip()
+        if run_id:
+            try:
+                from app.runs.restart_reconcile import interrupt_run_on_restart
+
+                interrupt_run_on_restart(run_id)
+            except Exception:  # noqa: BLE001
+                pass
+        cancelled.append(row)
+    return cancelled
 
 
 def _utc_now_iso() -> str:
@@ -54,7 +106,8 @@ def _roster_from_company(workspace_id: str) -> list[LeadPlanRosterMember]:
     return members
 
 
-def _employee_id_for_role(workspace_id: str, role: str) -> str | None:
+def employee_for_role(workspace_id: str, role: str) -> dict[str, Any] | None:
+    """Public roster lookup by role (Lead voice / takeover / check-in)."""
     company = build_company_roster(workspace_id)
     rows = company.get("employees") if isinstance(company, dict) else None
     if not isinstance(rows, list):
@@ -64,9 +117,20 @@ def _employee_id_for_role(workspace_id: str, role: str) -> str | None:
         if not isinstance(row, dict):
             continue
         if str(row.get("role") or "").strip().lower() == want:
-            employee_id = str(row.get("employee_id") or "").strip()
-            return employee_id or None
+            return row
     return None
+
+
+# Compat alias — prefer employee_for_role at new call sites.
+_employee_for_role = employee_for_role
+
+
+def _employee_id_for_role(workspace_id: str, role: str) -> str | None:
+    employee = employee_for_role(workspace_id, role)
+    if employee is None:
+        return None
+    employee_id = str(employee.get("employee_id") or "").strip()
+    return employee_id or None
 
 
 def _deps_completed(task: dict[str, Any]) -> bool:
@@ -112,23 +176,11 @@ def _post_assignment_to_employee_thread(
             employee_role=owner_role,
         )
     thread_id = str(thread["thread_id"])
-    goal_line = " ".join(str(goal or "").split())
-    if len(goal_line) > 220:
-        goal_line = f"{goal_line[:219].rstrip()}…"
-    chat_store.save_message(
-        {
-            "message_id": f"message_system_{uuid4().hex}",
-            "thread_id": thread_id,
-            "workspace_id": workspace_id,
-            "run_id": run_id,
-            "role": "system",
-            "content": (
-                f"Lead fan-out assigned task {task_id} → run {run_id} "
-                f"(queued — waiting for worker dispatch)."
-            ),
-            "created_at": created_at,
-        }
-    )
+    goal_line = " ".join(str(goal or "").strip().split())
+    if len(goal_line) > 160:
+        goal_line = f"{goal_line[:159].rstrip()}…"
+    # Compact chip only — SYSTEM queue essays clutter the specialist dock.
+    # Lead keeps a full summary on their own thread; run receipts stay on the ledger.
     chat_store.save_message(
         {
             "message_id": f"message_agent_{uuid4().hex}",
@@ -136,12 +188,7 @@ def _post_assignment_to_employee_thread(
             "workspace_id": workspace_id,
             "run_id": run_id,
             "role": "agent",
-            "content": (
-                f"Assigned by Lead fan-out.\n"
-                f"Goal: {goal_line or '(no goal text)'}\n"
-                f"Status: queued until continuous worker dispatch starts Lane B. "
-                f"Open this thread after dispatch to follow the shift transcript."
-            ),
+            "content": f"Queued for dispatch · {goal_line or f'task `{task_id}`'}",
             "created_at": created_at,
         }
     )
@@ -155,6 +202,7 @@ def materialize_lead_fan_out(
     mode: PlanMode = "auto",
     create_runs: bool = True,
     supersedes_plan_id: str | None = None,
+    use_model: bool = True,
 ) -> dict[str, Any]:
     """Build plan, persist tasks, and open leased runs for dependency-ready items.
 
@@ -169,12 +217,31 @@ def materialize_lead_fan_out(
     if not cleaned_goal:
         raise LeadFanOutError("goal is required")
 
+    superseded = supersede_stale_queue_for_new_lead_goal(
+        workspace_id=workspace,
+        goal=cleaned_goal,
+    )
+    try:
+        from app.workspace_agents.task_duplicate_cleanup import (
+            reconcile_workspace_waiting_duplicates,
+        )
+
+        reconcile_workspace_waiting_duplicates(workspace_id=workspace)
+    except Exception:  # noqa: BLE001 — never block Lead materialize on cleanup
+        pass
+
     roster = _roster_from_company(workspace)
     if not roster:
         raise LeadFanOutError(f"no company roster for workspace {workspace}")
 
     try:
-        plan = build_lead_task_plan(goal=cleaned_goal, roster=roster, mode=mode)
+        plan = resolve_lead_task_plan(
+            goal=cleaned_goal,
+            roster=roster,
+            mode=mode,
+            workspace_id=workspace,
+            use_model=use_model,
+        )
     except ValueError as exc:
         raise LeadFanOutError(str(exc)) from exc
 
@@ -283,12 +350,18 @@ def materialize_lead_fan_out(
         "tasks": list(tasks_by_id.values()),
         "runs": runs,
         "deferred": deferred,
+        "superseded_tasks": superseded,
         "receipt": {
             "receipt_id": receipt["receipt_id"],
             "type": receipt["kind"],
             "summary": (
                 f"Lead materialized {len(persisted['tasks'])} tasks; "
                 f"queued {len(runs)} ready runs; deferred {len(deferred)}"
+                + (
+                    f"; superseded {len(superseded)} stale queue task(s)"
+                    if superseded
+                    else ""
+                )
             ),
             "mode": plan.mode,
             "run_count": len(runs),
@@ -297,4 +370,8 @@ def materialize_lead_fan_out(
     }
 
 
-__all__ = ["LeadFanOutError", "materialize_lead_fan_out"]
+__all__ = [
+    "LeadFanOutError",
+    "materialize_lead_fan_out",
+    "supersede_stale_queue_for_new_lead_goal",
+]

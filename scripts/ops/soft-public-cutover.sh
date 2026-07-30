@@ -11,6 +11,7 @@ AXON_LOCAL_ROOT="${AXON_LOCAL_ROOT:-/home/edp/axon-nvme/repos/axon-local}"
 STATE_DIR="${AXON_WATCH_STATE_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)/.local/state}"
 PROXY_PIDFILE="${STATE_DIR}/tunnel/public-origin-proxy.pid"
 PROXY_LOG="${STATE_DIR}/tunnel/public-origin-proxy.log"
+PROXY_SCRIPT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/public-origin-proxy.py"
 mkdir -p "${STATE_DIR}/tunnel"
 
 echo "=== Soft public cutover ==="
@@ -57,90 +58,19 @@ if [[ -f "${PROXY_PIDFILE}" ]]; then
   fi
 fi
 
-PROXY_PY="${STATE_DIR}/tunnel/public-origin-proxy.py"
-cat >"${PROXY_PY}" <<'PY'
-import http.client
-import http.server
-import os
-import socketserver
-import urllib.parse
-
-ORIGIN = urllib.parse.urlparse(os.environ["AXON_X_ORIGIN"])
-HOST = ORIGIN.hostname or "127.0.0.1"
-PORT = ORIGIN.port or 80
-LISTEN = int(os.environ["AXON_PUBLIC_ORIGIN_PORT"])
-
-
-class Proxy(http.server.BaseHTTPRequestHandler):
-    protocol_version = "HTTP/1.1"
-
-    def log_message(self, fmt, *args):
-        print("[%s] %s" % (self.log_date_time_string(), fmt % args), flush=True)
-
-    def _proxy(self):
-        length = int(self.headers.get("Content-Length") or 0)
-        body = self.rfile.read(length) if length else None
-        headers = {
-            k: v
-            for k, v in self.headers.items()
-            if k.lower() not in {"host", "content-length", "transfer-encoding", "connection"}
-        }
-        headers["Host"] = f"{HOST}:{PORT}"
-        headers["Connection"] = "close"
-        conn = http.client.HTTPConnection(HOST, PORT, timeout=60)
-        try:
-            conn.request(self.command, self.path, body=body, headers=headers)
-            resp = conn.getresponse()
-            payload = resp.read()
-            self.send_response(resp.status, resp.reason)
-            for key, value in resp.getheaders():
-                if key.lower() in {"transfer-encoding", "connection", "content-length"}:
-                    continue
-                self.send_header(key, value)
-            self.send_header("Content-Length", str(len(payload)))
-            self.send_header("Connection", "close")
-            self.end_headers()
-            if self.command != "HEAD":
-                self.wfile.write(payload)
-        finally:
-            conn.close()
-
-    def do_GET(self):
-        self._proxy()
-
-    def do_POST(self):
-        self._proxy()
-
-    def do_PUT(self):
-        self._proxy()
-
-    def do_PATCH(self):
-        self._proxy()
-
-    def do_DELETE(self):
-        self._proxy()
-
-    def do_HEAD(self):
-        self._proxy()
-
-    def do_OPTIONS(self):
-        self._proxy()
-
-
-class ReuseTCPServer(socketserver.ThreadingTCPServer):
-    allow_reuse_address = True
-
-
-with ReuseTCPServer(("0.0.0.0", LISTEN), Proxy) as httpd:
-    print("proxy listening on %s -> %s:%s" % (LISTEN, HOST, PORT), flush=True)
-    httpd.serve_forever()
-PY
-AXON_X_ORIGIN="${AXON_X_ORIGIN}" AXON_PUBLIC_ORIGIN_PORT="${PUBLIC_PORT}" \
-  nohup python3 "${PROXY_PY}" >"${PROXY_LOG}" 2>&1 &
-proxy_pid=$!
-disown "${proxy_pid}" 2>/dev/null || true
-echo "${proxy_pid}" >"${PROXY_PIDFILE}"
-sleep 0.8
+if systemctl --user cat axon-public-origin-proxy.service >/dev/null 2>&1; then
+  echo "Starting systemd-owned public origin proxy"
+  systemctl --user restart axon-public-origin-proxy.service
+  proxy_pid="$(systemctl --user show -p MainPID --value axon-public-origin-proxy.service)"
+else
+  echo "WARN: systemd proxy unit is not installed; using non-durable fallback" >&2
+  AXON_X_ORIGIN="${AXON_X_ORIGIN}" AXON_PUBLIC_ORIGIN_PORT="${PUBLIC_PORT}" \
+    nohup python3 "${PROXY_SCRIPT}" >"${PROXY_LOG}" 2>&1 &
+  proxy_pid=$!
+  disown "${proxy_pid}" 2>/dev/null || true
+  echo "${proxy_pid}" >"${PROXY_PIDFILE}"
+fi
+sleep 1
 
 echo "Local public origin:"
 curl -sS --max-time 5 "http://127.0.0.1:${PUBLIC_PORT}/api/health" | head -c 200; echo

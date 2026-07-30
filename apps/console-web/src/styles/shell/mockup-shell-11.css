@@ -246,6 +246,23 @@
   grid-column: centerWorkbench;
 }
 
+/* Mission Control grid: left rail is redundant with Fleet Health.
+   Keep LIVE OPERATIONS / RightDock; expand the center workbench. */
+.console-shell--mockup.console-shell--operator.console-shell--mission-control {
+  grid-template-columns:
+    0
+    minmax(0, 1fr)
+    var(--shell-agent-dock-width, min(26rem, 32vw));
+}
+
+.console-shell--mockup.console-shell--operator.console-shell--mission-control .region-left-sidebar {
+  display: none;
+}
+
+.console-shell--mockup.console-shell--operator.console-shell--mission-control .region-center-workbench {
+  grid-column: centerWorkbench;
+}
+
 @keyframes kairo-voice-pulse {
   0%,
   100% {
@@ -278,6 +295,15 @@
   gap: 0.75rem;
 }
 
+.operator-fleet-grid__header-meta {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.35rem;
+  min-width: 0;
+  max-width: min(22rem, 48%);
+}
+
 .operator-fleet-grid__eyebrow {
   margin: 0;
   color: var(--text-hud);
@@ -299,19 +325,46 @@
   text-align: right;
 }
 
+.operator-fleet-grid__new {
+  border: 1px solid rgba(72, 196, 255, 0.28);
+  border-radius: 0.35rem;
+  background: rgba(0, 40, 56, 0.45);
+  color: var(--text-hud);
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  padding: 0.28rem 0.55rem;
+  cursor: pointer;
+}
+
+.operator-fleet-grid__new:hover,
+.operator-fleet-grid__new:focus-visible {
+  border-color: rgba(0, 242, 255, 0.55);
+  background: rgba(0, 60, 80, 0.55);
+}
+
+.operator-fleet-grid__new:focus-visible {
+  outline: 2px solid rgba(0, 242, 255, 0.45);
+  outline-offset: 2px;
+}
+
 .operator-fleet-grid__list {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(9.5rem, 1fr));
-  gap: 0.4rem;
+  grid-template-columns: repeat(auto-fill, minmax(12.5rem, 1fr));
+  gap: 0.45rem;
   margin: 0;
   padding: 0;
   list-style: none;
+  align-items: start;
 }
 
 .operator-fleet-grid__item {
+  min-width: 0;
+  max-width: 100%;
   border: 1px solid rgba(120, 200, 255, 0.12);
   border-radius: 0.4rem;
   background: rgba(6, 12, 20, 0.72);
+  overflow: hidden;
 }
 
 .operator-fleet-grid__item--attention {
@@ -326,27 +379,90 @@
   box-shadow: 0 0 0 1px rgba(72, 196, 255, 0.45);
 }
 
+.operator-fleet-grid__item--busy {
+  border-color: rgba(0, 242, 255, 0.42);
+  background:
+    linear-gradient(165deg, rgba(0, 242, 255, 0.12), transparent 48%),
+    rgba(4, 22, 32, 0.88);
+  box-shadow:
+    0 0 0 1px rgba(0, 220, 255, 0.18),
+    0 0 18px rgba(0, 200, 255, 0.16);
+  animation: operator-fleet-busy-pulse 2.4s ease-in-out infinite;
+}
+
+.operator-fleet-grid__item--has-attention {
+  box-shadow: inset 0 0 0 1px rgba(255, 196, 72, 0.18);
+}
+
+.operator-fleet-grid--busy .operator-fleet-grid__headline {
+  color: rgba(140, 235, 255, 0.95);
+}
+
+.operator-fleet-grid-host--busy .operator-fleet-grid.hud-holo-shell {
+  box-shadow: 0 0 28px rgba(0, 200, 255, 0.12);
+}
+
+@keyframes operator-fleet-busy-pulse {
+  0%,
+  100% {
+    box-shadow:
+      0 0 0 1px rgba(0, 220, 255, 0.16),
+      0 0 12px rgba(0, 200, 255, 0.1);
+  }
+  50% {
+    box-shadow:
+      0 0 0 1px rgba(0, 242, 255, 0.42),
+      0 0 22px rgba(0, 220, 255, 0.28);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .operator-fleet-grid__item--busy {
+    animation: none;
+  }
+}
+
 .operator-fleet-grid__button {
   display: flex;
   flex-direction: column;
-  gap: 0.2rem;
+  gap: 0.22rem;
   width: 100%;
-  min-height: 4.35rem;
-  padding: 0.45rem 0.55rem;
+  min-width: 0;
+  min-height: 3.75rem;
+  padding: 0.45rem 0.6rem;
   border: 0;
   background: transparent;
   color: inherit;
   text-align: left;
   cursor: pointer;
+  overflow: hidden;
 }
 
-.operator-fleet-grid__label {
-  display: flex;
-  align-items: center;
-  gap: 0.35rem;
+.operator-fleet-grid__label-row {
+  display: block;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.operator-fleet-grid__name {
+  display: block;
+  min-width: 0;
+  max-width: 100%;
   color: var(--text-primary);
-  font-size: 0.78rem;
-  font-weight: 600;
+  font-size: 0.8rem;
+  font-weight: 650;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.25;
+}
+
+.operator-fleet-grid__badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  min-width: 0;
 }
 
 .operator-fleet-grid__badge {
@@ -359,21 +475,107 @@
   text-transform: uppercase;
 }
 
+.operator-fleet-grid__badge--live {
+  background: rgba(0, 242, 255, 0.22);
+  color: rgba(180, 250, 255, 0.98);
+  box-shadow: 0 0 0.4rem rgba(0, 220, 255, 0.35);
+}
+
+.operator-fleet-grid__attention {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+}
+
+.operator-fleet-grid__badge--signal {
+  background: rgba(255, 196, 72, 0.18);
+  color: rgba(255, 220, 140, 0.98);
+}
+
+.operator-fleet-grid__badge--critical {
+  background: rgba(255, 80, 80, 0.22);
+  color: rgba(255, 190, 190, 0.98);
+}
+
+.operator-fleet-grid__badge--approval {
+  background: rgba(255, 140, 60, 0.2);
+  color: rgba(255, 210, 160, 0.98);
+}
+
+.operator-fleet-grid__badge--review {
+  background: rgba(120, 180, 255, 0.18);
+  color: rgba(190, 220, 255, 0.98);
+}
+
 .operator-fleet-grid__summary {
   color: var(--text-secondary);
   font-size: 0.68rem;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 
 .operator-fleet-grid__detail {
   color: var(--text-muted);
   font-size: 0.62rem;
   font-family: var(--font-mono);
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 
 .operator-fleet-grid__error {
   margin: 0;
   color: var(--state-critical);
   font-size: 0.72rem;
+}
+
+.operator-status-radar-panel__attention {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  min-height: 0;
+  max-height: min(34rem, 62vh);
+  padding: 0.45rem 0.55rem 0.55rem;
+  border: 1px solid rgba(0, 242, 255, 0.14);
+  border-radius: 0.45rem;
+  background: rgba(0, 12, 20, 0.42);
+  overflow: auto;
+}
+
+.operator-status-radar-panel__attention-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.operator-status-radar-panel__attention-eyebrow {
+  margin: 0;
+  color: var(--text-hud);
+  font-size: 0.62rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.operator-status-radar-panel__attention-scope {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 0.7rem;
+}
+
+.operator-status-radar-panel__attention .attention-stack--sidebar {
+  flex: 1 1 auto;
+  min-height: 0;
+  padding-top: 0.2rem;
+  padding-bottom: 0.2rem;
+  padding-right: 0.2rem;
+}
+
+.operator-status-radar-panel__attention .attention-stack--attention-only {
+  gap: 0.45rem;
 }
 
 .operator-center-view-switch {

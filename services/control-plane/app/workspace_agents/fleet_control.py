@@ -11,6 +11,7 @@ from app.workspace_agents.scheduler import (
     DEFAULT_MAX_ACTIVE_EXECUTING,
     DEFAULT_MAX_STARTS_PER_TICK,
     env_scheduler_allowed,
+    run_continuous_worker_tick,
     scheduler_enabled,
     tick_interval_seconds,
     worker_dispatch_enabled_for_status,
@@ -41,11 +42,28 @@ def build_scheduler_status() -> dict[str, Any]:
         "active_run_count": len(active_runs),
         "employee_enabled": dict(settings.get("employee_enabled") or {}),
         "updated_at": settings.get("updated_at"),
+        # Idle ticks only reconcile housekeeping; Cursor CLI usage starts on dispatch.
+        "cursor_usage_on_idle_tick": False,
+        "cursor_usage_policy": "dispatch_only",
     }
+
+
+def _sync_autonomy_with_scheduler(*, enabled: bool) -> None:
+    """Workers on ⇒ Full; workers off ⇒ Semi (VAXON stays proactive, not silent Manual)."""
+    from app.persistence import operator_presence_settings_store
+
+    current = operator_presence_settings_store.load_settings()
+    mode = str(current.get("autonomy_mode") or "manual").strip().lower()
+    if enabled and mode != "full":
+        operator_presence_settings_store.save_settings({**current, "autonomy_mode": "full"})
+    elif not enabled and mode == "full":
+        operator_presence_settings_store.save_settings({**current, "autonomy_mode": "semi"})
 
 
 def patch_scheduler_settings(patch: dict[str, Any]) -> dict[str, Any]:
     worker_scheduler_settings_store.patch_settings(patch)
+    if "scheduler_enabled" in patch and patch["scheduler_enabled"] is not None:
+        _sync_autonomy_with_scheduler(enabled=bool(patch["scheduler_enabled"]))
     return build_scheduler_status()
 
 
@@ -64,6 +82,29 @@ def stop_active_runs() -> dict[str, Any]:
     status = build_scheduler_status()
     status["stopped_run_ids"] = stopped
     status["stop_errors"] = errors
+    return status
+
+
+def hard_kill_scheduler() -> dict[str, Any]:
+    """Pause continuous starts from Settings (SQLite), stop active shifts, keep VAXON on Semi."""
+    worker_scheduler_settings_store.patch_settings({"scheduler_enabled": False})
+    _sync_autonomy_with_scheduler(enabled=False)
+    status = stop_active_runs()
+    status["hard_killed"] = True
+    return status
+
+
+def resume_scheduler() -> dict[str, Any]:
+    """Re-enable workers and dispatch queued Lead work without waiting for the next tick."""
+    status = patch_scheduler_settings({"scheduler_enabled": True})
+    started = run_continuous_worker_tick() if status["effective_enabled"] else []
+    status = build_scheduler_status()
+    status["resumed"] = True
+    status["started_run_ids"] = [
+        str(run.get("run_id") or "").strip()
+        for run in started
+        if str(run.get("run_id") or "").strip()
+    ]
     return status
 
 

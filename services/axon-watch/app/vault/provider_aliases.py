@@ -28,6 +28,8 @@ PROVIDER_VAULT_URLS: dict[str, list[str]] = {
 RUNTIME_PROVIDER_IDS: dict[str, str] = {
     "cursor_local": "cursor_cli",
     "cursor_cloud": "cursor_cli",
+    "claude_local": "anthropic",
+    "claude_cloud": "anthropic",
     "codex_local": "codex_cli",
     "codex_cloud": "codex_cli",
 }

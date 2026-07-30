@@ -78,6 +78,7 @@ class LeadDanaReportTests(unittest.TestCase):
             )
             self.assertEqual("ok", partial.get("status"))
             self.assertEqual("awaiting_results", (partial.get("synthesis") or {}).get("status"))
+            self.assertIn((partial.get("takeover") or {}).get("status"), {"posted", "already_posted"})
 
             last_synthesis = None
             for task in tasks[1:]:

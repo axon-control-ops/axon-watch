@@ -124,6 +124,7 @@ const {
   gateFeedback,
   voiceBlocked,
   selectedComposerModel: computed(() => shell.selectedComposerModel),
+  vaxonModelId: computed(() => shell.operatorPresenceSettings.vaxon_model_id ?? null),
 });
 const { showInterrupt, showIdeClose } = useKairoGalaxyOrbChromeFlags({
   shell,

@@ -53,7 +53,13 @@ export interface VaultSecretDetail extends VaultSecretRecord {
   notes: string;
 }
 
-export function vaultStateLabel(snapshot: VaultStatusSnapshot | null): string {
+export function vaultStateLabel(
+  snapshot: VaultStatusSnapshot | null,
+  options?: { unavailable?: boolean },
+): string {
+  if (options?.unavailable && !snapshot) {
+    return 'Status unavailable';
+  }
   if (!snapshot?.is_setup) {
     return 'Setup required';
   }

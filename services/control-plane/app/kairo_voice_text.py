@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import re
 
-from app.operator_persona_name import OPERATOR_PERSONA_NAME
+from app.operator_persona_name import OPERATOR_PERSONA_NAME, OPERATOR_PERSONA_SPOKEN_NAME
 from app.kairo_spoken_symbol_words import strip_literal_symbol_words
 
 _STREAM_BLOCK_START_RE = re.compile(
@@ -73,6 +73,27 @@ def _strip_markdown_for_speech(text: str) -> str:
     text = re.sub(r"\[([^\]]+)\]\([^)]+\)", r"\1", text)
     text = text.replace('"', " ").replace("'", "'")
     return text
+
+
+def _prepare_persona_name_for_speech(text: str) -> str:
+    """Speak as Vekson (vek-son) — never letter-spell V-A-X-O-N."""
+    text = re.sub(
+        r"\bV\s*[.\-]\s*A\s*[.\-]\s*X\s*[.\-]\s*O\s*[.\-]\s*N\b",
+        OPERATOR_PERSONA_SPOKEN_NAME,
+        text,
+        flags=re.IGNORECASE,
+    )
+    text = re.sub(
+        r"\bV\s+A\s+X\s+O\s+N\b",
+        OPERATOR_PERSONA_SPOKEN_NAME,
+        text,
+        flags=re.IGNORECASE,
+    )
+    text = re.sub(r"\bVAXON\b", OPERATOR_PERSONA_SPOKEN_NAME, text, flags=re.IGNORECASE)
+    # Sesotho name — keep display text as Thabo, guide TTS to TA-bo.
+    text = re.sub(r"\bThabo\b", "Ta-bo", text, flags=re.IGNORECASE)
+    # Zulu name — speak Sipho as SEE-po (not SIFO).
+    return re.sub(r"\bSipho\b", "See-po", text, flags=re.IGNORECASE)
 
 
 def _soften_symbols_for_speech(text: str) -> str:
@@ -179,6 +200,47 @@ def _strip_forbidden_listener_address(text: str) -> str:
     return cleaned.strip()
 
 
+def _prepare_counts_for_speech(text: str) -> str:
+    """Stop TTS from gluing '4 Lead' / 'four Lead' into 'forlead'."""
+    number_words = {
+        "0": "zero",
+        "1": "one",
+        "2": "two",
+        "3": "three",
+        "4": "four",
+        "5": "five",
+        "6": "six",
+        "7": "seven",
+        "8": "eight",
+        "9": "nine",
+        "10": "ten",
+        "11": "eleven",
+        "12": "twelve",
+    }
+    count_words = "|".join(number_words.values())
+
+    def _lead_replace(match: re.Match[str]) -> str:
+        raw = match.group(1)
+        spoken = number_words.get(raw.lower(), number_words.get(raw, raw))
+        # Comma + hyphenated Lead-team forces Azure to pause (avoids "forlead").
+        return f"{spoken}, Lead-team"
+
+    text = re.sub(
+        rf"\b({count_words}|\d{{1,2}})\s+Lead(?:[- ]team)?\b",
+        _lead_replace,
+        text,
+        flags=re.IGNORECASE,
+    )
+
+    def _replace(match: re.Match[str]) -> str:
+        digits = match.group(1)
+        word = match.group(2)
+        spoken = number_words.get(digits, digits)
+        return f"{spoken} {word}"
+
+    return re.sub(r"\b(\d{1,2})\s+([A-Z][A-Za-z-]+)\b", _replace, text)
+
+
 def normalize_spoken_line(raw: str, *, max_chars: int = _MAX_SPOKEN_CHARS) -> str:
     """Convert agent/model text into concise operator-facing speech."""
     original = str(raw or "").strip()
@@ -199,6 +261,8 @@ def normalize_spoken_line(raw: str, *, max_chars: int = _MAX_SPOKEN_CHARS) -> st
         flags=re.IGNORECASE,
     )
     text = _strip_forbidden_listener_address(text)
+    text = _prepare_persona_name_for_speech(text)
+    text = _prepare_counts_for_speech(text)
     text = _soften_symbols_for_speech(text)
     text = strip_literal_symbol_words(text)
     text = re.sub(r"\s+", " ", text).strip()

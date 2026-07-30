@@ -10,6 +10,7 @@ import {
   type KairoVoicePlaybackResult,
 } from './kairo-voice-playback';
 import type { KairoVoiceSpeaker } from './kairo-voice-utterance';
+import { reportTheaterOpen } from '../features/report-theater/report-theater-state';
 
 export type KairoVoicePriority =
   | 'interrupt'
@@ -24,6 +25,12 @@ export type EnqueueKairoSpeechOptions = {
   speechPitch?: number;
   azureVoiceId?: string;
   speaker?: KairoVoiceSpeaker;
+  /** Command Theater narration — only this lane may speak while stand-up is open. */
+  allowDuringReportTheater?: boolean;
+  /** Cap Azure wait before falling back to browser TTS (ms). */
+  ttsTimeoutMs?: number;
+  /** Fires once when audible playback begins. */
+  onPlaybackStart?: () => void;
 };
 
 type VoiceJob = {
@@ -35,6 +42,8 @@ type VoiceJob = {
   speechPitch?: number;
   azureVoiceId?: string;
   speaker?: KairoVoiceSpeaker;
+  ttsTimeoutMs?: number;
+  onPlaybackStart?: () => void;
   resolve: (result: KairoVoicePlaybackResult) => void;
   reject: (error: unknown) => void;
 };
@@ -77,6 +86,18 @@ export function dropWaitingKairoNarration(reason = 'stale_run_advance'): void {
   dropWaitingNarration(reason);
 }
 
+/**
+ * Drop waiting narration and stop an already-playing narration utterance.
+ * Used when a stream ends so mid-run "I am checking…" cannot keep speaking
+ * after Done / ask. Does not cut alerts or conversation replies.
+ */
+export function stopActiveKairoNarration(reason = 'stream_complete'): void {
+  dropWaitingNarration(reason);
+  if (activeJob?.priority === 'narration') {
+    stopKairoPlayback();
+  }
+}
+
 async function settleAfterUtterance(): Promise<void> {
   await new Promise<void>((resolve) => {
     globalThis.setTimeout(resolve, POST_UTTERANCE_SETTLE_MS);
@@ -103,6 +124,8 @@ async function pump(): Promise<void> {
           speechPitch: job.speechPitch,
           azureVoiceId: job.azureVoiceId,
           speaker: job.speaker,
+          ttsTimeoutMs: job.ttsTimeoutMs,
+          onPlaybackStart: job.onPlaybackStart,
         });
         await settleAfterUtterance();
         job.resolve(result);
@@ -158,6 +181,15 @@ export function enqueueKairoSpeech(
     return Promise.resolve({ engine: 'skipped', reason: 'empty' });
   }
 
+  // Hard mute: nothing barges into Command Theater except the stand-up lane.
+  if (
+    reportTheaterOpen.value &&
+    !options.allowDuringReportTheater &&
+    priority !== 'interrupt'
+  ) {
+    return Promise.resolve({ engine: 'skipped', reason: 'report_theater_lock' });
+  }
+
   return new Promise<KairoVoicePlaybackResult>((resolve, reject) => {
     const job: VoiceJob = {
       id: ++nextJobId,
@@ -168,6 +200,8 @@ export function enqueueKairoSpeech(
       speechPitch: options.speechPitch,
       azureVoiceId: options.azureVoiceId,
       speaker: options.speaker,
+      ttsTimeoutMs: options.ttsTimeoutMs,
+      onPlaybackStart: options.onPlaybackStart,
       resolve,
       reject,
     };

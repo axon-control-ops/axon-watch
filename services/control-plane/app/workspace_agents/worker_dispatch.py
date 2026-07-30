@@ -176,6 +176,7 @@ def dispatch_continuous_worker_run(
             ),
             actor="workspace_scheduler",
         )
+        heartbeat.start()
         try:
             ide_stream = prepare_worker_ide_stream(
                 workspace_id=workspace_id,
@@ -198,7 +199,6 @@ def dispatch_continuous_worker_run(
                 employee.role,
             )
             ide_stream = None
-        heartbeat.start()
         isolation_root = create_worker_isolation(workspace_id=workspace_id, run_id=run_id)
         agent_root = worker_agent_workspace(isolation_root)
         append_run_execution_receipt(
@@ -226,6 +226,14 @@ def dispatch_continuous_worker_run(
             workspace_root=agent_root,
         )
         reply_text = str(lane_b_result.get("content") or "")
+        from app.workspace_agents.employee_first_person import (
+            rewrite_employee_third_person_to_first,
+        )
+
+        reply_text = rewrite_employee_third_person_to_first(
+            reply_text,
+            str(employee.name or "").strip() or None,
+        )
         scope_guard_detail = parse_out_of_scope_guard(reply_text)
         if scope_guard_detail:
             dispatched = False
@@ -313,7 +321,19 @@ def dispatch_continuous_worker_run(
             phase = str(finalized.get("phase") or "").strip().lower()
             try:
                 if phase == "completed":
-                    task_store.complete_task(task_id, run_id=run_id)
+                    completed = task_store.complete_task(task_id, run_id=run_id)
+                    try:
+                        from app.workspace_agents.task_duplicate_cleanup import (
+                            cleanup_after_task_completed,
+                        )
+
+                        cleanup_after_task_completed(completed)
+                    except Exception:  # noqa: BLE001
+                        logger.exception(
+                            "waiting duplicate cleanup failed for %s task=%s",
+                            run_id,
+                            task_id,
+                        )
                 elif phase == "failed":
                     task_store.fail_task(task_id, run_id=run_id)
             except task_store.TaskLedgerError:

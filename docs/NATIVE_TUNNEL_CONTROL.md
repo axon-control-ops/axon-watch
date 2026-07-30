@@ -20,6 +20,13 @@ arguments or process-state files.
 The local tunnel origin is the Axon-X operator at `http://127.0.0.1:4173`; it
 does not route through the legacy `:7734` service.
 
+The current Cloudflare remote ingress still targets `http://localhost:7734`.
+Axon-X owns that compatibility hop through
+`axon-public-origin-proxy.service`, which forwards `:7734` to `:4173`, listens
+on IPv4 and IPv6 localhost, and restarts automatically after a process crash.
+`scripts/ops/soft-public-cutover.sh` uses the service when installed and only
+falls back to a detached process for development checkouts.
+
 Axon-X writes a process ownership record and log under
 `AXON_WATCH_STATE_DIR/tunnel/`. Start is idempotent. Stop only signals the exact
 process recorded and validated as Axon-X-managed; it refuses to kill an

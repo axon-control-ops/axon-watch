@@ -62,6 +62,14 @@ describe('sanitizeSpokenReply', () => {
     expect(spoken).toContain('42');
   });
 
+  it('speaks readiness scores as percent instead of one hundred one hundred', () => {
+    const spoken = sanitizeSpokenReply(
+      'Production readiness 100/100 (ready) — clear to operate with confidence',
+    );
+    expect(spoken.toLowerCase()).toContain('100 percent');
+    expect(spoken).not.toMatch(/100\s+100/);
+  });
+
   it('keeps clock times with a colon', () => {
     const spoken = sanitizeSpokenReply('Briefing ready at 12:30.');
     expect(spoken).toContain('12:30');
@@ -129,5 +137,39 @@ describe('sanitizeSpokenReply', () => {
     expect(cleaned).toContain('Ready for reproduction.');
     expect(cleaned).not.toMatch(/^\s*2\.\s+/m);
     expect(cleaned).not.toContain('Listen for numbered steps');
+  });
+
+  it('keeps digit+role phrases speakable (4 Lead → four, Lead-team)', () => {
+    const spoken = sanitizeSpokenReply('4 Lead plans awaiting engagement in VAXON.');
+    expect(spoken.toLowerCase()).toContain('four, lead-team');
+    expect(spoken).not.toMatch(/\b4\s+Lead\b/);
+    expect(spoken).toMatch(/Vekson/i);
+    expect(spoken).not.toMatch(/\bVAXON\b/);
+  });
+
+  it('speaks VAXON as Vekson, never letter-by-letter', () => {
+    expect(sanitizeSpokenReply('VAXON is watching.')).toMatch(/^Vekson is watching/i);
+    expect(sanitizeSpokenReply('Engage in V.A.X.O.N now.')).toMatch(/Vekson/i);
+    expect(sanitizeSpokenReply('Say V A X O N clearly.')).toMatch(/Vekson/i);
+    expect(sanitizeSpokenReply('VAXON online.')).not.toMatch(/\bV\s+A\s+X\s+O\s+N\b/);
+  });
+
+  it('speaks Sipho as See-po', () => {
+    expect(sanitizeSpokenReply('Sipho is speaking.')).toMatch(/See-po is speaking/i);
+    expect(sanitizeSpokenReply('Ask Sipho for status.')).not.toMatch(/\bSipho\b/);
+  });
+
+  it('speaks Thabo as Ta-bo while display text remains canonical', () => {
+    expect(formatConversationDisplayReply('Thabo is reporting.')).toBe('Thabo is reporting.');
+    expect(sanitizeSpokenReply('Thabo is reporting.')).toMatch(/^Ta-bo is reporting/i);
+  });
+
+  it('keeps Lead-team hyphen and spells CI for TTS', () => {
+    const spoken = sanitizeSpokenReply(
+      'Four Lead-team plans waiting. DashPro CI failed on main.',
+    );
+    expect(spoken).toMatch(/four, Lead-team/i);
+    expect(spoken).toMatch(/C I/);
+    expect(spoken).not.toMatch(/\bCI\b/);
   });
 });

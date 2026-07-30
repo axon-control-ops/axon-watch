@@ -9,8 +9,10 @@ from app.cli_runtime.catalog import (
 from app.cli_runtime.cursor_models import cursor_runtime_snapshot
 from app.cli_runtime.mcp_registry import runtime_mcp_tools_registry
 from app.cli_runtime.runtime_auth_actions import (
+    logout_claude_runtime,
     logout_codex_runtime,
     logout_cursor_runtime,
+    start_claude_runtime_login,
     start_codex_runtime_login,
     start_cursor_runtime_login,
 )
@@ -47,3 +49,11 @@ def post_cursor_runtime_login_start() -> dict[str, object]:
 
 def post_codex_runtime_login_start() -> dict[str, object]:
     return start_codex_runtime_login()
+
+
+def post_claude_runtime_logout() -> dict[str, object]:
+    return logout_claude_runtime()
+
+
+def post_claude_runtime_login_start() -> dict[str, object]:
+    return start_claude_runtime_login()

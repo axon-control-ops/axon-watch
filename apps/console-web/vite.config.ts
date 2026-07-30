@@ -60,6 +60,27 @@ function resolveOperatorToken(): string {
 
 const operatorToken = resolveOperatorToken();
 
+function resolveAllowedHosts(): string[] {
+  // Vite preview blocks unknown Host headers. Soft-cutover :7734 rewrote Host to
+  // 127.0.0.1; direct Cloudflare ingress to :4173 keeps the public hostname.
+  const hosts = new Set<string>(['localhost', '127.0.0.1', '[::1]', '::1']);
+  const publicBase = (process.env.AXON_WATCH_PUBLIC_BASE_URL || '').trim();
+  if (publicBase) {
+    try {
+      const hostname = new URL(publicBase).hostname.trim().toLowerCase();
+      if (hostname) {
+        hosts.add(hostname);
+      }
+    } catch {
+      // Ignore malformed public base URLs; fall back to explicit defaults.
+    }
+  }
+  hosts.add('axon.edudashpro.org.za');
+  return [...hosts];
+}
+
+const allowedHosts = resolveAllowedHosts();
+
 function injectOperatorAuth(proxyReq: { setHeader: (name: string, value: string) => void }) {
   // Always-on Gate 2: console :4173 → vite /api proxy → CP appears as loopback.
   // With AUTH_ALLOW_LOOPBACK=0 the browser must not rely on loopback bypass;
@@ -79,11 +100,53 @@ const controlPlaneProxy = {
     target: process.env.VITE_CONTROL_PLANE_BASE_URL ?? 'http://127.0.0.1:8787',
     changeOrigin: true,
     ws: true,
+    // Lead decompose / agent Full Access can exceed 20s (model plan + materialize).
+    // Keep aligned with CHAT_MESSAGE_FETCH_TIMEOUT_MS (60s) so Vite does not
+    // kill the socket and the browser reports a bare "Failed to fetch".
+    timeout: 90_000,
+    proxyTimeout: 90_000,
     configure: (proxy: {
       on: (event: string, listener: (...args: unknown[]) => void) => void;
     }) => {
       proxy.on('proxyReq', (proxyReq: unknown) => {
         injectOperatorAuth(proxyReq as { setHeader: (name: string, value: string) => void });
+      });
+      // During axonrestart :8787 is briefly down. Answer 503 instead of
+      // uncaught ECONNREFUSED spam that looks like a permanent outage.
+      proxy.on('error', (err: unknown, _req: unknown, res: unknown) => {
+        const code =
+          err && typeof err === 'object' && 'code' in err
+            ? String((err as { code?: string }).code || '')
+            : '';
+        const message =
+          err instanceof Error ? err.message : typeof err === 'string' ? err : 'proxy error';
+        const socket = res as {
+          writeHead?: (code: number, headers: Record<string, string>) => void;
+          end?: (body?: string) => void;
+          headersSent?: boolean;
+          writableEnded?: boolean;
+        } | undefined;
+        if (
+          socket &&
+          typeof socket.writeHead === 'function' &&
+          typeof socket.end === 'function' &&
+          !socket.headersSent &&
+          !socket.writableEnded
+        ) {
+          socket.writeHead(503, { 'Content-Type': 'application/json' });
+          socket.end(
+            JSON.stringify({
+              detail: 'control-plane unavailable',
+              code: code || 'cp_down',
+              hint: 'Waiting for :8787 — axonrestart/axonrevive if it stays down',
+            }),
+          );
+          return;
+        }
+        if (code === 'ECONNREFUSED' || /ECONNREFUSED/i.test(message)) {
+          // eslint-disable-next-line no-console
+          console.warn('[vite] control-plane :8787 refused — soft 503 (will recover on restart)');
+        }
       });
     },
   },
@@ -103,8 +166,10 @@ export default defineConfig({
     strictPort: true,
     hmr: hmrEnabled,
     proxy: controlPlaneProxy,
+    allowedHosts,
   },
   preview: {
     proxy: controlPlaneProxy,
+    allowedHosts,
   },
 });

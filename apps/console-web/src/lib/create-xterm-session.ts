@@ -38,8 +38,10 @@ export interface XtermSessionController {
   writeMirrorSnapshot: (text: string) => void;
   /** Leave mirror mode and reconnect the agent PTY websocket. */
   exitMirrorMode: () => void;
-  /** Send keystrokes to the live PTY (operator interactive, or agent background continue). */
+  /** Send interactive keystrokes to an operator PTY. */
   writeInput: (data: string) => void;
+  /** Execute a complete command in a read-only agent PTY. */
+  runCommand: (command: string) => void;
 }
 
 interface TerminalServerMessage {
@@ -74,20 +76,23 @@ export async function createXtermSession(
     theme: useMockupTheme
       ? mockupXtermTheme
       : {
-          background: '#050a12',
-          foreground: '#8fa4b8',
-          cursor: '#edf8ff',
-          brightBlack: '#5f7388',
-          brightCyan: '#00f2ff',
+          ...mockupXtermTheme,
+          // Slightly deeper ink for non-mockup hosts while keeping full ANSI.
+          background: '#050f18',
         },
-    fontSize: useMockupTheme ? mockupTerminalFontOptions.fontSize : 15,
-    lineHeight: useMockupTheme ? mockupTerminalFontOptions.lineHeight : 1.25,
+    fontSize: useMockupTheme ? mockupTerminalFontOptions.fontSize : 14,
+    lineHeight: useMockupTheme ? mockupTerminalFontOptions.lineHeight : 1.3,
     fontFamily: useMockupTheme
       ? mockupTerminalFontOptions.fontFamily
-      : 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
+      : mockupTerminalFontOptions.fontFamily,
     cursorBlink: !readOnly,
+    cursorStyle: readOnly ? 'underline' : 'block',
+    cursorWidth: 2,
     convertEol: true,
     disableStdin: readOnly,
+    allowTransparency: false,
+    macOptionIsMeta: true,
+    rightClickSelectsWord: true,
     // Agent mirrors can contain complete build/test logs. Keep enough browser
     // scrollback that full server output remains reviewable instead of silently
     // falling back to xterm's 1,000-line default.
@@ -105,6 +110,7 @@ export async function createXtermSession(
   let inputDisposable: { dispose: () => void } | null = null;
   let pasteDisposable: (() => void) | null = null;
   let pendingInputLine = '';
+  let pendingAgentCommand: string | null = null;
   let mirrorMode = false;
   let lastMirrorText = '';
   let socketSendInput: ((data: string) => void) | null = null;
@@ -233,13 +239,22 @@ export async function createXtermSession(
       };
       socketSendInput = sendInput;
 
-      // Agent tabs stay keyboard-read-only; programmatic writeInput still works for
-      // Continue in background. Operator tabs accept interactive typing + paste.
+      // Agent tabs stay keyboard-read-only; explicit run_command messages still work.
+      // Operator tabs accept interactive typing + paste.
       if (sessionRole !== 'agent') {
         pasteDisposable = attachTerminalPasteHandler(container, sendInput);
         inputDisposable = terminal.onData((data) => {
           sendInput(data);
         });
+      }
+      if (sessionRole === 'agent' && pendingAgentCommand) {
+        nextSocket.send(
+          JSON.stringify({
+            type: 'run_command',
+            command: pendingAgentCommand,
+          }),
+        );
+        pendingAgentCommand = null;
       }
     };
 
@@ -331,12 +346,24 @@ export async function createXtermSession(
       if (mirrorMode) {
         return;
       }
-      // Operator: honor readOnly. Agent: allow programmatic background continue even
-      // when the tab is keyboard-read-only.
-      if (readOnly && attachedSessionRole !== 'agent') {
+      if (readOnly) {
         return;
       }
       socketSendInput?.(data);
+    },
+    runCommand(command: string) {
+      if (mirrorMode || attachedSessionRole !== 'agent') {
+        return;
+      }
+      const trimmed = command.trim();
+      if (!trimmed) {
+        return;
+      }
+      if (!socket || socket.readyState !== WebSocket.OPEN) {
+        pendingAgentCommand = trimmed;
+        return;
+      }
+      socket.send(JSON.stringify({ type: 'run_command', command: trimmed }));
     },
     exitMirrorMode() {
       if (!mirrorMode) {

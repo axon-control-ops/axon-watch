@@ -35,6 +35,17 @@ export type KairoConverseAction =
       model_receipt?: Record<string, unknown> | null;
     }
   | {
+      type: 'lead_fan_out';
+      target_workspace_id: string;
+      task: string;
+      mode?: string | null;
+      tasks?: unknown[];
+      runs?: unknown[];
+      deferred?: unknown[];
+      receipt?: unknown;
+      plan?: unknown;
+    }
+  | {
       type: 'dispatch_command';
       content: string;
     }
@@ -45,6 +56,21 @@ export type KairoConverseAction =
       type: 'move_voice_orb';
       dock?: 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right' | 'center';
       mode?: 'smart_dodge';
+    }
+  | {
+      type: 'switch_workspace';
+      workspace_id: string;
+      open_file_path?: string | null;
+    }
+  | {
+      type: 'start_tunnel';
+      outcome?: string;
+      tunnel?: Record<string, unknown> | null;
+    }
+  | {
+      type: 'clear_stale_ci_alerts';
+      resolved_count?: number;
+      resolved_signal_ids?: string[];
     };
 
 export interface KairoConverseArtifactAction {
@@ -75,6 +101,21 @@ export interface KairoConverseRequest {
   context_workspace_id?: string;
   context_signal_id?: string;
   context_node_id?: string;
+  attachment_ids?: string[];
+}
+
+export interface KairoConverseReportSections {
+  attention: string[];
+  work_in_flight: string[];
+  lead_rollups: string[];
+  fleet: string[];
+  next_move: string;
+}
+
+export interface KairoConverseReport {
+  sections: KairoConverseReportSections;
+  fingerprint?: string | null;
+  lane?: string | null;
 }
 
 export interface KairoConverseResponse {
@@ -92,6 +133,8 @@ export interface KairoConverseResponse {
   model_receipt?: Record<string, unknown> | null;
   action: KairoConverseAction | null;
   artifacts: KairoConverseArtifact[];
+  /** Structured stand-up payload for command-theater overlay. */
+  report?: KairoConverseReport | null;
 }
 
 export async function postKairoConverse(body: KairoConverseRequest): Promise<KairoConverseResponse> {

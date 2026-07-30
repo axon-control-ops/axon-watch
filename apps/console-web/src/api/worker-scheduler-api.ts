@@ -17,6 +17,11 @@ export interface WorkerSchedulerStatus {
   updated_at?: string | null;
   stopped_run_ids?: string[];
   stop_errors?: Array<{ run_id: string; error: string }>;
+  /** Idle ticks never invoke Cursor CLI; only dispatched shifts bill usage. */
+  cursor_usage_on_idle_tick?: boolean;
+  cursor_usage_policy?: 'dispatch_only' | string;
+  hard_killed?: boolean;
+  resumed?: boolean;
 }
 
 export interface WorkerSchedulerPatch {
@@ -59,6 +64,22 @@ export function stopActiveWorkerRuns(): Promise<WorkerSchedulerStatus> {
     '/api/worker-scheduler/stop-active',
     { method: 'POST' },
     'stop active workers request failed',
+  );
+}
+
+export function hardKillWorkerScheduler(): Promise<WorkerSchedulerStatus> {
+  return fetchJson<WorkerSchedulerStatus>(
+    '/api/worker-scheduler/hard-kill',
+    { method: 'POST' },
+    'hard-kill worker scheduler request failed',
+  );
+}
+
+export function resumeWorkerScheduler(): Promise<WorkerSchedulerStatus> {
+  return fetchJson<WorkerSchedulerStatus>(
+    '/api/worker-scheduler/resume',
+    { method: 'POST' },
+    'resume worker scheduler request failed',
   );
 }
 

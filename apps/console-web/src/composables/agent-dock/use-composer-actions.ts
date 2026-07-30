@@ -20,12 +20,17 @@ import {
   undoEmployeeSpecialtyRoute,
 } from '../../lib/apply-employee-specialty-route';
 import { shouldSoftSwitchAgentToPlan } from '../../lib/composer-plan-auto-switch';
+import {
+  matchNamedAssignEmployee,
+  rewriteNamedAssignPrompt,
+} from '../../lib/named-assign-route';
 import { resolveEmployeeSpecialtyRoute } from '../../lib/resolve-employee-specialty-route';
 import { DEBUG_REPRODUCE_PROCEED_MESSAGE } from '../../lib/debug-reproduce-view';
 import {
   findIdeComposerQueueEntry,
   type IdeComposerMode,
 } from '../../lib/ide-composer-queue';
+import { persistIdeComposerDraft } from '../../lib/ide-composer-draft-prefs';
 import { focusAgentDockComposerInput } from '../../lib/agent-dock-composer-focus';
 import {
   type TeammateRouteNotice,
@@ -145,6 +150,7 @@ export function useComposerActions(options: UseComposerActionsOptions) {
     }
     if (composerMode.value === 'kairo') {
       await submitKairoTurn(draft);
+      recordComposerHistoryIfSent(draft);
       return;
     }
     let modeForSubmit: IdeComposerMode = composerMode.value;
@@ -174,27 +180,52 @@ export function useComposerActions(options: UseComposerActionsOptions) {
 
     dismissEmployeeSpecialtyRoute();
     const workspaceId = shell.currentWorkspace?.workspace_id ?? '';
-    const submitStartedAt = Date.now();
+    const originThreadId = shell.activeIdeThreadId;
+    // Capture attachments before specialty route swaps the thread image scope.
+    const attachmentFiles = composerImages.value.map((image) => image.file);
     // Deterministic specialty route only on the send path. Model tie-break runs a
     // full ask-mode composer call (up to 45s) and was blocking Enter/send before
     // the real agent run started.
+    const roster = shell.companyEmployeesForCurrentWorkspace;
+    const namedAssign = matchNamedAssignEmployee(submitDraft, roster);
     const routeDecision = await resolveEmployeeSpecialtyRoute({
       prompt: submitDraft,
       workspaceId,
       currentEmployee: shell.activeIdeEmployeeRecord,
-      roster: shell.companyEmployeesForCurrentWorkspace,
+      roster,
       useModelTiebreak: false,
     });
-    const routeMs = Date.now() - submitStartedAt;
+    let routed = false;
     if (routeDecision.shouldRoute) {
-      await applyEmployeeSpecialtyRoute(shell, routeDecision);
+      const applied = await applyEmployeeSpecialtyRoute(shell, routeDecision);
+      routed = applied.routed;
     }
-    const applyMs = Date.now() - submitStartedAt;
+    const shouldRewriteNamedAssign =
+      Boolean(namedAssign) &&
+      (routed ||
+        (routeDecision.reason === 'already_owning' &&
+          routeDecision.employee?.employee_id === namedAssign?.employee.employee_id));
+    const routedPrompt =
+      shouldRewriteNamedAssign && namedAssign
+        ? rewriteNamedAssignPrompt(submitDraft, namedAssign.employee.name)
+        : submitDraft;
 
-    const attachmentFiles = composerImages.value.map((image) => image.file);
-    // openOrFocusEmployeeIdeThread may clear/restore drafts — keep the routed prompt.
-    shell.ideComposerDraft = submitDraft;
-    await shell.submitIdeComposer(modeForSubmit, { attachmentFiles });
+    // Never park the prompt on the destination tab — that bled drafts across agents
+    // when submit failed or the operator switched threads mid-flight.
+    const submitted = await shell.submitIdeComposer(modeForSubmit, {
+      attachmentFiles,
+      contentOverride: routedPrompt,
+    });
+    if (!submitted) {
+      if (originThreadId && shell.activeIdeThreadId !== originThreadId) {
+        await shell.selectIdeThread(originThreadId);
+      }
+      shell.ideComposerDraft = submitDraft;
+      return;
+    }
+    if (routed && originThreadId && workspaceId) {
+      persistIdeComposerDraft(workspaceId, '', originThreadId);
+    }
     clearSkillAttachments?.();
     recordComposerHistoryIfSent(draft);
   }
@@ -227,9 +258,15 @@ export function useComposerActions(options: UseComposerActionsOptions) {
       return;
     }
     composerMode.value = 'plan';
-    shell.ideComposerDraft = pending;
     const attachmentFiles = composerImages.value.map((image) => image.file);
-    await shell.submitIdeComposer('plan', { attachmentFiles });
+    const submitted = await shell.submitIdeComposer('plan', {
+      attachmentFiles,
+      contentOverride: pending,
+    });
+    if (!submitted) {
+      shell.ideComposerDraft = pending;
+      return;
+    }
     clearSkillAttachments?.();
     recordComposerHistoryIfSent(pending);
   }
@@ -245,22 +282,47 @@ export function useComposerActions(options: UseComposerActionsOptions) {
       return;
     }
     composerMode.value = 'agent';
-    shell.ideComposerDraft = pending;
     dismissEmployeeSpecialtyRoute();
     const workspaceId = shell.currentWorkspace?.workspace_id ?? '';
+    const originThreadId = shell.activeIdeThreadId;
+    const attachmentFiles = composerImages.value.map((image) => image.file);
+    const roster = shell.companyEmployeesForCurrentWorkspace;
+    const namedAssign = matchNamedAssignEmployee(pending, roster);
     const routeDecision = await resolveEmployeeSpecialtyRoute({
       prompt: pending,
       workspaceId,
       currentEmployee: shell.activeIdeEmployeeRecord,
-      roster: shell.companyEmployeesForCurrentWorkspace,
+      roster,
       useModelTiebreak: false,
     });
+    let routed = false;
     if (routeDecision.shouldRoute) {
-      await applyEmployeeSpecialtyRoute(shell, routeDecision);
+      const applied = await applyEmployeeSpecialtyRoute(shell, routeDecision);
+      routed = applied.routed;
     }
-    const attachmentFiles = composerImages.value.map((image) => image.file);
-    shell.ideComposerDraft = pending;
-    await shell.submitIdeComposer('agent', { attachmentFiles });
+    const shouldRewriteNamedAssign =
+      Boolean(namedAssign) &&
+      (routed ||
+        (routeDecision.reason === 'already_owning' &&
+          routeDecision.employee?.employee_id === namedAssign?.employee.employee_id));
+    const routedPrompt =
+      shouldRewriteNamedAssign && namedAssign
+        ? rewriteNamedAssignPrompt(pending, namedAssign.employee.name)
+        : pending;
+    const submitted = await shell.submitIdeComposer('agent', {
+      attachmentFiles,
+      contentOverride: routedPrompt,
+    });
+    if (!submitted) {
+      if (originThreadId && shell.activeIdeThreadId !== originThreadId) {
+        await shell.selectIdeThread(originThreadId);
+      }
+      shell.ideComposerDraft = pending;
+      return;
+    }
+    if (routed && originThreadId && workspaceId) {
+      persistIdeComposerDraft(workspaceId, '', originThreadId);
+    }
     clearSkillAttachments?.();
     recordComposerHistoryIfSent(pending);
   }

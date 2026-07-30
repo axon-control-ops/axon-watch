@@ -19,7 +19,7 @@
         {
           "name": "Mira",
           "role": "lead",
-          "owns": "priorities, handoffs, product direction, and Fast Gate triage for axon-watch",
+          "owns": "Axon-X priorities; fleet hierarchy; Fast Gate triage; coach workspace leads; propose upgrades",
           "schedule": "on_demand",
           "primary": true,
           "azure_voice_id": "en-GB-SoniaNeural"
@@ -60,7 +60,7 @@
         {
           "name": "Dana",
           "role": "lead",
-          "owns": "DashPro product priorities, CI triage decisions, and handoffs",
+          "owns": "DashPro priorities; monitor CI→PR→main; ensure green builds reach Vercel production; coach upgrades",
           "schedule": "on_demand",
           "primary": true,
           "azure_voice_id": "en-US-AriaNeural"
@@ -68,7 +68,7 @@
         {
           "name": "Cass",
           "role": "watcher",
-          "owns": "DashPro signals, runtime health, and CI red-build alerts",
+          "owns": "DashPro signals, runtime/public health, CI red builds, and Vercel deploy unhealthy alerts",
           "schedule": "always_on",
           "azure_voice_id": "en-US-DavisNeural"
         },
@@ -89,19 +89,19 @@
         {
           "name": "Soren",
           "role": "integrations",
-          "owns": "DashPro connectors, GitHub Actions, runner/SDK/secrets CI wiring",
+          "owns": "DashPro GitHub Actions, Vercel linkage, secrets/CI wiring, and production deploy readiness",
           "schedule": "continuous",
           "azure_voice_id": "en-US-SaraNeural"
         }
       ]
     },
     "workspace_edudashpro_school": {
-      "company_name": "EduDash PRO School of Excellence",
+      "company_name": "EDP Excellence",
       "employees": [
         {
           "name": "Lindi",
           "role": "lead",
-          "owns": "Centre priorities, Aftercare/Preschool planning order, and handoffs",
+          "owns": "EDP Excellence priorities; Aftercare G1–7 (G8–12 later); Preschool; monitor shifts; propose upgrades; handoffs",
           "schedule": "on_demand",
           "primary": true,
           "azure_voice_id": "en-ZA-LeahNeural"
@@ -130,7 +130,7 @@
         {
           "name": "Amara",
           "role": "integrations",
-          "owns": "EduDash PRO product linkage notes for the centre",
+          "owns": "EduDash Pro / DashPro app literacy for the centre; keep product linkage notes current",
           "schedule": "continuous",
           "azure_voice_id": "en-GB-HollieNeural"
         }

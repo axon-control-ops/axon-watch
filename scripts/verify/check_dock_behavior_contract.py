@@ -48,6 +48,13 @@ def validate_dock_behavior_contract(*, spec: dict[str, object] | None = None) ->
     agent_dock = (REPO_ROOT / "apps/console-web/src/components/ide/AgentDock.vue").read_text(
         encoding="utf-8"
     )
+    conversation_seam = (
+        REPO_ROOT / "apps/console-web/src/components/ConversationSeamPanel.vue"
+    ).read_text(encoding="utf-8")
+    sticky_prompt_css = (
+        REPO_ROOT
+        / "apps/console-web/src/components/ide/agent-dock/agent-dock-sticky-prompt.css"
+    ).read_text(encoding="utf-8")
     app_vue = (REPO_ROOT / "apps/console-web/src/App.vue").read_text(encoding="utf-8")
 
     operator_markers = spec.get("operator_mode_markers", {})
@@ -79,6 +86,30 @@ def validate_dock_behavior_contract(*, spec: dict[str, object] | None = None) ->
             status="fail",
             message=f"AgentDock missing thread section meta marker: {thread_meta}",
         )
+    for marker in (
+        "conversation-seam__operator-turn",
+        "show-resend",
+    ):
+        if marker not in conversation_seam:
+            return CheckResult(
+                name="dock_behavior",
+                status="fail",
+                message=f"AgentDock operator message missing action marker: {marker}",
+            )
+    for marker in (
+        "@media (hover: hover) and (pointer: fine)",
+        ".agent-dock-sticky-prompt:hover",
+        ".agent-dock-sticky-prompt--active",
+        ".conversation-seam__operator-turn:hover",
+        ".conversation-seam__operator-turn:focus-within",
+        "opacity: 0",
+    ):
+        if marker not in sticky_prompt_css:
+            return CheckResult(
+                name="dock_behavior",
+                status="fail",
+                message=f"AgentDock operator hover actions missing CSS marker: {marker}",
+            )
 
     prefs = (REPO_ROOT / "apps/console-web/src/lib/ide-layout-prefs.ts").read_text(encoding="utf-8")
     collapsed_key = str(spec.get("agent_dock_collapsed_storage_key", ""))

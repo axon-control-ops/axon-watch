@@ -4,6 +4,7 @@ import {
   fetchCursorRuntimeStatus,
   type CursorRuntimeStatusSnapshot,
 } from '../../../api/control-plane';
+import { saveWorkspaceComposerPrefs } from '../../../api/workspace-api';
 import {
   resolveCursorComposerModel,
   type CursorCatalogRow,
@@ -25,6 +26,16 @@ interface CreateCursorCatalogSliceInput {
 }
 
 export function createCursorCatalogSlice(input: CreateCursorCatalogSliceInput) {
+  function syncWorkspaceComposerPrefsToServer(modelId: string): void {
+    const workspaceId = input.currentWorkspaceId();
+    if (!workspaceId) {
+      return;
+    }
+    void saveWorkspaceComposerPrefs(workspaceId, {
+      cursor_cli_model: modelId.trim() || 'auto',
+    }).catch(() => undefined);
+  }
+
   function migrateCursorComposerModelIfNeeded(): void {
     const workspaceId = input.currentWorkspaceId();
     if (!workspaceId) {
@@ -33,14 +44,15 @@ export function createCursorCatalogSlice(input: CreateCursorCatalogSliceInput) {
     const prefs = readComposerRuntimePrefs(workspaceId);
     const stored = prefs.cursor_cli_model?.trim();
     if (!stored || stored === 'auto') {
+      syncWorkspaceComposerPrefsToServer(stored || 'auto');
       return;
     }
     const resolved = resolveCursorComposerModel(stored, input.cursorCatalogRows.value);
-    if (resolved === stored) {
-      return;
+    if (resolved !== stored) {
+      writeComposerRuntimePrefs(workspaceId, { cursor_cli_model: resolved });
+      input.composerRuntimePrefsRevision.value += 1;
     }
-    writeComposerRuntimePrefs(workspaceId, { cursor_cli_model: resolved });
-    input.composerRuntimePrefsRevision.value += 1;
+    syncWorkspaceComposerPrefsToServer(resolved);
   }
 
   async function loadCursorCatalog(forceRefresh = false): Promise<void> {

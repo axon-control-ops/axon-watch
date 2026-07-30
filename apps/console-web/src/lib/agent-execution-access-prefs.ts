@@ -72,6 +72,6 @@ export function agentExecutionAccessLabel(value: AgentExecutionAccess): string {
 
 export function agentExecutionAccessHint(value: AgentExecutionAccess): string {
   return value === 'full'
-    ? 'Tool execution after operator approval (Cursor agent / Codex write)'
+    ? 'Tool execution without per-run approval (Cursor agent / Codex write)'
     : 'Read-only answers; no file edits or shell tools';
 }

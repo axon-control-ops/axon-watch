@@ -32,6 +32,8 @@ export interface StatusBarZoneItem {
   id: string;
   label: string;
   tone?: 'default' | 'success' | 'warning' | 'brand';
+  title?: string;
+  ariaLabel?: string;
 }
 
 export interface StatusBarZones {
@@ -421,6 +423,6 @@ export function buildStatusBarZones(input: {
   return {
     left,
     center,
-    right: [{ id: 'workspace', label: `WORKSPACE: ${workspaceLabel}`, tone: 'default' }],
+    right: [],
   };
 }

@@ -23,6 +23,7 @@ import type { GalaxyMockupRailItem } from '../../features/brain-galaxy/galaxy-mo
 import { setBrainGalaxyConversationFocus } from '../../features/brain-galaxy/brain-galaxy-focus';
 import { resolveBrainGalaxyNodeSelection } from '../../features/brain-galaxy/brain-galaxy-node-selection';
 import { useGalaxySpeechWorkspaceCollapse } from '../../features/brain-galaxy/use-galaxy-speech-workspace-collapse';
+import { useOperatorBrainGalaxyPresence } from '../../features/brain-galaxy/use-operator-brain-galaxy-presence';
 import {
   brainGraphHeadline,
   type BrainGraphNode,
@@ -51,6 +52,7 @@ const galaxyStage = ref<HTMLElement | null>(null);
 const bottomHud = ref<HTMLElement | null>(null);
 const legendOpen = ref(false);
 let bottomHudObserver: ResizeObserver | null = null;
+const presenceInputs = useOperatorBrainGalaxyPresence(shell);
 
 const {
   widths: galaxyPanelWidths,
@@ -121,25 +123,15 @@ function handleNodeClick(node: BrainGraphNode): void {
   setBrainGalaxyConversationFocus(selection.focus);
 }
 
-const pendingApprovals = computed(
-  () =>
-    shell.operatorBriefing?.pending_approvals.count ??
-    shell.runtimeSummary?.approvals.pending_count ??
-    0,
-);
-const criticalSignals = computed(
-  () =>
-    shell.operatorBriefing?.top_signals.filter((signal) => signal.severity === 'critical').length ??
-    0,
-);
-const highSignals = computed(
-  () =>
-    shell.operatorBriefing?.top_signals.filter((signal) => signal.severity === 'high').length ?? 0,
-);
+const pendingApprovals = presenceInputs.pendingApprovals;
+const criticalSignals = presenceInputs.criticalSignals;
+const highSignals = presenceInputs.highSignals;
 const speechCapturing = kairoCaptureCapturing;
-const kairoSpeechActive = computed(() => shell.kairoSpeechActive);
-const agentStreamActive = computed(() => shell.agentStreamActive);
-const streamWorkspaceId = computed(() => shell.currentWorkspace?.workspace_id ?? null);
+const kairoSpeechActive = presenceInputs.kairoSpeechActive;
+const agentStreamActive = presenceInputs.agentStreamActive;
+const companyBusyCount = presenceInputs.companyBusyCount;
+const fleetActiveRuns = presenceInputs.fleetActiveRuns;
+const streamWorkspaceId = presenceInputs.streamWorkspaceId;
 useGalaxySpeechWorkspaceCollapse({
   kairoSpeechActive,
   setSpeechCollapseActive: setGalaxySpeechCollapseActive,
@@ -175,6 +167,8 @@ const {
   kairoSpeechActive,
   agentStreamActive,
   streamWorkspaceId,
+  companyBusyCount,
+  fleetActiveRuns,
   pendingApprovals,
   criticalSignals,
   highSignals,

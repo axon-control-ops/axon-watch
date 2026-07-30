@@ -1,6 +1,6 @@
 import type { KairoNarrationLevel } from '../contracts/canonical';
 
-import { narrationForCompletion } from './kairo-agent-narration';
+import { narrationForCompletion, isProgressOrIntentSentence } from './kairo-agent-narration';
 import type { NarrationMilestone } from './kairo-agent-narration';
 import { createKairoAgentMilestoneNarrator } from './kairo-agent-milestone-narrator';
 import {
@@ -11,7 +11,7 @@ import { isToolCapableComposerMode } from './composer-tool-modes';
 import { createKairoProgressNarrator } from './kairo-progress-narrator';
 import {
   isWaitProgressThinking,
-  stripAgentStreamFenceMarkers,
+  sanitizeAgentThinkingForOperator,
   thinkingSpeechSimilarity,
 } from './agent-live-line-view';
 import {
@@ -23,7 +23,7 @@ import {
   createKairoThinkingSpeechThrottle,
   TOOL_MILESTONE_INTERVAL_MS,
 } from './kairo-narration-throttle';
-import { dropWaitingKairoNarration } from './kairo-voice-queue';
+import { dropWaitingKairoNarration, stopActiveKairoNarration } from './kairo-voice-queue';
 import type { KairoVoiceSpeaker } from './kairo-voice-utterance';
 
 type Narrator = ReturnType<typeof createKairoAgentMilestoneNarrator>;
@@ -34,6 +34,8 @@ export type ChatStreamVoiceNarration = {
   progressNarrator: ProgressNarrator | null;
   agentMilestoneNarrator: Narrator | null;
   answerNarrator: Narrator | null;
+  /** Reserved: start bookend is model-only (no canned UI ack). */
+  speakStartBookend: () => boolean;
   maybeSpeakThinkingBlock: (spokenBlock: string) => boolean;
   narrateAgentMilestone: (
     milestone: NarrationMilestone,
@@ -119,9 +121,53 @@ export function createChatStreamVoiceNarration(input: {
     dropWaitingKairoNarration('stale_run_advance');
   }
 
+  /** Stream ended — never leave mid-run intent TTS playing after Done/ask. */
+  function clearMidRunSpeechForStreamEnd(): void {
+    agentMilestoneNarrator?.cancel();
+    progressNarrator?.cancel();
+    stopActiveKairoNarration('stream_complete');
+  }
+
+  function speakVerbatimStart(line: string): boolean {
+    const message = line.trim();
+    if (
+      !toolNarrationEnabled ||
+      !message ||
+      thinkingThrottle.spokenCount() > 0 ||
+      input.narration() === 'off' ||
+      !input.voiceDeliveryAllowed()
+    ) {
+      return false;
+    }
+    cancelStaleNarration();
+    agentMilestoneNarrator?.narrate({
+      key: 'start',
+      message,
+      verbatim: true,
+    });
+    thinkingThrottle.recordSpoken();
+    thinkingCarriesUpdate = true;
+    lastSpokenThinking = message;
+    return true;
+  }
+
+  function speakStartBookend(): boolean {
+    // No canned ack — wait for the model's first live thinking/reply line.
+    return false;
+  }
+
   function maybeSpeakThinkingBlock(spokenBlock: string): boolean {
-    const cleaned = stripAgentStreamFenceMarkers(spokenBlock);
-    if (!toolNarrationEnabled || !cleaned) {
+    if (!toolNarrationEnabled) {
+      return false;
+    }
+    const cleaned = sanitizeAgentThinkingForOperator(spokenBlock, {
+      speakerName: speaker?.()?.name ?? null,
+    });
+    // First breath: only real model text — never a console template.
+    if (thinkingThrottle.spokenCount() === 0) {
+      return cleaned ? speakVerbatimStart(cleaned) : false;
+    }
+    if (!cleaned) {
       return false;
     }
     const waitProgress = isWaitProgressThinking(cleaned);
@@ -143,10 +189,8 @@ export function createChatStreamVoiceNarration(input: {
       return false;
     }
     cancelStaleNarration();
-    const milestoneKey =
-      thinkingThrottle.spokenCount() === 0 ? 'start' : `thinking:${thinkingThrottle.spokenCount()}`;
     agentMilestoneNarrator?.narrate({
-      key: milestoneKey,
+      key: `thinking:${thinkingThrottle.spokenCount()}`,
       message: cleaned,
       verbatim: true,
     });
@@ -211,7 +255,20 @@ export function createChatStreamVoiceNarration(input: {
   function narrateCompletion(finalContent: string): void {
     const completion = narrationForCompletion(finalContent);
     if (toolNarrationEnabled) {
-      cancelStaleNarration();
+      // Always drain mid-run TTS first so "I am checking…" cannot speak after Done/ask.
+      clearMidRunSpeechForStreamEnd();
+      // Thinking already carried the "what I'll do" plan mid-run. Do not re-speak a
+      // progress opener after the roster is IDLE — unless this is an ask/reproduce cue.
+      if (
+        completion.key === 'done' &&
+        thinkingCarriesUpdate &&
+        !completion.verbatim &&
+        (isProgressOrIntentSentence(completion.message) ||
+          completion.message === 'Done' ||
+          completion.message === 'Shift complete.')
+      ) {
+        return;
+      }
       agentMilestoneNarrator?.narrate(completion);
       return;
     }
@@ -224,6 +281,8 @@ export function createChatStreamVoiceNarration(input: {
     ) {
       return;
     }
+    answerNarrator?.cancel();
+    stopActiveKairoNarration('stream_complete');
     answerNarrator?.narrate({
       ...completion,
       verbatim: true,
@@ -240,7 +299,7 @@ export function createChatStreamVoiceNarration(input: {
         : { key: 'failed' as const, message: errorSummary || 'Failed' };
 
     if (toolNarrationEnabled) {
-      cancelStaleNarration();
+      clearMidRunSpeechForStreamEnd();
       agentMilestoneNarrator?.narrate(failure);
       return;
     }
@@ -253,6 +312,8 @@ export function createChatStreamVoiceNarration(input: {
     ) {
       return;
     }
+    answerNarrator?.cancel();
+    stopActiveKairoNarration('stream_complete');
     answerNarrator?.narrate({
       ...failure,
       verbatim: true,
@@ -264,6 +325,7 @@ export function createChatStreamVoiceNarration(input: {
     progressNarrator,
     agentMilestoneNarrator,
     answerNarrator,
+    speakStartBookend,
     maybeSpeakThinkingBlock,
     narrateAgentMilestone,
     narrateProgress,

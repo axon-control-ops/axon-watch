@@ -8,7 +8,7 @@ import {
   buildIdeThreadFailureDetailTooltipMap,
   buildIdeThreadFailureHintMap,
 } from '../../features/workspace-agents/active-ide-employee';
-import { employeeIsActivelyBusy } from '../../features/workspace-agents/company-roster-view';
+import { resolveLiveBusyEmployeeIds } from '../../features/workspace-agents/company-roster-view';
 import {
   ideThreadMenuMeta,
   sortIdeThreadsNewestFirst,
@@ -27,23 +27,18 @@ const openTabs = computed(() => shell.openIdeThreadTabsForCurrentWorkspace);
 const allThreads = computed(() =>
   sortIdeThreadsNewestFirst(shell.ideThreadsForCurrentWorkspace),
 );
-const liveBusyEmployeeIds = computed(() => {
-  const ids = new Set<string>();
-  for (const row of shell.companyEmployeesForCurrentWorkspace) {
-    if (employeeIsActivelyBusy(row)) {
-      ids.add(row.employee_id);
-    }
-  }
-  if (shell.agentStreamActive) {
-    const threadEmployeeId = shell.activeIdeThread?.employee_id?.trim();
-    const recordEmployeeId = shell.activeIdeEmployeeRecord?.employee_id?.trim();
-    const streamOwnerId = threadEmployeeId || recordEmployeeId;
-    if (streamOwnerId) {
-      ids.add(streamOwnerId);
-    }
-  }
-  return [...ids];
-});
+const liveBusyEmployeeIds = computed(() =>
+  resolveLiveBusyEmployeeIds({
+    employees: shell.companyEmployeesForCurrentWorkspace,
+    streamingThreadIds: shell.streamingIdeThreadIds,
+    threads: shell.ideThreadsForCurrentWorkspace,
+    focusedStreamEmployeeId: shell.agentStreamActive
+      ? shell.activeIdeThread?.employee_id?.trim() ||
+        shell.activeIdeEmployeeRecord?.employee_id?.trim() ||
+        null
+      : null,
+  }),
+);
 const threadFailureHintById = computed(() =>
   buildIdeThreadFailureHintMap({
     threads: allThreads.value,
@@ -260,7 +255,7 @@ onUnmounted(() => {
           busyThreadIds.has(thread.thread_id)
             ? `Busy — ${threadDisplayTitle(thread)}`
             : threadFailureHintById.get(thread.thread_id)
-              ? `Last shift failed — ${threadDisplayTitle(thread)}`
+              ? `Last job failed — ${threadDisplayTitle(thread)}`
               : threadDisplayTitle(thread)
         "
         :title="
@@ -286,7 +281,7 @@ onUnmounted(() => {
           v-else-if="threadFailureHintById.has(thread.thread_id)"
           class="agent-dock-thread-tabbar__tab-fail-mark"
           aria-hidden="true"
-          title="Last shift failed"
+          title="Last job failed"
         >
           !
         </span>
@@ -364,7 +359,7 @@ onUnmounted(() => {
             :aria-selected="activeThreadId === thread.thread_id"
             :aria-label="
               threadFailureHintById.get(thread.thread_id)
-                ? `Last shift failed — ${threadDisplayTitle(thread)}`
+                ? `Last job failed — ${threadDisplayTitle(thread)}`
                 : busyThreadIds.has(thread.thread_id)
                   ? `Busy — ${threadDisplayTitle(thread)}`
                   : threadDisplayTitle(thread)

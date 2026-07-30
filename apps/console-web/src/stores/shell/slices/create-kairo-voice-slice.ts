@@ -22,6 +22,7 @@ import {
 import { buildKairoSpeechSessionId } from '../../../lib/kairo-speech-session';
 import { ideVoiceSpeechAllowed } from '../../../lib/ide-voice-strip';
 import { postKairoSpeak } from '../../../lib/kairo-speak-client';
+import type { LiveEventPayload } from '../../../lib/live-events-session';
 import {
   onKairoVoiceIdle,
   pauseKairoPlayback,
@@ -31,6 +32,9 @@ import {
   subscribeKairoVoiceSpeaking,
   isKairoVoiceSpeaking,
 } from '../../../lib/kairo-voice-playback';
+import { reportTheaterOpen } from '../../../features/report-theater/report-theater-state';
+import { isReportTheaterAutoStartPending } from '../../../features/report-theater/report-theater-auto-start';
+import { navigateToAppSurface } from '../../../lib/app-surface-route';
 import {
   flushKairoSpeechQueue,
   interruptKairoSpeechQueue,
@@ -48,6 +52,7 @@ import { scheduleBriefingSurfaceOffer } from '../../../features/kairo-conversati
 import { resolveKairoPresenceClickTarget } from '../../../lib/kairo-presence-action';
 import type { LayoutMode } from '../types';
 import type { IdeComposerActivity } from '../../../lib/agent-dock-activity-view';
+import { speakSpokenLineEvent } from './kairo-voice-spoken-line';
 
 interface CreateKairoVoiceSliceInput {
   currentWorkspace: Ref<WorkspaceRecord | null>;
@@ -69,6 +74,7 @@ interface CreateKairoVoiceSliceInput {
   currentThreadSurface: () => 'operator' | 'ide';
   focusAttentionSidebar: () => void;
   focusKairoBriefing: () => void;
+  focusCommandSeam?: () => void;
 }
 
 export function createKairoVoiceSlice(input: CreateKairoVoiceSliceInput) {
@@ -114,7 +120,11 @@ export function createKairoVoiceSlice(input: CreateKairoVoiceSliceInput) {
   }
 
   function interruptKairoVoice(): void {
-    void interruptKairoSpeechQueue('barge_in');
+    void interruptKairoVoiceAndWait();
+  }
+
+  async function interruptKairoVoiceAndWait(): Promise<void> {
+    await interruptKairoSpeechQueue('barge_in');
     input.kairoVoicePaused.value = false;
     if (kairoConversationPhase.value === 'speaking') {
       setKairoConversationPhase('idle');
@@ -128,6 +138,10 @@ export function createKairoVoiceSlice(input: CreateKairoVoiceSliceInput) {
       skipSpeakApi?: boolean;
       azureVoiceId?: string | null;
       speaker?: KairoVoiceSpeaker | null;
+      priority?: 'interrupt' | 'alert' | 'conversation' | 'narration';
+      allowDuringReportTheater?: boolean;
+      ttsTimeoutMs?: number;
+      onPlaybackStart?: () => void;
     },
   ): Promise<void> {
     const trimmed = line.trim();
@@ -138,12 +152,12 @@ export function createKairoVoiceSlice(input: CreateKairoVoiceSliceInput) {
       input.operatorPresenceSettings.value.privacy_mode ||
       configuredNarration === 'off'
     ) {
+      options?.onPlaybackStart?.();
       if (kairoConversationPhase.value === 'thinking') {
         setKairoConversationPhase('idle');
       }
       return;
     }
-
     setKairoConversationPhase('speaking');
     input.kairoVoicePaused.value = false;
     let message = trimmed;
@@ -190,11 +204,14 @@ export function createKairoVoiceSlice(input: CreateKairoVoiceSliceInput) {
           }
         : vaxonVoiceSpeaker());
     const playback = await speakKairoLine(message, {
-      priority: 'conversation',
+      priority: options?.priority ?? 'conversation',
       speechRate: input.operatorPresenceSettings.value.speech_rate,
       speechPitch: input.operatorPresenceSettings.value.speech_pitch,
       azureVoiceId: options?.azureVoiceId?.trim() || undefined,
       speaker,
+      allowDuringReportTheater: options?.allowDuringReportTheater === true,
+      ttsTimeoutMs: options?.ttsTimeoutMs,
+      onPlaybackStart: options?.onPlaybackStart,
     });
   }
 
@@ -230,9 +247,16 @@ export function createKairoVoiceSlice(input: CreateKairoVoiceSliceInput) {
     input.focusKairoBriefing();
   }
 
-
   async function deliverKairoSpokenAlert(alert: SpokenAlertEligibility): Promise<void> {
     if (!voiceDeliveryAllowed()) {
+      return;
+    }
+    // Command theater owns the voice queue — do not barge in with alerts/advisories.
+    if (reportTheaterOpen.value) {
+      return;
+    }
+    // Full autonomy just kicked off REPORT — let theater speak and act instead of a passive brief.
+    if (alert.reason === 'autonomy_advisory' && isReportTheaterAutoStartPending()) {
       return;
     }
     if (!alert.eligible || !input.operatorPresenceSettings.value.spoken_alerts_enabled) {
@@ -247,6 +271,9 @@ export function createKairoVoiceSlice(input: CreateKairoVoiceSliceInput) {
 
     let eventType = 'alert';
     const topSignal = input.operatorBriefing.value?.top_signals[0];
+    const strippedAlertMessage = alert.message
+      .replace(/^(?:VAXON|NAXON|X|KAIRO):\s*/i, '')
+      .trim();
     const context: Record<string, unknown> = {
       fallback: alert.message,
       pending_approvals: input.pendingApprovalsCount.value,
@@ -258,12 +285,17 @@ export function createKairoVoiceSlice(input: CreateKairoVoiceSliceInput) {
       degraded_active: Boolean(input.runtimeSummary.value?.degraded.active),
     };
 
-    if (alert.reason === 'operator_approval_required') {
+    // Speak control-plane crafted copy literally — do not rebuild idle persona filler.
+    if (
+      alert.reason === 'operator_approval_required' ||
+      alert.reason === 'autonomy_advisory'
+    ) {
       eventType = 'approval_literal';
-      context.literal_line = alert.message.replace(/^(?:VAXON|NAXON|X|KAIRO):\s*/i, '').trim();
+      context.literal_line = strippedAlertMessage;
     }
 
     let message = '';
+    let speakSource = '';
     try {
       const response = await postKairoSpeak({
         event_type: eventType,
@@ -271,16 +303,23 @@ export function createKairoVoiceSlice(input: CreateKairoVoiceSliceInput) {
         session_id: kairoSpeechSessionId(),
         workspace_id: input.currentWorkspace.value?.workspace_id ?? '',
         narration: input.effectiveKairoNarrationLevel.value,
+        use_runtime: eventType !== 'approval_literal',
       });
       if (response.source === 'skipped' || !response.line?.trim()) {
         return;
       }
       message = response.line.trim();
+      speakSource = response.source;
     } catch {
       return;
     }
 
-    void deliverSpokenOperatorAlert(
+    // Drop in-flight alerts that started before Command Theater opened.
+    if (reportTheaterOpen.value) {
+      return;
+    }
+
+    await deliverSpokenOperatorAlert(
       {
         eligible: true,
         reason: alert.reason,
@@ -290,6 +329,35 @@ export function createKairoVoiceSlice(input: CreateKairoVoiceSliceInput) {
       sessionStorage,
       { speaker: vaxonVoiceSpeaker() },
     );
+
+    // Full autonomy fallback: after "walk the fix", open Vault / command seam automatically.
+    if (
+      alert.reason === 'runtime_degraded' &&
+      input.operatorPresenceSettings.value.autonomy_mode === 'full' &&
+      !reportTheaterOpen.value
+    ) {
+      const blockers = input.operatorBriefing.value?.production_readiness?.blockers ?? [];
+      const hay = blockers.join(' ').toLowerCase();
+      const preferVault = /vault|cli|auth|key|login|dispatch-ready|runtime not ready/i.test(hay) ||
+        /vault|cli|runtime/i.test(message);
+      if (preferVault) {
+        navigateToAppSurface('vault');
+      } else {
+        input.focusCommandSeam?.();
+      }
+    }
+  }
+
+  async function speakSpokenLine(event: LiveEventPayload): Promise<void> {
+    await speakSpokenLineEvent({
+      event,
+      voiceDeliveryAllowed,
+      privacyMode: input.operatorPresenceSettings.value.privacy_mode,
+      spokenAlertsEnabled: input.operatorPresenceSettings.value.spoken_alerts_enabled,
+      narrationLevel: input.effectiveKairoNarrationLevel.value,
+      currentWorkspace: input.currentWorkspace.value,
+      sessionStorage,
+    });
   }
 
   async function speakOperatorBriefing(): Promise<void> {
@@ -349,7 +417,9 @@ export function createKairoVoiceSlice(input: CreateKairoVoiceSliceInput) {
           workspaceId: input.currentWorkspace.value?.workspace_id ?? null,
         });
       }
-      scheduleBriefingSurfaceOffer();
+      if (!reportTheaterOpen.value) {
+        scheduleBriefingSurfaceOffer();
+      }
     } catch {
       // Voice line unavailable — operator can read briefing in dock.
     }
@@ -413,7 +483,6 @@ export function createKairoVoiceSlice(input: CreateKairoVoiceSliceInput) {
     };
   }
 
-
   if (typeof window !== 'undefined') {
     subscribeSpeechQueueSpeaking((active) => {
       input.kairoSpeechQueueActive.value = active;
@@ -438,9 +507,11 @@ export function createKairoVoiceSlice(input: CreateKairoVoiceSliceInput) {
     pauseKairoSpeech,
     resumeKairoSpeech,
     interruptKairoVoice,
+    interruptKairoVoiceAndWait,
     speakKairoConversationLine,
     handleKairoPresenceAction,
     deliverKairoSpokenAlert,
+    speakSpokenLine,
     speakOperatorBriefing,
     maybeSpeakBootGreeting,
     kairoVoiceContext,

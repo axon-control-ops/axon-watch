@@ -5,8 +5,42 @@ export interface KairoTtsResponse {
   audio_base64?: string;
   content_type?: string;
   voice?: string;
+  /** Encoded SSML silence before the first spoken phoneme. */
+  leading_audio_guard_ms?: number;
   first_byte_ms?: number;
   prefetch?: boolean;
+}
+
+/** Sticky until Azure succeeds again — vault_locked / missing_key skip round-trips. */
+let azureTtsBlockedReason: string | null = null;
+let activeTtsAbort: AbortController | null = null;
+
+export function isAzureTtsBlocked(): boolean {
+  return azureTtsBlockedReason === 'vault_locked' || azureTtsBlockedReason === 'missing_key';
+}
+
+export function azureTtsBlockedReasonValue(): string | null {
+  return azureTtsBlockedReason;
+}
+
+/** Cancel an in-flight Azure TTS fetch so barge-in / stand-up can take the lane. */
+export function abortActiveKairoTts(): void {
+  if (!activeTtsAbort) {
+    return;
+  }
+  activeTtsAbort.abort();
+  activeTtsAbort = null;
+}
+
+function noteAzureTtsResponse(payload: KairoTtsResponse): void {
+  if (payload.available) {
+    azureTtsBlockedReason = null;
+    return;
+  }
+  const reason = String(payload.reason || '').trim();
+  if (reason === 'vault_locked' || reason === 'missing_key') {
+    azureTtsBlockedReason = reason;
+  }
 }
 
 export async function postKairoTts(
@@ -24,6 +58,7 @@ export async function postKairoTts(
   const baseUrl = import.meta.env.VITE_CONTROL_PLANE_BASE_URL ?? '';
   const url = baseUrl ? `${baseUrl}/api/kairo/tts` : '/api/kairo/tts';
   const controller = new AbortController();
+  activeTtsAbort = controller;
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
   const startedAt = performance.now();
 
@@ -45,11 +80,15 @@ export async function postKairoTts(
     }
 
     const payload = (await response.json()) as KairoTtsResponse;
+    noteAzureTtsResponse(payload);
     return {
       ...payload,
       first_byte_ms: Math.round(performance.now() - startedAt),
     };
   } finally {
+    if (activeTtsAbort === controller) {
+      activeTtsAbort = null;
+    }
     clearTimeout(timeout);
   }
 }

@@ -1,7 +1,10 @@
 import type { OrbFieldBox } from './orb-field-influence';
 
-export const VOICE_ORB_CORE_SELECTOR = '[data-voice-orb-core]';
-export const VOICE_ORB_ROOT_SELECTOR = '[data-voice-orb-root]';
+/** Floating Brain Graph orb only — ignore Mission Control embedded LIVE OPS orb. */
+export const VOICE_ORB_CORE_SELECTOR =
+  '[data-voice-orb-root].brain-galaxy-stage__jarvis-float--viewport [data-voice-orb-core]';
+export const VOICE_ORB_ROOT_SELECTOR =
+  '[data-voice-orb-root].brain-galaxy-stage__jarvis-float--viewport';
 export const VOICE_ORB_FALLBACK_SIZE = { width: 200, height: 200 };
 
 export type VoiceOrbQuery = (selector: string) => Element | null;

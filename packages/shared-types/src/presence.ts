@@ -1,6 +1,7 @@
 export type KairoNarrationLevel = 'off' | 'minimal' | 'conversational';
 export type VoiceRoutingMode = 'template_first' | 'runtime_on_deep' | 'runtime_aggressive';
 export type SttMode = 'browser' | 'browser_continuous' | 'cloud';
+export type AutonomyMode = 'manual' | 'semi' | 'full';
 
 /**
  * Continuous speech tuning — axon-local parity (`voice_speech_rate` / `voice_speech_pitch`).
@@ -19,6 +20,12 @@ export interface OperatorPresenceSettings {
    * (uses the follow-up window). Implies hands-free once voice is unlocked.
    */
   proactive_duplex_enabled: boolean;
+  /**
+   * manual = interruptive alerts only;
+   * semi = VAXON proactive advisory (workers paused);
+   * full = advisory + continuous workers.
+   */
+  autonomy_mode: AutonomyMode;
   /** Azure + browser speech rate (1.0 = engine default). */
   speech_rate: number;
   /** Azure + browser speech pitch (1.04 = axon-local Azure default). */
@@ -29,6 +36,11 @@ export interface OperatorPresenceSettings {
   stt_mode: SttMode;
   /** Independent VAXON voice routing (not IDE Composer). */
   voice_routing_mode: VoiceRoutingMode;
+  /**
+   * Operator-global VAXON LLM id (not per-workspace Composer prefs).
+   * Default: cursor-grok-4.5-high-fast (Cursor Grok 4.5 Fast).
+   */
+  vaxon_model_id: string;
   /** Speak tool milestones during agent runs (conversational only). */
   narrate_tool_progress: boolean;
 }

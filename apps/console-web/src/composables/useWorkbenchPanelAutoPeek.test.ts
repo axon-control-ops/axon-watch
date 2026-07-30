@@ -57,7 +57,7 @@ describe('useWorkbenchPanelAutoPeek', () => {
     const onShowTerminal = vi.fn();
     const onShowAgentDock = vi.fn();
     const shell = mockShell({
-      activeIdeEmployeeFailureLine: 'Last shift failed: vitest assertion failed',
+      activeIdeEmployeeFailureLine: 'Last job failed: vitest assertion failed',
       activeIdeEmployeeRecord: {
         employee_id: 'e1',
         workspace_id: 'workspace_demo',

@@ -1,14 +1,27 @@
-import { computed, onBeforeUnmount, ref } from 'vue';
+import { computed, onBeforeUnmount } from 'vue';
 
 import { postKairoConverse } from '../../lib/kairo-converse-client';
 import { parseChatUiAction } from '../../lib/chat-ui-action';
+import {
+  handleKairoComposerHistoryKeydown,
+  recordSharedKairoHistoryEntry,
+  sharedKairoDraft,
+  sharedKairoPending,
+  sharedKairoThinkingLine,
+  wireSharedKairoDraftPersistence,
+} from '../../lib/kairo-conversation-shared-session';
 import { normalizeKairoCopy, normalizeVoiceTranscript } from '../../lib/kairo-entity-labels';
 import { recordOperatorArtifacts } from '../../lib/operator-artifact-view';
 import {
   formatConversationDisplayReply,
   sanitizeSpokenReply,
 } from '../../lib/sanitize-spoken-reply';
-import { clearKairoVoiceFollowupWindow } from '../../lib/kairo-voice-followup-window';
+import { clearQueuedSpokenAlerts } from '../../lib/spoken-alert-delivery';
+import {
+  clearKairoVoiceFollowupWindow,
+  finalizeKairoVoiceFollowupWindow,
+  scheduleKairoVoiceFollowupWindowAfterSpeech,
+} from '../../lib/kairo-voice-followup-window';
 import type { KairoVoiceCaptureMode } from '../../lib/kairo-voice-gate';
 import { useShellStore } from '../../stores/shell';
 import { handleConversationModelSwitchIntent } from './conversation-model-switch-handler';
@@ -16,6 +29,7 @@ import {
   applyKairoConversationNavigationIntent,
   resolveKairoConversationNavigationIntent,
 } from './conversation-navigation-handler';
+import { expandReportHotword } from './conversation-report-hotword';
 import { dispatchKairoConverseOutcome } from './kairo-conversation-dispatch';
 import {
   clearBriefingSurfaceOffer,
@@ -28,10 +42,33 @@ import {
   kairoConversationReply,
   setKairoConversationPhase,
 } from './kairo-conversation-state';
-import { brainGalaxyConversationFocus, setBrainGalaxyConversationFocus } from '../brain-galaxy/brain-galaxy-focus';
-import { useKairoSpeechCapture } from './use-kairo-speech-capture';
+import { executeReportTheaterAction } from '../report-theater/report-theater-execute';
 import {
-  CONTINUE_VOICE_RE,
+  buildVaxonReportDirectives,
+} from '../report-theater/report-theater-directives';
+import { narrateReportTheater } from '../report-theater/report-theater-narration';
+import { speakReportTheaterTurn } from '../report-theater/report-theater-speaker';
+import {
+  closeReportTheater,
+  openReportTheater,
+  reportTheaterSessionToken,
+  reportTheaterShowNextSteps,
+  reportTheaterStageIndex,
+  reportTheaterStages,
+  revealReportTheaterNextSteps,
+  setReportTheaterDirectives,
+  setReportTheaterExecuting,
+  setReportTheaterStageIndex,
+} from '../report-theater/report-theater-state';
+import { pickReportTheaterActions } from '../report-theater/report-theater-model';
+import { brainGalaxyConversationFocus } from '../brain-galaxy/brain-galaxy-focus';
+import { useKairoSpeechCapture } from './use-kairo-speech-capture';
+import { useVaxonConversationAttachments } from './use-vaxon-conversation-attachments';
+import {
+  uploadVaxonConverseAttachments,
+  vaxonConversePromptForAttachments,
+} from './upload-vaxon-converse-attachments';
+import {
   createKairoConversationTurnHandlers,
   HANDOFF_CLIENT_RE,
 } from './kairo-conversation-turn-handlers';
@@ -42,14 +79,16 @@ import {
 
 export function useKairoConversation() {
   const shell = useShellStore();
-  const draft = ref('');
-  const pending = ref(false);
-  const thinkingLine = ref('');
+  wireSharedKairoDraftPersistence(shell);
+  const draft = sharedKairoDraft;
+  const pending = sharedKairoPending;
+  const thinkingLine = sharedKairoThinkingLine;
   let lastOperatorPrompt = '';
+  const attachments = useVaxonConversationAttachments();
 
   const canSubmit = computed(
     () =>
-      draft.value.trim().length > 0 &&
+      (draft.value.trim().length > 0 || attachments.pendingAttachments.value.length > 0) &&
       !pending.value &&
       kairoConversationPhase.value !== 'thinking',
   );
@@ -57,7 +96,8 @@ export function useKairoConversation() {
 
   const speechCapture = useKairoSpeechCapture({
     privacyBlocked: () => shell.operatorPresenceSettings.privacy_mode,
-    sttMode: () => shell.operatorPresenceSettings.stt_mode, captureMode: 'manual',
+    sttMode: () => shell.operatorPresenceSettings.stt_mode,
+    captureMode: 'manual',
     stopOnUnmount: 'manual_only',
   });
 
@@ -78,9 +118,7 @@ export function useKairoConversation() {
     determineAnswerTier,
     thinkingStatusLine,
   } = createKairoRuntimeAssistantCue({ shell, pending });
-
   const { deliverVoiceReply } = createKairoVoiceDelivery({ shell, speakReply });
-
   const {
     executeConverseAction,
     tryBriefingSurfaceFollowup,
@@ -94,6 +132,13 @@ export function useKairoConversation() {
     deliverVoiceReply,
     speakReply,
   });
+
+  function resetDraftState(): void {
+    draft.value = '';
+    pending.value = false;
+    thinkingLine.value = '';
+    attachments.clearAttachments();
+  }
 
   async function speakReplyFromExternal(
     reply: string,
@@ -110,12 +155,19 @@ export function useKairoConversation() {
     rawContent?: string,
     options?: { voiceCaptureMode?: KairoVoiceCaptureMode },
   ): Promise<void> {
-    const content = normalizeVoiceTranscript((rawContent ?? draft.value).trim());
-    if (!content || pending.value) {
+    const pendingFiles = [...attachments.pendingAttachments.value];
+    const raw = normalizeVoiceTranscript(
+      vaxonConversePromptForAttachments(rawContent ?? draft.value, pendingFiles.length),
+    );
+    if (!raw || pending.value) {
       return;
     }
+    const content = expandReportHotword(raw) ?? raw;
     lastOperatorPrompt = content;
-    const answerTier = determineAnswerTier(content);
+    recordSharedKairoHistoryEntry(content);
+    const answerTier = pendingFiles.length
+      ? 'deep'
+      : determineAnswerTier(content);
 
     pending.value = true;
     kairoConversationError.value = null;
@@ -132,18 +184,13 @@ export function useKairoConversation() {
       voiceCaptureMode: options?.voiceCaptureMode,
       clearRuntimeAssistantCue,
       deliverVoiceReply,
-      resetDraftState: () => {
-        draft.value = '';
-        pending.value = false;
-        thinkingLine.value = '';
-      },
+      resetDraftState,
     });
     if (modelHandled) {
       return;
     }
 
     const navIntent = resolveKairoConversationNavigationIntent(content, shell);
-
     if (navIntent) {
       clearRuntimeAssistantCue();
       await applyKairoConversationNavigationIntent({
@@ -151,11 +198,7 @@ export function useKairoConversation() {
         navIntent,
         deliverVoiceReply,
         voiceCaptureMode: options?.voiceCaptureMode,
-        resetDraftState: () => {
-          draft.value = '';
-          pending.value = false;
-          thinkingLine.value = '';
-        },
+        resetDraftState,
       });
       return;
     }
@@ -164,25 +207,26 @@ export function useKairoConversation() {
       clearRuntimeAssistantCue();
       return;
     }
-
     if (await tryResumeCurrentRun(content, options)) {
       clearRuntimeAssistantCue();
-      draft.value = '';
-      pending.value = false;
-      thinkingLine.value = '';
+      resetDraftState();
       return;
     }
 
     try {
+      const attachmentIds = pendingFiles.length
+        ? await uploadVaxonConverseAttachments(workspaceId.value, pendingFiles)
+        : [];
       const response = await postKairoConverse({
         content,
         session_id: kairoSpeechSessionId(),
         workspace_id: workspaceId.value,
-        use_runtime: answerTier === 'deep',
+        use_runtime: answerTier === 'deep' || attachmentIds.length > 0,
         answer_tier: answerTier,
         context_workspace_id: brainGalaxyConversationFocus.value?.workspaceId ?? workspaceId.value,
         context_signal_id: brainGalaxyConversationFocus.value?.signalId ?? '',
         context_node_id: brainGalaxyConversationFocus.value?.nodeId ?? '',
+        attachment_ids: attachmentIds.length ? attachmentIds : undefined,
       });
       clearRuntimeAssistantCue();
       if (response.artifacts.length) {
@@ -190,23 +234,103 @@ export function useKairoConversation() {
       }
       if (!response.action && HANDOFF_CLIENT_RE.test(content)) {
         if (await tryClientHandoff(content)) {
-          draft.value = '';
-          pending.value = false;
-          thinkingLine.value = '';
+          resetDraftState();
           return;
         }
       }
       kairoConversationReply.value = normalizeKairoCopy(
         formatConversationDisplayReply(response.reply) || sanitizeSpokenReply(response.reply),
       );
-      draft.value = '';
-      pending.value = false;
-      thinkingLine.value = '';
+      resetDraftState();
       await dispatchKairoConverseOutcome(shell, response, executeConverseAction);
-      if (mentionsBriefingSurfaceOffer(response.reply)) {
-        scheduleBriefingSurfaceOffer();
+      if (response.dispatch_lane === 'deterministic_report') {
+        // Open theater first so non-theater narration is hard-muted, then barge-in
+        // aborts any in-flight agent Azure fetch before stand-up takes the lane.
+        openReportTheater({
+          sections: {
+            attention: response.report?.sections?.attention ?? [],
+            work_in_flight: response.report?.sections?.work_in_flight ?? [],
+            lead_rollups: response.report?.sections?.lead_rollups ?? [],
+            fleet: response.report?.sections?.fleet ?? [],
+            next_move: response.report?.sections?.next_move ?? '',
+          },
+          fingerprint: response.report?.fingerprint ?? null,
+          reply: response.reply,
+          spokenReply: response.spoken_reply,
+          // Freeze roster at open so chips match spoken sections (no mid-theater drift).
+          employees: shell.companyEmployeesForCurrentWorkspace ?? [],
+        });
+        const committedDirectives = buildVaxonReportDirectives({
+          nextMove: reportTheaterStages.value.at(-1)?.lines[0] ?? '',
+          actions: pickReportTheaterActions(shell.operatorBriefing?.next_safe_actions, 3),
+          topSignals: shell.operatorBriefing?.top_signals ?? [],
+          workspaces: shell.workspaces,
+          readiness: shell.operatorBriefing?.production_readiness ?? null,
+        });
+        setReportTheaterDirectives(committedDirectives);
+        await shell.interruptKairoVoiceAndWait();
+        clearQueuedSpokenAlerts();
+        const narrationToken = reportTheaterSessionToken.value;
+        await narrateReportTheater(reportTheaterStages.value, {
+          speak: async (line, speakerName, onPlaybackStart) => {
+            await speakReportTheaterTurn(
+              shell,
+              line,
+              lastOperatorPrompt,
+              speakerName,
+              () => {
+                kairoConversationReply.value = normalizeKairoCopy(line);
+                onPlaybackStart?.();
+              },
+            );
+          },
+          setStageIndex: (index) => {
+            setReportTheaterStageIndex(index);
+          },
+          onComplete: () => {
+            revealReportTheaterNextSteps();
+          },
+          onCommitted: async () => {
+            const primary = committedDirectives.find((item) => item.kind === 'primary');
+            if (!primary?.briefingAction) {
+              return;
+            }
+            // Auto-commit: execute immediately — do not add another spoken turn.
+            if (primary.autoExecute) {
+              setReportTheaterExecuting(true);
+              await executeReportTheaterAction(
+                shell,
+                shell.operatorBriefing,
+                primary.briefingAction,
+              );
+              if (reportTheaterSessionToken.value === narrationToken) {
+                clearQueuedSpokenAlerts();
+                clearBriefingSurfaceOffer();
+                closeReportTheater();
+              }
+              return;
+            }
+            const secondary = committedDirectives.find((item) => item.kind !== 'primary');
+            const choiceLine = secondary
+              ? `Your call. ${primary.label}. Or ${secondary.label}.`
+              : `Your call. ${primary.label}.`;
+            kairoConversationReply.value = normalizeKairoCopy(choiceLine);
+            await speakReportTheaterTurn(shell, choiceLine, lastOperatorPrompt);
+          },
+          isCancelled: () => reportTheaterSessionToken.value !== narrationToken,
+        });
+        if (options?.voiceCaptureMode === 'hands_free') {
+          scheduleKairoVoiceFollowupWindowAfterSpeech();
+          finalizeKairoVoiceFollowupWindow();
+        }
+      } else {
+        if (mentionsBriefingSurfaceOffer(response.reply)) {
+          scheduleBriefingSurfaceOffer();
+        }
+        await deliverVoiceReply(response.reply, options?.voiceCaptureMode, {
+          spokenReply: response.spoken_reply,
+        });
       }
-      await deliverVoiceReply(response.reply, options?.voiceCaptureMode, { spokenReply: response.spoken_reply });
     } catch (error) {
       clearRuntimeAssistantCue();
       kairoConversationError.value =
@@ -234,15 +358,6 @@ export function useKairoConversation() {
     }
   }
 
-  function startVoiceCapture(): boolean {
-    shell.interruptKairoVoice();
-    return speechCapture.startCapture();
-  }
-
-  function stopVoiceCapture(): void {
-    speechCapture.stopCapture();
-  }
-
   onBeforeUnmount(() => {
     clearRuntimeAssistantCue();
   });
@@ -257,8 +372,13 @@ export function useKairoConversation() {
     submitTurn,
     handleFocus,
     handleBlur,
+    handleHistoryKeydown: handleKairoComposerHistoryKeydown,
     speechCapture,
-    startVoiceCapture,
-    stopVoiceCapture,
+    attachments,
+    startVoiceCapture: () => {
+      shell.interruptKairoVoice();
+      return speechCapture.startCapture();
+    },
+    stopVoiceCapture: () => speechCapture.stopCapture(),
   };
 }

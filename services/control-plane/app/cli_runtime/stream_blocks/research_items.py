@@ -210,11 +210,13 @@ def _sanitize_snippet(snippet: str, *, limit: int = 500) -> str:
                     or first.get("title")
                     or ""
                 ).strip()[:limit]
-
-    if cleaned.startswith("{") or cleaned.startswith("["):
-        payload = _unwrap_text_envelope(cleaned)
-        if payload is not None:
-            return _sanitize_snippet(json.dumps(payload), limit=limit)
+        # Unknown JSON envelopes used to recurse forever by serializing and
+        # parsing the same dict again. Preserve a useful scalar when possible,
+        # otherwise return the bounded original instead of crashing the run.
+        for key in ("snippet", "summary", "description", "title", "query", "url", "error"):
+            value = str(envelope.get(key) or "").strip()
+            if value:
+                return value[:limit]
 
     return cleaned[:limit]
 

@@ -40,6 +40,7 @@ import OperatorIncidentFeedPanel from './OperatorIncidentFeedPanel.vue';
 import OperatorRunStripPanel from './OperatorRunStripPanel.vue';
 import OperatorStatusRadarPanelHeader from './OperatorStatusRadarPanelHeader.vue';
 import OperatorTaskBoardPanel from './OperatorTaskBoardPanel.vue';
+import AttentionStackPanel from './AttentionStackPanel.vue';
 
 const props = defineProps<{
   terminalVisible: boolean;
@@ -257,13 +258,15 @@ onMounted(() => {
     void shell.loadWorkspaceTasks(shell.currentWorkspace.workspace_id);
   }
   // Park the Brain Graph floating orb after stage chrome exists in the DOM.
+  // Skip when the operator pinned a custom placement (persisted across refresh).
   window.setTimeout(() => {
     if (
       shell.layoutMode === 'operator' &&
       shell.operatorBrainGalaxyActive &&
-      shell.voiceOrbVisible
+      shell.voiceOrbVisible &&
+      !shell.voiceOrbUserPinned
     ) {
-      shell.requestVoiceOrbSmartDodge({ force: true, preferredDock: 'bottom-left' });
+      shell.requestVoiceOrbSmartDodge({ preferredDock: 'bottom-left' });
     }
   }, 80);
 });
@@ -372,11 +375,30 @@ function handleOperatorQuickGuideAction(actionId: OperatorQuickGuideActionId): v
         :terminal-panel-aria-label="terminalPanelAriaLabel"
         :kairo-title="kairoParts.title"
         :kairo-subtitle="kairoParts.subtitle"
+        :show-kairo-presence="centerView !== 'grid'"
         @set-center-view="setCenterView"
         @toggle-terminal="toggleTerminal"
       />
 
       <OperatorFleetHealthGrid />
+
+      <section
+        id="mission-control-attention"
+        class="operator-status-radar-panel__attention"
+        aria-label="Attention for current workspace"
+      >
+        <header class="operator-status-radar-panel__attention-head">
+          <p class="operator-status-radar-panel__attention-eyebrow">Attention</p>
+          <p class="operator-status-radar-panel__attention-scope">
+            {{
+              shell.currentWorkspace?.display_name?.trim() ||
+              shell.currentWorkspace?.workspace_id ||
+              'Current workspace'
+            }}
+          </p>
+        </header>
+        <AttentionStackPanel variant="sidebar" sections="attention-only" />
+      </section>
 
       <OperatorTaskBoardPanel />
 

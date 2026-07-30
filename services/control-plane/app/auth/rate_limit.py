@@ -22,15 +22,26 @@ def mutating_rate_limit_per_minute() -> int:
     return max(0, value)
 
 
+def _mutation_scope(request: Request) -> str:
+    """Keep one noisy API family from starving unrelated operator controls."""
+    parts = [part for part in request.url.path.split("/") if part]
+    if len(parts) >= 2 and parts[0] == "api":
+        return f"/api/{parts[1]}"
+    return f"/{parts[0]}" if parts else "/"
+
+
 def _client_key(request: Request, identity: str) -> str:
     host = request.client.host if request.client else "unknown"
-    return f"{identity}:{host}"
+    return f"{identity}:{host}:{_mutation_scope(request)}"
 
 
 def reject_mutating_rate_limit(request: Request, *, identity: str) -> str | None:
     """
-    Return an error detail when the identity+client exceeds the sliding window.
+    Return an error detail when the identity+client+API-family exceeds the window.
 
+    Workers and the browser commonly share the loopback operator identity. Scoping
+    by API family prevents task lease/complete bursts from blocking Team chat,
+    speech, or run controls while retaining a bounded limit for each surface.
     Limit ``0`` disables enforcement. Window is 60 seconds.
     """
     limit = mutating_rate_limit_per_minute()

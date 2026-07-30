@@ -15,12 +15,13 @@ def _local_records(snapshot: dict[str, Any]) -> list[dict[str, Any]]:
 def _blocker_message(record: dict[str, Any]) -> str:
     runtime_id = str(record.get("id") or "runtime")
     label = str(record.get("label") or runtime_id)
+    # Unavailable binary beats a misleading "Authenticated…" auth overlay.
+    if not record.get("available"):
+        return f"{label} unavailable"
     auth = record.get("auth") if isinstance(record.get("auth"), dict) else {}
     message = str(auth.get("message") or "").strip()
     if message:
         return f"{label}: {message}"
-    if not record.get("available"):
-        return f"{label} unavailable"
     return f"{label} not dispatch-ready"
 
 
@@ -41,11 +42,17 @@ def summarize_cli_runtime_readiness(snapshot: dict[str, Any]) -> dict[str, Any]:
         "default_runtime": default_runtime,
         "default_ready": bool(default_record.get("ready")) if default_record else False,
         "blockers": blockers,
+        # Empty local list is stale-while-revalidate bootstrap, not a proven outage.
+        "probe_pending": len(local) == 0,
     }
 
 
 def cli_runtime_degraded_reasons(snapshot: dict[str, Any]) -> list[str]:
     """Return degraded reasons when no local CLI runtime is dispatch-ready."""
+    local = _local_records(snapshot)
+    if not local:
+        # Empty snapshot from allow_stale bootstrap must not flash false CLI degraded.
+        return []
     summary = summarize_cli_runtime_readiness(snapshot)
     if summary["dispatch_ready"]:
         return []

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -21,6 +22,10 @@ from app.workspace_agents.diff_policy import evaluate_changed_paths, evaluate_di
 from app.workspace_agents.verifier_checks import (  # noqa: E402
     evaluate_acceptance,
 )
+
+# Constructed at runtime so the source file itself does not trip Gate 6 secret scan.
+_FAKE_GHP = "ghp_" + "abcdefghijklmnopqrstuvwxyz012345"
+_FAKE_AKIA = "AKIA" + "IOSFODNN7EXAMPLE" + "12"
 
 
 class Gate6ProjectContractTests(unittest.TestCase):
@@ -93,7 +98,7 @@ class Gate6DiffPolicyTests(unittest.TestCase):
         self.assertIn("out_of_scope", codes)
         self.assertIn("forbidden_path", codes)
         secret_findings = evaluate_diff_texts(
-            {"apps/x.ts": "const token = 'ghp_abcdefghijklmnopqrstuvwxyz012345'"}
+            {"apps/x.ts": f"const token = '{_FAKE_GHP}'"}
         )
         self.assertTrue(any(f.code == "secret" for f in secret_findings))
 
@@ -132,7 +137,7 @@ class Gate6VerifierCheckEvalTests(unittest.TestCase):
             },
             changed_paths=["apps/console-web/src/App.vue"],
             path_to_text={
-                "apps/console-web/src/App.vue": "ak=AKIAIOSFODNN7EXAMPLE12",
+                "apps/console-web/src/App.vue": f"ak={_FAKE_AKIA}",
             },
         )
         self.assertFalse(blocked_secret.passed)
@@ -157,6 +162,44 @@ class Gate6VerifierCheckEvalTests(unittest.TestCase):
                 check_results={},
                 actor="implementer",
             )
+
+    def test_list_changed_paths_excludes_axon_si_sidecar(self) -> None:
+        from app.workspace_agents.verifier_runner import list_changed_paths
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            sidecar = root / ".axon-si"
+            sidecar.mkdir()
+            (sidecar / "baseline.json").write_text("{}", encoding="utf-8")
+            (root / "services").mkdir()
+            (root / "services" / "note.txt").write_text("x\n", encoding="utf-8")
+            subprocess.run(["git", "init"], cwd=root, check=True, capture_output=True)
+            subprocess.run(
+                ["git", "config", "user.email", "gate6@test"],
+                cwd=root,
+                check=True,
+                capture_output=True,
+            )
+            subprocess.run(
+                ["git", "config", "user.name", "gate6"],
+                cwd=root,
+                check=True,
+                capture_output=True,
+            )
+            paths = list_changed_paths(root)
+            self.assertIn("services/note.txt", paths)
+            self.assertFalse(
+                any(p == ".axon-si" or p.startswith(".axon-si/") for p in paths)
+            )
+
+    def test_repo_contract_wires_isolation_gate6_commands(self) -> None:
+        contract = load_project_contract(resolve_default_contract(REPO_ROOT))
+        allowed = contract.get("allowed_paths") or []
+        self.assertIn("project.axon.yaml", [str(p) for p in allowed])
+        commands = contract.get("commands") or {}
+        self.assertIn("run_gate6_typecheck.sh", " ".join(commands.get("typecheck") or []))
+        self.assertIn("run_gate6_tests.sh", " ".join(commands.get("test") or []))
+        self.assertIn("run_gate6_build.sh", " ".join(commands.get("build") or []))
 
 
 if __name__ == "__main__":

@@ -8,7 +8,7 @@ import {
 describe('ide-attention-focus', () => {
   it('routes IDE attention focus to the IDE panel anchor', () => {
     expect(resolveAttentionFocusScrollTarget('ide')).toBe('ide-attention-panel');
-    expect(resolveAttentionFocusScrollTarget('operator')).toBe('dock-seam-signals');
+    expect(resolveAttentionFocusScrollTarget('operator')).toBe('mission-control-attention');
   });
 
   it('prefers an explicit signal id when provided', () => {
@@ -20,7 +20,7 @@ describe('ide-attention-focus', () => {
     ).toBe('signal_b');
   });
 
-  it('falls back to bootstrap or single-signal defaults', () => {
+  it('prefers actionable signals over bootstrap summaries', () => {
     expect(
       resolveDefaultHighlightedSignalId([
         {
@@ -29,7 +29,7 @@ describe('ide-attention-focus', () => {
         },
         { signal_id: 'signal_monitor', title: 'DashPro monitor critical' },
       ]),
-    ).toBe('signal_watch_bootstrap_ready');
+    ).toBe('signal_monitor');
 
     expect(
       resolveDefaultHighlightedSignalId([
@@ -37,11 +37,16 @@ describe('ide-attention-focus', () => {
       ]),
     ).toBe('signal_monitor');
 
+  });
+
+  it('uses the spoken signal, then highest severity, when attention has multiple items', () => {
+    const signals = [
+      { signal_id: 'signal_warning', title: 'Warning', severity: 'warning' },
+      { signal_id: 'signal_critical', title: 'Critical', severity: 'critical' },
+    ];
     expect(
-      resolveDefaultHighlightedSignalId([
-        { signal_id: 'signal_a', title: 'Signal A' },
-        { signal_id: 'signal_b', title: 'Signal B' },
-      ]),
-    ).toBeNull();
+      resolveDefaultHighlightedSignalId(signals, null, 'signal_warning'),
+    ).toBe('signal_warning');
+    expect(resolveDefaultHighlightedSignalId(signals)).toBe('signal_critical');
   });
 });

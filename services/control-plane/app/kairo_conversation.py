@@ -17,9 +17,14 @@ from app.chat.command_intent import (
 )
 from app.cli_runtime.router import dispatch_ide_composer
 from app.kairo.context_pack_cache import get_cached_context_pack
-from app.kairo.voice_dispatch import VoiceModelReceipt, normalize_voice_routing_mode, route_voice_turn
+from app.kairo.voice_dispatch import (
+    VoiceModelReceipt,
+    normalize_voice_routing_mode,
+    resolve_vaxon_model,
+    route_voice_turn,
+)
 from app.kairo.voice_autonomy import resolve_voice_action_tier
-from app.kairo_memory_intents import maybe_handle_memory_intent
+from app.kairo_early_intents import maybe_handle_early_converse_intent
 from app.persistence.operator_presence_settings_store import load_settings as load_presence_settings
 from app.kairo.turn_memory import (
     entity_context as _entity_context,
@@ -96,6 +101,7 @@ def _build_runtime_context_block(
     recent_turns: list[dict[str, str]],
     context_node_id: str | None = None,
     context_signal_id: str | None = None,
+    image_paths: tuple[str, ...] = (),
 ) -> str:
     return build_runtime_context_block(
         content=content,
@@ -105,6 +111,7 @@ def _build_runtime_context_block(
         recent_turns=recent_turns,
         context_node_id=context_node_id,
         context_signal_id=context_signal_id,
+        image_paths=image_paths,
     )
 
 
@@ -146,6 +153,7 @@ def converse_turn(
     context_signal_id: str | None = None,
     context_node_id: str | None = None,
     force_refresh: bool = False,
+    attachment_ids: list[str] | None = None,
 ) -> dict[str, object]:
     started_at = time.perf_counter()
     raw_content = content.strip()
@@ -153,23 +161,41 @@ def converse_turn(
     if not trimmed:
         raise ValueError("content must not be empty")
 
-    guest_name = update_participant_from_utterance(session_id, trimmed)
+    from app.kairo.converse_attachments import ConverseAttachmentError, prepare_converse_attachment_paths
 
+    if attachment_ids:
+        use_runtime = True
+        answer_tier = "deep"
+    guest_name = update_participant_from_utterance(session_id, trimmed)
     tier: ConversationAnswerTier = "deep" if str(answer_tier).strip().lower() == "deep" else "fast"
     inferred_workspace_id = infer_workspace_id_from_content(trimmed)
     entity = _entity_context(session_id)
-    entity_workspace_id = entity.get("target_workspace_id") or None
     resolved_workspace_id = (
-        context_workspace_id or workspace_id or inferred_workspace_id or entity_workspace_id
+        context_workspace_id
+        or workspace_id
+        or inferred_workspace_id
+        or entity.get("target_workspace_id")
+        or None
     )
+    try:
+        image_paths = prepare_converse_attachment_paths(
+            attachment_ids=attachment_ids,
+            workspace_id=str(resolved_workspace_id or workspace_id or ""),
+        )
+    except ConverseAttachmentError as exc:
+        raise ValueError(str(exc)) from exc
+    from app.kairo.operator_deterministic_report import is_operator_report_request
+
+    # REPORT always needs a fresh briefing/roster snapshot — ignore cache TTL.
     pack = build_conversation_context_pack(
         workspace_id=resolved_workspace_id,
-        force_refresh=force_refresh,
+        force_refresh=force_refresh or is_operator_report_request(trimmed),
     )
     presence_settings = load_presence_settings()
     voice_routing_mode = normalize_voice_routing_mode(
         presence_settings.get("voice_routing_mode")
     )
+    preferred_vaxon_model = resolve_vaxon_model(presence_settings.get("vaxon_model_id"))
     if context_signal_id and resolved_workspace_id:
         _remember_entities(
             session_id,
@@ -277,64 +303,44 @@ def converse_turn(
                 duration_ms=round((time.perf_counter() - started_at) * 1000),
             )
 
-    memory_intent = maybe_handle_memory_intent(
+    early_intent = maybe_handle_early_converse_intent(
         content=trimmed,
         session_id=session_id,
         workspace_id=resolved_workspace_id,
         guest_name=guest_name,
     )
-    if memory_intent is not None:
-        reply = str(memory_intent.get("reply") or "")
+    if early_intent is not None:
+        reply = str(early_intent.get("reply") or "")
+        participant = early_intent.get("active_participant") or guest_name
         _remember_turn(session_id, "user", trimmed)
         _remember_turn(session_id, "assistant", reply)
+        payload = {
+            "turn_kind": str(early_intent.get("turn_kind") or "action"),
+            "reply": reply,
+            "source": str(early_intent.get("source") or "template"),
+            "command_content": early_intent.get("command_content"),
+            "action": early_intent.get("action"),
+            "artifacts": list(early_intent.get("artifacts") or []),
+            "active_participant": participant,
+        }
+        if early_intent.get("action_tier"):
+            payload["action_tier"] = early_intent.get("action_tier")
         return _log_voice_turn(
             session_id=session_id,
             workspace_id=workspace_id,
             raw_content=raw_content,
             normalized_content=trimmed,
-            payload={
-                "turn_kind": str(memory_intent.get("turn_kind") or "action"),
-                "reply": reply,
-                "source": str(memory_intent.get("source") or "template"),
-                "command_content": memory_intent.get("command_content"),
-                "action": memory_intent.get("action"),
-                "artifacts": list(memory_intent.get("artifacts") or []),
-                "active_participant": guest_name,
-            },
-            duration_ms=round((time.perf_counter() - started_at) * 1000),
-        )
-
-    from app.chat.move_voice_orb import move_voice_orb_ack, parse_move_voice_orb_ui_action
-
-    move_orb_action = parse_move_voice_orb_ui_action(trimmed)
-    if move_orb_action is not None:
-        reply = apply_participant_address(
-            move_voice_orb_ack(move_orb_action),
-            guest_name or get_active_participant(session_id),
-        )
-        _remember_turn(session_id, "user", trimmed)
-        _remember_turn(session_id, "assistant", reply)
-        return _log_voice_turn(
-            session_id=session_id,
-            workspace_id=workspace_id,
-            raw_content=raw_content,
-            normalized_content=trimmed,
-            payload={
-                "turn_kind": "action",
-                "reply": reply,
-                "source": "template",
-                "command_content": None,
-                "action": move_orb_action,
-                "artifacts": [],
-                "active_participant": guest_name or get_active_participant(session_id),
-                "action_tier": "reversible_auto",
-            },
+            payload=payload,
             duration_ms=round((time.perf_counter() - started_at) * 1000),
         )
 
     turn_kind = classify_conversation_turn(trimmed)
     # Keep caller use_runtime; voice_routing_mode gates lanes inside the router.
     recent = _recent_turns(session_id)
+
+    def _runtime_context_with_attachments(**kwargs: Any) -> str:
+        return _build_runtime_context_block(**kwargs, image_paths=image_paths)
+
     decision = route_voice_turn(
         content=trimmed,
         session_id=session_id,
@@ -342,18 +348,19 @@ def converse_turn(
         pack=pack,
         turn_kind=turn_kind,
         voice_routing_mode=voice_routing_mode,
-        use_runtime=use_runtime,
+        use_runtime=use_runtime or bool(image_paths),
         answer_tier=tier,
         recent_turns=recent,
         command_ack_line=command_ack_line,
         workspace_short_label=workspace_short_label,
         build_runtime_artifact=build_runtime_artifact,
-        build_runtime_context_block=_build_runtime_context_block,
+        build_runtime_context_block=_runtime_context_with_attachments,
         remember_entities=_remember_entities,
         remember_top_signal=_remember_top_signal,
         dispatch_runtime=dispatch_ide_composer,
         context_signal_id=context_signal_id,
         context_node_id=context_node_id,
+        preferred_model=preferred_vaxon_model,
     )
 
     reply = decision.reply
@@ -390,11 +397,13 @@ def converse_turn(
             "action_tier": decision.action_tier,
             "dispatch_lane": decision.lane,
             "voice_routing_mode": voice_routing_mode,
+            "vaxon_model_id": preferred_vaxon_model,
             "model_receipt": model_receipt,
             "routing_receipt": decision.model_receipt.as_line() if decision.model_receipt else None,
             "action": decision.action,
             "artifacts": artifacts,
             "active_participant": listener,
+            "report": decision.report,
         },
         duration_ms=round((time.perf_counter() - started_at) * 1000),
         runtime_dispatched=runtime_dispatched,

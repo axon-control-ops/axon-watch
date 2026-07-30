@@ -12,11 +12,11 @@ const props = defineProps<{
   /** When set (employee thread active), mark/title reflect that teammate. */
   personaMark?: string | null;
   personaName?: string | null;
-  /** Optional suffix when chip state needs extra context (e.g. failed shift). */
+  /** Optional suffix when chip state needs extra context (e.g. failed job). */
   presenceHint?: string | null;
   /** Warm red accent when alerting reflects a failed teammate shift. */
   employeeFailed?: boolean;
-  /** Amber accent when alerting reflects an interrupted shift that can continue. */
+  /** Amber accent when alerting reflects an interrupted job that can continue. */
   employeeInterrupted?: boolean;
   /** Overrides default briefing title when set (e.g. full failure detail on hover). */
   chipTitle?: string | null;

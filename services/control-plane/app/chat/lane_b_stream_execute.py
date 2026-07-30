@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import logging
+import threading
+import time
 from dataclasses import dataclass
 from datetime import datetime, timezone
 
@@ -33,8 +36,18 @@ from app.runs.service import (
 from app.terminal.workspace_roots import WorkspaceRootError, resolve_workspace_root
 from app.workspace_agents.critical_review_clause import (
     MISSING_CONFIDENCE_DETAIL,
-    parse_confidence,
+    critical_review_receipt_summary,
+    resolve_critical_review_confidence,
 )
+from app.workspace_agents.employee_first_person import (
+    employee_name_from_persona_block,
+    rewrite_employee_third_person_to_first,
+)
+
+logger = logging.getLogger(__name__)
+
+# Keep role-tagged IDE turns ahead of the stale reaper during long Cursor sessions.
+_LANE_B_PROGRESS_RECEIPT_MIN_SECONDS = 60.0
 
 
 @dataclass(frozen=True)
@@ -145,7 +158,7 @@ def finalize_lane_b_agent_run(
     )
     try:
         if dispatched:
-            confidence = parse_confidence(reply_text)
+            confidence, auto_recovered = resolve_critical_review_confidence(reply_text)
             if confidence is None:
                 run_record = append_run_execution_receipt(
                     dispatch_run_id,
@@ -159,11 +172,19 @@ def finalize_lane_b_agent_run(
                     dispatch_run_id,
                     receipt_summary=MISSING_CONFIDENCE_DETAIL,
                 )
+                # Still notify Lead/VAXON on terminal failure so the chain is not silent.
+                _maybe_notify_lead_after_lane_b(
+                    dispatch_run_id=dispatch_run_id,
+                    run_record=run_record,
+                    reply_text=reply_text,
+                )
                 return False, run_record
             run_record = append_run_execution_receipt(
                 dispatch_run_id,
                 receipt_type="critical_review",
-                receipt_summary=f"Critical Review Confidence: {confidence}/10",
+                receipt_summary=critical_review_receipt_summary(
+                    confidence, auto_recovered=auto_recovered
+                ),
                 actor="critical_review",
                 success=True,
                 intent="lane_b_agent",
@@ -208,7 +229,72 @@ def finalize_lane_b_agent_run(
                 intent="lane_b_agent",
             )
             dispatched = False
+    _maybe_notify_lead_after_lane_b(
+        dispatch_run_id=dispatch_run_id,
+        run_record=run_record,
+        reply_text=reply_text,
+    )
     return dispatched, run_record
+
+
+def _maybe_notify_lead_after_lane_b(
+    *,
+    dispatch_run_id: str,
+    run_record: dict[str, object] | None,
+    reply_text: str,
+) -> None:
+    """Lead takeover for specialists; Lead-shift → VAXON flash when Dana finishes."""
+    if not isinstance(run_record, dict):
+        return
+    phase = str(run_record.get("phase") or "").strip().lower()
+    if phase not in {"completed", "failed"}:
+        return
+    role = str(run_record.get("employee_role") or "").strip().lower()
+    if not role or role == "overview_agent":
+        return
+    # Continuous workers already notify after task ledger finalize.
+    if str(run_record.get("task_id") or "").strip():
+        return
+    workspace_id = str(run_record.get("workspace_id") or "").strip()
+    if not workspace_id:
+        return
+    try:
+        from app.workspace_agents import build_company_roster
+        from app.workspace_agents.lead_replan import notify_lead_after_worker_task
+        from app.workspace_agents.lead_vaxon_handoff import notify_vaxon_after_lead_shift
+
+        name = role
+        company = build_company_roster(workspace_id)
+        for row in company.get("employees") or []:
+            if not isinstance(row, dict):
+                continue
+            if str(row.get("role") or "").strip().lower() == role:
+                name = str(row.get("name") or role).strip() or role
+                break
+        run_id = str(run_record.get("run_id") or dispatch_run_id)
+        if role == "lead":
+            notify_vaxon_after_lead_shift(
+                workspace_id=workspace_id,
+                run_id=run_id,
+                employee_name=name,
+                phase=phase,
+                reply_text=reply_text,
+            )
+            return
+        notify_lead_after_worker_task(
+            workspace_id=workspace_id,
+            task_id="",
+            run_id=run_id,
+            employee_role=role,
+            employee_name=name,
+            phase=phase,
+            reply_text=reply_text,
+        )
+    except Exception:  # noqa: BLE001 — never block Lane B finalize on Lead notify
+        logger.exception(
+            "lead/VAXON notify after Lane B shift failed for %s",
+            dispatch_run_id,
+        )
 
 
 def execute_lane_b_stream(job: LaneBStreamJob) -> None:
@@ -225,9 +311,11 @@ def execute_lane_b_stream(job: LaneBStreamJob) -> None:
     run_record = None
     lane_b_result: dict[str, object] = {}
     milestone_content = ""
+    progress_lock = threading.Lock()
+    last_progress_at = 0.0
 
     def on_chunk(accumulated: str, delta: str) -> None:
-        nonlocal milestone_content
+        nonlocal milestone_content, last_progress_at
         milestone_content = persist_stream_delta(
             thread_id=job.thread_id,
             message_id=job.agent_message_id,
@@ -236,6 +324,25 @@ def execute_lane_b_stream(job: LaneBStreamJob) -> None:
             delta=delta,
             updated_at=_utc_now(),
         )
+        # Role-tagged IDE turns need non-heartbeat receipts or the 12-minute stale
+        # reaper treats a long Cursor agent session as hung (especially Lead).
+        run_id = str(job.dispatch_run_id or "").strip()
+        if not run_id:
+            return
+        now = time.monotonic()
+        with progress_lock:
+            if now - last_progress_at < _LANE_B_PROGRESS_RECEIPT_MIN_SECONDS:
+                return
+            last_progress_at = now
+        try:
+            append_run_execution_receipt(
+                run_id,
+                receipt_type="worker_progress",
+                receipt_summary="IDE agent turn still executing",
+                actor="cli_runtime",
+            )
+        except (RunLifecycleError, RunNotFoundError):
+            return
 
     try:
         lane_b_result = generate_lane_b_result(
@@ -248,6 +355,8 @@ def execute_lane_b_stream(job: LaneBStreamJob) -> None:
             on_chunk=on_chunk,
         )
         agent_content = str(lane_b_result.get("content") or "")
+        speaker_name = employee_name_from_persona_block(job.memory_appendix)
+        agent_content = rewrite_employee_third_person_to_first(agent_content, speaker_name)
         execution_tier = str(lane_b_result.get("execution_tier") or "consultative")
         try:
             workspace_root = resolve_workspace_root(job.workspace_id)

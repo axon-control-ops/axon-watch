@@ -90,7 +90,7 @@ describe('ide presence profile', () => {
     expect(
       resolveIdeKairoChipState({
         profileState: 'idle',
-        employeeFailureLine: 'Last shift failed: npm test exited 1',
+        employeeFailureLine: 'Last job failed: npm test exited 1',
         agentStreamActive: false,
         kairoSpeechActive: false,
       }),
@@ -101,7 +101,7 @@ describe('ide presence profile', () => {
     expect(
       resolveIdeKairoChipState({
         profileState: 'idle',
-        employeeFailureLine: 'Last shift failed: npm test exited 1',
+        employeeFailureLine: 'Last job failed: npm test exited 1',
         agentStreamActive: true,
         kairoSpeechActive: false,
       }),
@@ -110,7 +110,7 @@ describe('ide presence profile', () => {
     expect(
       resolveIdeKairoChipState({
         profileState: 'idle',
-        employeeFailureLine: 'Last shift failed: npm test exited 1',
+        employeeFailureLine: 'Last job failed: npm test exited 1',
         agentStreamActive: false,
         kairoSpeechActive: true,
       }),
@@ -120,7 +120,7 @@ describe('ide presence profile', () => {
   it('gates composer failure chrome on the same alerting rules as the Kairo chip', () => {
     const failureInput = {
       profileState: 'idle' as const,
-      employeeFailureLine: 'Last shift failed: npm test exited 1',
+      employeeFailureLine: 'Last job failed: npm test exited 1',
       agentStreamActive: false,
       kairoSpeechActive: false,
     };
@@ -143,5 +143,27 @@ describe('ide presence profile', () => {
         profileState: 'thinking',
       }),
     ).toBe(false);
+  });
+
+  it('does not show Soft Attention Try again for fleet VAXON alerts alone', () => {
+    expect(
+      shouldSurfaceIdeEmployeeFailure({
+        profileState: 'alerting',
+        employeeFailureLine: null,
+        agentStreamActive: false,
+        kairoSpeechActive: false,
+      }),
+    ).toBe(false);
+  });
+
+  it('still shows Soft Attention when a teammate failed during a fleet alert', () => {
+    expect(
+      shouldSurfaceIdeEmployeeFailure({
+        profileState: 'alerting',
+        employeeFailureLine: 'Last job failed: npm test exited 1',
+        agentStreamActive: false,
+        kairoSpeechActive: false,
+      }),
+    ).toBe(true);
   });
 });

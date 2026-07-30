@@ -1,7 +1,24 @@
 /* Left-rail Voice card fill + absolute region resize handles. */
 
+/*
+ * Mission Control left rail: bottom ACTIVE RUN is content-sized so
+ * Workspaces/Attention can scroll to the last item.
+ */
+.console-shell--mockup .left-sidebar-mockup--mission-control {
+  display: grid !important;
+  grid-template-rows:
+    minmax(0, 1fr)
+    auto;
+  min-height: 0;
+  height: 100% !important;
+  max-height: 100%;
+  align-self: stretch;
+}
+
 .console-shell--mockup
-  .left-sidebar-mockup:not(.left-sidebar-mockup--galaxy) {
+  .left-sidebar-mockup:not(.left-sidebar-mockup--galaxy):not(.left-sidebar-mockup--mission-control):not(
+    .left-sidebar-mockup--ide
+  ) {
   display: grid !important;
   grid-template-rows:
     minmax(0, 1fr)
@@ -28,6 +45,14 @@
   margin-top: 0;
   padding-top: 0.9rem;
   overflow: hidden;
+}
+
+.left-sidebar-mockup__status-anchor--run-only {
+  height: auto;
+  max-height: min(42vh, 18rem);
+  overflow: auto;
+  overscroll-behavior: contain;
+  padding-bottom: 0.35rem;
 }
 
 .console-shell--mockup[data-layout-mode='operator']
@@ -102,16 +127,14 @@
   position: absolute !important;
   top: 0;
   bottom: 0;
+  /* Sit in the shell gutter BETWEEN panels — never over the scrollbar. */
   right: 0;
-  z-index: 100;
-  width: 0.75rem;
+  z-index: 40;
+  width: 0.55rem;
   height: 100%;
-  background: linear-gradient(
-    90deg,
-    transparent,
-    rgba(0, 242, 255, 0.08)
-  );
-  transform: none;
+  background: transparent;
+  transform: translateX(50%);
+  pointer-events: auto;
 }
 
 .console-shell--mockup
@@ -121,16 +144,12 @@
   top: 0;
   bottom: 0;
   left: 0;
-  z-index: 100;
-  width: 0.75rem;
+  z-index: 40;
+  width: 0.55rem;
   height: 100%;
-  background: linear-gradient(
-    90deg,
-    rgba(0, 242, 255, 0.08),
-    transparent
-  );
+  background: transparent;
   cursor: col-resize;
-  transform: none;
+  transform: translateX(-50%);
   touch-action: none;
 }
 
@@ -138,7 +157,8 @@
   .region-right-dock.agent-dock
   > .agent-dock__resize-handle
   .agent-dock__resize-grip {
-  left: 0.22rem;
+  left: 50%;
+  transform: translateX(-50%);
 }
 
 .console-shell--mockup
@@ -147,7 +167,7 @@
 .console-shell--mockup
   .region-right-dock.agent-dock
   > .agent-dock__resize-handle:hover {
-  background: rgba(0, 242, 255, 0.12);
+  background: rgba(0, 242, 255, 0.08);
 }
 
 .voice-card-resize-handle {

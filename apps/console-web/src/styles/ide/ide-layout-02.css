@@ -214,6 +214,21 @@
   color: var(--text-hud);
 }
 
+.kairo-sidebar-panel__attend {
+  margin-top: 0.4rem;
+  width: 100%;
+  border: 1px solid rgba(0, 242, 255, 0.35);
+  border-radius: 0.35rem;
+  background: rgba(0, 180, 200, 0.12);
+  color: rgba(180, 245, 255, 0.96);
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.68rem;
+  font-weight: 600;
+  padding: 0.35rem 0.55rem;
+  text-align: left;
+}
+
 .kairo-sidebar-panel__stop-speech {
   margin-top: 0.45rem;
   width: 100%;
@@ -382,19 +397,50 @@
 }
 
 .agent-dock__header {
-  /* Above .agent-dock__thread so the workspace picker can overhang the transcript. */
+  /* Above .agent-dock__thread so the chat history panel can overhang the transcript. */
   position: relative;
   z-index: 30;
   flex-shrink: 0;
   min-width: 0;
   max-width: 100%;
   overflow: visible;
-  padding: 0.45rem 0.65rem 0.4rem;
+  padding: 0.28rem 0.45rem 0.28rem 0.35rem;
   border-bottom: 1px solid rgba(138, 154, 173, 0.14);
 }
 
 .agent-dock__header--compact {
-  padding-bottom: 0.4rem;
+  padding-bottom: 0.28rem;
+}
+
+.agent-dock__header--chat {
+  padding-top: 0.2rem;
+  padding-bottom: 0.2rem;
+}
+
+.agent-dock__chat-chrome {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  min-width: 0;
+  width: 100%;
+}
+
+.agent-dock__chat-chrome > .agent-dock-thread-tabbar {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.agent-dock__chat-chrome > .agent-dock__pill--approvals {
+  flex: 0 0 auto;
+  min-width: 1.35rem;
+  justify-content: center;
+  text-align: center;
+  padding-inline: 0.35rem;
+}
+
+.agent-dock__chat-chrome > .agent-dock__collapse {
+  flex: 0 0 auto;
+  margin-left: 0.1rem;
 }
 
 .agent-dock__head-row {
@@ -425,9 +471,9 @@
   overflow: visible;
   position: relative;
   z-index: 20;
-  margin: 0.35rem -0.65rem -0.4rem;
-  border-top: 1px solid rgba(0, 242, 255, 0.14);
-  background: #031622;
+  margin: 0;
+  border-top: 0;
+  background: transparent;
 }
 
 .agent-dock__head-tabs > .agent-dock-thread-tabbar {
@@ -444,7 +490,7 @@
   flex-wrap: wrap;
 }
 
-.agent-dock-workspace-menu {
+.workspace-picker-menu {
   position: relative;
   z-index: 50;
   flex: 0 1 auto;
@@ -452,8 +498,28 @@
   max-width: 13rem;
 }
 
-.agent-dock-workspace-menu:has(.agent-dock-workspace-menu__panel) {
+.workspace-picker-menu:has(.workspace-picker-menu__panel) {
   z-index: 80;
+}
+
+.workspace-picker-menu--compact {
+  max-width: 12.5rem;
+}
+
+.workspace-picker-menu--compact .workspace-picker-menu__trigger {
+  max-width: 12.5rem;
+  min-height: 1.55rem;
+  padding: 0.16rem 0.45rem;
+  border-radius: 999px;
+}
+
+.workspace-picker-menu--compact .workspace-picker-menu__meta {
+  display: none;
+}
+
+.workspace-picker-menu--compact .workspace-picker-menu__panel {
+  right: 0;
+  left: auto;
 }
 
 /* glass3d flattens dock children to z-index:1 — restore chrome above transcript. */

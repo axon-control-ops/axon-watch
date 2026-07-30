@@ -5,7 +5,18 @@ import {
   subscribeKairoVoiceUtterance,
   type KairoVoiceSpeaker,
 } from '../../lib/kairo-voice-utterance';
-import { stripAgentStreamFenceMarkers } from '../../lib/agent-live-line-view';
+import {
+  sanitizeAgentThinkingForOperator,
+  stripAgentStreamFenceMarkers,
+} from '../../lib/agent-live-line-view';
+
+function operatorFacingCaptionText(text: string): string {
+  return (
+    sanitizeAgentThinkingForOperator(text) ||
+    stripAgentStreamFenceMarkers(text) ||
+    text.trim()
+  );
+}
 import { useShellStore } from '../../stores/shell';
 import { resolveGalaxySpeakerAvatar } from './galaxy-speaker-avatar-view';
 import {
@@ -50,16 +61,18 @@ export function useGalaxySpeechCaptions() {
   const activityLine = computed(() => {
     const spoken = activeUtteranceText.value?.trim() || null;
     if (spoken) {
-      return spoken.length > 120 ? `${spoken.slice(0, 117)}…` : spoken;
+      const cleaned = operatorFacingCaptionText(spoken);
+      return cleaned.length > 120 ? `${cleaned.slice(0, 117)}…` : cleaned;
     }
     const activity = shell.ideComposerActivity;
     if (!activity) {
       return null;
     }
-    const live = activity.liveBodyFull?.trim() || activity.label?.trim() || null;
-    if (!live) {
+    const liveRaw = activity.liveBodyFull?.trim() || activity.label?.trim() || null;
+    if (!liveRaw) {
       return null;
     }
+    const live = operatorFacingCaptionText(liveRaw);
     // Keep the HUD line short.
     return live.length > 120 ? `${live.slice(0, 117)}…` : live;
   });
@@ -89,12 +102,13 @@ export function useGalaxySpeechCaptions() {
   }
 
   function pushCaption(text: string, gen: number): void {
-    if (gen !== generation || !text.trim()) {
+    const cleaned = operatorFacingCaptionText(text);
+    if (gen !== generation || !cleaned) {
       return;
     }
     const caption: GalaxySpeechCaption = {
       id: `galaxy-cap-${++nextCaptionId}`,
-      text: text.trim(),
+      text: cleaned,
       bornAt: Date.now(),
     };
     captions.value = [...captions.value, caption].slice(-GALAXY_CAPTION_MAX_VISIBLE);
@@ -131,7 +145,7 @@ export function useGalaxySpeechCaptions() {
 
   function startUtterance(text: string, speaker: KairoVoiceSpeaker | null): void {
     utteranceActive = true;
-    activeUtteranceText.value = stripAgentStreamFenceMarkers(text) || null;
+    activeUtteranceText.value = operatorFacingCaptionText(text) || null;
     activeSpeaker.value = speaker;
     clearTimers();
     captions.value = [];

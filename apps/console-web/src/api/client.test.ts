@@ -50,4 +50,22 @@ describe('fetchJson timeout', () => {
     controller.abort();
     await expectation;
   });
+
+  it('surfaces control-plane detail on non-OK responses', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => ({
+        ok: false,
+        status: 403,
+        json: async () => ({
+          detail: 'cross-origin mutation blocked (origin http://127.0.0.1:5173 != https://axon.example.com)',
+          csrf_blocked: true,
+        }),
+      })),
+    );
+
+    await expect(fetchJson('/api/chat/messages', { method: 'POST' }, 'chat message submit failed')).rejects.toThrow(
+      /chat message submit failed: cross-origin mutation blocked/,
+    );
+  });
 });

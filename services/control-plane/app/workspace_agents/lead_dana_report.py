@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from datetime import datetime, timezone
 from typing import Any
 from uuid import uuid4
@@ -9,6 +10,9 @@ from uuid import uuid4
 from app.persistence import chat_store
 from app.workspace_agents import lead_plan_store
 from app.workspace_agents.lead_fan_out import _employee_id_for_role
+from app.workspace_agents.lead_text import truncate_text as _truncate
+
+logger = logging.getLogger(__name__)
 
 DANA_SYNTHESIS_RECEIPT_KIND = "lead_synthesis_dana_posted"
 SPECIALIST_STATUS_RECEIPT_KIND = "lead_specialist_status_posted"
@@ -25,13 +29,6 @@ def _utc_now_iso() -> str:
 
 def _new_message_id(prefix: str) -> str:
     return f"{prefix}_{uuid4().hex}"
-
-
-def _truncate(text: str, *, max_len: int) -> str:
-    cleaned = " ".join(str(text or "").strip().split())
-    if len(cleaned) <= max_len:
-        return cleaned
-    return f"{cleaned[: max_len - 1].rstrip()}…"
 
 
 def _receipt_already_posted(plan_id: str, kind: str, *, run_id: str | None = None) -> bool:
@@ -127,6 +124,7 @@ def build_lead_synthesis_dana_message(
             "3) I will keep holding cross-team decisions until you engage.",
             "",
             "Ask me anything about this rollup — I stay with you conversationally.",
+            "Confidence: 8/10",
         ]
     )
     return "\n".join(lines).rstrip() + "\n"
@@ -210,12 +208,37 @@ def post_lead_synthesis_to_dana_ide(
             "summary": summary,
         },
     )
+    spoken: dict[str, Any] | None = None
     try:
         from app.live_events import broadcast_material_change
+        from app.workspace_agents.lead_takeover_voice import (
+            build_lead_synthesis_spoken_line,
+            emit_lead_spoken_line,
+        )
 
         broadcast_material_change(receipt_id=str(receipt.get("receipt_id") or plan_id))
-    except Exception:
-        pass
+        lead_row = None
+        try:
+            from app.workspace_agents.lead_fan_out import employee_for_role
+
+            lead_row = employee_for_role(workspace_id, "lead")
+        except Exception:  # noqa: BLE001
+            lead_row = None
+        lead_name = str((lead_row or {}).get("name") or "Lead").strip() or "Lead"
+        spoken = emit_lead_spoken_line(
+            workspace_id=workspace_id,
+            line=build_lead_synthesis_spoken_line(
+                goal=goal,
+                summary=summary,
+                findings=findings,
+                lead_name=lead_name,
+            ),
+            receipt_id=f"lead_synthesis_voice_{plan_id}",
+            kind="lead_synthesis",
+        )
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("lead synthesis spoken_line failed: %s", exc)
+        spoken = {"status": "error", "detail": str(exc)}
 
     return {
         "plan_id": plan_id,
@@ -224,6 +247,7 @@ def post_lead_synthesis_to_dana_ide(
         "message_id": agent_message["message_id"],
         "thread_id": thread_id,
         "content": content,
+        "spoken": spoken,
     }
 
 
@@ -271,7 +295,10 @@ def post_specialist_status_to_dana(
     excerpt = _truncate(reply_excerpt or "", max_len=280)
     if excerpt:
         lines.append(f"Excerpt: {excerpt}")
-    lines.append("I will synthesize a full operator rollup when every specialist is terminal.")
+    lines.append(
+        "Lead takeover started — I posted a rollup in my Lead tab. "
+        "Full team synthesis still waits until every specialist on this plan is terminal."
+    )
 
     agent_message = chat_store.save_message(
         {

@@ -8,6 +8,8 @@ from app.cli_runtime.routes import (
     get_cursor_runtime_status,
     get_runtime_mcp_tools,
     get_runtime_status,
+    post_claude_runtime_login_start,
+    post_claude_runtime_logout,
     post_codex_runtime_login_start,
     post_codex_runtime_logout,
     post_cursor_runtime_login_start,
@@ -46,6 +48,16 @@ def codex_runtime_logout() -> dict[str, object]:
 @router.post("/api/runtime/codex/login/start")
 def codex_runtime_login_start() -> dict[str, object]:
     return post_codex_runtime_login_start()
+
+
+@router.post("/api/runtime/claude/logout")
+def claude_runtime_logout() -> dict[str, object]:
+    return post_claude_runtime_logout()
+
+
+@router.post("/api/runtime/claude/login/start")
+def claude_runtime_login_start() -> dict[str, object]:
+    return post_claude_runtime_login_start()
 
 
 @router.get("/api/runtime/cursor/status")

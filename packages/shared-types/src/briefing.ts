@@ -35,6 +35,22 @@ export interface OperatorBriefingConnectivity {
   watch_connected: boolean;
 }
 
+export interface ProductionReadinessCheck {
+  id: string;
+  ok: boolean;
+  weight: number;
+  detail: string;
+}
+
+export interface ProductionReadiness {
+  score: number;
+  grade: 'not_ready' | 'partial' | 'ready';
+  autonomy_mode: 'manual' | 'semi' | 'full';
+  blockers: string[];
+  checks: ProductionReadinessCheck[];
+  summary: string;
+}
+
 export interface ExecutiveOperatorRhythm {
   notice: string;
   advise: string;
@@ -69,6 +85,8 @@ export interface OperatorBriefing {
   scope?: OperatorBriefingScope;
   notice: string;
   advise: string;
+  /** One-click Attend action for the current Advise line (switch workspace + Attention). */
+  advise_ui_action?: Record<string, unknown> | null;
   executive_rhythm: ExecutiveOperatorRhythm;
   top_signals: InboxItem[];
   pending_approvals: OperatorBriefingPendingApprovals;
@@ -79,6 +97,7 @@ export interface OperatorBriefing {
   degraded: RuntimeSummaryDegradedState;
   cli_runtime?: CliRuntimeReadiness;
   connectivity: OperatorBriefingConnectivity;
+  production_readiness?: ProductionReadiness;
   memory_highlights?: OperatorBriefingMemoryHighlight[];
   due_reminders?: OperatorBriefingMemoryHighlight[];
   host_artifacts?: Array<Record<string, unknown>>;

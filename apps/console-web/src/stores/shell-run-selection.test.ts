@@ -60,6 +60,24 @@ describe('shell run selection', () => {
     expect(selectPrimaryApprovalRun([approval, executing])?.run_id).toBe('run_approval');
   });
 
+  it('prefers executing over queued so Start now is visible in the status bar', () => {
+    const queued = run({
+      run_id: 'run_queued',
+      phase: 'queued',
+      status: 'waiting',
+      updated_at: '2026-07-30T16:00:00Z',
+    });
+    const executing = run({
+      run_id: 'run_exec',
+      phase: 'executing',
+      status: 'running',
+      updated_at: '2026-07-30T15:00:00Z',
+    });
+
+    expect(selectPrimaryRun([queued, executing])?.run_id).toBe('run_exec');
+    expect(selectWorkspacePrimaryRun([queued, executing])?.run_id).toBe('run_exec');
+  });
+
   it('surfaces awaiting_approval when it is the only active run', () => {
     const approval = run({
       run_id: 'run_approval',

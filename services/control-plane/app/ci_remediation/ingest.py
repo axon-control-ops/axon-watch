@@ -55,6 +55,21 @@ def _track_delivery_status(payload: dict[str, Any]) -> dict[str, Any] | None:
     )
 
 
+def _clear_stale_on_success(payload: dict[str, Any]) -> int:
+    """Resolve older open CI failure alerts when this event is a green run."""
+    status = classify_workflow_status(payload)
+    if status is None or str(status.get("kind") or "") != "success":
+        return 0
+    from app.ci_remediation.stale_sweep import resolve_open_for_branch_success
+
+    cleared = resolve_open_for_branch_success(
+        workflow_name=str(status.get("workflow_name") or ""),
+        head_branch=str(status.get("head_branch") or ""),
+        head_sha=str(status.get("head_sha") or ""),
+    )
+    return len(cleared)
+
+
 def ingest_workflow_run_event(
     payload: dict[str, Any],
     *,
@@ -63,14 +78,44 @@ def ingest_workflow_run_event(
     delivery = _track_delivery_status(payload)
     delivery_id = str((delivery or {}).get("delivery_id") or "")
 
+    stale_cleared = 0
+    try:
+        stale_cleared = _clear_stale_on_success(payload)
+    except Exception:  # noqa: BLE001 — never block ingest on stale clear
+        import logging
+
+        logging.getLogger(__name__).exception("ci success stale-clear failed")
+
     classified = classify_workflow_run_event(payload)
     if classified is None:
         if delivery is not None:
+            reason = f"delivery_status:{delivery.get('stage')}"
+            if stale_cleared:
+                reason = f"{reason};stale_cleared:{stale_cleared}"
             return IngestResult(
                 accepted=True,
-                reason=f"delivery_status:{delivery.get('stage')}",
+                reason=reason,
                 delivery_id=delivery_id,
                 run_id=str(delivery.get("run_id") or ""),
+            )
+        if stale_cleared:
+            return IngestResult(
+                accepted=True,
+                reason=f"stale_cleared:{stale_cleared}",
+                delivery_id=delivery_id,
+            )
+        status = classify_workflow_status(payload)
+        if status is not None and match_binding(
+            github_owner=status["github_owner"],
+            github_repo=status["github_repo"],
+            workflow_name=status["workflow_name"],
+            enabled_only=True,
+        ) is not None:
+            return IngestResult(
+                accepted=True,
+                reason=f"workflow_status:{status['kind']};no_matching_state",
+                run_id=str(status.get("run_id") or ""),
+                delivery_id=delivery_id,
             )
         return IngestResult(accepted=False, reason="not_a_completed_failure")
 
@@ -159,11 +204,16 @@ def ingest_workflow_run_event(
         )
 
     task_id = str(leased.get("task_id") or "")
-    ci_store.attach_task(key, task_id, status="repairing")
+    parked_plan = str(leased.get("parked_under_plan") or "").strip()
+    ci_store.attach_task(
+        key,
+        task_id,
+        status="parked_under_plan" if parked_plan else "repairing",
+    )
 
     should_dispatch = binding.dispatch_on_ingest if dispatch is None else dispatch
     run_record = None
-    if should_dispatch:
+    if should_dispatch and not parked_plan:
         run_record = dispatch_repair_run(
             binding=binding,
             leased_task=leased,

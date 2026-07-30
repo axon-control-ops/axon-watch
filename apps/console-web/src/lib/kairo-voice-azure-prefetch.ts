@@ -17,7 +17,11 @@ export type AzureChunkHandlers = {
     contentType?: string,
   ) => { audio: HTMLAudioElement; revoke: () => void };
   registerAudio: (audio: HTMLAudioElement | null) => void;
-  playToCompletion: (audio: HTMLAudioElement) => Promise<void>;
+  playToCompletion: (
+    audio: HTMLAudioElement,
+    onAudibleStart?: () => void,
+    encodedLeadInMs?: number,
+  ) => Promise<void>;
   speakBrowserFallback: (
     text: string,
     reason: string,
@@ -30,6 +34,7 @@ export type AzureChunkHandlers = {
   ) => { engine: 'azure' | 'browser' | 'skipped' | 'idle'; reason: string | null };
   notifySpeaking: (active: boolean) => void;
   notifyIdle: () => void;
+  onPlaybackStart: () => void;
 };
 
 export async function speakAzureChunksWithPrefetch(
@@ -79,8 +84,16 @@ export async function speakAzureChunksWithPrefetch(
     const handle = handlers.createAudioHandle(response.audio_base64, response.content_type);
     handlers.registerAudio(handle.audio);
     try {
-      handlers.notifyChunk(chunk);
-      await handlers.playToCompletion(handle.audio);
+      await handlers.playToCompletion(
+        handle.audio,
+        () => {
+          if (index === 0) {
+            handlers.onPlaybackStart();
+          }
+          handlers.notifyChunk(chunk);
+        },
+        response.leading_audio_guard_ms,
+      );
     } catch (error) {
       handlers.registerAudio(null);
       const reason =

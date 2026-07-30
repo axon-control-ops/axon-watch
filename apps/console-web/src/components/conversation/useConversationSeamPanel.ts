@@ -11,11 +11,14 @@ import {
   prepareOperatorConversationDock,
   type ConversationDisplayItem,
 } from '../../lib/operator-conversation-view';
+import { conversationMessageWindow } from '../../lib/conversation-message-window';
+import { collapseConsecutiveDuplicateOperatorMessages } from '../../lib/collapse-duplicate-operator-messages';
+import { groupIdeConversationTurns } from '../../lib/group-ide-conversation-turns';
 import { operatorArtifactRecords } from '../../lib/operator-artifact-view';
 import type { OperatorThreadEntry, ThreadMessageAttachment } from '../../lib/operator-thread';
 import { agentContentHasTranscriptBlocks } from '../../lib/agent-transcript-blocks';
 import { createTranscriptSegmentCache } from '../../lib/conversation-transcript-segment-cache';
-import { sanitizeAgentThinkingForOperator } from '../../lib/agent-live-line-view';
+import { sanitizeAgentThinkingForOperator, THINKING_SPEECH_FALLBACK } from '../../lib/agent-live-line-view';
 import { prepareAgentTerminalOpen } from '../../lib/agent-terminal-open';
 import {
   shouldShowAgentTerminalBackgroundControl,
@@ -29,12 +32,20 @@ import { useShellStore } from '../../stores/shell';
 
 export function useConversationSeamPanel(rootRef: Ref<HTMLElement | null>, listRef: Ref<HTMLElement | null>, handleContentChange: () => void) {
   const shell = useShellStore();
-  const conversationMessages = computed(() =>
-    shell.layoutMode === 'ide' ? shell.threadMessages : shell.operatorThreadMessages,
+  const conversationMessages = computed(() => {
+    const raw =
+      shell.layoutMode === 'ide' ? shell.threadMessages : shell.operatorThreadMessages;
+    return shell.layoutMode === 'ide'
+      ? collapseConsecutiveDuplicateOperatorMessages(raw)
+      : raw;
+  });
+  const ideHistoryPage = ref(0);
+  const ideMessageWindow = computed(() =>
+    conversationMessageWindow(conversationMessages.value, ideHistoryPage.value),
   );
   const conversationDisplayItems = computed((): ConversationDisplayItem[] => {
     if (shell.layoutMode === 'ide') {
-      return conversationMessages.value.map((message: OperatorThreadEntry) => ({
+      return ideMessageWindow.value.items.map((message: OperatorThreadEntry) => ({
         kind: 'message' as const,
         message,
       }));
@@ -43,6 +54,11 @@ export function useConversationSeamPanel(rootRef: Ref<HTMLElement | null>, listR
       artifacts: operatorArtifactRecords.value,
     }).items;
   });
+  const ideConversationTurns = computed(() =>
+    shell.layoutMode === 'ide'
+      ? groupIdeConversationTurns(ideMessageWindow.value.items)
+      : [],
+  );
 
   const conversationDockHint = computed(() =>
     shell.layoutMode === 'operator'
@@ -62,7 +78,7 @@ export function useConversationSeamPanel(rootRef: Ref<HTMLElement | null>, listR
       );
     }
     if (shell.agentStreamActive) {
-      return 'I am thinking…';
+      return 'Agent — responding…';
     }
     return shell.ideComposerActivity?.label ?? 'Agent is working…';
   });
@@ -140,11 +156,8 @@ export function useConversationSeamPanel(rootRef: Ref<HTMLElement | null>, listR
     void shell.backgroundIdeAgentRun();
   }
 
-  async function continueTerminalInBackground(command: string): Promise<void> {
-    await shell.runCommandInAgentBackgroundTerminal(command);
-  }
-
   function showTerminalBackgroundControl(messageId: string, segmentOpen: boolean): boolean {
+    // Cursor: background/move only while the shell tool is still running.
     return shouldShowAgentTerminalBackgroundControl({
       canStopIdeAgentRun: shell.canStopIdeAgentRun,
       terminalBlockRunning: segmentOpen && isStreamingMessage(messageId),
@@ -159,7 +172,12 @@ export function useConversationSeamPanel(rootRef: Ref<HTMLElement | null>, listR
   }
 
   function thinkingBodyText(text: string): string {
-    return sanitizeAgentThinkingForOperator(text) || 'I am thinking…';
+    return sanitizeAgentThinkingForOperator(text) || THINKING_SPEECH_FALLBACK;
+  }
+
+  /** Empty while waiting for the first model tokens — never a canned spoken line. */
+  function emptyStreamingAck(): string {
+    return '';
   }
 
   async function copyTerminalOutput(output: string): Promise<void> {
@@ -239,17 +257,58 @@ export function useConversationSeamPanel(rootRef: Ref<HTMLElement | null>, listR
     return message.role === 'agent' && !message.content.trim() && isStreamingMessage(message.message_id);
   }
 
+  function showEarlierMessages(): void {
+    if (ideMessageWindow.value.olderCount > 0) {
+      ideHistoryPage.value += 1;
+    }
+  }
+
+  function showNewerMessages(): void {
+    ideHistoryPage.value = Math.max(0, ideHistoryPage.value - 1);
+  }
+
+  function showLatestMessages(): void {
+    ideHistoryPage.value = 0;
+  }
+
   watch(
-    conversationDisplayItems,
+    () => shell.activeIdeThreadId,
+    () => {
+      ideHistoryPage.value = 0;
+    },
+  );
+
+  const conversationContentRevision = computed(() => {
+    const items = conversationDisplayItems.value;
+    const last = items.at(-1);
+    if (!last) {
+      return 'empty';
+    }
+    if (last.kind === 'message') {
+      return `${items.length}:${last.message.message_id}:${last.message.content.length}`;
+    }
+    if (last.kind === 'command_turn') {
+      return `${items.length}:${last.messageId}:${last.execution.output.length}`;
+    }
+    if (last.kind === 'artifact') {
+      return `${items.length}:${last.messageId}:${last.artifact.body.length}`;
+    }
+    return `${items.length}:${last.messageId}:${last.text.length}`;
+  });
+
+  watch(
+    conversationContentRevision,
     () => {
       handleContentChange();
     },
-    { immediate: true, deep: true },
+    { immediate: true },
   );
 
   return {
     shell,
     conversationDisplayItems,
+    ideConversationTurns,
+    ideMessageWindow,
     conversationDockHint,
     showAgentWorking,
     agentWorkingLabel,
@@ -266,10 +325,10 @@ export function useConversationSeamPanel(rootRef: Ref<HTMLElement | null>, listR
     segmentKey,
     revealTerminalPanel,
     backgroundAgentTerminalRun,
-    continueTerminalInBackground,
     showTerminalBackgroundControl,
     terminalMirrorBadge,
     thinkingBodyText,
+    emptyStreamingAck,
     copyTerminalOutput,
     isThinkingExpanded,
     toggleThinking,
@@ -282,6 +341,9 @@ export function useConversationSeamPanel(rootRef: Ref<HTMLElement | null>, listR
     closeAttachmentLightbox,
     compactCommandSummary,
     isEmptyStreamingAgent,
+    showEarlierMessages,
+    showNewerMessages,
+    showLatestMessages,
     transcriptSegments,
     rootRef,
     listRef,

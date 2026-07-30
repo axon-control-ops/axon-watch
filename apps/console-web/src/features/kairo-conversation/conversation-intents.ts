@@ -5,7 +5,12 @@ import {
 } from '../../lib/kairo-entity-labels';
 
 export type ConversationNavigationIntent = {
-  kind: 'focus_workspace' | 'focus_attention' | 'focus_briefing' | 'switch_center_view';
+  kind:
+    | 'focus_workspace'
+    | 'enter_workspace'
+    | 'focus_attention'
+    | 'focus_briefing'
+    | 'switch_center_view';
   workspaceId?: string;
   centerView?: 'graph' | 'grid';
   reply: string;
@@ -26,8 +31,12 @@ const BRAIN_NAV_RE =
   /\b(?:show|open|switch to|go to|return to)\s+(?:the\s+)?(?:brain(?:\s+galaxy)?|galaxy(?:\s+view)?)\b|\b(?:brain|galaxy)\s+(?:view|mode)\b/i;
 const FEED_NAV_RE =
   /\b(?:show|open|switch to|go to)\s+(?:the\s+)?(?:incident\s+)?feed(?:\s+(?:view|mode))?\b|\b(?:incident|feed)\s+(?:view|mode)\b/i;
-const SHOW_WORKSPACE_RE =
-  /\b(?:show|focus|open|switch to)\s+(?:me\s+)?(?:the\s+)?(.+?)(?:\s+workspace)?\s*$/i;
+/** Enter the coding surface — "open DashPro workspace", "go into DashPro". */
+const ENTER_WORKSPACE_RE =
+  /\b(?:open|enter|go into|launch)\s+(?:me\s+)?(?:the\s+)?(.+?)(?:\s+workspace)?\s*$/i;
+/** Focus without leaving Mission Control — "show me DashPro", "focus DashPro". */
+const FOCUS_WORKSPACE_RE =
+  /\b(?:show|focus|switch to)\s+(?:me\s+)?(?:the\s+)?(.+?)(?:\s+workspace)?\s*$/i;
 
 function normalizeLabel(value: string): string {
   return normalizeVoiceTranscript(value).trim().toLowerCase().replace(/\s+/g, ' ');
@@ -118,15 +127,28 @@ export function resolveConversationNavigationIntent(
     };
   }
 
-  const workspaceMatch = trimmed.match(SHOW_WORKSPACE_RE);
-  if (workspaceMatch?.[1]) {
-    const workspace = matchWorkspace(workspaceMatch[1], workspaces);
+  const enterMatch = trimmed.match(ENTER_WORKSPACE_RE);
+  if (enterMatch?.[1]) {
+    const workspace = matchWorkspace(enterMatch[1], workspaces);
+    if (workspace) {
+      const label = canonicalWorkspaceLabel(workspace.workspace_id, workspace.display_name);
+      return {
+        kind: 'enter_workspace',
+        workspaceId: workspace.workspace_id,
+        reply: `Opening ${label}.`,
+      };
+    }
+  }
+
+  const focusMatch = trimmed.match(FOCUS_WORKSPACE_RE);
+  if (focusMatch?.[1]) {
+    const workspace = matchWorkspace(focusMatch[1], workspaces);
     if (workspace) {
       const label = canonicalWorkspaceLabel(workspace.workspace_id, workspace.display_name);
       return {
         kind: 'focus_workspace',
         workspaceId: workspace.workspace_id,
-        reply: `Focusing ${label}.`,
+        reply: `${label} is on deck.`,
       };
     }
   }

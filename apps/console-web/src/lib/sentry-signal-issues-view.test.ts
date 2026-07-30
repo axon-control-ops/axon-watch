@@ -34,6 +34,30 @@ describe('sentryIssuesFromSignalMeta', () => {
       shortId: 'RN-99',
       title: 'Boom',
       count: 3,
+      environment: '',
+      firstRelease: '',
+      lastRelease: '',
+    });
+  });
+
+  it('keeps production release metadata when present', () => {
+    const issues = sentryIssuesFromSignalMeta({
+      signal_family: 'child_project_monitor',
+      sentry_issues: [
+        {
+          id: '7',
+          title: 'Prod boom',
+          environment: 'production',
+          last_release: '1.4.0',
+          first_release: '1.3.9',
+        },
+      ],
+    });
+    expect(issues[0]).toMatchObject({
+      id: '7',
+      environment: 'production',
+      lastRelease: '1.4.0',
+      firstRelease: '1.3.9',
     });
   });
 });

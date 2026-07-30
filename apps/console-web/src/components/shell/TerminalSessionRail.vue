@@ -2,7 +2,10 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue';
 
 import WorkbenchIcon from '../WorkbenchIcon.vue';
-import { terminalSessionTabLabel } from '../../lib/terminal-session-view';
+import {
+  DEFAULT_OPERATOR_TERMINAL_SESSION_ID,
+  terminalSessionTabLabel,
+} from '../../lib/terminal-session-view';
 
 type TerminalSessionRow = {
   id: string;
@@ -124,6 +127,9 @@ function onKill(sessionId: string, event?: Event): void {
   event?.preventDefault();
   event?.stopPropagation();
   closeContextMenu();
+  if (sessionId === DEFAULT_OPERATOR_TERMINAL_SESSION_ID) {
+    return;
+  }
   emit('kill', sessionId);
 }
 
@@ -183,8 +189,8 @@ onBeforeUnmount(() => {
           <button
             type="button"
             class="terminal-session-rail__icon-btn"
-            :title="session.role === 'agent' ? 'Split with bash terminal' : 'Split Terminal'"
-            :aria-label="session.role === 'agent' ? 'Split with bash terminal' : 'Split Terminal'"
+            :title="session.role === 'agent' ? 'Split with zsh terminal' : 'Split Terminal'"
+            :aria-label="session.role === 'agent' ? 'Split with zsh local terminal' : 'Split Terminal'"
             @click="onSplit(session.id, $event)"
           >
             <WorkbenchIcon name="split" :size="13" />
@@ -192,11 +198,12 @@ onBeforeUnmount(() => {
           <button
             type="button"
             class="terminal-session-rail__icon-btn"
-            title="Kill Terminal"
-            aria-label="Kill Terminal"
+            :title="session.id === DEFAULT_OPERATOR_TERMINAL_SESSION_ID ? 'The default terminal stays available' : 'Kill Terminal'"
+            :aria-label="session.id === DEFAULT_OPERATOR_TERMINAL_SESSION_ID ? 'Default terminal cannot be killed' : 'Kill Terminal'"
+            :disabled="session.id === DEFAULT_OPERATOR_TERMINAL_SESSION_ID"
             @click="onKill(session.id, $event)"
           >
-            <WorkbenchIcon name="trash" :size="13" />
+            <WorkbenchIcon name="trash" :size="14" />
           </button>
         </div>
       </div>
@@ -211,6 +218,7 @@ onBeforeUnmount(() => {
         @pointerdown.stop
       >
         <button
+          v-if="contextSession.id !== DEFAULT_OPERATOR_TERMINAL_SESSION_ID"
           type="button"
           class="terminal-session-rail__context-item"
           role="menuitem"
@@ -381,6 +389,16 @@ onBeforeUnmount(() => {
 .terminal-session-rail__icon-btn:hover {
   background: rgba(255, 255, 255, 0.1);
   color: rgba(230, 242, 255, 0.98);
+}
+
+.terminal-session-rail__icon-btn:disabled {
+  cursor: default;
+  opacity: 0.35;
+}
+
+.terminal-session-rail__icon-btn:disabled:hover {
+  background: transparent;
+  color: rgba(168, 186, 204, 0.92);
 }
 </style>
 

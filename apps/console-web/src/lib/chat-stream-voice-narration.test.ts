@@ -16,9 +16,11 @@ vi.mock('./kairo-progress-narrator', () => ({
 
 vi.mock('./kairo-voice-queue', () => ({
   dropWaitingKairoNarration: vi.fn(),
+  stopActiveKairoNarration: vi.fn(),
 }));
 
 import { createKairoAgentMilestoneNarrator } from './kairo-agent-milestone-narrator';
+import { stopActiveKairoNarration } from './kairo-voice-queue';
 import { createChatStreamVoiceNarration } from './chat-stream-voice-narration';
 
 describe('createChatStreamVoiceNarration', () => {
@@ -93,5 +95,182 @@ describe('createChatStreamVoiceNarration', () => {
 
     voice.narrateCompletion('Here is a three-step plan.');
     expect(voice.answerNarrator?.narrate).not.toHaveBeenCalled();
+  });
+
+  it('does not speak a canned start ack — waits for model live text', () => {
+    const voice = createChatStreamVoiceNarration({
+      composerMode: 'agent',
+      messageId: 'msg_4',
+      sessionId: () => 'session',
+      workspaceId: () => 'workspace_edudashpro_school',
+      narration: () => 'minimal',
+      narrateToolProgress: () => false,
+      voiceDeliveryAllowed: () => true,
+      operatorPrompt: () => 'retry the bounded continuous shift',
+      fullAccess: () => true,
+      speaker: () => ({
+        kind: 'employee',
+        id: 'employee-lindi',
+        name: 'Lindi',
+        roleLabel: 'Lead',
+      }),
+    });
+
+    expect(voice.speakStartBookend()).toBe(false);
+    expect(voice.agentMilestoneNarrator?.narrate).not.toHaveBeenCalled();
+
+    voice.maybeSpeakThinkingBlock(
+      'Assuming the Lindi persona for the EDP Excellence workspace. Reviewing her last shift receipts.',
+    );
+    expect(voice.agentMilestoneNarrator?.narrate).toHaveBeenCalledTimes(1);
+    expect(voice.agentMilestoneNarrator?.narrate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        key: 'start',
+        verbatim: true,
+        message: 'Reviewing my last shift receipts.',
+      }),
+    );
+  });
+
+  it('skips post-IDLE progress openers when mid-run thinking already carried intent', () => {
+    const voice = createChatStreamVoiceNarration({
+      composerMode: 'agent',
+      messageId: 'msg_6',
+      sessionId: () => 'session',
+      workspaceId: () => 'workspace_dashpro',
+      narration: () => 'minimal',
+      narrateToolProgress: () => false,
+      voiceDeliveryAllowed: () => true,
+      operatorPrompt: () => 'fix the payments card',
+      fullAccess: () => true,
+      speaker: () => ({
+        kind: 'employee',
+        id: 'employee-priya',
+        name: 'Priya',
+        roleLabel: 'Frontend',
+      }),
+    });
+
+    expect(
+      voice.maybeSpeakThinkingBlock(
+        'Reading the payments card styles and planning the layout fix.',
+      ),
+    ).toBe(true);
+    vi.mocked(voice.agentMilestoneNarrator!.narrate).mockClear();
+    vi.mocked(stopActiveKairoNarration).mockClear();
+
+    voice.narrateCompletion(
+      'Reading the parent dashboard survey payments wiring and the selected-child card styles next, then fix that card layout and produce a clear dashboard layout preview.',
+    );
+    expect(stopActiveKairoNarration).toHaveBeenCalledWith('stream_complete');
+    expect(voice.agentMilestoneNarrator?.narrate).not.toHaveBeenCalled();
+  });
+
+  it('stops mid-run speech and cues the ask card on completion', () => {
+    const voice = createChatStreamVoiceNarration({
+      composerMode: 'agent',
+      messageId: 'msg_ask',
+      sessionId: () => 'session',
+      workspaceId: () => 'workspace_dashpro',
+      narration: () => 'minimal',
+      narrateToolProgress: () => false,
+      voiceDeliveryAllowed: () => true,
+      operatorPrompt: () => 'prep canary OTA',
+      fullAccess: () => true,
+    });
+
+    expect(
+      voice.maybeSpeakThinkingBlock(
+        'Sir King chose prep-and-run canary OTA. Checking the development tree next.',
+      ),
+    ).toBe(true);
+    vi.mocked(voice.agentMilestoneNarrator!.narrate).mockClear();
+    vi.mocked(stopActiveKairoNarration).mockClear();
+
+    voice.narrateCompletion(
+      [
+        ':::thinking',
+        'Sir King chose prep-and-run canary OTA. I am checking that we are on a clean development tree, then I will publish.',
+        ':::',
+        '',
+        'The release gate blocked the publish.',
+        '',
+        ':::ask How should I clear the canary gate?',
+        '- 1 | Fix the tree and retry',
+        '- 2 | Skip canary for now',
+        '- 3 | Force publish anyway',
+        ':::',
+      ].join('\n'),
+    );
+    expect(stopActiveKairoNarration).toHaveBeenCalledWith('stream_complete');
+    expect(voice.agentMilestoneNarrator?.narrate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        key: 'done',
+        verbatim: true,
+        message: 'I need your choice on the ask card.',
+      }),
+    );
+  });
+
+  it('still speaks a Confidence close-out after thinking carried intent', () => {
+    const voice = createChatStreamVoiceNarration({
+      composerMode: 'agent',
+      messageId: 'msg_7',
+      sessionId: () => 'session',
+      workspaceId: () => 'workspace_dashpro',
+      narration: () => 'minimal',
+      narrateToolProgress: () => false,
+      voiceDeliveryAllowed: () => true,
+      operatorPrompt: () => 'fix the payments card',
+      fullAccess: () => true,
+    });
+
+    expect(
+      voice.maybeSpeakThinkingBlock('Reading the payments wiring next.'),
+    ).toBe(true);
+    vi.mocked(voice.agentMilestoneNarrator!.narrate).mockClear();
+
+    voice.narrateCompletion(
+      'Reading the wiring next.\n\nCritical Review: payments card layout is restored.\n\nConfidence: 8/10',
+    );
+    expect(voice.agentMilestoneNarrator?.narrate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        key: 'done',
+        message: expect.stringMatching(/Critical Review|Confidence/i),
+      }),
+    );
+  });
+
+  it('prefers sanitized model live text over the ack when thinking arrives first', () => {
+    const voice = createChatStreamVoiceNarration({
+      composerMode: 'agent',
+      messageId: 'msg_5',
+      sessionId: () => 'session',
+      workspaceId: () => 'workspace_edudashpro_school',
+      narration: () => 'minimal',
+      narrateToolProgress: () => false,
+      voiceDeliveryAllowed: () => true,
+      operatorPrompt: () => 'retry the bounded continuous shift',
+      fullAccess: () => true,
+      speaker: () => ({
+        kind: 'employee',
+        id: 'employee-lindi',
+        name: 'Lindi',
+        roleLabel: 'Lead',
+      }),
+    });
+
+    expect(
+      voice.maybeSpeakThinkingBlock(
+        'Assuming the Lindi persona. Reviewing my last shift receipts and planning docs.',
+      ),
+    ).toBe(true);
+    expect(voice.agentMilestoneNarrator?.narrate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        key: 'start',
+        verbatim: true,
+        message: 'Reviewing my last shift receipts and planning docs.',
+      }),
+    );
   });
 });

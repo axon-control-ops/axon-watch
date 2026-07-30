@@ -275,6 +275,14 @@
   animation: presence-busy-label 1.4s ease-in-out infinite;
 }
 
+.company-presence-strip__role--failed {
+  color: rgba(255, 150, 130, 0.92);
+}
+
+.company-presence-strip__role--paused {
+  color: rgba(170, 185, 200, 0.7);
+}
+
 .company-presence-strip__btn--selected .company-presence-strip__name {
   color: rgba(210, 240, 255, 0.95);
 }

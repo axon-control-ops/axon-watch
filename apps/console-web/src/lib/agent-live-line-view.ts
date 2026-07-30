@@ -10,6 +10,13 @@ const USER_META_ASKED_RE =
 const USER_META_PREFIX_RE =
   /^(?:\*+)?\s*(?:the\s+)?user\s+(?:is\s+asking(?:\s+(?:whether|if|about))?|asked|requested|said|says)\s*/i;
 const LEADING_WHETHER_RE = /^(?:whether|if)\s+/i;
+/** Model meta about "taking on" a named persona — UI already shows the speaker. */
+const PERSONA_ASSUMPTION_SENTENCE_RE =
+  /\b(?:i(?:['’]m|\s+am)\s+)?assum(?:e|ing)\s+(?:the\s+)?[A-Z][A-Za-z-]*(?:\s+[A-Z][A-Za-z-]*)?\s+persona\b[^.!?]*[.!?]?/gi;
+const PERSONA_ASSUMPTION_PREFIX_RE =
+  /^(?:\*+)?\s*(?:i(?:['’]m|\s+am)\s+)?assum(?:e|ing)\s+(?:the\s+)?[A-Z][A-Za-z-]*(?:\s+[A-Z][A-Za-z-]*)?\s+persona\b[^.!?]*(?:[.!?]|$)\s*/i;
+const ACTING_AS_PERSONA_SENTENCE_RE =
+  /\b(?:i(?:['’]m|\s+am)\s+)?(?:acting|speaking)\s+as\s+(?:the\s+)?[A-Z][A-Za-z-]+(?:\s+persona)?\b[^.!?]*[.!?]?/gi;
 
 const THINKING_ECHO_MIN = 40;
 /** Near-duplicate paragraphs (typos / glued words) still count as an echo. */
@@ -157,29 +164,157 @@ export function stripAgentStreamFenceMarkers(text: string): string {
     .trim();
 }
 
-/** Operator-facing fallback when thinking has no usable body. */
-export const THINKING_SPEECH_FALLBACK = 'I am thinking…';
+/**
+ * Neutral UI placeholder when thinking has no usable body yet.
+ * Never spoken as a model reply — real thinking/reply text replaces this.
+ */
+export const THINKING_SPEECH_FALLBACK = 'Working…';
+
+const THINKING_LEAD_RE = /^(?:i\s+am\s+)?thinking(?:[,.…\s]{0,3}|\.\.\.)?$/i;
+const THINKING_PREFIX_IAM_RE = /^i\s+am\s+thinking(?:[,.…\s]{1,3}|\.\.\.)?\s*/i;
+const THINKING_PREFIX_RE = /^thinking(?:[,.…\s]{1,3}|\.\.\.)?\s*/i;
+const FUTURE_INTENT_RE =
+  /^(?:i(?:['’]ll|\s+will)|i(?:['’]m)\s+(?:going\s+to|about\s+to))\s+(\w+)([\s\S]*)$/i;
+const PRESENT_PROGRESS_RE = /^i(?:['’]m)\s+(\w+ing)([\s\S]*)$/i;
+
+const GERUND_EXCEPTIONS: Record<string, string> = {
+  be: 'Working on',
+  begin: 'Beginning',
+  get: 'Getting',
+  put: 'Putting',
+  run: 'Running',
+  set: 'Setting',
+  sit: 'Sitting',
+  scan: 'Scanning',
+  plan: 'Planning',
+  stop: 'Stopping',
+  trip: 'Tripping',
+  wrap: 'Wrapping',
+};
+
+function capitalizeWord(word: string): string {
+  if (!word) {
+    return word;
+  }
+  return `${word.charAt(0).toUpperCase()}${word.slice(1)}`;
+}
+
+function verbToGerund(verb: string): string {
+  const lower = verb.toLowerCase();
+  const exception = GERUND_EXCEPTIONS[lower];
+  if (exception) {
+    return exception;
+  }
+  if (lower.endsWith('ie')) {
+    return capitalizeWord(`${lower.slice(0, -2)}ying`);
+  }
+  if (lower.endsWith('e') && !lower.endsWith('ee')) {
+    return capitalizeWord(`${lower.slice(0, -1)}ing`);
+  }
+  // Double final consonant only for short CVC stems (plan → planning).
+  if (
+    lower.length <= 4 &&
+    /^[b-df-hj-np-tv-z]+[aeiou][b-df-hj-np-tv-z]$/i.test(lower)
+  ) {
+    return capitalizeWord(`${lower}${lower.slice(-1)}ing`);
+  }
+  return capitalizeWord(`${lower}ing`);
+}
 
 /**
- * Prefer first-person "I am thinking…" over bare "Thinking…" labels
- * (milestones, model lead-ins, and OCR-prone transcript chips).
+ * Turn future-intent monologue ("I'll read X", "I will check Y") into present
+ * progress copy operators can skim ("Reading X", "Checking Y").
+ */
+export function rewriteFutureIntentToPresent(text: string): string | null {
+  const flattened = flattenLiveLineText(text);
+  if (!flattened) {
+    return null;
+  }
+  const future = flattened.match(FUTURE_INTENT_RE);
+  if (future) {
+    const gerund = verbToGerund(future[1] ?? '');
+    const rest = (future[2] ?? '').replace(/\s+/g, ' ');
+    if (gerund === 'Working on') {
+      return flattenLiveLineText(`Working on${rest}`);
+    }
+    return flattenLiveLineText(`${gerund}${rest}`);
+  }
+  const present = flattened.match(PRESENT_PROGRESS_RE);
+  if (present) {
+    return flattenLiveLineText(`${capitalizeWord(present[1] ?? '')}${present[2] ?? ''}`);
+  }
+  return null;
+}
+
+/**
+ * Drop "Thinking…" / "thinking I'll…" filler and prefer concrete progress lines
+ * (milestones, model lead-ins, transcript chips, Galaxy captions).
  */
 export function normalizeThinkingSpeechLead(text: string): string {
   const flattened = flattenLiveLineText(text);
   if (!flattened) {
     return '';
   }
-  if (/^thinking(?:[.…]{1,3}|\.\.\.)?$/i.test(flattened)) {
-    return THINKING_SPEECH_FALLBACK;
+  if (THINKING_LEAD_RE.test(flattened)) {
+    return '';
   }
-  // "Thinking I'll…" / "thinking I'll…" → "I am thinking I'll…"
-  if (/^thinking\b/i.test(flattened) && !/^i\s+am\s+thinking\b/i.test(flattened)) {
-    return flattened.replace(/^thinking(?:[.…]{1,3}|\.\.\.)?\s*/i, 'I am thinking ').trim();
+
+  let strippedThinking = false;
+  let rest = flattened;
+  if (/^i\s+am\s+thinking\b/i.test(flattened)) {
+    strippedThinking = true;
+    rest = flattened.replace(THINKING_PREFIX_IAM_RE, '').trim();
+  } else if (/^thinking\b/i.test(flattened)) {
+    strippedThinking = true;
+    rest = flattened.replace(THINKING_PREFIX_RE, '').trim();
   }
-  return flattened;
+  if (!strippedThinking) {
+    return flattened;
+  }
+  if (!rest) {
+    return '';
+  }
+
+  const action = rewriteFutureIntentToPresent(rest);
+  if (action) {
+    return action;
+  }
+  if (/^about\s+/i.test(rest)) {
+    return flattenLiveLineText(`Working on ${rest.replace(/^about\s+/i, '')}`);
+  }
+  return capitalizeWord(rest);
 }
 
-export function sanitizeAgentThinkingForOperator(text: string): string {
+export function rewriteThirdPersonSpeaker(
+  text: string,
+  speakerName?: string | null,
+): string {
+  const name = String(speakerName || '').trim();
+  const cleaned = String(text || '');
+  if (!name || !cleaned) {
+    return cleaned;
+  }
+  const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  let out = cleaned;
+  out = out.replace(new RegExp(`\\b${escaped}\\s+is\\b`, 'gi'), 'I am');
+  out = out.replace(new RegExp(`\\b${escaped}\\s+was\\b`, 'gi'), 'I was');
+  out = out.replace(new RegExp(`\\b${escaped}\\s+will\\b`, 'gi'), 'I will');
+  out = out.replace(new RegExp(`\\b${escaped}\\s+has\\b`, 'gi'), 'I have');
+  out = out.replace(new RegExp(`\\b${escaped}'s\\b`, 'gi'), 'my');
+  out = out.replace(new RegExp(`\\b${escaped}\u2019s\\b`, 'gi'), 'my');
+  out = out.replace(new RegExp(`\\bas\\s+${escaped}\\b[,]?\\s*`, 'gi'), '');
+  // Self-narration often uses gendered possessives ("her last shift") after naming.
+  out = out.replace(
+    /\b(?:his|her|their)\s+((?:last\s+)?(?:shift|receipts|run)s?)\b/gi,
+    'my $1',
+  );
+  return flattenLiveLineText(out);
+}
+
+export function sanitizeAgentThinkingForOperator(
+  text: string,
+  options?: { speakerName?: string | null },
+): string {
   let out = collapseBackToBackThinkingEcho(text);
   if (!out) {
     return '';
@@ -189,18 +324,22 @@ export function sanitizeAgentThinkingForOperator(text: string): string {
   out = out.replace(USER_META_SENTENCE_RE, ' ');
   out = out.replace(USER_META_ASKED_RE, ' ');
   out = out.replace(USER_META_PREFIX_RE, '');
+  out = out.replace(PERSONA_ASSUMPTION_SENTENCE_RE, ' ');
+  out = out.replace(ACTING_AS_PERSONA_SENTENCE_RE, ' ');
+  out = out.replace(PERSONA_ASSUMPTION_PREFIX_RE, '');
   out = out.replace(LEADING_WHETHER_RE, '');
   out = flattenLiveLineText(out).replace(/^[,.\-–—:;]+/, '').trim();
   out = stripAgentStreamFenceMarkers(out);
+  out = rewriteThirdPersonSpeaker(out, options?.speakerName);
   out = normalizeThinkingSpeechLead(out);
-  if (!out || /^(?:the\s+)?user\b/i.test(out) || /^(?:whether|if)\s*$/i.test(out)) {
+  if (
+    !out ||
+    /^(?:the\s+)?user\b/i.test(out) ||
+    /^(?:whether|if)\s*$/i.test(out) ||
+    /\bassum(?:e|ing)\s+(?:the\s+)?\w+\s+persona\b/i.test(out)
+  ) {
     return '';
   }
-  // #region agent log
-  if (/^i am thinking\b/i.test(out) || /^thinking\b/i.test(flattenLiveLineText(text))) {
-
-  }
-  // #endregion
   return out;
 }
 

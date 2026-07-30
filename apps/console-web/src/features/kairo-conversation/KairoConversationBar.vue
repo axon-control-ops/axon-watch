@@ -23,10 +23,22 @@ import {
 } from '../../lib/apply-employee-specialty-route';
 import { teammateRouteNotice } from '../../lib/teammate-route-notice';
 import { useShellStore } from '../../stores/shell';
+import VaxonConversationAttachControls from './VaxonConversationAttachControls.vue';
 
 const shell = useShellStore();
-const { draft, pending, thinkingLine, canSubmit, submitTurn, handleFocus, handleBlur, speechCapture } =
-  useKairoConversation();
+const {
+  draft,
+  pending,
+  thinkingLine,
+  canSubmit,
+  submitTurn,
+  handleFocus,
+  handleBlur,
+  handleHistoryKeydown,
+  speechCapture,
+  attachments,
+} = useKairoConversation();
+const pendingAttachments = attachments.pendingAttachments;
 
 const workspaceId = computed(() => shell.currentWorkspace?.workspace_id ?? null);
 const pendingApprovals = computed(
@@ -102,6 +114,14 @@ function dismissTeammateRoute(): void {
 
 function handleInputFocus(): void {
   handleFocus();
+}
+
+function handleInputKeydown(event: KeyboardEvent): void {
+  const target = event.target;
+  if (!(target instanceof HTMLInputElement)) {
+    return;
+  }
+  handleHistoryKeydown(event, target);
 }
 
 const micDisabled = computed(
@@ -304,8 +324,22 @@ onUnmounted(() => {
       @undo="undoTeammateRoute"
       @dismiss="dismissTeammateRoute"
     />
+    <VaxonConversationAttachControls
+      v-if="pendingAttachments.length"
+      chips-only
+      :attachments="pendingAttachments"
+      :disabled="inputDisabled"
+      @attach="attachments.pickFiles"
+      @remove="attachments.removeAttachment"
+    />
     <div class="kairo-conversation-bar__command-row">
-      <form class="kairo-conversation-bar__form" @submit.prevent="handleSubmit">
+      <form
+        class="kairo-conversation-bar__form"
+        @submit.prevent="handleSubmit"
+        @paste="attachments.handlePaste"
+        @dragover.prevent
+        @drop.prevent="attachments.handleDrop"
+      >
         <span class="kairo-conversation-bar__glyph-slot" aria-hidden="true">
           <OperatorPersonaMark size="xs" />
         </span>
@@ -320,6 +354,14 @@ onUnmounted(() => {
           :disabled="inputDisabled"
           @focus="handleInputFocus"
           @blur="handleBlur"
+          @keydown="handleInputKeydown"
+        />
+        <VaxonConversationAttachControls
+          button-only
+          :attachments="pendingAttachments"
+          :disabled="inputDisabled"
+          @attach="attachments.pickFiles"
+          @remove="attachments.removeAttachment"
         />
         <button
           v-if="showInterrupt"

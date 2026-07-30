@@ -14,6 +14,30 @@ describe('parseChatUiAction', () => {
       type: 'switch_workspace',
       workspace_id: 'workspace_dashpro',
       open_file_path: 'README.md',
+      layout_mode: undefined,
+      focus_attention: false,
+      signal_id: null,
+      cta_label: null,
+    });
+  });
+
+  it('parses switch_workspace Attend actions', () => {
+    expect(
+      parseChatUiAction({
+        type: 'switch_workspace',
+        workspace_id: 'workspace_axon_watch',
+        layout_mode: 'operator',
+        focus_attention: true,
+        cta_label: 'Switch to Axon Watch & open Attention',
+      }),
+    ).toEqual({
+      type: 'switch_workspace',
+      workspace_id: 'workspace_axon_watch',
+      open_file_path: null,
+      layout_mode: 'operator',
+      focus_attention: true,
+      signal_id: null,
+      cta_label: 'Switch to Axon Watch & open Attention',
     });
   });
 
@@ -61,21 +85,25 @@ describe('parseChatUiAction', () => {
 });
 
 describe('applyChatUiAction', () => {
-  it('switches workspace and opens a file', () => {
+  it('applies Attend switch with Attention focus', () => {
     const setCurrentWorkspace = vi.fn();
     const openWorkspaceFile = vi.fn().mockResolvedValue(undefined);
+    const setLayoutMode = vi.fn();
+    const focusAttentionSidebar = vi.fn();
 
     applyChatUiAction(
-      { setCurrentWorkspace, openWorkspaceFile },
+      { setCurrentWorkspace, openWorkspaceFile, setLayoutMode, focusAttentionSidebar },
       {
         type: 'switch_workspace',
-        workspace_id: 'workspace_dashpro',
-        open_file_path: 'README.md',
+        workspace_id: 'workspace_axon_watch',
+        layout_mode: 'operator',
+        focus_attention: true,
       },
     );
 
-    expect(setCurrentWorkspace).toHaveBeenCalledWith('workspace_dashpro');
-    expect(openWorkspaceFile).toHaveBeenCalledWith('README.md');
+    expect(setCurrentWorkspace).toHaveBeenCalledWith('workspace_axon_watch');
+    expect(setLayoutMode).toHaveBeenCalledWith('operator');
+    expect(focusAttentionSidebar).toHaveBeenCalledWith(null);
   });
 
   it('hands off a signal to the IDE', () => {

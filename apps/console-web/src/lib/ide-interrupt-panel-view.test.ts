@@ -40,9 +40,22 @@ describe('ide interrupt panel view', () => {
         },
         watchConnected: true,
         degradedActive: false,
-        primaryRunPhase: null,
+        primaryRunPhase: 'review_ready',
       }),
     ).toBe('DashPro monitor warning');
+  });
+
+  it('labels remote-ingress-only issues without calling the local stack dead', () => {
+    expect(
+      resolveIdeInterruptHeadline({
+        pendingApprovalsCount: 0,
+        topSignal: null,
+        watchConnected: true,
+        degradedActive: false,
+        remoteIngressAttention: true,
+        primaryRunPhase: null,
+      }),
+    ).toBe('Remote ingress unhealthy — local Axon-X is up');
   });
 
   it('does not surface Open Attention for bootstrap-only inbox when healthy', () => {

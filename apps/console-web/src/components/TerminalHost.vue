@@ -38,12 +38,17 @@ function writeInput(data: string): void {
   terminalController?.writeInput(data);
 }
 
+function runCommand(command: string): void {
+  terminalController?.runCommand(command);
+}
+
 defineExpose({
   clearTerminal,
   persistTerminalScrollback,
   writeMirrorSnapshot,
   exitMirrorMode,
   writeInput,
+  runCommand,
 });
 
 function handleBeforeUnload(): void {

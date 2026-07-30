@@ -34,7 +34,7 @@
       "owner_role": "watcher",
       "escalate_role": "integrations",
       "lead_role": "lead",
-      "dispatch_on_ingest": true
+      "dispatch_on_ingest": false
     },
     {
       "enabled": true,
@@ -47,7 +47,7 @@
       "owner_role": "watcher",
       "escalate_role": "integrations",
       "lead_role": "lead",
-      "dispatch_on_ingest": true
+      "dispatch_on_ingest": false
     },
     {
       "enabled": true,
@@ -86,7 +86,7 @@
       "owner_role": "watcher",
       "escalate_role": "integrations",
       "lead_role": "lead",
-      "dispatch_on_ingest": true
+      "dispatch_on_ingest": false
     },
     {
       "enabled": true,
@@ -99,7 +99,7 @@
       "owner_role": "watcher",
       "escalate_role": "integrations",
       "lead_role": "lead",
-      "dispatch_on_ingest": true
+      "dispatch_on_ingest": false
     }
   ]
 }

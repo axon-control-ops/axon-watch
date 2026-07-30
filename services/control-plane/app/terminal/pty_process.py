@@ -18,11 +18,17 @@ from app.terminal.shell_invocation import (
 
 
 class PtyProcess:
-    def __init__(self, workspace_root: str, *, session_id: str | None = None) -> None:
+    def __init__(
+        self,
+        workspace_root: str,
+        *,
+        session_id: str | None = None,
+        preferred_shell: str | None = None,
+    ) -> None:
         self.workspace_root = workspace_root
         self.session_id = session_id
         self.master_fd, slave_fd = pty.openpty()
-        shell = resolve_terminal_shell()
+        shell = resolve_terminal_shell(preferred_shell)
         env = build_shell_env(
             os.environ,
             workspace_root=workspace_root,

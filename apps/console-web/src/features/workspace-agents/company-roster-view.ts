@@ -1,18 +1,27 @@
 import type { CompanyEmployeeRecord } from '../../contracts/canonical';
+import { OPERATOR_FAILURE_STATUS_LABEL } from '../../lib/operator-failure-copy';
 
 import { employeeFailureDetailTooltip, employeeFailureLine } from './company-roster-failure-view';
 import { employeeIsWorking } from './company-roster-status';
+
+export {
+  employeeTalkLine,
+  employeeTalkLineDetailTooltip,
+} from './company-roster-talk-view';
 
 export {
   employeeResolvedFailureDetail,
   failureSpeakDetail,
   isAgentRuntimeFallbackFailure,
   isAgentSessionInterruptedFailure,
+  isMissingConfidenceFailure,
   isOperatorStoppedFailure,
   isRestartInterruptedFailure,
   isShiftContinuationFailure,
   isRuntimeAuthFailure,
+  isRuntimeAuthProbeFailure,
   isUsageLimitFailure,
+  looksLikeSuccessfulOutcomeDetail,
   normalizeOperatorFailureDetail,
 } from './employee-failure-detail';
 
@@ -22,6 +31,7 @@ export {
   companyBusyEmployeesCount,
   employeeIsActivelyBusy,
   employeeIsLeadLikeRole,
+  resolveLiveBusyEmployeeIds,
 } from './company-roster-busy';
 
 export {
@@ -43,6 +53,7 @@ export {
   employeeFailureLine,
   employeeFailurePeekKey,
   employeeFailureRetryActionLabel,
+  employeeFailureBlocksAutoRetry,
   employeeShiftNeedsContinuation,
   employeeDockReceiptDetail,
   type CompanyRosterAlertBadge,
@@ -63,10 +74,10 @@ export function employeeStatusLabel(status: string | null | undefined): string {
     return 'idle';
   }
   if (value === 'failed') {
-    return 'last shift failed';
+    return OPERATOR_FAILURE_STATUS_LABEL;
   }
   if (value === 'interrupted') {
-    return 'shift interrupted';
+    return 'job interrupted';
   }
   return value.replace(/_/g, ' ');
 }
@@ -259,46 +270,6 @@ export function selectedPresenceStripEmployee(
     return null;
   }
   return employees.find((row) => row.employee_id === id) ?? null;
-}
-
-export function employeeTalkLine(employee: CompanyEmployeeRecord): string | null {
-  const failure = employeeFailureLine(employee);
-  if (failure) {
-    return failure;
-  }
-  const pipeline = String(employee.pipeline_stage || '').trim();
-  if (pipeline && ['watcher', 'integrations', 'lead', 'backend'].includes(String(employee.role || '').toLowerCase())) {
-    const label = pipeline.replace(/_/g, ' ');
-    const detail = employee.pipeline_detail?.trim();
-    return detail ? `Delivery ${label}: ${detail}` : `Delivery ${label}.`;
-  }
-  if (!employeeIsWorking(employee.status)) {
-    return null;
-  }
-  const owns = employee.owns?.trim() || employee.role_label?.trim() || 'my lane';
-  const status = (employee.status ?? '').trim();
-  if (status === 'watching') {
-    return `Watching ${owns} for new signals.`;
-  }
-  if (status === 'planning') {
-    return `Planning the next cut on ${owns}.`;
-  }
-  if (status === 'executing') {
-    return `In progress on ${owns}.`;
-  }
-  if (status === 'verifying') {
-    return `Verifying ${owns} before handoff.`;
-  }
-  if (status === 'blocked') {
-    return `Blocked on ${owns} — need a decision.`;
-  }
-  if (status === 'waiting_approval') {
-    return `Waiting on approval for ${owns}.`;
-  }
-  if (status === 'handoff_ready') {
-    return `Ready to hand off ${owns}.`;
-  }
-  return `On ${owns}.`;
 }
 
 export function employeeMetaLine(employee: CompanyEmployeeRecord): string {

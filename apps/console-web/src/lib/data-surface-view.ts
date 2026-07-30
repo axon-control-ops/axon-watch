@@ -47,6 +47,8 @@ const HANDOFF_COLUMNS = [
   'source_workspace_id',
   'target_workspace_id',
   'status',
+  'target_task_id',
+  'routed_role',
   'task',
   'created_at',
 ] as const;

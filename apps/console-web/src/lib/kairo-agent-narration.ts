@@ -29,7 +29,6 @@ export type NarrationMilestone = {
 };
 
 const THINKING_BLOCK_RE = /:::thinking\n([\s\S]*?)(?:\n:::|$)/;
-const THINKING_OPEN_RE = /^:::thinking$/gm;
 const TOOL_RE = /^:::tool\s+(.+)$/gm;
 const EDIT_RE = /^:::edit\s+(.+?)\s+\+(\d+)\s+-(\d+)\s*$/gm;
 
@@ -71,7 +70,9 @@ export function resolveStreamingActivity(
       : personaThreadPrefix(body);
   const thinking = liveThinkingText(content);
   if (thinking) {
-    const sanitized = sanitizeAgentThinkingForOperator(thinking);
+    const sanitized = sanitizeAgentThinkingForOperator(thinking, {
+      speakerName: personaName,
+    });
     if (sanitized) {
       const displayBody = truncateAgentLiveLineForDisplay(sanitized, AGENT_LIVE_LINE_DISPLAY_MAX);
       return {
@@ -118,14 +119,8 @@ export function narrationMilestonesForDelta(
 ): NarrationMilestone[] {
   const milestones: NarrationMilestone[] = [];
 
-  const previousThinking = matchAll(previousContent, THINKING_OPEN_RE).length;
-  const thinking = matchAll(content, THINKING_OPEN_RE).length;
-  if (thinking > previousThinking && previousThinking === 0) {
-    milestones.push({
-      key: 'thinking:0',
-      message: 'I am thinking…',
-    });
-  }
+  // Open thinking alone is not a speakable milestone — live thinking speech waits
+  // for a complete sanitized body so we never voice a canned "On it…".
 
   const previousTools = matchAll(previousContent, TOOL_RE).length;
   const tools = matchAll(content, TOOL_RE);
@@ -152,6 +147,8 @@ export function narrationMilestonesForDelta(
   return milestones;
 }
 
+const AGENT_CONFIDENCE_LINE_RE = /\bConfidence:\s*(\d{1,2})\s*\/\s*10\b/i;
+
 /** True when the agent turn ended as a runtime/auth failure, not a successful reply. */
 export function isAgentTurnFailureContent(content: string): boolean {
   const text = content.trim();
@@ -167,6 +164,56 @@ export function isAgentTurnFailureContent(content: string): boolean {
   );
 }
 
+/** Critical Review close-out line — successful shifts end with Confidence: N/10. */
+export function agentTurnHasConfidenceRating(content: string): boolean {
+  const text = content.trim();
+  if (!text || isAgentTurnFailureContent(text)) {
+    return false;
+  }
+  const match = text.match(AGENT_CONFIDENCE_LINE_RE);
+  if (!match) {
+    return false;
+  }
+  const score = Number(match[1]);
+  return Number.isFinite(score) && score >= 1 && score <= 10;
+}
+
+/**
+ * Mid-shift / future-tense openers that must not be spoken as the end-of-run
+ * bookend after the roster has already flipped to IDLE.
+ */
+export function isProgressOrIntentSentence(sentence: string): boolean {
+  const text = sentence.trim();
+  if (!text) {
+    return true;
+  }
+  if (/^\s*(Retrying|Continuing)\b/i.test(text)) {
+    return true;
+  }
+  // Present / future intent: "I am checking…", "I'll publish…", "I will prep…"
+  if (
+    /^\s*I(?:'m| am|'ll| will)\s+(?:going to |now )?(?:read(?:ing)?|start(?:ing)?|begin(?:ning)?|retry(?:ing)?|check(?:ing)?|look(?:ing)?|scan(?:ning)?|inspect(?:ing)?|open(?:ing)?|review(?:ing)?|draft(?:ing)?|fix(?:ing)?|update(?:ing)?|wire(?:ing)?|produc(?:e|ing)|analyz(?:e|ing)|publish(?:ing)?|prepar(?:e|ing)|run(?:ning)?)\b/i.test(
+      text,
+    )
+  ) {
+    return true;
+  }
+  if (
+    /^\s*(Reading|Checking|Looking|Scanning|Inspecting|Opening|Reviewing|Drafting|Analyzing|Working on|Next|Publishing|Preparing)\b/i.test(
+      text,
+    )
+  ) {
+    return true;
+  }
+  if (
+    /\bnext,\s+then\b/i.test(text) ||
+    /\bthen (?:I will |I'll |fix|produce|update|wire|check|read|publish|prep)\b/i.test(text)
+  ) {
+    return true;
+  }
+  return false;
+}
+
 /** First one or two sentences from the final agent reply for end-of-run narration. */
 export function spokenCompletionSummary(content: string): string {
   const cleaned = cleanAgentReplyText(content);
@@ -174,10 +221,45 @@ export function spokenCompletionSummary(content: string): string {
     return '';
   }
   const flat = cleaned.replace(/\n+/g, ' ').replace(/\s+/g, ' ').trim();
+  // Prefer the closing confidence line so we do not speak a mid-shift opener
+  // ("Retrying my bounded shift now…") after the composer run already stopped.
+  const confidence = flat.match(AGENT_CONFIDENCE_LINE_RE);
+  if (confidence) {
+    const score = confidence[1] ?? '?';
+    const withoutConfidence = flat.replace(AGENT_CONFIDENCE_LINE_RE, ' ').replace(/\s+/g, ' ').trim();
+    const reportSentences = withoutConfidence.match(/[^.!?]+[.!?]+/g) ?? [];
+    const usableReport = reportSentences.filter(
+      (sentence) => !isProgressOrIntentSentence(sentence),
+    );
+    if (usableReport.length > 0) {
+      let summary = (usableReport[0] ?? '').trim();
+      const second = usableReport[1];
+      if (summary.length < 140 && second) {
+        summary = `${summary} ${second.trim()}`;
+      }
+      if (summary.length > COMPLETION_SUMMARY_MAX) {
+        summary = `${summary.slice(0, COMPLETION_SUMMARY_MAX - 1).trim()}…`;
+      }
+      const ended = summary.endsWith('.') || summary.endsWith('…') ? summary : `${summary}.`;
+      return `${ended} Confidence ${score} out of 10.`;
+    }
+    const review = flat.match(/Critical\s+Review[^.!?]{0,160}[.!?]?/i)?.[0]?.trim();
+    if (review && review.length >= 24) {
+      const clipped =
+        review.length > COMPLETION_SUMMARY_MAX
+          ? `${review.slice(0, COMPLETION_SUMMARY_MAX - 1).trim()}…`
+          : review;
+      return clipped.endsWith('.') || clipped.endsWith('…') ? clipped : `${clipped}.`;
+    }
+    return `Shift complete. Confidence ${score} out of 10.`;
+  }
   const sentences = flat.match(/[^.!?]+[.!?]+/g) ?? [];
-  if (sentences.length > 0) {
-    let summary = (sentences[0] ?? '').trim();
-    const second = sentences[1];
+  const usable = sentences.filter((sentence) => !isProgressOrIntentSentence(sentence));
+  // Never fall back to filtered progress openers — that is what makes Priya
+  // announce "Reading… next, then fix…" after IDLE.
+  if (usable.length > 0) {
+    let summary = (usable[0] ?? '').trim();
+    const second = usable[1];
     if (summary.length < 120 && second) {
       summary = `${summary} ${second.trim()}`;
     }
@@ -186,8 +268,14 @@ export function spokenCompletionSummary(content: string): string {
     }
     return summary;
   }
+  if (sentences.length > 0) {
+    return 'Shift complete.';
+  }
   if (flat.length <= COMPLETION_SUMMARY_MAX) {
-    return flat;
+    return isProgressOrIntentSentence(flat) ? 'Shift complete.' : flat;
+  }
+  if (isProgressOrIntentSentence(flat)) {
+    return 'Shift complete.';
   }
   return `${flat.slice(0, COMPLETION_SUMMARY_MAX - 1).trim()}…`;
 }
@@ -203,6 +291,14 @@ export function narrationForCompletion(content: string): NarrationMilestone {
     return {
       key: 'done',
       message: 'Waiting for you to reproduce the bug.',
+      verbatim: true,
+    };
+  }
+  // Ask pause: stop mid-run intent speech and cue the operator to the card.
+  if (/:::ask\b/m.test(content)) {
+    return {
+      key: 'done',
+      message: 'I need your choice on the ask card.',
       verbatim: true,
     };
   }

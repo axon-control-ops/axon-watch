@@ -8,13 +8,13 @@
       "display_name": "axon-local",
       "project_root": "/home/edp/axon-nvme/repos/axon-local"
     },
-    "workspace_axon_online": {
-      "display_name": "axon-online",
-      "project_root": "/home/edp/Projectx/internal/axon-online"
-    },
     "workspace_axon_watch": {
       "display_name": "axon-watch",
       "project_root": "/home/edp/axon-nvme/repos/axon-watch"
+    },
+    "workspace_axon_online": {
+      "display_name": "axon-online",
+      "project_root": "/home/edp/Projectx/internal/axon-online"
     },
     "workspace_bkk_invoice_system": {
       "display_name": "bkk-invoice-system",
@@ -37,7 +37,7 @@
       "project_root": "/home/edp/Projectx/internal/ecd-staff-desktop"
     },
     "workspace_edudashpro_school": {
-      "display_name": "EduDash PRO School of Excellence",
+      "display_name": "EDP Excellence",
       "project_root": "/home/edp/Projectx/client/edudashpro-school-of-excellence"
     },
     "workspace_edusitepro": {

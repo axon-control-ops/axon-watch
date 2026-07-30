@@ -11,6 +11,42 @@ import { clearBriefingSurfaceOffer } from './conversation-briefing-surface';
 
 type ShellStore = ReturnType<typeof useShellStore>;
 
+function workspaceLabel(shell: ShellStore, workspaceId: string): string {
+  return canonicalWorkspaceLabel(
+    workspaceId,
+    shell.workspaces.find((workspace) => workspace.workspace_id === workspaceId)?.display_name ??
+      workspaceId,
+  );
+}
+
+function focusWorkspaceOnOperator(shell: ShellStore, workspaceId: string): void {
+  shell.setCurrentWorkspace(workspaceId);
+  // Keep Mission Control (grid) when already there so Live Ops stays the reply surface.
+  if (shell.operatorCenterView !== 'grid') {
+    shell.setOperatorCenterView('grid');
+  }
+  const label = workspaceLabel(shell, workspaceId);
+  setBrainGalaxyConversationFocus({
+    nodeId: workspaceGalaxyNodeId(workspaceId),
+    workspaceId,
+    signalId: null,
+    label,
+  });
+}
+
+function enterWorkspaceIde(shell: ShellStore, workspaceId: string): void {
+  shell.setCurrentWorkspace(workspaceId);
+  const label = workspaceLabel(shell, workspaceId);
+  setBrainGalaxyConversationFocus({
+    nodeId: workspaceGalaxyNodeId(workspaceId),
+    workspaceId,
+    signalId: null,
+    label,
+  });
+  shell.setLeftSidebarMode('workspaces');
+  shell.setLayoutMode('ide');
+}
+
 export function resolveKairoConversationNavigationIntent(
   content: string,
   shell: ShellStore,
@@ -39,21 +75,10 @@ export async function applyKairoConversationNavigationIntent(input: {
   } else if (input.navIntent.kind === 'focus_briefing') {
     clearBriefingSurfaceOffer();
     input.shell.focusKairoBriefing();
+  } else if (input.navIntent.kind === 'enter_workspace' && input.navIntent.workspaceId) {
+    enterWorkspaceIde(input.shell, input.navIntent.workspaceId);
   } else if (input.navIntent.kind === 'focus_workspace' && input.navIntent.workspaceId) {
-    input.shell.setOperatorCenterView('graph');
-    input.shell.setCurrentWorkspace(input.navIntent.workspaceId);
-    const label = canonicalWorkspaceLabel(
-      input.navIntent.workspaceId,
-      input.shell.workspaces.find(
-        (workspace) => workspace.workspace_id === input.navIntent.workspaceId,
-      )?.display_name ?? input.navIntent.workspaceId,
-    );
-    setBrainGalaxyConversationFocus({
-      nodeId: workspaceGalaxyNodeId(input.navIntent.workspaceId),
-      workspaceId: input.navIntent.workspaceId,
-      signalId: null,
-      label,
-    });
+    focusWorkspaceOnOperator(input.shell, input.navIntent.workspaceId);
   } else if (input.navIntent.kind === 'switch_center_view' && input.navIntent.centerView) {
     input.shell.setOperatorCenterView(input.navIntent.centerView);
   }

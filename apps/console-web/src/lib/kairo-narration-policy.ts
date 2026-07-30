@@ -27,7 +27,8 @@ export function shouldNarrateAgentEvent(input: {
     return false;
   }
   if (input.eventKey.startsWith('thinking:')) {
-    return true;
+    // Live thinking speech uses shouldSpeakLiveThinkingBlock with real model copy.
+    return false;
   }
   // Conversational mode: prefer live thinking over canned tool/edit chatter.
   if (

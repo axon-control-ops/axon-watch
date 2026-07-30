@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  agentTurnHasConfidenceRating,
+  isProgressOrIntentSentence,
   liveThinkingText,
   narrationForCompletion,
   narrationMilestonesForDelta,
@@ -52,7 +54,7 @@ describe('resolveStreamingActivity', () => {
 describe('narrationMilestonesForDelta', () => {
   it('emits structured milestones without speakable copy', () => {
     const first = narrationMilestonesForDelta('', STAGE_1);
-    expect(first).toEqual([{ key: 'thinking:0', message: 'I am thinking…' }]);
+    expect(first).toEqual([]);
 
     const second = narrationMilestonesForDelta(STAGE_1, STAGE_2);
     expect(second[0]).toMatchObject({ key: 'tool:0', toolLabel: 'Read README.md' });
@@ -80,6 +82,27 @@ describe('narrationForCompletion', () => {
     );
   });
 
+  it('prefers Confidence closing over a mid-shift Retrying opener', () => {
+    const content = [
+      'Retrying my bounded shift now, Sir King — I will read the charter next.',
+      'Critical Review: receipts restored after usage limits.',
+      'Confidence: 9/10',
+    ].join('\n\n');
+    const spoken = spokenCompletionSummary(content);
+    expect(spoken).not.toMatch(/^Retrying/i);
+    expect(spoken.toLowerCase()).toMatch(/confidence|critical review|shift complete/);
+  });
+
+  it('detects a successful Critical Review confidence rating', () => {
+    expect(agentTurnHasConfidenceRating('Done.\n\nConfidence: 9/10')).toBe(true);
+    expect(agentTurnHasConfidenceRating('Still working — no close-out yet.')).toBe(false);
+    expect(
+      agentTurnHasConfidenceRating(
+        "Lane B (agent) cannot start because no CLI runtime is ready: ActionRequiredError: You're out of usage.\nConfidence: 9/10",
+      ),
+    ).toBe(false);
+  });
+
   it('marks Lane B runtime failures instead of done', () => {
     const failure =
       "Lane B (agent) cannot start because no CLI runtime is ready: ActionRequiredError: You're out of usage.";
@@ -101,5 +124,48 @@ describe('narrationForCompletion', () => {
       verbatim: true,
     });
     expect(spokenCompletionSummary(content)).not.toContain('Keep Debug mode on');
+  });
+
+  it('does not speak progress openers as the end-of-run bookend', () => {
+    const plan =
+      'Reading the parent dashboard survey payments wiring and the selected-child card styles next, then fix that card layout and produce a clear dashboard layout preview.';
+    expect(isProgressOrIntentSentence(plan)).toBe(true);
+    expect(spokenCompletionSummary(plan)).toBe('Shift complete.');
+    expect(spokenCompletionSummary(`${plan} Confidence: 8/10`)).toMatch(/confidence/i);
+  });
+
+  it('speaks the specialist report body with confidence, not only Shift complete', () => {
+    const content =
+      'Sir King — OTA gate blocked. Wrong branch and dirty tree. Hold OTA until merge is green.\n' +
+      'Confidence: 8/10';
+    const spoken = spokenCompletionSummary(content);
+    expect(spoken).toMatch(/OTA gate blocked/i);
+    expect(spoken).toMatch(/Confidence 8 out of 10/i);
+    expect(spoken).not.toBe('Shift complete. Confidence 8 out of 10.');
+  });
+
+  it('treats gerund and future-tense mid-run intent as progress openers', () => {
+    expect(
+      isProgressOrIntentSentence(
+        'Sir King chose prep-and-run canary OTA. I am checking that we are on a clean development tree, then I will publish the canary update if that gate passes.',
+      ),
+    ).toBe(true);
+  });
+
+  it('speaks an ask waiting cue instead of mid-run intent on ask completion', () => {
+    const content = [
+      'The release gate blocked the publish.',
+      '',
+      ':::ask How should I clear the canary gate?',
+      '- 1 | Fix the tree and retry',
+      '- 2 | Skip canary for now',
+      '- 3 | Force publish anyway',
+      ':::',
+    ].join('\n');
+    expect(narrationForCompletion(content)).toEqual({
+      key: 'done',
+      message: 'I need your choice on the ask card.',
+      verbatim: true,
+    });
   });
 });

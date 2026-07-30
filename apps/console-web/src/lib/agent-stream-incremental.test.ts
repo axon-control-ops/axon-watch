@@ -71,6 +71,23 @@ describe('createAgentStreamIncrementalState', () => {
     expect(state.takeCompletedThinkingSpeech()).toBeNull();
   });
 
+  it('queues the first speakable sentence while the thinking fence is still open', () => {
+    const state = createAgentStreamIncrementalState();
+    state.consumeFullContent(
+      ':::thinking\nSir King chose prep-and-run canary OTA. I am checking the tree next.\n',
+    );
+    expect(state.takeCompletedThinkingSpeech()).toBe(
+      'Sir King chose prep-and-run canary OTA. I am checking the tree next.',
+    );
+    expect(state.takeCompletedThinkingSpeech()).toBeNull();
+
+    // Closing the fence must not re-queue the same mid-run intent.
+    state.consumeFullContent(
+      ':::thinking\nSir King chose prep-and-run canary OTA. I am checking the tree next.\nMore notes after the first breath.\n:::\n',
+    );
+    expect(state.takeCompletedThinkingSpeech()).toBeNull();
+  });
+
   it('exposes the complete first thinking block for one verbatim narration', () => {
     const state = createAgentStreamIncrementalState();
     state.consumeFullContent(

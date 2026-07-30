@@ -97,8 +97,21 @@ describe('decideBusyEmployeeStreamAttach', () => {
         resolvedMessageId: 'm1',
         alreadyActive: true,
         alreadyMessageId: 'm1',
+        hasLiveSession: true,
       }),
     ).toBe('skip_already');
+  });
+
+  it('reattaches when chrome is active but the EventSource is gone', () => {
+    expect(
+      decideBusyEmployeeStreamAttach({
+        threadId: 'thread_1',
+        resolvedMessageId: 'm1',
+        alreadyActive: true,
+        alreadyMessageId: 'm1',
+        hasLiveSession: false,
+      }),
+    ).toBe('attach');
   });
 
   it('attaches when a new message id is ready', () => {

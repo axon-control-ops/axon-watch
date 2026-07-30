@@ -12,7 +12,7 @@ export const agentShellMirrorForcedText = ref<string | null>(null);
 /** Queued command to inject into the interactive operator bash PTY. */
 export const pendingOperatorTerminalCommand = ref<string | null>(null);
 
-/** Queued command to run in the vaxon agent PTY (Continue in background). */
+/** Optional queue to inject a command into the read-only vaxon agent PTY. */
 export const pendingAgentBackgroundCommand = ref<string | null>(null);
 
 export function armAgentShellMirror(): void {

@@ -100,15 +100,28 @@ export function buildWorkerDeliveryPipelineView(input: {
     input.ciStatus?.trim(),
   ].filter(Boolean);
 
+  const draftPrUrl = input.draftPrUrl?.trim() || null;
+  const explicitCi = input.ciUrl?.trim() || null;
+  // Prefer the Actions run URL; fall back to the PR checks tab so CI stays watchable.
+  const ciUrl = explicitCi || (draftPrUrl ? prChecksUrl(draftPrUrl) : null);
+
   return {
     stage,
     label: workerDeliveryStageLabel(stage),
     detail: detailParts.join(' · '),
-    draftPrUrl: input.draftPrUrl?.trim() || null,
-    ciUrl: input.ciUrl?.trim() || null,
+    draftPrUrl,
+    ciUrl,
     attempt: input.attempt ?? null,
     steps,
   };
+}
+
+function prChecksUrl(prUrl: string): string | null {
+  const cleaned = prUrl.replace(/[?#].*$/, '').replace(/\/+$/, '');
+  if (!/\/pull\/\d+$/i.test(cleaned)) {
+    return null;
+  }
+  return `${cleaned}/checks`;
 }
 
 /** Parse stage=… from a worker_delivery receipt summary. */
@@ -123,6 +136,7 @@ export function resolveDockDeliveryPipelineView(input: {
     stage?: string | null;
     detail?: string | null;
     draftPrUrl?: string | null;
+    ciUrl?: string | null;
     ciStatus?: string | null;
   } | null;
 }): WorkerDeliveryPipelineView | null {
@@ -138,6 +152,7 @@ export function resolveDockDeliveryPipelineView(input: {
       stage: employee.stage,
       detail: employee.detail,
       draftPrUrl: employee.draftPrUrl,
+      ciUrl: employee.ciUrl,
       ciStatus: employee.ciStatus,
     });
   }

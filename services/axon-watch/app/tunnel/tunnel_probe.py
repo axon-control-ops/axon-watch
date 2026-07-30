@@ -306,7 +306,9 @@ def build_tunnel_diagnostics(config: dict[str, object] | None = None) -> dict[st
         detail = "tunnel process is running but is not managed by Axon-X"
     elif tunnel_mode == "named" and public_health_url and not public_ok:
         status = "degraded"
-        detail = f"process up; public health failed ({public_detail})"
+        detail = (
+            f"remote ingress unhealthy ({public_detail}); local Axon-X unaffected"
+        )
     elif (
         tunnel_mode == "named"
         and remote_service

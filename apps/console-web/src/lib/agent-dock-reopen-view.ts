@@ -53,7 +53,7 @@ function employeeFailureHintParts(state: AgentDockReopenState): string[] {
   if (!line) {
     return [];
   }
-  return state.employeeShiftInterrupted ? ['Shift interrupted'] : ['Last shift failed'];
+  return state.employeeShiftInterrupted ? ['Job interrupted'] : ['Last job failed'];
 }
 
 function employeeFailureAriaHintParts(state: AgentDockReopenState): string[] {
@@ -61,7 +61,7 @@ function employeeFailureAriaHintParts(state: AgentDockReopenState): string[] {
   if (!line) {
     return [];
   }
-  return state.employeeShiftInterrupted ? ['shift interrupted'] : ['last shift failed'];
+  return state.employeeShiftInterrupted ? ['job interrupted'] : ['last job failed'];
 }
 
 function activityHintParts(state: AgentDockReopenState): string[] {

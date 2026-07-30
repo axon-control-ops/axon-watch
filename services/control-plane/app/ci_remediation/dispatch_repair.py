@@ -86,6 +86,116 @@ def supersede_prior_repair_tasks(
     )
 
 
+def _park_repair_under_ship_plan(
+    *,
+    binding: CiRemediationBinding,
+    classified: dict[str, str],
+    dedupe_key: str,
+    plan: dict[str, Any],
+) -> dict[str, Any]:
+    """Open a Lead finding instead of leasing Watcher under an active ship plan."""
+    from app.workspace_agents.lead_plan_control import plan_marker
+    from app.workspace_agents.lead_text import truncate_text
+
+    plan_id = str(plan.get("plan_id") or "").strip()
+    plan_goal = truncate_text(str(plan.get("goal") or ""), max_len=160) or "Lead plan"
+    workflow = classified.get("workflow_name") or "CI"
+    branch = classified.get("head_branch") or "unknown-branch"
+    run_url = classified.get("html_url") or classified.get("run_id") or ""
+    failing = classified.get("failing_step") or "unknown failing step"
+    marker = plan_marker(plan_id)
+
+    # Collapse onto any open/leased Lead sticky ticket for this plan — do not
+    # spawn a second Lead lease beside an existing "advance [plan …]" follow-up.
+    needle = repair_goal_match_key(classified)
+    existing: dict[str, Any] | None = None
+    for status in ("open", "leased"):
+        for row in task_store.list_tasks(
+            workspace_id=binding.workspace_id,
+            status=status,
+            limit=100,
+        ):
+            if str(row.get("owner_role") or "").strip().lower() != "lead":
+                continue
+            goal = str(row.get("goal") or "")
+            if marker and marker in goal:
+                existing = dict(row)
+                break
+        if existing is not None:
+            break
+
+    superseded = supersede_prior_repair_tasks(
+        workspace_id=binding.workspace_id,
+        classified=classified,
+    )
+    if superseded:
+        logger.info(
+            "CI remediation superseded %s prior repair task(s) for %s (parked)",
+            len(superseded),
+            needle,
+        )
+
+    reused_sticky = existing is not None
+    if existing is None:
+        existing = task_store.create_task(
+            workspace_id=binding.workspace_id,
+            goal=(
+                f'Lead: advance "{plan_goal}" toward Done {marker} — '
+                f"CI finding: {needle}. Failing step: {failing}. "
+                f"Source: {run_url}. dedupe_key: {dedupe_key}."
+            ),
+            acceptance_criteria=(
+                f"Sole truth: advance plan {plan_id} — {plan_goal}. "
+                f"Treat {workflow} on {branch} as a blocker input, not a parallel Watcher dig. "
+                "Decide whether to assign a specialist under the plan, escalate Decide, "
+                "or defer non-blocking CI. End with Confidence: N/10."
+            ),
+            risk="normal",
+            owner_role="lead",
+            attempt_budget=2,
+        )
+
+    try:
+        from app.workspace_agents import lead_plan_store
+
+        lead_plan_store.append_receipt(
+            plan_id=plan_id,
+            workspace_id=binding.workspace_id,
+            kind="ci_finding_parked",
+            payload={
+                "task_id": existing.get("task_id"),
+                "workflow_name": workflow,
+                "head_branch": branch,
+                "run_id": classified.get("run_id"),
+                "html_url": classified.get("html_url"),
+                "failing_step": failing,
+                "dedupe_key": dedupe_key,
+                "reused_sticky_lead_task": reused_sticky,
+            },
+        )
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("ci finding plan receipt failed: %s", exc)
+    try:
+        from app.live_events import broadcast_material_change
+
+        broadcast_material_change(
+            receipt_id=f"ci_parked_{plan_id}_{classified.get('run_id') or dedupe_key}"
+        )
+    except Exception:  # noqa: BLE001
+        pass
+
+    parked = dict(existing)
+    parked["parked_under_plan"] = plan_id
+    logger.info(
+        "CI remediation parked under ship plan %s workspace=%s workflow=%s task=%s",
+        plan_id,
+        binding.workspace_id,
+        workflow,
+        parked.get("task_id"),
+    )
+    return parked
+
+
 def create_and_lease_repair_task(
     *,
     binding: CiRemediationBinding,
@@ -93,6 +203,17 @@ def create_and_lease_repair_task(
     dedupe_key: str,
     owner_role: str | None = None,
 ) -> dict[str, Any]:
+    from app.workspace_agents.lead_plan_control import controlling_ship_plan
+
+    ship_plan = controlling_ship_plan(binding.workspace_id)
+    if ship_plan is not None:
+        return _park_repair_under_ship_plan(
+            binding=binding,
+            classified=classified,
+            dedupe_key=dedupe_key,
+            plan=ship_plan,
+        )
+
     role = (owner_role or binding.owner_role).strip().lower() or "watcher"
     superseded = supersede_prior_repair_tasks(
         workspace_id=binding.workspace_id,

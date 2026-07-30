@@ -35,6 +35,18 @@ export async function executeKairoConverseAction(
     });
     return;
   }
+  if (action.type === 'lead_fan_out') {
+    const workspaceId = action.target_workspace_id?.trim();
+    if (workspaceId) {
+      shell.setCurrentWorkspace(workspaceId);
+      await shell.loadWorkspaceTasks(workspaceId);
+    }
+    if (shell.layoutMode !== 'ide') {
+      shell.setLayoutMode('ide');
+    }
+    shell.focusOperatorTaskBoard();
+    return;
+  }
   if (action.type === 'focus_briefing') {
     clearBriefingSurfaceOffer();
     shell.focusKairoBriefing();
@@ -42,6 +54,20 @@ export async function executeKairoConverseAction(
   }
   if (action.type === 'dispatch_command') {
     await shell.submitOperatorCommandContent(action.content);
+    return;
+  }
+  if (action.type === 'start_tunnel') {
+    // Server already attempted Watch tunnel start; refresh UI (and re-issue start if needed).
+    await shell.startCloudflareTunnel();
+    await Promise.all([
+      shell.loadRuntimeSummary({ background: true }),
+      shell.loadOperatorBriefing(),
+      shell.loadInbox(),
+    ]);
+    return;
+  }
+  if (action.type === 'clear_stale_ci_alerts') {
+    await Promise.all([shell.loadInbox(), shell.loadOperatorBriefing()]);
     return;
   }
   if (action.type === 'move_voice_orb') {
@@ -54,5 +80,20 @@ export async function executeKairoConverseAction(
       },
       action,
     );
+    return;
+  }
+  if (action.type === 'switch_workspace') {
+    await shell.loadWorkspaces({ sync: false });
+    applyChatUiAction(
+      {
+        setCurrentWorkspace: shell.setCurrentWorkspace,
+        openWorkspaceFile: shell.openWorkspaceFile,
+      },
+      action,
+    );
+    // Keep Mission Control selection chrome in sync with VAXON "open workspace".
+    if (shell.layoutMode === 'operator') {
+      shell.focusMissionControl();
+    }
   }
 }

@@ -2,7 +2,7 @@
 import { computed, onMounted, onUnmounted, ref } from 'vue';
 
 import WorkspaceIcon from '../WorkspaceIcon.vue';
-import WorkspaceAddForm from '../shell/WorkspaceAddForm.vue';
+import WorkspaceAddForm from './WorkspaceAddForm.vue';
 import { useWorkspaceAgents } from '../../features/workspace-agents/use-workspace-agents';
 import { workspaceAgentLabel } from '../../features/workspace-agents/workspace-agent-label';
 import { workspaceIconKind } from '../../lib/mockup-workspace-icons';
@@ -11,6 +11,14 @@ import {
   workspacePickerPrimaryLabel,
 } from '../../lib/workspace-picker-view';
 import { useShellStore } from '../../stores/shell';
+
+withDefaults(
+  defineProps<{
+    /** Compact single-line trigger for TopBar. */
+    compact?: boolean;
+  }>(),
+  { compact: false },
+);
 
 const shell = useShellStore();
 const menuOpen = ref(false);
@@ -89,35 +97,40 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div ref="menuRef" class="agent-dock-workspace-menu">
+  <div
+    ref="menuRef"
+    class="workspace-picker-menu"
+    :class="{ 'workspace-picker-menu--compact': compact }"
+  >
     <button
       type="button"
-      class="agent-dock-workspace-menu__trigger"
-      :class="{ 'agent-dock-workspace-menu__trigger--active': Boolean(currentWorkspace) }"
+      class="workspace-picker-menu__trigger"
+      :class="{ 'workspace-picker-menu__trigger--active': Boolean(currentWorkspace) }"
       :aria-expanded="menuOpen ? 'true' : 'false'"
       aria-haspopup="listbox"
+      aria-label="Select workspace"
       :title="currentWorkspaceMeta || currentWorkspaceLabel"
       @click.stop="toggleMenu"
     >
-      <span class="agent-dock-workspace-menu__trigger-main">
+      <span class="workspace-picker-menu__trigger-main">
         <WorkspaceIcon
-          class="agent-dock-workspace-menu__icon"
+          class="workspace-picker-menu__icon"
           :kind="currentWorkspaceKind"
-          :size="14"
+          :size="compact ? 13 : 14"
         />
-        <span class="agent-dock-workspace-menu__trigger-copy">
-          <span class="agent-dock-workspace-menu__label">{{ currentWorkspaceLabel }}</span>
+        <span class="workspace-picker-menu__trigger-copy">
+          <span class="workspace-picker-menu__label">{{ currentWorkspaceLabel }}</span>
           <span
-            v-if="currentWorkspaceMeta"
-            class="agent-dock-workspace-menu__meta"
+            v-if="!compact && currentWorkspaceMeta"
+            class="workspace-picker-menu__meta"
           >
             {{ currentWorkspaceMeta }}
           </span>
         </span>
       </span>
       <span
-        class="agent-dock-workspace-menu__chevron"
-        :class="{ 'agent-dock-workspace-menu__chevron--open': menuOpen }"
+        class="workspace-picker-menu__chevron"
+        :class="{ 'workspace-picker-menu__chevron--open': menuOpen }"
         aria-hidden="true"
       >
         ▾
@@ -126,7 +139,7 @@ onUnmounted(() => {
 
     <div
       v-if="menuOpen"
-      class="agent-dock-workspace-menu__panel"
+      class="workspace-picker-menu__panel"
       role="listbox"
       aria-label="Workspaces"
     >
@@ -135,27 +148,27 @@ onUnmounted(() => {
         :key="workspace.workspace_id"
         type="button"
         role="option"
-        class="agent-dock-workspace-menu__item"
+        class="workspace-picker-menu__item"
         :class="{
-          'agent-dock-workspace-menu__item--active':
+          'workspace-picker-menu__item--active':
             shell.currentWorkspace?.workspace_id === workspace.workspace_id,
         }"
         :aria-selected="shell.currentWorkspace?.workspace_id === workspace.workspace_id"
         @click="selectWorkspace(workspace.workspace_id)"
       >
-        <span class="agent-dock-workspace-menu__item-main">
+        <span class="workspace-picker-menu__item-main">
           <WorkspaceIcon
-            class="agent-dock-workspace-menu__item-icon"
+            class="workspace-picker-menu__item-icon"
             :kind="workspaceIconKind(workspace.workspace_id)"
             :size="14"
           />
-          <span class="agent-dock-workspace-menu__item-copy">
-            <span class="agent-dock-workspace-menu__item-label">
+          <span class="workspace-picker-menu__item-copy">
+            <span class="workspace-picker-menu__item-label">
               {{ workspacePickerPrimaryLabel(workspace) }}
             </span>
             <span
               v-if="workspaceRowMeta(workspace.workspace_id)"
-              class="agent-dock-workspace-menu__item-meta"
+              class="workspace-picker-menu__item-meta"
             >
               {{ workspaceRowMeta(workspace.workspace_id) }}
             </span>
@@ -163,19 +176,19 @@ onUnmounted(() => {
         </span>
         <span
           v-if="shell.currentWorkspace?.workspace_id === workspace.workspace_id"
-          class="agent-dock-workspace-menu__item-active-dot"
+          class="workspace-picker-menu__item-active-dot"
           aria-hidden="true"
         />
       </button>
       <button
         v-if="!showAddWorkspaceForm"
         type="button"
-        class="agent-dock-workspace-menu__item agent-dock-workspace-menu__item--add"
+        class="workspace-picker-menu__item workspace-picker-menu__item--add"
         @click="openAddWorkspaceForm"
       >
         + Add workspace
       </button>
-      <div v-else class="agent-dock-workspace-menu__add-form" @click.stop>
+      <div v-else class="workspace-picker-menu__add-form" @click.stop>
         <WorkspaceAddForm
           @registered="selectWorkspace"
           @cancel="showAddWorkspaceForm = false"

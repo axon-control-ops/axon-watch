@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import json
 import os
+import time
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, File, HTTPException, Query, UploadFile
@@ -147,6 +149,18 @@ def operator_presence_settings_get() -> dict[str, object]:
 def operator_presence_settings_put(body: OperatorPresenceSettingsRequest) -> dict[str, object]:
     current = operator_presence_settings_store.load_settings()
     patch = body.model_dump(exclude_none=True)
+    if "autonomy_mode" in patch:
+        mode = str(patch.get("autonomy_mode") or "manual").strip().lower()
+        if mode not in {"manual", "semi", "full"}:
+            patch.pop("autonomy_mode", None)
+        else:
+            patch["autonomy_mode"] = mode
+            # Full autonomy drives continuous worker starts; manual/semi keep them paused.
+            from app.persistence import worker_scheduler_settings_store
+
+            worker_scheduler_settings_store.patch_settings(
+                {"scheduler_enabled": mode == "full"}
+            )
     current.update(patch)
     return operator_presence_settings_store.save_settings(current)
 
@@ -198,6 +212,7 @@ def kairo_tts(body: KairoTtsRequest) -> dict[str, object]:
     from app.azure_tts import (
         DEFAULT_AZURE_VOICE,
         azure_speech_configured,
+        leading_audio_guard_ms,
         synthesize_azure_speech,
     )
     from app.cli_runtime.vault_keys import runtime_vault_posture
@@ -233,6 +248,7 @@ def kairo_tts(body: KairoTtsRequest) -> dict[str, object]:
         "voice": voice,
         "content_type": content_type,
         "audio_base64": base64.b64encode(audio).decode("ascii"),
+        "leading_audio_guard_ms": leading_audio_guard_ms(trimmed),
     }
 
 
@@ -331,19 +347,21 @@ def kairo_converse(
     refresh: bool = Query(default=False),
 ) -> dict[str, object]:
     trimmed = body.content.strip()
-    if not trimmed:
+    attachment_ids = list(body.attachment_ids or [])
+    if not trimmed and not attachment_ids:
         raise HTTPException(status_code=400, detail="content must not be empty")
     try:
         return converse_turn(
-            content=trimmed,
+            content=trimmed or "Please review the attached files.",
             session_id=body.session_id,
             workspace_id=body.workspace_id or None,
-            use_runtime=body.use_runtime,
-            answer_tier=body.answer_tier,
+            use_runtime=body.use_runtime or bool(attachment_ids),
+            answer_tier="deep" if attachment_ids else body.answer_tier,
             context_workspace_id=body.context_workspace_id or None,
             context_signal_id=body.context_signal_id or None,
             context_node_id=body.context_node_id or None,
             force_refresh=refresh,
+            attachment_ids=attachment_ids,
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
@@ -388,6 +406,47 @@ def dev_debug_session_log(body: DebugSessionLogRequest) -> dict[str, object]:
     with log_path.open("a", encoding="utf-8") as handle:
         handle.write(json.dumps(payload, ensure_ascii=True) + "\n")
     return {"ok": True, "path": str(log_path)}
+
+
+@router.get("/api/operator/autonomy/status")
+def operator_autonomy_status(workspace_id: str = "") -> dict[str, object]:
+    """Read-only Mission Control autonomy feed (mode, scheduler, receipts)."""
+    from app.workspace_agents.autonomous_attention import build_autonomy_status_feed
+
+    return build_autonomy_status_feed(workspace_id=workspace_id.strip() or None)
+
+
+@router.post("/api/operator/autonomy/scan")
+def operator_autonomy_scan() -> dict[str, object]:
+    """Operator-triggered attend scan (also runs on Full-autonomy scheduler ticks)."""
+    from app.persistence import operator_presence_settings_store
+    from app.workspace_agents.autonomous_attention import run_autonomous_attention_scan
+
+    settings = operator_presence_settings_store.load_settings()
+    mode = str(settings.get("autonomy_mode") or "manual").strip().lower()
+    if mode != "full":
+        raise HTTPException(
+            status_code=400,
+            detail=f"attend scan requires autonomy_mode=full (current={mode})",
+        )
+    return run_autonomous_attention_scan(include_lead_checkin=False)
+
+
+@router.post("/api/operator/autonomy/decisions/{receipt_id}")
+def operator_autonomy_decision_resolve(
+    receipt_id: str,
+    body: dict[str, object],
+) -> dict[str, object]:
+    """Resolve one exact critical/dangerous decision as approve or reject."""
+    from app.workspace_agents.autonomous_attention import resolve_autonomy_decision
+
+    resolution = str(body.get("resolution") or "").strip().lower()
+    try:
+        return resolve_autonomy_decision(receipt_id, resolution=resolution)
+    except ValueError as exc:
+        detail = str(exc)
+        status_code = 404 if "not found" in detail else 400
+        raise HTTPException(status_code=status_code, detail=detail) from exc
 
 
 @router.get("/api/live/events")

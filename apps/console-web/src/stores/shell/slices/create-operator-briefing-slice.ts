@@ -6,6 +6,12 @@ import type {
   OperatorBriefing,
   OperatorPresenceSettings,
 } from '../../../contracts/canonical';
+import { submitKairoConversationTranscript } from '../../../features/kairo-conversation/kairo-conversation-bus';
+import {
+  markReportTheaterAutoStarted,
+  shouldAutoStartReportTheater,
+  shouldStartReportTheaterForBriefing,
+} from '../../../features/report-theater/report-theater-auto-start';
 import { shouldRequestViewportCompactBriefing } from '../../../lib/viewport-compact';
 import type { BriefingLoadState } from '../types';
 
@@ -25,6 +31,7 @@ interface CreateOperatorBriefingSliceInput {
 export function createOperatorBriefingSlice(input: CreateOperatorBriefingSliceInput) {
   let operatorBriefingFetchInFlight: Promise<void> | null = null;
   let operatorBriefingFetchWorkspaceKey: string | null = null;
+  const observedFullBriefKeyByWorkspace = new Map<string, string>();
 
   async function loadOperatorBriefing(options?: {
     viewportCompact?: boolean;
@@ -89,6 +96,7 @@ export function createOperatorBriefingSlice(input: CreateOperatorBriefingSliceIn
             degraded: briefing.degraded,
             cli_runtime: briefing.cli_runtime,
             connectivity: briefing.connectivity,
+            production_readiness: briefing.production_readiness,
             active_runs: briefing.active_runs,
             pending_approvals: briefing.pending_approvals,
             next_safe_actions: briefing.next_safe_actions,
@@ -100,6 +108,40 @@ export function createOperatorBriefingSlice(input: CreateOperatorBriefingSliceIn
         input.setLastViewportCompactRequested(viewportCompact);
         input.briefingLoadState.value = 'loaded';
         input.applyOperatorDockDefaults();
+
+        if (!light) {
+          const settings =
+            briefing.operator_presence?.settings ?? input.operatorPresenceSettings.value;
+          const briefKey = [
+            briefing.advise ?? '',
+            briefing.notice ?? '',
+            String(briefing.awaiting_engagement_count ?? 0),
+            briefing.top_signals?.[0]?.signal_id ?? '',
+            String(briefing.pending_approvals?.count ?? 0),
+          ].join('|');
+          const previousBriefKey = observedFullBriefKeyByWorkspace.get(requestedWorkspaceKey);
+          observedFullBriefKeyByWorkspace.set(requestedWorkspaceKey, briefKey);
+          const autoStartEligible = shouldAutoStartReportTheater({
+            autonomyMode: settings.autonomy_mode,
+            privacyMode: Boolean(settings.privacy_mode),
+            spokenAlertsEnabled: settings.spoken_alerts_enabled !== false,
+            pendingApprovals: briefing.pending_approvals?.count ?? 0,
+            topSignalCount: briefing.top_signals?.length ?? 0,
+            awaitingEngagementCount: briefing.awaiting_engagement_count ?? 0,
+            degradedActive: Boolean(briefing.degraded?.active),
+            briefKey,
+          });
+          const shouldStart = shouldStartReportTheaterForBriefing({
+            autonomyMode: settings.autonomy_mode,
+            previousBriefKey,
+            currentBriefKey: briefKey,
+            eligible: autoStartEligible,
+          });
+          if (shouldStart) {
+            markReportTheaterAutoStarted(briefKey);
+            void submitKairoConversationTranscript('REPORT');
+          }
+        }
       } catch (error) {
         if ((input.currentWorkspaceId()?.trim() || '') !== requestedWorkspaceKey) {
           return;

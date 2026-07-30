@@ -9,6 +9,9 @@ from app.chat.lane_b_generated_image_actions import (
     lane_b_open_file_ui_action,
     maybe_generated_image_redisplay_reply,
 )
+from app.chat.lane_b_lead_decompose_fast_path import maybe_post_lead_decompose_message
+from app.chat.lane_b_lead_fan_out_fast_path import maybe_post_lead_fan_out_message
+from app.chat.lane_b_lead_named_assign_fast_path import maybe_post_lead_named_assign_message
 from app.chat.lane_b_persona_fast_path import build_lane_b_persona_reply, post_lane_b_persona_message
 from app.chat.lane_b_plan_run import finalize_lane_b_plan_run
 from app.chat.lane_b_run_dispatch import resolve_lane_b_agent_run
@@ -24,6 +27,10 @@ from app.persistence import chat_store
 from app.plans.service import maybe_attach_plan_artifact
 from app.terminal.session_registry import ensure_agent_session, serialize_session
 from app.workspace_agents.employee_persona_prompt import build_employee_persona_appendix
+from app.workspace_agents.employee_first_person import (
+    employee_name_from_persona_block,
+    rewrite_employee_third_person_to_first,
+)
 
 
 def post_lane_b_message(
@@ -128,6 +135,58 @@ def post_lane_b_message(
         }
         for item in chat_store.list_thread_messages(thread_id)
     ]
+    thread_employee_role = str(early_thread.get("employee_role") or "").strip()
+    lead_name = employee_name_from_persona_block(employee_persona or "") or "Lead"
+    bind_lane_b_attachments = lambda message_id: _bind_message_attachments(
+        attachment_ids=attachment_ids,
+        workspace_id=workspace_id,
+        message_id=message_id,
+        thread_id=thread_id,
+    )[0]
+    # Named assign before fan-out: "assign Cole…" must not become assign-all / Lead essay.
+    lead_named_assign_response = maybe_post_lead_named_assign_message(
+        workspace_id=workspace_id,
+        content=content,
+        thread_id=thread_id,
+        employee_role=thread_employee_role or None,
+        lead_name=lead_name,
+        composer_mode=composer_mode,
+        created_at=created_at,
+        save_message=chat_store.save_message,
+        new_message_id=_new_message_id,
+        bind_attachments=bind_lane_b_attachments,
+    )
+    if lead_named_assign_response is not None:
+        return lead_named_assign_response
+    lead_decompose_response = maybe_post_lead_decompose_message(
+        workspace_id=workspace_id,
+        content=content,
+        thread_id=thread_id,
+        employee_role=thread_employee_role or None,
+        lead_name=lead_name,
+        composer_mode=composer_mode,
+        created_at=created_at,
+        save_message=chat_store.save_message,
+        new_message_id=_new_message_id,
+        bind_attachments=bind_lane_b_attachments,
+    )
+    if lead_decompose_response is not None:
+        return lead_decompose_response
+    lead_fan_out_response = maybe_post_lead_fan_out_message(
+        workspace_id=workspace_id,
+        content=content,
+        thread_id=thread_id,
+        employee_role=thread_employee_role or None,
+        lead_name=lead_name,
+        composer_mode=composer_mode,
+        created_at=created_at,
+        save_message=chat_store.save_message,
+        new_message_id=_new_message_id,
+        bind_attachments=bind_lane_b_attachments,
+    )
+    if lead_fan_out_response is not None:
+        return lead_fan_out_response
+
     # VAXON smalltalk fast-path stays on generic threads only — employee 1:1s dispatch.
     persona_reply = (
         build_lane_b_persona_reply(
@@ -321,6 +380,8 @@ def post_lane_b_message(
         )
 
     agent_content = str(lane_b_result.get("content") or "")
+    speaker_name = employee_name_from_persona_block(memory_appendix)
+    agent_content = rewrite_employee_third_person_to_first(agent_content, speaker_name)
     # Thread id may still be unresolved here; capture after resolve below for plan mode.
 
     if is_tool_capable_composer_mode(composer_mode) and run_record is not None:

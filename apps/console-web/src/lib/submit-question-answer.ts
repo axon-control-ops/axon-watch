@@ -6,7 +6,7 @@ import type { IdeComposerMode } from './ide-composer-queue';
 
 export type SubmitQuestionAnswerShell = {
   openIdeComposerWithDraft: (content: string) => void;
-  submitIdeComposer: (mode: IdeComposerMode) => Promise<void>;
+  submitIdeComposer: (mode: IdeComposerMode) => Promise<boolean | void>;
   activeIdeThreadId?: string | null;
 };
 

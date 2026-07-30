@@ -1,7 +1,11 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue';
 
-import { probeSentryWriteScope, resolveSentryIssue } from '../../api/sentry-api';
+import {
+  attendSentryIssue,
+  probeSentryWriteScope,
+  resolveSentryIssue,
+} from '../../api/sentry-api';
 import {
   sentryIssuesFromSignalMeta,
   type SentrySignalIssue,
@@ -15,6 +19,7 @@ const props = defineProps<{
 
 const shell = useShellStore();
 const resolvingId = ref<string | null>(null);
+const attendingId = ref<string | null>(null);
 const errorMessage = ref<string | null>(null);
 const statusMessage = ref<string | null>(null);
 const resolvedIds = ref<string[]>([]);
@@ -37,7 +42,7 @@ async function refreshSignalsQuietly(): Promise<void> {
 }
 
 async function handleResolve(issue: SentrySignalIssue): Promise<void> {
-  if (resolvingId.value) {
+  if (resolvingId.value || attendingId.value) {
     return;
   }
   resolvingId.value = issue.id;
@@ -84,13 +89,45 @@ async function handleResolve(issue: SentrySignalIssue): Promise<void> {
     resolvingId.value = null;
   }
 }
+
+async function handleAttendAfterOta(issue: SentrySignalIssue): Promise<void> {
+  if (resolvingId.value || attendingId.value) {
+    return;
+  }
+  attendingId.value = issue.id;
+  errorMessage.value = null;
+  writeScopeHint.value = null;
+  statusMessage.value = null;
+  const label = issue.shortId || issue.id;
+  const confirmRelease = issue.lastRelease || issue.firstRelease || 'attended';
+  try {
+    const result = await attendSentryIssue(issue.id, {
+      confirm_release: confirmRelease,
+      workspace_id: shell.currentWorkspace?.workspace_id || 'workspace_dashpro',
+      mark_resolved_in_next_release: true,
+    });
+    if (!result.ok) {
+      errorMessage.value = result.detail || result.reason || `Attend failed for ${label}`;
+      return;
+    }
+    resolvedIds.value = [...resolvedIds.value, issue.id];
+    statusMessage.value =
+      result.detail ||
+      `Attended ${label} after OTA/build (${confirmRelease}). Suppressed until a newer production release reopens it.`;
+    await refreshSignalsQuietly();
+  } catch (error) {
+    errorMessage.value = error instanceof Error ? error.message : 'Sentry attend failed';
+  } finally {
+    attendingId.value = null;
+  }
+}
 </script>
 
 <template>
   <div v-if="issues.length || statusMessage" class="sentry-issues-list">
     <p class="sentry-issues-list__label">Sentry issues</p>
     <p class="sentry-issues-list__hint">
-      Resolve writes to Sentry per issue. The Axon critical signal stays while any unresolved issues remain — CLEAR only dismisses Axon locally.
+      Production issues only. Resolve closes in Sentry now. Attended after OTA mutes Axon until a newer production release reports the issue again.
     </p>
     <ul v-if="visibleIssues.length" class="sentry-issues-list__items">
       <li
@@ -113,20 +150,34 @@ async function handleResolve(issue: SentrySignalIssue): Promise<void> {
             {{ issue.shortId || issue.id }} · {{ issue.title }}
           </span>
           <span class="sentry-issues-list__meta">
+            <template v-if="issue.environment">{{ issue.environment }} · </template>
             <template v-if="issue.level">{{ issue.level }} · </template>
             {{ issue.count }} event{{ issue.count === 1 ? '' : 's' }}
+            <template v-if="issue.lastRelease"> · {{ issue.lastRelease }}</template>
           </span>
         </div>
-        <button
-          type="button"
-          class="sentry-issues-list__resolve"
-          :class="{ 'sentry-issues-list__resolve--compact': compact }"
-          :disabled="resolvingId !== null"
-          title="Resolve this issue in Sentry (does not CLEAR the local Axon signal)"
-          @click.stop="handleResolve(issue)"
-        >
-          {{ resolvingId === issue.id ? 'Resolving…' : 'Resolve' }}
-        </button>
+        <div class="sentry-issues-list__actions">
+          <button
+            type="button"
+            class="sentry-issues-list__resolve sentry-issues-list__resolve--attend"
+            :class="{ 'sentry-issues-list__resolve--compact': compact }"
+            :disabled="resolvingId !== null || attendingId !== null"
+            title="Confirm attended after OTA/new build — suppress until a newer production release"
+            @click.stop="handleAttendAfterOta(issue)"
+          >
+            {{ attendingId === issue.id ? 'Attending…' : 'Attended after OTA' }}
+          </button>
+          <button
+            type="button"
+            class="sentry-issues-list__resolve"
+            :class="{ 'sentry-issues-list__resolve--compact': compact }"
+            :disabled="resolvingId !== null || attendingId !== null"
+            title="Resolve this issue in Sentry now"
+            @click.stop="handleResolve(issue)"
+          >
+            {{ resolvingId === issue.id ? 'Resolving…' : 'Resolve' }}
+          </button>
+        </div>
       </li>
     </ul>
     <p v-if="statusMessage" class="sentry-issues-list__status" role="status">{{ statusMessage }}</p>
@@ -188,6 +239,13 @@ a.sentry-issues-list__title:hover {
   opacity: 0.7;
 }
 
+.sentry-issues-list__actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.28rem;
+  flex: 0 0 auto;
+}
+
 .sentry-issues-list__resolve {
   flex: 0 0 auto;
   border: 1px solid rgba(255, 176, 72, 0.4);
@@ -199,6 +257,11 @@ a.sentry-issues-list__title:hover {
   font-size: 0.68rem;
   letter-spacing: 0.04em;
   padding: 0.3rem 0.55rem;
+}
+
+.sentry-issues-list__resolve--attend {
+  border-color: rgba(72, 210, 255, 0.45);
+  background: rgba(72, 210, 255, 0.1);
 }
 
 .sentry-issues-list__resolve--compact {

@@ -168,6 +168,25 @@ def explain_operator_alert(
             "spoken": spoken,
         }
 
+    if reason == "runtime_degraded":
+        detail = summary or "a production or watch health check failed"
+        spoken = _ask_shaped(
+            f"Sir, runtime is degraded — {detail}",
+            "Want me to walk the fix?",
+        )
+        return {
+            "what": f"Runtime is degraded: {detail}.",
+            "you_do": (
+                "Open Attention / Mission Control, confirm watch connectivity and "
+                "public health, then decide whether to pause new dispatches."
+            ),
+            "agent_do": (
+                "Surface the degraded reason, propose the single safest next check, "
+                "and do not start new risky runs until connectivity is restored."
+            ),
+            "spoken": spoken,
+        }
+
     if family == "email_triage":
         sender = str((meta or {}).get("sender") or "someone").strip() or "someone"
         action = str((meta or {}).get("recommended_action") or "follow up").replace("_", " ")

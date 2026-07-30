@@ -16,11 +16,12 @@ export function employeeIsActivelyBusy(employee: CompanyEmployeeRecord): boolean
   if (!employee.enabled) {
     return false;
   }
-  // Own role-tagged run is personal busy only once work has entered a mid-shift phase.
-  // Lead fan-out leaves queued/assigned runs that must not light "N BUSY" with empty threads.
+  // Own role-tagged run is personal busy once dispatched. Continuous workers often
+  // stay `watching` with an active_run_id while the IDE stream is live — count them.
+  // Lead fan-out `assigned` (queued, not started) must not light "N BUSY".
   if (employee.active_run_id?.trim()) {
     const status = (employee.status ?? '').trim();
-    if (status === 'assigned' || status === 'watching' || status === 'idle') {
+    if (status === 'assigned' || status === 'idle') {
       return false;
     }
     return true;
@@ -43,4 +44,47 @@ export function companyBusyEmployeesCount(
   employees: readonly CompanyEmployeeRecord[] | null | undefined,
 ): number {
   return companyBusyEmployees(employees).length;
+}
+
+export type LiveBusyEmployeeResolutionInput = {
+  employees: readonly CompanyEmployeeRecord[] | null | undefined;
+  /** Thread ids with an active IDE chat stream (including background tabs). */
+  streamingThreadIds?: readonly string[] | null;
+  threads?: readonly { thread_id: string; employee_id?: string | null }[] | null;
+  /** Focused-thread owner when a global stream flag is on (fallback). */
+  focusedStreamEmployeeId?: string | null;
+};
+
+/**
+ * Union of roster mid-shift busy + every streaming thread's owner.
+ * Parallel continuous workers must all appear in the Team busy count.
+ */
+export function resolveLiveBusyEmployeeIds(
+  input: LiveBusyEmployeeResolutionInput,
+): string[] {
+  const ids = new Set<string>();
+  for (const row of input.employees ?? []) {
+    if (employeeIsActivelyBusy(row)) {
+      ids.add(row.employee_id);
+    }
+  }
+  const streaming = new Set(
+    (input.streamingThreadIds ?? []).map((id) => id.trim()).filter(Boolean),
+  );
+  if (streaming.size && input.threads?.length) {
+    for (const thread of input.threads) {
+      if (!streaming.has(thread.thread_id)) {
+        continue;
+      }
+      const employeeId = thread.employee_id?.trim();
+      if (employeeId) {
+        ids.add(employeeId);
+      }
+    }
+  }
+  const focused = input.focusedStreamEmployeeId?.trim();
+  if (focused) {
+    ids.add(focused);
+  }
+  return [...ids];
 }

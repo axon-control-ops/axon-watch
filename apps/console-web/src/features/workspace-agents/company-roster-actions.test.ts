@@ -14,6 +14,7 @@ import {
   employeeSurfaceAction,
   employeeTalkDraft,
 } from './company-roster-actions';
+import { employeeFailureBlocksAutoRetry } from './company-roster-view';
 
 function employee(overrides: Partial<CompanyEmployeeRecord> = {}): CompanyEmployeeRecord {
   return {
@@ -45,9 +46,11 @@ describe('company-roster-actions', () => {
   });
 
   it('picks composer mode by chat kind', () => {
-    expect(employeeChatComposerMode('status')).toBe('ask');
+    // Status is voice + focus only — must not demote Full Access into Ask/consultative.
+    expect(employeeChatComposerMode('status')).toBeNull();
     expect(employeeChatComposerMode('talk')).toBe('agent');
     expect(employeeChatComposerMode('assign')).toBe('agent');
+    expect(employeeChatComposerMode('receipts')).toBe('ask');
   });
 
   it('bundles composer mode and draft for roster and dock open flows', () => {
@@ -69,6 +72,16 @@ describe('company-roster-actions', () => {
       mode: 'agent',
       draft: '',
     });
+    expect(employeeComposerOpenPayload(failed, 'status')).toEqual({
+      mode: null,
+      draft: '',
+    });
+  });
+
+  it('does not attach Ask composerMode on the Status quick action', () => {
+    const statusAction = employeeQuickActions(employee()).find((action) => action.id === 'status');
+    expect(statusAction?.chatKind).toBe('status');
+    expect(statusAction?.composerMode).toBeUndefined();
   });
 
   it('maps lead to briefing and watcher to signals', () => {
@@ -122,19 +135,75 @@ describe('company-roster-actions', () => {
       'toggle_enabled',
     ]);
     expect(employeeQuickActions(failed).find((action) => action.id === 'retry')?.label).toBe(
-      'Retry shift',
+      'Try again',
     );
     expect(employeeQuickActions(failed).find((action) => action.id === 'receipts')?.label).toBe(
-      'Explain receipts',
+      'Explain what happened',
     );
-    expect(employeeRetryDraft(failed)).toMatch(/I am .+\. My last continuous shift failed/);
+    expect(employeeRetryDraft(failed)).toMatch(/My last continuous shift on .+ failed/);
+    expect(employeeRetryDraft(failed)).not.toMatch(/^I am /);
     expect(employeeRetryDraft(failed)).toContain('vitest: assertion failed');
     expect(employeeRetryDraft(failed).toLowerCase()).toContain('first person');
     expect(employeeChatDraft(failed, 'retry')).toBe(employeeRetryDraft(failed));
 
     expect(employeeReceiptsDraft(failed)).toContain('run_failed_abc123');
     expect(employeeReceiptsDraft(failed)).toContain('vitest: assertion failed');
+    expect(employeeReceiptsDraft(failed)).toContain('my last job');
+    expect(employeeReceiptsDraft(failed)).not.toContain("Priya's");
+    expect(employeeReceiptsDraft(failed)).not.toContain('Error: Run completed');
     expect(employeeChatComposerMode('receipts')).toBe('ask');
+  });
+
+  it('still offers Try again when Cursor usage is exhausted (copy warns; dock must not hide retry)', () => {
+    const usageBlocked = employee({
+      status: 'idle',
+      last_outcome: 'failed',
+      last_outcome_detail: 'ActionRequiredError: out of usage',
+      last_run_id: 'run_usage_blocked',
+    });
+    const actions = employeeQuickActions(usageBlocked);
+    expect(actions.map((action) => action.id)).toEqual([
+      'retry',
+      'receipts',
+      'talk',
+      'status',
+      'assign',
+      'toggle_enabled',
+    ]);
+    expect(actions.find((action) => action.id === 'retry')?.label).toBe('Try again');
+    expect(employeeDockDisplayActions(actions, usageBlocked).map((action) => action.id)).toEqual([
+      'retry',
+      'talk',
+      'status',
+      'assign',
+      'toggle_enabled',
+    ]);
+    expect(employeeFailureBlocksAutoRetry(usageBlocked)).toBe(true);
+  });
+
+  it('explains completed jobs without calling them failures', () => {
+    const completed = employee({
+      status: 'idle',
+      last_outcome: 'completed',
+      last_outcome_detail: 'Run completed',
+      last_run_id: 'run_133bac69735e',
+    });
+    const draft = employeeReceiptsDraft(completed);
+    expect(draft).toContain('run_133bac69735e');
+    expect(draft).toContain('completed successfully');
+    expect(draft).not.toMatch(/what failed|Error:/i);
+  });
+
+  it('treats success-like detail as completed even when outcome tag is stale failed', () => {
+    const stale = employee({
+      status: 'idle',
+      last_outcome: 'failed',
+      last_outcome_detail: 'Run completed',
+      last_run_id: 'run_133bac69735e',
+    });
+    const draft = employeeReceiptsDraft(stale);
+    expect(draft).toContain('completed successfully');
+    expect(draft).not.toMatch(/what failed|Error:/i);
   });
 
   it('uses continuation prompt when the last failure was a SIGTERM agent session', () => {
@@ -148,7 +217,7 @@ describe('company-roster-actions', () => {
     expect(retry).toContain('Continue the interrupted run from after the server restart');
     expect(retry).not.toContain('status 143');
     expect(employeeQuickActions(interrupted).find((action) => action.id === 'retry')?.label).toBe(
-      'Continue shift',
+      'Continue',
     );
   });
 
@@ -191,13 +260,14 @@ describe('company-roster-actions', () => {
         "Lane B agent fallback reply generated (ActionRequiredError: You're out of usage.)",
       last_run_id: 'run_7ae605411d4d',
     });
-    expect(employeeRetryDraft(failed)).toContain('Usage limits blocked my last shift');
-    expect(employeeRetryDraft(failed)).toContain('Once limits are restored');
+    expect(employeeRetryDraft(failed)).toContain('Cursor usage signal blocked my last shift');
+    expect(employeeRetryDraft(failed)).toContain('Auto+Composer or on-demand');
     expect(employeeRetryDraft(failed)).not.toContain('ActionRequiredError');
 
     expect(employeeReceiptsDraft(failed)).toContain('run_7ae605411d4d');
-    expect(employeeReceiptsDraft(failed)).toContain('usage limits blocked the agent runtime');
+    expect(employeeReceiptsDraft(failed)).toContain('Cursor usage signal');
     expect(employeeReceiptsDraft(failed)).not.toContain('ActionRequiredError');
+    expect(employeeReceiptsDraft(failed)).toContain('do not claim the whole account is exhausted');
   });
 
   it('uses runtime-auth guidance in retry and receipts drafts', () => {
@@ -213,7 +283,22 @@ describe('company-roster-actions', () => {
     expect(employeeRetryDraft(failed)).not.toContain('Lane B agent fallback');
 
     expect(employeeReceiptsDraft(failed)).toContain('run_43ca086d22d4');
-    expect(employeeReceiptsDraft(failed)).toContain('runtime auth is not ready');
+    expect(employeeReceiptsDraft(failed)).toContain('login is not ready');
+  });
+
+  it('uses auth-probe guidance (not login) when the Cursor probe timed out', () => {
+    const failed = employee({
+      status: 'idle',
+      last_outcome: 'failed',
+      last_outcome_detail:
+        'Lane B agent fallback reply generated (Cursor auth probe timed out. Run `cursor agent status` manually.; Cursor Cloud Agent unavailable)',
+      last_run_id: 'run_probe_timeout',
+    });
+    expect(employeeRetryDraft(failed)).toContain('auth probe timed out');
+    expect(employeeRetryDraft(failed)).toContain('cursor agent status');
+    expect(employeeRetryDraft(failed)).not.toContain('cursor agent login');
+    expect(employeeReceiptsDraft(failed)).toContain('auth probe timed out');
+    expect(employeeReceiptsDraft(failed)).not.toContain('login is not ready');
   });
 
   it('hides duplicate view receipts in the dock when the run link is shown', () => {
@@ -234,7 +319,7 @@ describe('company-roster-actions', () => {
     ]);
   });
 
-  it('omits view receipts when a failed shift has no run id', () => {
+  it('omits view receipts when a failed job has no run id', () => {
     const failed = employee({
       status: 'idle',
       last_outcome: 'failed',
@@ -247,5 +332,45 @@ describe('company-roster-actions', () => {
       'assign',
       'toggle_enabled',
     ]);
+  });
+
+  it('offers Start now only for Manual handoffs that are not live-busy', () => {
+    const tasks = [
+      {
+        task_id: 'task_open',
+        workspace_id: 'workspace_demo',
+        goal: 'Ship dock polish',
+        acceptance_criteria: '',
+        owner_role: 'frontend',
+        status: 'open' as const,
+        risk: 'normal' as const,
+        attempt_budget: 3,
+        attempts_used: 0,
+        dependencies: [],
+        allowed_paths: [],
+        exclusive_paths: [],
+        lease_holder: null,
+        lease_expires_at: null,
+        run_id: null,
+        plan_id: null,
+        plan_key: null,
+        terminal_outcome: null,
+        created_at: '2026-07-30T00:00:00Z',
+        updated_at: '2026-07-30T00:00:00Z',
+      },
+    ];
+    const waiting = employeeQuickActions(employee(), {
+      autonomyMode: 'manual',
+      tasks,
+      liveBusy: false,
+    });
+    expect(waiting[0]).toMatchObject({ id: 'start_now', taskId: 'task_open' });
+
+    const busy = employeeQuickActions(employee(), {
+      autonomyMode: 'manual',
+      tasks,
+      liveBusy: true,
+    });
+    expect(busy.map((action) => action.id)).not.toContain('start_now');
   });
 });

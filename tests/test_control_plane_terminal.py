@@ -148,6 +148,31 @@ class ControlPlaneTerminalTests(unittest.TestCase):
         fake_pty.write.assert_not_called()
         fake_pty.resize.assert_called_once_with(120, 30)
 
+    def test_agent_terminal_runs_explicit_programmatic_command(self) -> None:
+        fake_pty = Mock()
+        fake_pty.attach_reader.side_effect = lambda loop, on_output, on_closed: None
+        fake_pty.detach_reader.side_effect = lambda loop: None
+        fake_runtime = Mock()
+        fake_runtime.pty = fake_pty
+
+        with patch("app.terminal.session_handler.ensure_runtime", return_value=fake_runtime):
+            with self.client.websocket_connect(
+                "/api/workspaces/workspace_alpha/terminal?session_id=terminal-agent-test&role=agent"
+            ) as ws:
+                ready = json.loads(ws.receive_text())
+                self.assertEqual("agent", ready["role"])
+                ws.send_text(
+                    json.dumps(
+                        {
+                            "type": "run_command",
+                            "command": "npm run ota:canary",
+                        }
+                    )
+                )
+                ws.send_text(json.dumps({"type": "close"}))
+
+        fake_pty.write.assert_called_once_with(b"npm run ota:canary\n")
+
 
 if __name__ == "__main__":
     unittest.main()

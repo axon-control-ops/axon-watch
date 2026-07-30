@@ -23,6 +23,8 @@ export type {
   OperatorBriefingMemoryHighlight,
   OperatorBriefingPendingApprovals,
   ExecutiveOperatorRhythm,
+  ProductionReadiness,
+  ProductionReadinessCheck,
 } from './briefing';
 export { BRIEFING_ACTION_KINDS } from './briefing';
 export type {
@@ -31,6 +33,7 @@ export type {
   OperatorPresenceMobile,
   OperatorPresenceSettings,
   OperatorPresenceState,
+  AutonomyMode,
   KairoNarrationLevel,
   SpokenAlertEligibility,
   SttMode,

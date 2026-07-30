@@ -36,7 +36,7 @@ defineProps<{
         :href="pipeline.ciUrl"
         target="_blank"
         rel="noopener noreferrer"
-      >CI run</a>
+      >Watch CI</a>
     </div>
   </div>
 </template>

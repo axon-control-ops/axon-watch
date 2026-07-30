@@ -8,7 +8,8 @@
     {
       "id": "dashpro_sentry_recent_issues",
       "type": "sentry_recent_issues",
-      "service": "Sentry"
+      "service": "Sentry",
+      "environment": "production"
     },
     {
       "id": "dashpro_posthog_recent_events",
@@ -19,6 +20,23 @@
       "id": "dashpro_supabase_storage_quota",
       "type": "supabase_storage_quota",
       "service": "Supabase Storage"
+    },
+    {
+      "id": "dashpro_marketing_site_health",
+      "type": "http_health",
+      "service": "EduDash Pro site",
+      "url": "https://edudashpro.org.za",
+      "expect_status": 200,
+      "timeout_seconds": 8
+    },
+    {
+      "id": "dashpro_github_api_health",
+      "type": "http_health",
+      "service": "GitHub API",
+      "url": "https://api.github.com/zen",
+      "expect_status": 200,
+      "timeout_seconds": 5,
+      "bearer_token_env": "GH_TOKEN"
     }
   ]
 }

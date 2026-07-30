@@ -79,6 +79,8 @@ export interface CompanyEmployeeRecord {
   pipeline_stage?: string | null;
   pipeline_detail?: string | null;
   draft_pr_url?: string | null;
+  /** GitHub Actions (or equivalent) run URL while CI is pending/green/red. */
+  ci_run_url?: string | null;
   ci_status?: string | null;
 }
 

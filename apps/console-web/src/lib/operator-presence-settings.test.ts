@@ -55,13 +55,15 @@ describe('operator-presence-settings', () => {
       kairo_narration: 'conversational',
       ide_voice_strip_enabled: false,
       hands_free_enabled: false,
-      proactive_duplex_enabled: false,
+      proactive_duplex_enabled: true,
+      autonomy_mode: 'manual',
       speech_rate: 1.0,
       speech_pitch: 1.04,
       azure_voice_id: 'en-GB-RyanNeural',
       stt_mode: 'cloud',
-      voice_routing_mode: 'template_first',
+      voice_routing_mode: 'runtime_on_deep',
       narrate_tool_progress: false,
+      vaxon_model_id: 'cursor-grok-4.5-high-fast',
     });
     expect(storage.getItem(OPERATOR_PRESENCE_SETTINGS_KEY)).toContain('"operator_persona_enabled":false');
   });
@@ -75,14 +77,30 @@ describe('operator-presence-settings', () => {
       kairo_narration: 'conversational',
       ide_voice_strip_enabled: false,
       hands_free_enabled: false,
-      proactive_duplex_enabled: false,
+      proactive_duplex_enabled: true,
+      autonomy_mode: 'manual',
       speech_rate: 1.0,
       speech_pitch: 1.04,
       azure_voice_id: 'en-GB-RyanNeural',
       stt_mode: 'cloud',
-      voice_routing_mode: 'template_first',
+      voice_routing_mode: 'runtime_on_deep',
       narrate_tool_progress: false,
+      vaxon_model_id: 'cursor-grok-4.5-high-fast',
     });
+  });
+
+  it('normalizes autonomy modes', () => {
+    expect(normalizeOperatorPresenceSettings({ autonomy_mode: 'semi' }).autonomy_mode).toBe(
+      'semi',
+    );
+    expect(normalizeOperatorPresenceSettings({ autonomy_mode: 'full' }).autonomy_mode).toBe(
+      'full',
+    );
+    expect(
+      normalizeOperatorPresenceSettings({
+        autonomy_mode: 'nope' as 'manual',
+      }).autonomy_mode,
+    ).toBe('manual');
   });
 
   it('normalizes continuous speech rate and pitch like axon-local', () => {
@@ -97,5 +115,14 @@ describe('operator-presence-settings', () => {
       ...defaultOperatorPresenceSettings(),
       ide_voice_strip_enabled: true,
     });
+  });
+
+  it('defaults and accepts VAXON model ids independently of workspace composer', () => {
+    expect(normalizeOperatorPresenceSettings({}).vaxon_model_id).toBe(
+      'cursor-grok-4.5-high-fast',
+    );
+    expect(
+      normalizeOperatorPresenceSettings({ vaxon_model_id: 'composer-2' }).vaxon_model_id,
+    ).toBe('composer-2');
   });
 });

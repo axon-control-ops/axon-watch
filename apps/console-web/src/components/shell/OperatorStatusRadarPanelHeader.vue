@@ -14,6 +14,7 @@ defineProps<{
   terminalPanelAriaLabel: string;
   kairoTitle: string;
   kairoSubtitle: string;
+  showKairoPresence?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -77,7 +78,7 @@ const emit = defineEmits<{
           aria-hidden="true"
         />
       </button>
-      <div class="operator-status-radar-panel__presence">
+      <div v-if="showKairoPresence !== false" class="operator-status-radar-panel__presence">
         <span
           class="operator-status-radar-panel__status-dot"
           :class="`operator-status-radar-panel__status-dot--${radarTone}`"

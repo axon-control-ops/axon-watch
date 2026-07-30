@@ -34,6 +34,32 @@ describe('projectLiveOperationsStream', () => {
     expect(items.some((item) => item.text.includes('Sentry'))).toBe(true);
     expect(items.some((item) => item.agent === 'MARCO')).toBe(true);
     expect(items.some((item) => item.tone === 'critical')).toBe(true);
+    expect(
+      items.some(
+        (item) =>
+          item.text.includes('Last job failed') ||
+          item.text.includes('closing Confidence line was missing'),
+      ),
+    ).toBe(true);
+  });
+
+  it('does not surface success-like stale failed tags as critical employee events', () => {
+    const items = projectLiveOperationsStream({
+      briefing: null,
+      primaryActiveRun: null,
+      employees: [
+        {
+          employee_id: 'employee-priya',
+          name: 'Priya',
+          role: 'frontend',
+          status: 'idle',
+          last_outcome: 'failed',
+          last_outcome_detail: 'Run completed',
+        },
+      ] as never,
+      presencePhase: 'idle',
+    });
+    expect(items.some((item) => item.id === 'emp-fail-employee-priya')).toBe(false);
   });
 
   it('falls back to standby when there is nothing live', () => {
@@ -45,5 +71,59 @@ describe('projectLiveOperationsStream', () => {
     });
     expect(items).toHaveLength(1);
     expect(items[0]?.text).toMatch(/standby/i);
+  });
+
+  it('surfaces autonomous mode and critical attend receipts', () => {
+    const items = projectLiveOperationsStream({
+      briefing: null,
+      primaryActiveRun: null,
+      employees: [],
+      presencePhase: 'autonomous',
+      autonomyMode: 'full',
+      autonomyReceipts: [
+        {
+          receipt_id: 'auton-1',
+          kind: 'critical_signal',
+          decision: 'escalate',
+          title: 'Sentry critical needs approval',
+          ask_operator: true,
+          risk: 'critical',
+        },
+        {
+          receipt_id: 'auton-2',
+          kind: 'warning_signal',
+          decision: 'dispatch',
+          title: 'Fast Gate repair',
+          ask_operator: false,
+          risk: 'normal',
+          created_at: '2026-07-29T18:04:05Z',
+        },
+        {
+          receipt_id: 'auton-3',
+          kind: 'critical_signal',
+          decision: 'escalate',
+          title: 'Resolved critical action',
+          ask_operator: true,
+          status: 'resolved',
+          resolution: 'approved',
+          risk: 'critical',
+        },
+      ],
+    });
+    expect(items.some((item) => item.kind === 'autonomy' && /AUTONOMOUS ON/i.test(item.text))).toBe(
+      true,
+    );
+    expect(items.some((item) => /Needs you/i.test(item.text))).toBe(true);
+    expect(items.some((item) => /Dispatched/i.test(item.text))).toBe(true);
+    expect(items.some((item) => /Approved · Resolved critical action/i.test(item.text))).toBe(true);
+    expect(items.some((item) => /Needs you · Resolved critical action/i.test(item.text))).toBe(false);
+    expect(items.find((item) => item.id === 'auton-auton-2')?.tone).toBe('info');
+    const dispatchTime = new Date('2026-07-29T18:04:05Z');
+    const expectedTime = [
+      String(dispatchTime.getHours()).padStart(2, '0'),
+      String(dispatchTime.getMinutes()).padStart(2, '0'),
+      String(dispatchTime.getSeconds()).padStart(2, '0'),
+    ].join(':');
+    expect(items.find((item) => item.id === 'auton-auton-2')?.at).toBe(expectedTime);
   });
 });

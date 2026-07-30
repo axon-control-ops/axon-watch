@@ -220,6 +220,8 @@ onBeforeUnmount(() => {
       'left-sidebar-mockup--ide': isIdeMode,
       'left-sidebar-mockup--explorer-collapsed': isIdeMode && shell.ideExplorerCollapsed,
       'left-sidebar-mockup--galaxy': !isIdeMode && shell.operatorBrainGalaxyActive,
+      'left-sidebar-mockup--mission-control':
+        !isIdeMode && !shell.operatorBrainGalaxyActive,
     }"
   >
     <template v-if="isIdeMode">
@@ -386,9 +388,9 @@ onBeforeUnmount(() => {
       <AttentionStackPanel variant="sidebar" sections="run-only" />
     </div>
 
-    <!-- LIVE OPERATIONS right rail owns VAXON voice on Mission Control (mockup). -->
+    <!-- ACTIVE RUN footer on Mission Control — hidden while Attention already shows the run seam. -->
     <div
-      v-else-if="!isIdeMode && !shell.operatorBrainGalaxyActive"
+      v-else-if="!isIdeMode && !shell.operatorBrainGalaxyActive && shell.leftSidebarMode === 'workspaces'"
       class="left-sidebar-mockup__status-anchor left-sidebar-mockup__status-anchor--run-only"
     >
       <AttentionStackPanel variant="sidebar" sections="run-only" />

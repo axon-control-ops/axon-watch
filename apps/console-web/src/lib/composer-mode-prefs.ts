@@ -19,21 +19,9 @@ function readMap(storage: Pick<Storage, 'getItem'>): Record<string, StoredCompos
   }
 }
 
-function resolveModeScopeKey(
-  workspaceId: string | null | undefined,
-  threadId?: string | null,
-): string | null {
-  const threadScope = composerThreadScopeKey(workspaceId, threadId);
-  if (threadScope) {
-    return threadScope;
-  }
-  const workspace = String(workspaceId ?? '').trim();
-  return workspace || null;
-}
-
 /**
  * Read composer mode for a conversation tab.
- * Thread-scoped first; migrates legacy workspace mode once when needed.
+ * Thread-scoped only — do not migrate workspace-wide modes into an arbitrary tab.
  */
 export function readWorkspaceComposerMode(
   workspaceId: string | null | undefined,
@@ -42,27 +30,10 @@ export function readWorkspaceComposerMode(
 ): StoredComposerMode | null {
   const map = readMap(storage);
   const threadScope = composerThreadScopeKey(workspaceId, threadId);
-  if (threadScope) {
-    if (Object.prototype.hasOwnProperty.call(map, threadScope)) {
-      return map[threadScope] ?? null;
-    }
-    const workspace = String(workspaceId ?? '').trim();
-    if (workspace && Object.prototype.hasOwnProperty.call(map, workspace)) {
-      const legacy = map[workspace] ?? null;
-      if (legacy) {
-        const { [workspace]: _removed, ...rest } = map;
-        storage.setItem(
-          COMPOSER_MODE_KEY,
-          JSON.stringify({ ...rest, [threadScope]: legacy }),
-        );
-        return legacy;
-      }
-    }
+  if (!threadScope) {
     return null;
   }
-
-  const key = resolveModeScopeKey(workspaceId, null);
-  return key ? map[key] ?? null : null;
+  return map[threadScope] ?? null;
 }
 
 export function persistWorkspaceComposerMode(
@@ -71,7 +42,7 @@ export function persistWorkspaceComposerMode(
   storage: Pick<Storage, 'getItem' | 'setItem'> = sessionStorage,
   threadId?: string | null,
 ): void {
-  const key = resolveModeScopeKey(workspaceId, threadId);
+  const key = composerThreadScopeKey(workspaceId, threadId);
   if (!key || !VALID_MODES.has(mode)) {
     return;
   }

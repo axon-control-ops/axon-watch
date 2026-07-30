@@ -21,6 +21,13 @@ import {
   vaxonBriefingInteractionKey,
   vaxonBriefingPendingByWorkspace,
 } from '../../lib/vaxon-briefing-interaction';
+import {
+  adviseAttendCtaLabel,
+  applyAdviseAttendAction,
+  parseAdviseUiAction,
+} from '../../lib/kairo-sidebar-attend';
+import { vaxonLineAsksForReply } from '../../lib/vaxon-reply-prompt';
+import { sidebarSpeechShouldOfferReply } from '../../lib/sidebar-speech-reply-route';
 import { employeeFailureDetailTooltip } from '../../features/workspace-agents/company-roster-view';
 import { useShellStore } from '../../stores/shell';
 import OperatorPersonaMark from '../OperatorPersonaMark.vue';
@@ -29,13 +36,12 @@ import KairoSidebarSpeechChip from './KairoSidebarSpeechChip.vue';
 import { OPERATOR_PERSONA_NAME } from '../../lib/operator-persona-name';
 import BriefingSurfaceFollowupPrompt from '../../features/kairo-conversation/BriefingSurfaceFollowupPrompt.vue';
 
-const DECISION_PROMPT_RE =
-  /\b(shall i|would you like me to|do you want me to|want me to|open attention for|confirm|approve|retry)\b/i;
-
 const shell = useShellStore();
 const { spokenText, speaker } = useSpokenUtteranceText();
 const stickySpokenText = ref('');
 const stickySpeakerName = ref('');
+const stickySpeakerKind = ref<'vaxon' | 'employee' | null>(null);
+const stickySpeakerId = ref<string | null>(null);
 const stickyNeedsDecision = ref(false);
 const followupTick = ref(0);
 let followupTimer: ReturnType<typeof globalThis.setTimeout> | null = null;
@@ -50,15 +56,24 @@ watch(
     stickySpokenText.value = next;
     const speakerName = name?.trim() || '';
     const activeEmployee = shell.activeIdeEmployee?.name?.trim() || '';
+    stickySpeakerKind.value = kind === 'employee' || kind === 'vaxon' ? kind : null;
+    stickySpeakerId.value = typeof speakerId === 'string' && speakerId.trim() ? speakerId : null;
     stickySpeakerName.value =
       (speakerName && speakerName.toLowerCase() !== 'teammate'
         ? speakerName
         : null) ||
       (kind === 'vaxon' ? OPERATOR_PERSONA_NAME : activeEmployee) ||
       OPERATOR_PERSONA_NAME;
-    const needsDecision = kind === 'vaxon' && DECISION_PROMPT_RE.test(next);
+    const needsDecision = kind === 'vaxon' && vaxonLineAsksForReply(next);
     stickyNeedsDecision.value = needsDecision;
-    // Only questions awaiting an operator answer persist; plain narration expires.
+    // Employee asks replace a prior VAXON decision so the reply box matches the speaker.
+    if (kind === 'employee') {
+      const ws = shell.currentWorkspace?.workspace_id?.trim();
+      if (ws) {
+        clearVaxonBriefingInteraction(ws);
+      }
+    }
+    // Only VAXON questions awaiting an operator answer persist; plain narration expires.
     if (needsDecision) {
       const ws = shell.currentWorkspace?.workspace_id?.trim();
       if (ws) {
@@ -104,7 +119,7 @@ onMounted(() => {
   }
   stickySpokenText.value = pending.line.trim();
   stickySpeakerName.value = OPERATOR_PERSONA_NAME;
-  stickyNeedsDecision.value = DECISION_PROMPT_RE.test(pending.line);
+  stickyNeedsDecision.value = vaxonLineAsksForReply(pending.line);
 });
 
 onBeforeUnmount(() => {
@@ -185,8 +200,8 @@ const presenceLabel = computed(() => {
   }
   if (!debugModeActive.value && surfaceEmployeeFailure.value) {
     const hint = shell.activeIdeEmployeeShiftInterrupted
-      ? 'shift interrupted'
-      : 'last shift failed';
+      ? 'job interrupted'
+      : 'last job failed';
     return `${activePersonaName.value} · ${hint}`;
   }
   if (!debugModeActive.value) {
@@ -245,8 +260,14 @@ function dismissSpeechChip(): void {
   }
   stickySpokenText.value = '';
   stickySpeakerName.value = '';
+  stickySpeakerKind.value = null;
+  stickySpeakerId.value = null;
   stickyNeedsDecision.value = false;
   followupTick.value += 1;
+}
+
+function onSpeechChipReplied(): void {
+  dismissSpeechChip();
 }
 
 const briefingHeadline = computed(() =>
@@ -261,6 +282,22 @@ const notice = computed(() => {
 const advise = computed(() =>
   briefingAdvise(shell.operatorBriefing, shell.briefingLoadState),
 );
+const adviseUiAction = computed(() =>
+  parseAdviseUiAction(shell.operatorBriefing?.advise_ui_action ?? null),
+);
+const attendCtaLabel = computed(() => adviseAttendCtaLabel(adviseUiAction.value));
+
+function handleAttendAdvise(): void {
+  applyAdviseAttendAction(
+    {
+      setCurrentWorkspace: shell.setCurrentWorkspace,
+      openWorkspaceFile: shell.openWorkspaceFile,
+      setLayoutMode: shell.setLayoutMode,
+      focusAttentionSidebar: shell.focusAttentionSidebar,
+    },
+    adviseUiAction.value,
+  );
+}
 const approvalBadge = computed(() => shell.pendingApprovalsCount);
 const signalBadge = computed(
   () => shell.operatorBriefing?.top_signals.length ?? shell.runtimeSummary?.signals.open_count ?? 0,
@@ -284,6 +321,20 @@ const speechChipText = computed(
     pendingVaxonDecision.value?.line.trim() ||
     null,
 );
+const showSpeechReplyBlock = computed(() => {
+  const line = speechChipText.value?.trim() ?? '';
+  const speakerKind =
+    speaker.value?.kind ??
+    stickySpeakerKind.value ??
+    (stickySpeakerName.value === OPERATOR_PERSONA_NAME ? 'vaxon' : null);
+  return sidebarSpeechShouldOfferReply({
+    line,
+    speakerKind,
+    stickyNeedsDecision: stickyNeedsDecision.value,
+    pendingVaxonDecision: Boolean(pendingVaxonDecision.value),
+    followupActive: stickyDecisionActive.value,
+  });
+});
 const agentLinkLabel = computed(() => {
   if (shell.kairoSpeechActive) {
     return 'Voice live';
@@ -428,6 +479,14 @@ function handleStopSpeech(event?: Event): void {
             </p>
             <p class="kairo-sidebar-panel__notice">{{ notice }}</p>
             <p v-if="advise" class="kairo-sidebar-panel__advise">{{ advise }}</p>
+            <button
+              v-if="attendCtaLabel"
+              type="button"
+              class="kairo-sidebar-panel__attend"
+              @click.stop="handleAttendAdvise"
+            >
+              {{ attendCtaLabel }}
+            </button>
             <div v-if="approvalBadge || signalBadge" class="kairo-sidebar-panel__badges">
               <span v-if="approvalBadge" class="kairo-sidebar-panel__badge">
                 {{ approvalBadge }} approval{{ approvalBadge === 1 ? '' : 's' }}
@@ -458,9 +517,14 @@ function handleStopSpeech(event?: Event): void {
       :fallback-persona-name="speechPersonaName"
       :sticky-text="stickySpokenText"
       :sticky-speaker-name="stickySpeakerName"
+      :sticky-speaker-kind="stickySpeakerKind"
+      :sticky-speaker-id="stickySpeakerId"
+      :employees="shell.companyEmployeesForCurrentWorkspace"
       :show-dismiss="showSpeechDismiss"
+      :awaiting-reply="showSpeechReplyBlock"
       @stop-speech="handleStopSpeech()"
       @dismiss="dismissSpeechChip()"
+      @replied="onSpeechChipReplied()"
     />
   </div>
 </template>

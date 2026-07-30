@@ -11,7 +11,7 @@ type EditorPlanBuildShell = {
   submitIdeComposer: (
     mode: 'ask' | 'plan' | 'agent' | 'debug',
     options?: { attachmentFiles?: File[] },
-  ) => Promise<void>;
+  ) => Promise<boolean | void>;
 };
 
 export function useEditorPlanBuild(shell: EditorPlanBuildShell): {

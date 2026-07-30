@@ -1,6 +1,7 @@
 /** Parse block-annotated agent transcripts (:::thinking / :::edit / :::tool / :::terminal). */
 
-import { sanitizeAgentThinkingForOperator } from './agent-live-line-view';
+import { sanitizeAgentThinkingForOperator, THINKING_SPEECH_FALLBACK } from './agent-live-line-view';
+import { tryParseLegacyLeadFanOutText } from './lead-fan-out-card';
 
 export type {
   AgentTranscriptSegment,
@@ -24,7 +25,15 @@ import {
 } from './agent-transcript/parse-transcript-blocks';
 
 export function agentContentHasTranscriptBlocks(content: string): boolean {
-  return /^:::(thinking|edit|tool|plan|ask|terminal|research|image|debug-reproduce)\b/m.test(content);
+  if (
+    /^:::(thinking|edit|tool|plan|ask|terminal|research|image|debug-reproduce|lead-fan-out)\b/m.test(
+      content,
+    )
+  ) {
+    return true;
+  }
+  // Legacy Lead essays (pre-fence) still get the cinematic fan-out card.
+  return tryParseLegacyLeadFanOutText(content) != null;
 }
 
 export function countAgentTranscriptHeaders(content: string): {
@@ -140,7 +149,7 @@ export function diffLineTone(line: string): DiffLineTone {
 
 export function thinkingPreview(text: string, maxLength = 90): string {
   const sanitized = sanitizeAgentThinkingForOperator(text);
-  const flattened = (sanitized || 'I am thinking…').replace(/\s+/g, ' ').trim();
+  const flattened = (sanitized || THINKING_SPEECH_FALLBACK).replace(/\s+/g, ' ').trim();
   if (flattened.length <= maxLength) {
     return flattened;
   }

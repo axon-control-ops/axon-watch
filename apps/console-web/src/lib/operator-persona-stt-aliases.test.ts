@@ -25,6 +25,7 @@ describe('operator persona STT aliases', () => {
     ['cairo', 'check health'],
     ['axon vixen', 'check health'],
     ['V.A.X.O.N', 'check health'],
+    ['Vekson', 'check health'],
   ])('maps %s mishear to VAXON', (phrase, command) => {
     const normalized = normalizePersonaSttAliases(`hey ${phrase} ${command}`);
     expect(normalized.toLowerCase()).toContain(OPERATOR_PERSONA_NAME.toLowerCase());

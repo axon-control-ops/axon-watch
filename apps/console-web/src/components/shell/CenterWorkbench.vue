@@ -5,6 +5,7 @@ import WorkbenchTerminalDock from '../WorkbenchTerminalDock.vue';
 import AgentEditReviewViewer from '../AgentEditReviewViewer.vue';
 import EditorHost from '../EditorHost.vue';
 import GalaxySpeechCaptions from '../../features/brain-galaxy/GalaxySpeechCaptions.vue';
+import { shouldShowGalaxySpeechCaptions } from '../../features/brain-galaxy/should-show-galaxy-speech-captions';
 import EditorMarkdownToolbar from './EditorMarkdownToolbar.vue';
 import EditorCsvToolbar from './EditorCsvToolbar.vue';
 import CenterWorkbenchIdeQuickGuide from './CenterWorkbenchIdeQuickGuide.vue';
@@ -64,11 +65,11 @@ import { useWorkbenchTerminalAutoClose } from '../../composables/useWorkbenchTer
 import { buildWorkbenchProblemItems } from '../../lib/workbench-problem-items';
 import { useEditorPlanBuild } from '../../composables/use-editor-plan-build';
 import { useEditorStatusBarMeta } from '../../composables/useEditorStatusBarMeta';
-
 const shell = useShellStore();
 const { activePlanId, buildingPlan, buildPlanError, buildActivePlan } = useEditorPlanBuild(shell);
 const hideOperatorEditor = computed(() => shell.layoutMode === 'operator');
 const isIdeMode = computed(() => shell.layoutMode === 'ide');
+const showGalaxySpeechCaptions = computed(() => shouldShowGalaxySpeechCaptions({ layoutMode: shell.layoutMode, operatorBrainGalaxyActive: shell.operatorBrainGalaxyActive }));
 const workbenchLayoutMode = computed((): 'operator' | 'ide' =>
   hideOperatorEditor.value ? 'operator' : 'ide',
 );
@@ -350,7 +351,6 @@ const onIdeQuickGuideAction = (actionId: IdeQuickGuideActionId): void =>
 const onOpenWatchConnectors = (): void => openWatchConnectors(shell);
 const onOpenSourceControl = (): void => openIdeSourceControl(shell);
 const onOpenSearch = (): void => openIdeSearch(shell);
-const onOpenTeam = (): void => openIdeTeam(shell);
 
 function startTerminalResize(event: MouseEvent): void {
   if (event.button !== 0) {
@@ -404,7 +404,7 @@ function syncShellColumnHeights(): void {
   }
 
   const statusTop = statusBar.getBoundingClientRect().top;
-  const footerGapPx = readShellFooterGapPx(shellRoot);
+  const shellFooterGapPx = readShellFooterGapPx(shellRoot);
   const columns = [
     workbench,
     document.querySelector('.region-right-dock'),
@@ -421,20 +421,20 @@ function syncShellColumnHeights(): void {
       continue;
     }
 
+    const footerGapPx =
+      shell.layoutMode === 'ide' && column.classList.contains('region-right-dock')
+        ? 0
+        : shellFooterGapPx;
     const target = Math.round(computeShellColumnMinHeight(columnTop, statusTop, footerGapPx));
     const maxReasonable = window.innerHeight * 1.25;
-    if (target <= 0 || target > maxReasonable) {
-      continue;
-    }
+    if (target <= 0 || target > maxReasonable) continue;
 
     const nextHeight = `${target}px`;
     if (
       column.style.minHeight === nextHeight &&
       column.style.height === nextHeight &&
       column.style.maxHeight === nextHeight
-    ) {
-      continue;
-    }
+    ) continue;
     column.style.minHeight = nextHeight;
     column.style.height = nextHeight;
     column.style.maxHeight = nextHeight;
@@ -642,7 +642,7 @@ watch(
           @open-connectors="onOpenWatchConnectors"
           @open-source-control="onOpenSourceControl"
           @open-search="onOpenSearch"
-          @open-team="onOpenTeam"
+          @open-team="() => openIdeTeam(shell)"
           @show-agent="showAgentDock"
           @toggle-minimap="toggleEditorMinimap"
         />
@@ -650,8 +650,7 @@ watch(
     </section>
 
     <OperatorStatusRadarPanel v-if="hideOperatorEditor" :terminal-visible="terminalPanelVisible" @toggle-terminal="toggleTerminalPanel" />
-    <!-- Speaker HUD stays Operator-only — IDE keeps the editor clear (presence lives in left rail / status bar). -->
-    <GalaxySpeechCaptions v-if="!isIdeMode" />
+    <GalaxySpeechCaptions v-if="showGalaxySpeechCaptions" />
     <WorkbenchTerminalDock v-if="showTerminalDock" :hide-operator-editor="hideOperatorEditor" :log-lines="logLines" :output-lines="outputLines" :problem-items="problemItems" :terminal-height="terminalHeight" @hide="hideTerminalPanel" @start-resize="startTerminalResize" />
   </main>
 </template>

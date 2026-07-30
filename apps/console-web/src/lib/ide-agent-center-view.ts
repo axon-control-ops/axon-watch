@@ -2,7 +2,10 @@ import {
   normalizeEditedFilePath,
   parseAgentTranscriptBlocks,
 } from './agent-transcript-blocks';
-import { isAgentTurnFailureContent } from './kairo-agent-narration';
+import {
+  agentTurnHasConfidenceRating,
+  isAgentTurnFailureContent,
+} from './kairo-agent-narration';
 import { OPERATOR_PERSONA_NAME, personaThreadPrefix } from './operator-persona-name';
 
 export type IdeAgentThreadMessage = {
@@ -203,6 +206,22 @@ export function latestIdeAgentTurnFailed(
   return false;
 }
 
+/**
+ * Latest agent turn closed Critical Review with Confidence: N/10.
+ * Soft Attention "Try again" must not stay up after a successful close-out.
+ */
+export function latestIdeAgentTurnHasConfidence(
+  messages: readonly IdeAgentThreadMessage[],
+): boolean {
+  for (let index = messages.length - 1; index >= 0; index -= 1) {
+    const message = messages[index];
+    if (message.role === 'agent' && message.content.trim()) {
+      return agentTurnHasConfidenceRating(message.content);
+    }
+  }
+  return false;
+}
+
 export function shouldShowIdeAgentReviewStrip(input: {
   layoutMode: 'operator' | 'ide';
   agentStreamActive: boolean;
@@ -210,9 +229,14 @@ export function shouldShowIdeAgentReviewStrip(input: {
   reviewReadyCount: number;
   editedFileCount: number;
   latestAgentTurnFailed?: boolean;
+  /** Soft Attention actions (Try again / Explain / Open team) live on this strip. */
+  employeeFailureActions?: boolean;
 }): boolean {
   if (input.layoutMode !== 'ide') {
     return false;
+  }
+  if (input.employeeFailureActions) {
+    return true;
   }
   if (input.agentStreamActive || input.composerAgentBusy) {
     return true;
@@ -220,7 +244,9 @@ export function shouldShowIdeAgentReviewStrip(input: {
   if (input.reviewReadyCount > 0) {
     return true;
   }
-  if (input.latestAgentTurnFailed) {
+  // Failed turns without file edits stay off the strip; file review still wins when
+  // the agent produced edits (operator needs Review N files even after a soft fail).
+  if (input.latestAgentTurnFailed && input.editedFileCount <= 0) {
     return false;
   }
   return input.editedFileCount > 0;

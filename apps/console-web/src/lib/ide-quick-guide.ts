@@ -1,4 +1,5 @@
 import type { CompanyRosterAlertBadgeTone } from '../features/workspace-agents/company-roster-failure-view';
+import { operatorFailureRetryLabel } from './operator-failure-copy';
 
 import { buildConnectorIdeQuickGuide } from './ide-quick-guide-connectors';
 import { ideSidebarStubActionAriaLabel } from './ide-sidebar-stub-view';
@@ -87,15 +88,15 @@ function withEmployeeFailureDetail(
 }
 
 function employeeFailureBannerStep(interrupted: boolean): string {
-  const action = interrupted ? 'Continue shift' : 'Retry shift';
   return interrupted
-    ? `Use ${action} in the failure banner to continue, or open Team to talk it through.`
-    : `Use ${action} in the failure banner, or open Team to talk it through.`;
+    ? 'Open Team and tap Continue on their roster card to pick up where they left off.'
+    : 'Open Team and tap Try again on their roster card, or talk it through.';
 }
 
 function employeeFailureComposerBannerStep(interrupted: boolean): string {
-  const action = interrupted ? 'Continue shift' : 'Retry shift';
-  return `Use ${action} in the failure banner at the top of the agent dock composer.`;
+  return interrupted
+    ? 'Open Team and tap Continue on their roster card to pick up where they left off.'
+    : 'Open Team and tap Try again on their roster card, or talk it through.';
 }
 
 function rosterFailureQuickGuideTone(
@@ -110,12 +111,12 @@ function rosterFailureQuickGuideTitle(
 ): string {
   if (count === 1) {
     return tone === 'interrupted'
-      ? 'Teammate shift interrupted — open Team to continue'
-      : 'Teammate shift failed — open Team to review';
+      ? "Teammate's job was interrupted — open Team to continue"
+      : "Teammate's last job failed — open Team to review";
   }
 
   if (tone === 'interrupted') {
-    return `${count} interrupted shifts — open Team to continue`;
+    return `${count} interrupted jobs — open Team to continue`;
   }
 
   return `${count} teammates need attention — open Team to review`;
@@ -127,33 +128,36 @@ function rosterFailureQuickGuideFallbackStep(
 ): string {
   if (count === 1) {
     return tone === 'interrupted'
-      ? 'A teammate has an interrupted shift that can be continued.'
-      : 'A teammate needs attention after a failed shift.';
+      ? 'A teammate has an interrupted job that can be continued.'
+      : 'A teammate needs attention after a failed job.';
   }
 
   if (tone === 'interrupted') {
-    return `${count} teammates have interrupted shifts that can be continued.`;
+    return `${count} teammates have interrupted jobs that can be continued.`;
   }
 
   if (tone === 'mixed') {
-    return `${count} teammates need attention after failed or interrupted shifts.`;
+    return `${count} teammates need attention after failed or interrupted jobs.`;
   }
 
-  return `${count} teammates need attention after failed shifts.`;
+  return `${count} teammates need attention after failed jobs.`;
 }
 
 function rosterFailureRecoveryStep(
   tone: CompanyRosterAlertBadgeTone | null | undefined,
 ): string {
   if (tone === 'interrupted') {
-    return 'Team in the left activity bar shows who was interrupted and offers Continue shift.';
+    return `Team in the left activity bar shows who was interrupted and offers ${operatorFailureRetryLabel(true)}.`;
   }
 
   if (tone === 'mixed') {
-    return 'Team in the left activity bar shows who needs attention and offers Continue shift or Retry shift.';
+    return (
+      'Team in the left activity bar shows who needs attention and offers '
+      + `${operatorFailureRetryLabel(true)} or ${operatorFailureRetryLabel(false)}.`
+    );
   }
 
-  return 'Team in the left activity bar shows who failed and offers Retry shift.';
+  return `Team in the left activity bar shows who failed and offers ${operatorFailureRetryLabel(false)}.`;
 }
 
 function buildRosterFailureQuickGuide(input: {
@@ -161,9 +165,14 @@ function buildRosterFailureQuickGuide(input: {
   failedEmployeesHint?: string | null;
   rosterAlertTone?: CompanyRosterAlertBadgeTone | null;
   terminalVisible: boolean;
+  teamExpanded?: boolean;
 }): IdeQuickGuide | null {
   const count = input.failedEmployeeCount ?? 0;
   if (count <= 0) {
+    return null;
+  }
+  // Team already owns the failure surface — don't also sticky-banner "Open Team".
+  if (input.teamExpanded) {
     return null;
   }
 
@@ -181,10 +190,9 @@ function buildRosterFailureQuickGuide(input: {
     steps: [
       hint || rosterFailureQuickGuideFallbackStep(count, tone),
       rosterFailureRecoveryStep(tone),
-      'Activity bar Team badge · editor status bar chip · roster alert hint · select a teammate to open their dock.',
       ...(input.terminalVisible
         ? []
-        : ['Ctrl/Cmd+J opens the terminal when you need shell output in the workbench.']),
+        : ['Ctrl/Cmd+J opens the terminal when you need shell output.']),
     ],
   };
 }
@@ -198,7 +206,7 @@ export function buildIdeQuickGuide(input: {
   runPhase: string | null;
   employeeFailureLine?: string | null;
   employeeShiftInterrupted?: boolean;
-  /** Continue shift / Retry shift — omitted when no active teammate record. */
+  /** Continue / Try again — omitted when no active teammate record. */
   employeeRetryActionLabel?: string | null;
   requiredConnectorsUnavailable?: number;
   legacyConnectorGlanceVisible?: boolean;
@@ -210,6 +218,8 @@ export function buildIdeQuickGuide(input: {
   sourceControlExpanded?: boolean;
   workspaceFilesLoadState?: 'idle' | 'loading' | 'loaded' | 'error';
   searchExpanded?: boolean;
+  /** Team activity view already open — skip redundant "Open Team" failure sticky. */
+  teamExpanded?: boolean;
 }): IdeQuickGuide | null {
   if (input.layoutMode !== 'ide') {
     return null;
@@ -250,8 +260,8 @@ export function buildIdeQuickGuide(input: {
     const retryLabel = (input.employeeRetryActionLabel ?? '').trim();
     return {
       title: interrupted
-        ? 'Shift interrupted — expand the agent dock to continue'
-        : 'Last shift failed — expand the agent dock to retry',
+        ? 'Job interrupted — expand the agent dock to continue'
+        : 'Last job failed — expand the agent dock to retry',
       tone: interrupted ? 'interrupted' : 'failure',
       actions: [
         { id: 'expand-agent-dock', label: 'Expand agent dock' },
@@ -272,29 +282,29 @@ export function buildIdeQuickGuide(input: {
     !input.streaming &&
     input.pendingApprovals <= 0
   ) {
-    const interrupted = Boolean(input.employeeShiftInterrupted);
-    const retryLabel = (input.employeeRetryActionLabel ?? '').trim();
-    const actions: IdeQuickGuideAction[] = [];
-    if (retryLabel) {
-      actions.push({ id: 'retry-employee-shift', label: retryLabel });
+    // Dock banner owns the failure line; retry lives on Team roster (not composer).
+    if (input.teamExpanded) {
+      return null;
     }
+    const interrupted = Boolean(input.employeeShiftInterrupted);
+    const actions: IdeQuickGuideAction[] = [{ id: 'open-team', label: 'Open Team' }];
     if (!input.terminalVisible) {
       actions.push({ id: 'show-terminal', label: 'Show terminal' });
     }
 
     return {
       title: interrupted
-        ? 'Shift interrupted — retry from the agent dock banner'
-        : 'Last shift failed — retry from the agent dock banner',
+        ? 'Job interrupted — continue from Team'
+        : 'Last job failed — retry from Team',
       tone: interrupted ? 'interrupted' : 'failure',
       actions,
-      steps: withEmployeeFailureDetail(input.employeeFailureLine, [
+      steps: [
         employeeFailureComposerBannerStep(interrupted),
-        'Open Team in the left sidebar to review receipts or talk it through.',
+        'The composer banner explains the failure; retry stays on the Team roster.',
         ...(input.terminalVisible
           ? []
-          : ['Ctrl/Cmd+J opens the terminal when you need shell output in the workbench.']),
-      ]),
+          : ['Ctrl/Cmd+J opens the terminal when you need shell output.']),
+      ],
     };
   }
 

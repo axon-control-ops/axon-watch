@@ -104,6 +104,69 @@ def run_scheduled_work_sources(*, root: Path | None = None) -> dict[str, Any]:
                 "work_source": "ci_remediation",
                 "mode": "recover_only",
             }
+            continue
+        if source_id == "lead_team_checkin" and "scheduler" in trigger:
+            from app.workspace_agents.lead_team_checkin import run_lead_team_checkin
+            from app.persistence import operator_presence_settings_store
+
+            min_interval = float(source.get("min_interval_seconds") or 900)
+            max_assign = int(source.get("max_assignments_per_workspace") or 2)
+            # Full autonomy attend owns specialist task creation — avoid dual
+            # Lead assigned: + VAXON attend: rows for the same failed_shift.
+            settings = operator_presence_settings_store.load_settings()
+            mode = str(settings.get("autonomy_mode") or "manual").strip().lower()
+            if mode == "full":
+                max_assign = 0
+            try:
+                results["sources"][source_id] = run_lead_team_checkin(
+                    min_interval_seconds=min_interval,
+                    max_assignments_per_workspace=max_assign,
+                )
+            except Exception:  # noqa: BLE001 — never block the scheduler tick
+                logger.exception("lead_team_checkin work source failed")
+                results["sources"][source_id] = {"error": "lead_team_checkin_failed"}
+            continue
+        if source_id == "ci_stale_signal_sweep" and "scheduler" in trigger:
+            from app.ci_remediation.stale_sweep import sweep_stale_ci_signals
+
+            try:
+                results["sources"][source_id] = sweep_stale_ci_signals(
+                    include_drills=bool(source.get("include_drills", True)),
+                    confirm_with_gh=bool(source.get("confirm_with_gh", True)),
+                    max_resolve=int(source.get("max_resolve") or 40),
+                )
+            except Exception:  # noqa: BLE001
+                logger.exception("ci_stale_signal_sweep work source failed")
+                results["sources"][source_id] = {"error": "ci_stale_signal_sweep_failed"}
+            continue
+        if source_id == "autonomous_attention" and "scheduler" in trigger:
+            from app.workspace_agents.autonomous_attention import run_autonomous_attention_scan
+            from app.persistence import operator_presence_settings_store
+
+            settings = operator_presence_settings_store.load_settings()
+            mode = str(settings.get("autonomy_mode") or "manual").strip().lower()
+            if mode != "full":
+                results["sources"][source_id] = {
+                    "work_source": "autonomous_attention",
+                    "skipped": True,
+                    "reason": f"autonomy_mode={mode}",
+                }
+                continue
+            try:
+                results["sources"][source_id] = run_autonomous_attention_scan(
+                    max_dispatch_per_workspace=int(
+                        source.get("max_dispatch_per_workspace") or 3
+                    ),
+                    max_escalations_per_workspace=int(
+                        source.get("max_escalations_per_workspace") or 5
+                    ),
+                    # lead_team_checkin remains its own source; avoid double message spam
+                    include_lead_checkin=False,
+                )
+            except Exception:  # noqa: BLE001 — never block the scheduler tick
+                logger.exception("autonomous_attention work source failed")
+                results["sources"][source_id] = {"error": "autonomous_attention_failed"}
+            continue
     return results
 
 

@@ -2,12 +2,24 @@
 # Fallback Gate 9 poller when GitHub webhooks cannot reach control-plane.
 # Usage:
 #   CONTROL_PLANE_URL=http://127.0.0.1:8787 ./scripts/ops/poll-fast-gate-remediation.sh
-# Posts a synthetic workflow_run failure payload for the latest red Fast Gate run
-# on the current branch (requires gh + jq + curl). Prefer the real webhook in prod.
+# Posts a synthetic completed workflow_run payload for the latest Fast Gate run
+# on the current branch (requires gh + jq + curl). Red runs start remediation;
+# green runs clear stale failure state. Prefer the real webhook in production.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$ROOT"
+
+env_file="${AXON_WATCH_DEPLOYMENT_ENV:-${HOME}/.config/axon-watch/deployment.env}"
+if [[ ! -f "$env_file" && -f /etc/axon-watch/deployment.env ]]; then
+  env_file=/etc/axon-watch/deployment.env
+fi
+if [[ -f "$env_file" ]]; then
+  set -a
+  # shellcheck disable=SC1090
+  source "$env_file"
+  set +a
+fi
 
 CP_URL="${CONTROL_PLANE_URL:-http://127.0.0.1:8787}"
 SECRET="${AXON_WATCH_GITHUB_WEBHOOK_SECRET:-${GITHUB_WEBHOOK_SECRET:-}}"
@@ -21,8 +33,12 @@ fi
 RUN_JSON="$(gh run list --branch "$BRANCH" --workflow "Axon-X Fast Gate" --limit 1 --json databaseId,conclusion,headSha,displayTitle,url,status,name,headBranch)"
 CONCLUSION="$(echo "$RUN_JSON" | jq -r '.[0].conclusion // empty')"
 STATUS="$(echo "$RUN_JSON" | jq -r '.[0].status // empty')"
-if [[ "$STATUS" != "completed" || "$CONCLUSION" != "failure" ]]; then
-  echo "Latest Fast Gate on $BRANCH is not a completed failure (status=$STATUS conclusion=$CONCLUSION)."
+if [[ "$STATUS" != "completed" ]]; then
+  echo "Latest Fast Gate on $BRANCH is not completed (status=${STATUS:-missing})."
+  exit 0
+fi
+if [[ "$CONCLUSION" != "failure" && "$CONCLUSION" != "success" ]]; then
+  echo "Latest Fast Gate on $BRANCH is not actionable (conclusion=${CONCLUSION:-missing})."
   exit 0
 fi
 
@@ -45,13 +61,14 @@ BODY="$(jq -nc \
   --arg title "$TITLE" \
   --arg owner "$OWNER" \
   --arg repo "$REPO" \
+  --arg conclusion "$CONCLUSION" \
   '{
     action: "completed",
     workflow_run: {
       id: ($id|tonumber),
       name: $name,
       status: "completed",
-      conclusion: "failure",
+      conclusion: $conclusion,
       head_branch: $branch,
       head_sha: $sha,
       html_url: $url,

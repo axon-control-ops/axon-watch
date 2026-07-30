@@ -8,6 +8,7 @@ explicit IDE handoff; every runtime selection records a failover receipt.
 from __future__ import annotations
 
 import os
+import re
 from dataclasses import dataclass, field
 from typing import Any, Literal
 
@@ -32,6 +33,7 @@ VoiceDispatchLane = Literal[
     "bounded_command",
     "vaxon_runtime",
     "ide_handoff",
+    "deterministic_report",
 ]
 VoiceRoutingMode = Literal["template_first", "runtime_on_deep", "runtime_aggressive"]
 ConversationAnswerTier = Literal["fast", "deep"]
@@ -42,10 +44,12 @@ _MAX_RUNTIME_VOICE_REPLY_CHARS = 1200
 
 # Dedicated VAXON pool — independent from IDE Composer UI selection.
 _DEFAULT_VAXON_MODEL_POOL = (
-    "composer-2",
+    "cursor-grok-4.5-high-fast",
     "gpt-5.4-high",
+    "composer-2",
     "claude-sonnet-5-thinking-high",
 )
+_DEFAULT_VAXON_MODEL_ID = "cursor-grok-4.5-high-fast"
 
 
 def _short_spoken_summary(
@@ -134,6 +138,7 @@ class VoiceDispatchDecision:
     artifacts: list[dict[str, object]] = field(default_factory=list)
     runtime_dispatched: bool = False
     model_receipt: VoiceModelReceipt | None = None
+    report: dict[str, object] | None = None
 
 
 def normalize_voice_routing_mode(raw: object) -> VoiceRoutingMode:
@@ -150,41 +155,45 @@ def vaxon_model_pool() -> list[str]:
     return list(_DEFAULT_VAXON_MODEL_POOL)
 
 
+def resolve_vaxon_model(preferred: object | None = None) -> str:
+    """Resolve the operator-global VAXON model id against the allowlist."""
+    pool = vaxon_model_pool()
+    allowlist = {item.lower(): item for item in pool}
+    default = allowlist.get(_DEFAULT_VAXON_MODEL_ID.lower()) or (
+        pool[0] if pool else _DEFAULT_VAXON_MODEL_ID
+    )
+    candidate = str(preferred or "").strip()
+    if not candidate or candidate.lower() in {"auto", "default"}:
+        return default
+    matched = allowlist.get(candidate.lower())
+    if matched:
+        return matched
+    # Soft accept unknown but well-formed ids when operators extend the pool via env.
+    if re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]{1,118}", candidate):
+        return candidate[:120]
+    return default
+
+
 def select_vaxon_runtime(
     *,
     preferred_model: str | None = None,
 ) -> tuple[str | None, str | None, str | None, list[str]]:
-    """Pick a ready runtime from the VAXON pool; return id, label, model, attempt trail."""
+    """Pick a ready runtime; return id, label, resolved VAXON model, attempt trail."""
     snapshot = runtime_status_snapshot()
     candidates = ordered_runtime_candidates(snapshot)
-    pool = vaxon_model_pool()
+    resolved_model = resolve_vaxon_model(preferred_model)
     attempts: list[str] = []
-    preferred = (preferred_model or "").strip() or None
 
-    def matches_pool(record: dict[str, Any]) -> bool:
-        model = str(record.get("model") or record.get("default_model") or "").strip()
-        runtime_id = str(record.get("id") or "").strip()
-        label = str(record.get("label") or "").strip()
-        haystack = f"{model} {runtime_id} {label}".lower()
-        if preferred and preferred.lower() in haystack:
-            return True
-        return any(token.lower() in haystack for token in pool)
-
-    ordered = [record for record in candidates if matches_pool(record)]
-    if not ordered:
-        ordered = list(candidates)
-
-    for record in ordered:
+    for record in candidates:
         runtime_id = str(record.get("id") or "").strip() or None
         label = str(record.get("label") or runtime_id or "").strip() or None
-        model = str(record.get("model") or record.get("default_model") or "").strip() or None
         ready = bool(record.get("ready"))
         attempts.append(f"{runtime_id or 'unknown'}:{'ready' if ready else 'skip'}")
         if not ready or not runtime_id:
             continue
-        return runtime_id, label, model, attempts
+        return runtime_id, label, resolved_model, attempts
 
-    return None, None, None, attempts
+    return None, None, resolved_model, attempts
 
 
 def should_use_vaxon_runtime(
@@ -242,6 +251,45 @@ def route_voice_turn(
     """Route a classified turn into a VAXON lane with autonomy + model receipts."""
     mode = normalize_voice_routing_mode(voice_routing_mode)
 
+    from app.kairo.operator_deterministic_report import (
+        build_operator_report_snapshot,
+        compose_operator_report,
+        is_operator_report_request,
+    )
+
+    # Dedicated REPORT lane — never Lane B / runtime; roster + verified handoffs only.
+    if is_operator_report_request(content):
+        snapshot = build_operator_report_snapshot(
+            workspace_id=workspace_id,
+            pack=pack,
+            force_refresh=True,
+        )
+        composed = compose_operator_report(snapshot)
+        reply = str(composed.get("text") or "").strip()
+        spoken = str(composed.get("spoken") or reply).strip()
+        receipt = VoiceModelReceipt(
+            selected_model=None,
+            runtime_id=None,
+            runtime_label=None,
+            lane="deterministic_report",
+            reason=f"fingerprint={composed.get('fingerprint') or 'none'}",
+            fallback=False,
+        )
+        remember_top_signal(session_id, pack, fallback_workspace_id=workspace_id)
+        return VoiceDispatchDecision(
+            lane="deterministic_report",
+            turn_kind="status_question",
+            source="template",
+            reply=reply,
+            spoken_reply=spoken or reply,
+            model_receipt=receipt,
+            report={
+                "sections": composed.get("sections") or {},
+                "fingerprint": composed.get("fingerprint"),
+                "lane": "deterministic_report",
+            },
+        )
+
     if turn_kind == "command":
         normalized = expand_command_shortcuts(content)
         requires_confirmation = command_requires_confirmation(normalized)
@@ -279,13 +327,24 @@ def route_voice_turn(
             workspace_id=workspace_id,
         )
         if specialty_action is not None:
-            employee_name = str(specialty_action.get("employee_name") or "the specialist")
-            employee_role = str(specialty_action.get("employee_role") or "specialist")
+            action_type = str(specialty_action.get("type") or "")
+            if action_type == "lead_fan_out":
+                mode = str(specialty_action.get("mode") or "decompose").strip() or "decompose"
+                task_count = len(specialty_action.get("tasks") or [])
+                reply = (
+                    f"On it — handing this to Lead for {mode}"
+                    + (f" ({task_count} tasks)" if task_count else "")
+                    + ". Opening the Task Board."
+                )
+            else:
+                employee_name = str(specialty_action.get("employee_name") or "the specialist")
+                employee_role = str(specialty_action.get("employee_role") or "specialist")
+                reply = f"Routing this to {employee_name}, your {employee_role} specialist."
             return VoiceDispatchDecision(
                 lane="ide_handoff",
                 turn_kind="action",
                 source="model" if specialty_action.get("model_receipt") else "template",
-                reply=f"Routing this to {employee_name}, your {employee_role} specialist.",
+                reply=reply,
                 action_tier="reversible_auto",
                 action=specialty_action,
             )
@@ -367,6 +426,9 @@ def route_voice_turn(
         selected_label = str(payload.get("runtime_label") or runtime_label or "") or None
         selected_model = str(payload.get("runtime_model") or model or "") or None
         reason = str(payload.get("reason") or ("dispatched" if dispatched else "runtime_unavailable"))
+        failure_phase = str(payload.get("failure_phase") or "").strip()
+        if failure_phase and failure_phase not in reason:
+            reason = f"{failure_phase};{reason}"
         receipt = VoiceModelReceipt(
             selected_model=selected_model,
             runtime_id=selected_runtime,

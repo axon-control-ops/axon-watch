@@ -99,7 +99,7 @@ describe('openWatchConnectors', () => {
 });
 
 describe('openEmployeeShiftRetry', () => {
-  it('opens the agent dock and seeds the composer with a retry draft', () => {
+  it('opens the agent dock, seeds a retry draft, and submits the agent run', async () => {
     const employee = {
       employee_id: 'e1',
       workspace_id: 'workspace_demo',
@@ -118,16 +118,20 @@ describe('openEmployeeShiftRetry', () => {
     const shell = mockShell({ activeIdeEmployeeRecord: employee });
     const showAgentDock = vi.fn();
 
-    openEmployeeShiftRetry({ shell: shell as never, showAgentDock });
+    await openEmployeeShiftRetry({ shell: shell as never, showAgentDock });
 
     expect(showAgentDock).toHaveBeenCalledOnce();
+    expect(shell.openOrFocusEmployeeIdeThread).toHaveBeenCalledOnce();
     expect(shell.setAgentExecutionAccess).toHaveBeenCalledWith('full');
     expect(shell.openIdeComposerWithDraft).toHaveBeenCalledOnce();
     const draft = vi.mocked(shell.openIdeComposerWithDraft).mock.calls[0]?.[0] ?? '';
-    expect(draft).toContain('Jules');
-    expect(draft).toMatch(/I am Jules/i);
+    expect(draft).toContain('console UI/UX');
+    expect(draft).toMatch(/my last continuous shift/i);
     expect(draft).toContain('vitest assertion failed');
     expect(draft.toLowerCase()).toContain('first person');
+    expect(shell.submitIdeComposer).toHaveBeenCalledWith('agent', {
+      contentOverride: draft,
+    });
   });
 });
 
@@ -207,7 +211,7 @@ describe('handleIdeQuickGuideAction', () => {
     expect(showAgentDock).not.toHaveBeenCalled();
   });
 
-  it('retries the active teammate shift from the quick guide', () => {
+  it('retries the active teammate shift from the quick guide', async () => {
     const employee = {
       employee_id: 'e1',
       workspace_id: 'workspace_demo',
@@ -231,6 +235,14 @@ describe('handleIdeQuickGuideAction', () => {
       shell: shell as never,
       showAgentDock,
       showTerminalPanel,
+    });
+    await vi.waitFor(() => {
+      expect(shell.submitIdeComposer).toHaveBeenCalledWith(
+        'agent',
+        expect.objectContaining({
+          contentOverride: expect.stringContaining('timeout'),
+        }),
+      );
     });
 
     expect(showAgentDock).toHaveBeenCalledOnce();

@@ -69,6 +69,8 @@ export function decideBusyEmployeeStreamAttach(input: {
   resolvedMessageId: string | null | undefined;
   alreadyActive: boolean;
   alreadyMessageId: string | null | undefined;
+  /** False when UI chrome says streaming but the EventSource is gone (workspace switch). */
+  hasLiveSession?: boolean;
 }): BusyStreamAttachDecision {
   const threadId = input.threadId?.trim() ?? '';
   if (!threadId) {
@@ -78,7 +80,12 @@ export function decideBusyEmployeeStreamAttach(input: {
   if (!messageId) {
     return 'skip_no_message';
   }
-  if (input.alreadyActive && (input.alreadyMessageId?.trim() ?? '') === messageId) {
+  const hasLiveSession = input.hasLiveSession !== false;
+  if (
+    input.alreadyActive &&
+    hasLiveSession &&
+    (input.alreadyMessageId?.trim() ?? '') === messageId
+  ) {
     return 'skip_already';
   }
   return 'attach';

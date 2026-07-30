@@ -1,11 +1,17 @@
 import type { RunRecord, RuntimeSummary } from '../contracts/canonical';
 
+import {
+  localRuntimeDegradedActive,
+  partitionDegradedReasons,
+  primaryRemoteIngressReason,
+  remoteIngressAttentionActive,
+} from './runtime-degraded-scope';
 import { formatRunDisplayName, formatRunShortId } from './run-display';
 
 export type RuntimeStripChipTone = 'default' | 'run' | 'success' | 'warning' | 'degraded' | 'muted';
 
 export interface RuntimeStripChip {
-  id: 'run' | 'watch' | 'degraded' | 'loading' | 'unavailable';
+  id: 'run' | 'watch' | 'degraded' | 'remote' | 'loading' | 'unavailable';
   label: string;
   tone: RuntimeStripChipTone;
 }
@@ -59,9 +65,18 @@ export function buildTopbarChips(input: {
     chips.push({ id: 'watch', label: 'watch offline', tone: 'warning' });
   }
 
-  if (input.runtimeSummary.degraded.active) {
-    const reason = input.runtimeSummary.degraded.reasons[0] ?? 'degraded';
-    chips.push({ id: 'degraded', label: `degraded · ${reason}`, tone: 'degraded' });
+  if (localRuntimeDegradedActive(input.runtimeSummary.degraded)) {
+    const { local } = partitionDegradedReasons(input.runtimeSummary.degraded.reasons);
+    const localReason = local[0] ?? input.runtimeSummary.degraded.reasons[0] ?? 'degraded';
+    chips.push({ id: 'degraded', label: `degraded · ${localReason}`, tone: 'degraded' });
+  } else if (remoteIngressAttentionActive(input.runtimeSummary.degraded)) {
+    const reason =
+      primaryRemoteIngressReason(input.runtimeSummary.degraded) ?? 'public tunnel';
+    chips.push({
+      id: 'remote',
+      label: `remote ingress · ${reason}`,
+      tone: 'warning',
+    });
   }
 
   return chips.slice(0, 3);
@@ -85,7 +100,7 @@ export function buildStatusBarSegments(input: {
     const watch = input.runtimeSummary.watch;
     if (watch.connected) {
       segments.push({ id: 'watch', label: 'watch connected', tone: 'success' });
-    } else if (input.runtimeSummary.degraded.active) {
+    } else if (localRuntimeDegradedActive(input.runtimeSummary.degraded)) {
       segments.push({ id: 'watch', label: 'watch degraded', tone: 'degraded' });
     } else {
       segments.push({ id: 'watch', label: 'watch offline', tone: 'warning' });
@@ -119,11 +134,20 @@ export function buildStatusBarSegments(input: {
       });
     }
 
-    if (input.runtimeSummary.degraded.active) {
+    if (localRuntimeDegradedActive(input.runtimeSummary.degraded)) {
+      const { local } = partitionDegradedReasons(input.runtimeSummary.degraded.reasons);
       segments.push({
         id: 'degraded',
-        label: input.runtimeSummary.degraded.reasons[0] ?? 'degraded',
+        label: local[0] ?? input.runtimeSummary.degraded.reasons[0] ?? 'degraded',
         tone: 'degraded',
+      });
+    } else if (remoteIngressAttentionActive(input.runtimeSummary.degraded)) {
+      segments.push({
+        id: 'remote',
+        label:
+          primaryRemoteIngressReason(input.runtimeSummary.degraded) ??
+          'remote ingress unhealthy',
+        tone: 'warning',
       });
     }
   }

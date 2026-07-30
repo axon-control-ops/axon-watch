@@ -1,3 +1,8 @@
+import {
+  OPERATOR_FAILURE_CONTINUE_LABEL,
+  OPERATOR_FAILURE_RETRY_LABEL,
+} from './operator-failure-copy';
+
 export type IdeSidebarStubTone =
   | 'neutral'
   | 'attention'
@@ -8,7 +13,7 @@ export type IdeSidebarStubTone =
 export type IdeSidebarStubPanel = {
   lines: string[];
   actionLabel: string | null;
-  /** Optional second CTA — e.g. Retry shift when the dock stays collapsed. */
+  /** Optional second CTA — e.g. Try again when the dock stays collapsed. */
   secondaryActionLabel?: string | null;
   tone: IdeSidebarStubTone;
 };
@@ -48,11 +53,11 @@ export function ideSidebarStubActionAriaLabel(
     }
   }
 
-  if (actionLabel === 'Retry shift') {
-    return 'Retry shift from the agent dock composer';
+  if (actionLabel === OPERATOR_FAILURE_RETRY_LABEL) {
+    return 'Try again from the agent dock composer';
   }
-  if (actionLabel === 'Continue shift') {
-    return 'Continue shift from the agent dock composer';
+  if (actionLabel === OPERATOR_FAILURE_CONTINUE_LABEL) {
+    return 'Continue from the agent dock composer';
   }
 
   return actionLabel;
@@ -63,10 +68,9 @@ function approvalPhrase(count: number): string {
 }
 
 function employeeFailureSidebarStep(interrupted: boolean): string {
-  const action = interrupted ? 'Continue shift' : 'Retry shift';
   return interrupted
-    ? `Expand the dock and use ${action} in the failure banner to pick up where you left off.`
-    : `Expand the dock and use ${action} in the failure banner, or open Team to talk it through.`;
+    ? 'Expand the dock, then open Team and tap Continue on their roster card.'
+    : 'Expand the dock, then open Team and tap Try again on their roster card.';
 }
 
 /** Copy and CTA for the IDE left-rail agent stub when the dock lives on the right. */

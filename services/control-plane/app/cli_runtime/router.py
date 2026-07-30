@@ -2,10 +2,9 @@
 
 from __future__ import annotations
 
-import json
+import logging
 import os
 import re
-import time
 from collections.abc import Callable
 from pathlib import Path
 
@@ -15,12 +14,21 @@ from app.cli_runtime.approval_gate import (
     resolve_runtime_execution_tier,
 )
 from app.cli_runtime.catalog import runtime_status_snapshot
-from app.cli_runtime.codex_agent import run_codex_local
 from app.cli_runtime.mcp_registry import mcp_tools_for_composer_mode
+from app.cli_runtime.non_cursor_dispatch import run_non_cursor_local
 from app.cli_runtime.recovery import ordered_runtime_candidates
+from app.cli_runtime.runtime_failure import (
+    fallback_reply as _fallback_reply,
+    runtime_unready_reason as _runtime_unready_reason,
+)
 from app.cli_runtime.subprocess_runner import RuntimeProcessStoppedError
-from app.cli_runtime.cursor_agent import CursorAgentReply, run_cursor_local
+from app.cli_runtime.cursor_agent import (
+    CursorAgentReply,
+    run_cursor_local,
+    run_cursor_local_with_recursion_retry,
+)
 from app.cli_runtime.runtime_auth import (
+    claude_dispatch_env,
     cursor_dispatch_env,
     env_has_api_key,
     env_without_api_keys,
@@ -42,6 +50,8 @@ from app.research.availability import format_capability_line, research_capabilit
 from app.persistence.operator_presence_settings_store import load_settings
 from app.runs.service import RunNotFoundError, get_run
 from app.terminal.workspace_roots import WorkspaceRootError, resolve_workspace_root
+
+logger = logging.getLogger(__name__)
 
 
 _REPLY_STYLE = (
@@ -118,34 +128,6 @@ def _sentry_monitor_context(user_prompt: str) -> str:
             "do not claim the Sentry token is absent."
         )
 
-    # region agent log
-    try:
-        with open(
-            "/home/edp/axon-nvme/repos/axon-watch/.cursor/debug-fc0b35.log",
-            "a",
-            encoding="utf-8",
-        ) as debug_log:
-            debug_log.write(
-                json.dumps(
-                    {
-                        "sessionId": "fc0b35",
-                        "runId": "post-fix",
-                        "hypothesisId": "SENTRY1",
-                        "location": "cli_runtime/router.py:_sentry_monitor_context",
-                        "message": "Sentry request received trusted monitor context",
-                        "data": {
-                            "monitorAvailable": bool(record),
-                            "status": status,
-                            "issueCount": issue_count,
-                        },
-                        "timestamp": int(time.time() * 1000),
-                    }
-                )
-                + "\n"
-            )
-    except OSError:
-        pass
-    # endregion
 
     return "\n".join(lines)
 
@@ -247,29 +229,6 @@ def _build_prompt(
     )
 
 
-def _runtime_unready_reason(record: dict[str, object]) -> str:
-    runtime_id = str(record.get("id") or "runtime")
-    label = str(record.get("label") or runtime_id)
-    target_type = str(record.get("target_type") or "local")
-    if target_type == "cloud" or not record.get("available"):
-        return f"{label} unavailable"
-    auth = record.get("auth") if isinstance(record.get("auth"), dict) else {}
-    message = str(auth.get("message") or "").strip()
-    if message and not auth.get("logged_in"):
-        return message
-    if message and auth.get("logged_in"):
-        return f"{label} unavailable"
-    return f"{label} unavailable"
-
-
-def _fallback_reply(*, composer_mode: str, user_prompt: str, context_block: str, reason: str) -> str:
-    del user_prompt, context_block
-    return (
-        f"Lane B ({composer_mode}) cannot start because no CLI runtime is ready: {reason}. "
-        "Open Runtime or `/vault`, then retry."
-    )
-
-
 def _resolve_workspace_root(workspace_id: str) -> Path | None:
     try:
         return resolve_workspace_root(workspace_id)
@@ -288,7 +247,12 @@ def _cloud_runtime_message(record: dict[str, object]) -> str:
 def _effective_cli_model(family: str, runtime_model: str) -> str:
     normalized = str(runtime_model or "").strip()
     if not normalized or normalized.lower() == "auto":
-        env_key = "AXON_WATCH_CURSOR_MODEL" if family == "cursor" else "AXON_WATCH_CODEX_MODEL"
+        if family == "cursor":
+            env_key = "AXON_WATCH_CURSOR_MODEL"
+        elif family == "claude":
+            env_key = "AXON_WATCH_CLAUDE_MODEL"
+        else:
+            env_key = "AXON_WATCH_CODEX_MODEL"
         normalized = str(os.environ.get(env_key, "")).strip()
     if normalized.lower() == "auto":
         return ""
@@ -396,6 +360,8 @@ def dispatch_ide_composer(
         execution_access=execution_access,
     )
     errors: list[str] = []
+    ready_run_errors: list[str] = []
+    last_ready_runtime_label = ""
 
     for record in _ordered_candidates_for_dispatch(snapshot, runtime_target):
         runtime_id = str(record.get("id") or "")
@@ -406,9 +372,15 @@ def dispatch_ide_composer(
         family = str(record.get("family") or "")
         target_type = str(record.get("target_type") or "local")
         model = _effective_cli_model(family, str(runtime_model or ""))
+        runtime_label = str(record.get("label") or runtime_id)
         dispatch_env = subprocess_env
         if family == "cursor":
             dispatch_env = cursor_dispatch_env(
+                subprocess_env,
+                auth=record.get("auth") if isinstance(record.get("auth"), dict) else None,
+            )
+        elif family == "claude":
+            dispatch_env = claude_dispatch_env(
                 subprocess_env,
                 auth=record.get("auth") if isinstance(record.get("auth"), dict) else None,
             )
@@ -416,7 +388,9 @@ def dispatch_ide_composer(
             if target_type == "cloud":
                 raise RuntimeError(_cloud_runtime_message(record))
             if family == "cursor":
-                cursor_reply = run_cursor_local(
+                cursor_reply = run_cursor_local_with_recursion_retry(
+                    runtime_id=runtime_id,
+                    workspace_id=workspace_id,
                     binary=binary,
                     prompt=prompt,
                     workspace_root=workspace_root,
@@ -433,13 +407,14 @@ def dispatch_ide_composer(
                     "content": content,
                     "dispatched": True,
                     "runtime_id": runtime_id,
-                    "runtime_label": str(record.get("label") or runtime_id),
+                    "runtime_label": runtime_label,
                     "reason": "",
                     "execution_tier": execution_tier,
                     "generated_image_paths": list(cursor_reply.generated_image_paths),
                 })
-            if family == "codex":
-                content = run_codex_local(
+            if family in {"claude", "codex"}:
+                content = run_non_cursor_local(
+                    family=family,
                     binary=binary,
                     prompt=prompt,
                     workspace_root=workspace_root,
@@ -449,14 +424,13 @@ def dispatch_ide_composer(
                     subprocess_env=dispatch_env,
                     run_id=run_id,
                     on_chunk=on_chunk,
+                    approval_notice=approval_notice,
                 )
-                if approval_notice:
-                    content = f"{content.rstrip()}\n\n---\n{approval_notice}"
                 return _finish({
                     "content": content,
                     "dispatched": True,
                     "runtime_id": runtime_id,
-                    "runtime_label": str(record.get("label") or runtime_id),
+                    "runtime_label": runtime_label,
                     "reason": "",
                     "execution_tier": execution_tier,
                 })
@@ -468,14 +442,26 @@ def dispatch_ide_composer(
                         user_prompt=user_prompt,
                         context_block=context_block,
                         reason=str(exc),
+                        failure_phase="run_error",
+                        runtime_label=runtime_label,
                     ),
                     "dispatched": False,
                     "runtime_id": runtime_id,
-                    "runtime_label": str(record.get("label") or runtime_id),
+                    "runtime_label": runtime_label,
                     "reason": str(exc),
                     "stopped": True,
+                    "failure_phase": "run_error",
                 })
             detail = str(exc)
+            logger.exception(
+                "lane_b_dispatch_failed runtime_id=%s family=%s composer_mode=%s "
+                "workspace_id=%s exc_type=%s",
+                runtime_id,
+                family,
+                composer_mode,
+                workspace_id,
+                type(exc).__name__,
+            )
             if looks_like_auth_error(detail) and env_has_api_key(dispatch_env, family=family):
                 retry_env = env_without_api_keys(dispatch_env, family=family)
                 if retry_env != dispatch_env:
@@ -495,7 +481,8 @@ def dispatch_ide_composer(
                             )
                             content = _cursor_reply_content(cursor_reply, approval_notice)
                         else:
-                            content = run_codex_local(
+                            content = run_non_cursor_local(
+                                family=family,
                                 binary=binary,
                                 prompt=prompt,
                                 workspace_root=workspace_root,
@@ -505,14 +492,13 @@ def dispatch_ide_composer(
                                 subprocess_env=retry_env,
                                 run_id=run_id,
                                 on_chunk=on_chunk,
+                                approval_notice=approval_notice,
                             )
-                        if approval_notice:
-                            content = f"{content.rstrip()}\n\n---\n{approval_notice}"
                         payload = {
                             "content": content,
                             "dispatched": True,
                             "runtime_id": runtime_id,
-                            "runtime_label": str(record.get("label") or runtime_id),
+                            "runtime_label": runtime_label,
                             "reason": "",
                             "execution_tier": execution_tier,
                         }
@@ -521,26 +507,39 @@ def dispatch_ide_composer(
                         return _finish(payload)
                     except RuntimeError as retry_exc:
                         detail = str(retry_exc)
-            errors.append(
-                summarize_auth_error(
-                    family=family,
-                    detail=detail,
-                    had_api_key=env_has_api_key(dispatch_env, family=family),
-                )
+                        logger.exception(
+                            "lane_b_dispatch_auth_retry_failed runtime_id=%s family=%s",
+                            runtime_id,
+                            family,
+                        )
+            summarized = summarize_auth_error(
+                family=family,
+                detail=detail,
+                had_api_key=env_has_api_key(dispatch_env, family=family),
             )
+            errors.append(summarized)
+            ready_run_errors.append(summarized)
+            last_ready_runtime_label = runtime_label
 
     reason = "; ".join(item for item in errors if item) or "no CLI runtime is installed"
+    failure_phase = "run_error" if ready_run_errors else "not_ready"
+    # When a ready runtime actually failed, don't bury that under skipped "unavailable" peers.
+    if failure_phase == "run_error" and ready_run_errors:
+        reason = "; ".join(item for item in ready_run_errors if item) or reason
     return _finish({
         "content": _fallback_reply(
             composer_mode=composer_mode,
             user_prompt=user_prompt,
             context_block=context_block,
             reason=reason,
+            failure_phase=failure_phase,
+            runtime_label=last_ready_runtime_label,
         ),
         "dispatched": False,
         "runtime_id": "",
         "runtime_label": "",
         "reason": reason,
+        "failure_phase": failure_phase,
     })
 
 

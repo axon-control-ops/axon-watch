@@ -65,6 +65,51 @@ class CliRuntimeReadinessTests(unittest.TestCase):
         self.assertIn("CLI runtime not ready", reasons[0])
         self.assertIn("Cursor auth probe timed out", reasons[0])
 
+    def test_empty_stale_snapshot_is_not_false_cli_degraded(self) -> None:
+        reasons = cli_runtime_degraded_reasons(
+            {
+                "updated_at": "2026-07-28T00:00:00Z",
+                "default_runtime": "",
+                "local": [],
+                "cloud": [],
+            }
+        )
+        self.assertEqual([], reasons)
+        summary = summarize_cli_runtime_readiness({"local": []})
+        self.assertTrue(summary["probe_pending"])
+        self.assertFalse(summary["dispatch_ready"])
+
+    def test_unavailable_binary_blocker_prefers_unavailable_over_auth_message(self) -> None:
+        snapshot = {
+            "default_runtime": "cursor_local",
+            "local": [
+                {
+                    "id": "cursor_local",
+                    "label": "Cursor CLI (local)",
+                    "ready": True,
+                    "available": True,
+                    "auth": {
+                        "logged_in": True,
+                        "message": "Authenticated with Cursor subscription.",
+                    },
+                },
+                {
+                    "id": "codex_local",
+                    "label": "Codex CLI (local)",
+                    "ready": False,
+                    "available": False,
+                    "auth": {
+                        "logged_in": True,
+                        "message": "Authenticated via Codex/OpenAI API key from vault.",
+                    },
+                },
+            ],
+        }
+        summary = summarize_cli_runtime_readiness(snapshot)
+        self.assertTrue(summary["dispatch_ready"])
+        self.assertEqual(["Codex CLI (local) unavailable"], summary["blockers"])
+        self.assertEqual([], cli_runtime_degraded_reasons(snapshot))
+
 
 if __name__ == "__main__":
     unittest.main()

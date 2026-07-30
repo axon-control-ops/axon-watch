@@ -2,7 +2,7 @@
   "schema_version": 1,
   "canonical_home": "docs/planning/",
   "legacy_mirror": "axon-local/Plans/Axon-Watch/",
-  "generated_on": "2026-07-25",
+  "generated_on": "2026-07-30",
   "file_count": 44,
   "files": {
     "ADR-001-greenfield-repo.md": {
@@ -30,8 +30,8 @@
       "bytes": 2894
     },
     "AGENT_SHELL_BACKGROUND_DETACH.md": {
-      "sha256": "beff208a91621b4daba2ebdbe51ca7f3c5f3d440da749db03f0cd34270ecfa60",
-      "bytes": 2988
+      "sha256": "36f39105d6960450b611deb37bb7a9db5c72d4077f023784b3b0f0d2612c13c8",
+      "bytes": 3068
     },
     "ARCHITECTURE.md": {
       "sha256": "5e5a9430ba1c4110209ddbd43e831a7a6f89ccb9001041c85657078c0b417710",
@@ -46,8 +46,8 @@
       "bytes": 3567
     },
     "DASHPRO_CI_AGENT_PLAYBOOK.md": {
-      "sha256": "e7290a6468ec2f3bd3286813f2610d7a70cebb6d48cb21d5d60bc497174f3ba6",
-      "bytes": 10448
+      "sha256": "9eaf6523915bbb54aa23e55769c4f9fa3529d4d153b88bf29deb2c1d0d2a79ca",
+      "bytes": 10716
     },
     "DELIVERY_PLAN.md": {
       "sha256": "8b5053cfaa554a7a650a7ceae4a1f7bcb01ef752d27a483ac88093b083e8975a",

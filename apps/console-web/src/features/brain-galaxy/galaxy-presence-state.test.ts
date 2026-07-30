@@ -86,6 +86,28 @@ describe('resolveGalaxyPresence', () => {
     expect(resolveGalaxyPresence(base).presenceAmp).toBe(0.32);
   });
 
+  it('lights thinking presence when company or fleet work is live', () => {
+    expect(
+      resolveGalaxyPresence({ ...base, companyBusyCount: 2 }).phase,
+    ).toBe('thinking');
+    expect(
+      resolveGalaxyPresence({ ...base, fleetActiveRuns: 1 }).presenceAmp,
+    ).toBe(1);
+    expect(
+      resolveGalaxyPresence({ ...base, companyBusyCount: 1 }).busy,
+    ).toBe(true);
+  });
+
+  it('maps full autonomy mode to autonomous presence', () => {
+    const resolved = resolveGalaxyPresence({
+      ...base,
+      fullAutonomyActive: true,
+    });
+    expect(resolved.phase).toBe('autonomous');
+    expect(resolved.coreOrbMode).toBe('autonomous');
+    expect(resolved.busy).toBe(true);
+  });
+
   it('maps workspace selection when idle', () => {
     const resolved = resolveGalaxyPresence({
       ...base,

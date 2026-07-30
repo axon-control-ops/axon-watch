@@ -3,8 +3,10 @@ import { computed, onMounted, ref } from 'vue';
 
 import type { RuntimeTargetRecord } from '../../api/control-plane';
 import {
+  logoutClaudeRuntime,
   logoutCodexRuntime,
   logoutCursorRuntime,
+  startClaudeRuntimeLogin,
   startCodexRuntimeLogin,
   startCursorRuntimeLogin,
 } from '../../api/control-plane';
@@ -15,8 +17,9 @@ import {
   runtimeAuthSummary,
 } from '../../lib/runtime-auth-view';
 import { useShellStore } from '../../stores/shell';
+import CursorUsageCard from './CursorUsageCard.vue';
 
-type RuntimeFamily = 'cursor' | 'codex';
+type RuntimeFamily = 'cursor' | 'claude' | 'codex';
 
 type RuntimeCard = {
   family: RuntimeFamily;
@@ -60,7 +63,7 @@ function shortenBinaryPath(path: string): string {
 
 function buildCards(): RuntimeCard[] {
   const targets = [...(shell.runtimeStatus?.local ?? []), ...(shell.runtimeStatus?.cloud ?? [])];
-  return (['cursor', 'codex'] as RuntimeFamily[]).map((family) => {
+  return (['cursor', 'claude', 'codex'] as RuntimeFamily[]).map((family) => {
     const target =
       targets.find((record) => record.family === family && record.target_type === 'local') ??
       targets.find((record) => record.family === family) ??
@@ -69,15 +72,33 @@ function buildCards(): RuntimeCard[] {
   });
 }
 
+function familyTitle(family: RuntimeFamily): string {
+  if (family === 'cursor') return 'Cursor CLI';
+  if (family === 'claude') return 'Claude Code CLI';
+  return 'Codex CLI';
+}
+
+function familyLoginCommand(family: RuntimeFamily): string {
+  if (family === 'cursor') return 'cursor agent login';
+  if (family === 'claude') return 'claude auth login';
+  return 'codex login';
+}
+
+function familyStatusCommand(family: RuntimeFamily): string {
+  if (family === 'cursor') return 'cursor agent status';
+  if (family === 'claude') return 'claude auth status';
+  return 'codex login status';
+}
+
 function buildCard(family: RuntimeFamily, target: RuntimeTargetRecord | null): RuntimeCard {
   const auth = target?.auth;
   const loggedIn = Boolean(auth?.logged_in);
   const installed = Boolean(target?.available && target.binary);
   const managedByVault =
     auth?.auth_method === 'vault_api_key' || auth?.auth_method === 'api_key';
-  const title = family === 'cursor' ? 'Cursor CLI' : 'Codex CLI';
-  const loginCommand = family === 'cursor' ? 'cursor agent login' : 'codex login';
-  const statusCommand = family === 'cursor' ? 'cursor agent status' : 'codex login status';
+  const title = familyTitle(family);
+  const loginCommand = familyLoginCommand(family);
+  const statusCommand = familyStatusCommand(family);
 
   let statusTone: RuntimeCard['statusTone'] = 'muted';
   let statusLabel = 'Not installed';
@@ -138,9 +159,13 @@ async function runAction(family: RuntimeFamily, action: 'login' | 'logout'): Pro
         ? action === 'login'
           ? await startCursorRuntimeLogin()
           : await logoutCursorRuntime()
-        : action === 'login'
-          ? await startCodexRuntimeLogin()
-          : await logoutCodexRuntime();
+        : family === 'claude'
+          ? action === 'login'
+            ? await startClaudeRuntimeLogin()
+            : await logoutClaudeRuntime()
+          : action === 'login'
+            ? await startCodexRuntimeLogin()
+            : await logoutCodexRuntime();
     actionTone.value = result.status === 'error' ? 'error' : 'ok';
     actionMessage.value = result.message;
     await Promise.all([shell.loadRuntimeStatus(true), shell.loadCursorCatalog(true)]);
@@ -210,7 +235,13 @@ onMounted(() => {
       </article>
     </div>
 
-    <div v-else class="runtime-auth-settings__grid">
+    <CursorUsageCard
+      v-if="!isLoading"
+      class="runtime-auth-settings__usage"
+      :usage="shell.runtimeStatus?.cursor_usage"
+    />
+
+    <div v-if="!isLoading" class="runtime-auth-settings__grid">
       <article
         v-for="card in runtimeCards"
         :key="card.family"

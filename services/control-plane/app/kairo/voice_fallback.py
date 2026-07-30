@@ -110,19 +110,68 @@ def _is_failed_outcome(context: dict[str, Any]) -> bool:
     lowered = summary.lower()
     return (
         "cannot start because no cli runtime is ready" in lowered
+        or "could not start" in lowered
         or "actionrequirederror" in lowered
         or "you're out of usage" in lowered
+        or "hit your usage" in lowered
         or "api key was rejected" in lowered
     )
 
 
+def _strip_advice_suffix(summary: str) -> str:
+    """Drop trailing operator-advice clauses so classification uses the root cause."""
+    cleaned = str(summary or "").strip()
+    for marker in (
+        "Open Runtime or",
+        "Raise the Cursor usage",
+        "Check Cursor Usage",
+        "Run `cursor agent login`",
+        "Check `cursor agent status`",
+        "Check Runtime status",
+    ):
+        idx = cleaned.find(marker)
+        if idx > 0:
+            cleaned = cleaned[:idx].rstrip(" .;")
+    return cleaned
+
+
 def _contextual_failed_fallback(context: dict[str, Any]) -> str:
-    summary = str(context.get("failure_summary") or "").lower()
-    if "out of usage" in summary or "actionrequirederror" in summary:
+    raw = str(context.get("failure_summary") or "")
+    summary = _strip_advice_suffix(raw).lower()
+    if (
+        "out of usage" in summary
+        or "actionrequirederror" in summary
+        or "hit your usage" in summary
+        or "increase limits" in summary
+        or "usage limit" in summary
+    ):
         return "That run couldn't start — Cursor usage is exhausted. Switch model or raise the limit."
-    if "api key was rejected" in summary or "vault" in summary:
+    if (
+        "api key was rejected" in summary
+        or "not signed in" in summary
+        or "cursor agent login" in summary
+        or "vault locked" in summary
+        or "unlock /vault" in summary
+    ):
         return "That run couldn't start — fix the runtime keys in vault, then retry."
-    return "That run couldn't start — open Runtime or vault, then retry."
+    if "auth probe" in summary:
+        return "That run couldn't start — Cursor auth timed out. Check runtime on the host, then retry."
+    if "no cli runtime is ready" in summary or "could not start" in summary:
+        return "That run couldn't start — no agent runtime was ready. Check Runtime, then retry."
+    # Mid-run SSE drops / hub close without a done event — not a cold start failure.
+    if (
+        "chat stream closed" in summary
+        or "chat stream interrupted" in summary
+        or "chat stream disconnected" in summary
+        or "stream closed" in summary
+        or "stream interrupted" in summary
+    ):
+        return "That run was cut off mid-stream — Try again to continue."
+    if "timed out" in summary or "timeout" in summary:
+        return "That run timed out before it finished — Try again when the host is ready."
+    if summary.strip():
+        return "That run failed — check the thread, then Try again."
+    return "That run failed — check Runtime status, then Try again."
 
 
 def _contextual_done_fallback(context: dict[str, Any]) -> str | None:
@@ -205,6 +254,18 @@ def fallback_for_event(
         return str(context.get("literal_line") or "Approval required before I can continue.")
 
     if event_type == "alert":
+        # Prefer control-plane crafted copy (e.g. autonomy_advisory) over idle persona filler.
+        crafted = str(
+            context.get("literal_line")
+            or context.get("fallback")
+            or ""
+        ).strip()
+        if crafted:
+            return apply_participant_address(
+                crafted,
+                guest_name,
+                speaker_kind=speaker_kind,
+            )
         line = build_persona_voice_line(
             pending_approvals=int(context.get("pending_approvals") or 0),
             top_signal_title=str(context.get("top_signal_title") or ""),

@@ -3,7 +3,8 @@
 # when you are away (machine must stay powered on).
 #
 # Starts: axon-watch :8788, control-plane :8787, console-web :4173
-# Does NOT start legacy axon-local :7734.
+# Does NOT start legacy axon-local or the retired :7734 soft-cutover proxy.
+# Cloudflare named tunnel should ingress to :4173 directly.
 #
 # Usage:
 #   ./scripts/ops/install-user-always-on.sh           # install + enable
@@ -57,19 +58,39 @@ ensure_gate2_auth_env() {
   fi
 }
 
+ensure_public_origin_env() {
+  local env_file="$1"
+  local public_origin="https://axon.edudashpro.org.za"
+  local cors
+
+  if rg -q '^AXON_WATCH_PUBLIC_BASE_URL=https?://(127\.0\.0\.1|localhost)' "${env_file}"; then
+    sed -i "s|^AXON_WATCH_PUBLIC_BASE_URL=.*|AXON_WATCH_PUBLIC_BASE_URL=${public_origin}|" "${env_file}"
+  elif ! rg -q '^AXON_WATCH_PUBLIC_BASE_URL=' "${env_file}"; then
+    printf 'AXON_WATCH_PUBLIC_BASE_URL=%s\n' "${public_origin}" >>"${env_file}"
+  fi
+
+  cors="$(rg -N '^AXON_WATCH_CORS_ORIGINS=' "${env_file}" 2>/dev/null | tail -1 | cut -d= -f2- || true)"
+  if [[ -z "${cors}" ]]; then
+    printf 'AXON_WATCH_CORS_ORIGINS=http://127.0.0.1:4173,http://127.0.0.1:5173,%s\n' \
+      "${public_origin}" >>"${env_file}"
+  elif [[ ",${cors}," != *",${public_origin},"* ]]; then
+    sed -i "s|^AXON_WATCH_CORS_ORIGINS=.*|AXON_WATCH_CORS_ORIGINS=${cors},${public_origin}|" "${env_file}"
+  fi
+}
+
 if [[ ! -f "${env_dst}" ]]; then
   cat >"${env_dst}" <<EOF
 # Local always-on host (machine stays powered; you may be away).
 AXON_WATCH_DEPLOYMENT_MODE=bootstrap
 AXON_WATCH_REPO_ROOT=${repo_root}
 AXON_WATCH_BIND_HOST=127.0.0.1
-AXON_WATCH_PUBLIC_BASE_URL=http://127.0.0.1:4173
+AXON_WATCH_PUBLIC_BASE_URL=https://axon.edudashpro.org.za
 AXON_WATCH_CONSOLE_WEB_PORT=4173
 AXON_WATCH_CONTROL_PLANE_PORT=8787
 AXON_WATCH_WATCH_SERVICE_PORT=8788
 AXON_WATCH_CONTROL_PLANE_BASE_URL=http://127.0.0.1:8787
 AXON_WATCH_WATCH_SERVICE_BASE_URL=http://127.0.0.1:8788
-AXON_WATCH_CORS_ORIGINS=http://127.0.0.1:4173,http://127.0.0.1:5173
+AXON_WATCH_CORS_ORIGINS=http://127.0.0.1:4173,http://127.0.0.1:5173,https://axon.edudashpro.org.za
 AXON_WATCH_STATE_DIR=${repo_root}/.local/state
 AXON_WATCH_CONTROL_PLANE_DB=${repo_root}/.local/state/control-plane.sqlite3
 AXON_WATCH_WATCH_SERVICE_DB=${repo_root}/.local/state/axon-watch.sqlite3
@@ -84,6 +105,7 @@ else
   echo "Keeping existing ${env_dst}"
 fi
 ensure_gate2_auth_env "${env_dst}"
+ensure_public_origin_env "${env_dst}"
 
 # Rewrite ExecStart paths in installed units to this checkout.
 for name in axon-watch control-plane console-web; do
@@ -92,6 +114,8 @@ for name in axon-watch control-plane console-web; do
   sed "s|%h/axon-nvme/repos/axon-watch|${repo_root}|g" "${src}" >"${dst}"
   echo "Installed ${dst}"
 done
+# Soft-cutover proxy (:7734 -> :4173) is retired — Cloudflare points at :4173 directly.
+systemctl --user disable --now axon-public-origin-proxy.service 2>/dev/null || true
 
 # Keep legacy :7734 off login autostart.
 if [[ -x "${repo_root}/scripts/ops/disable-legacy-7734-autostart.sh" ]]; then
@@ -102,7 +126,10 @@ if [[ -x "${repo_root}/scripts/ops/install-bin-wrappers.sh" ]]; then
 fi
 
 systemctl --user daemon-reload
-systemctl --user enable axon-watch.service control-plane.service console-web.service
+systemctl --user enable \
+  axon-watch.service \
+  control-plane.service \
+  console-web.service
 
 port_busy() {
   local port="$1"
@@ -127,7 +154,10 @@ if [[ "${takeover}" -eq 1 ]]; then
   systemctl --user restart axon-watch.service
   systemctl --user restart control-plane.service
   systemctl --user restart console-web.service
-  systemctl --user --no-pager --full status axon-watch.service control-plane.service console-web.service || true
+  systemctl --user --no-pager --full status \
+    axon-watch.service \
+    control-plane.service \
+    console-web.service || true
   echo "Takeover complete. Check: axonhealth"
   echo "  curl -sS http://127.0.0.1:8787/api/health"
   echo "  curl -sS http://127.0.0.1:4173/api/health"
@@ -142,20 +172,22 @@ else
     echo "Building console-web dist for :4173 ..."
     (cd "${repo_root}" && npm run build -w @axon-watch/console-web)
   fi
-  systemctl --user start axon-watch.service control-plane.service console-web.service
-  systemctl --user --no-pager --full status axon-watch.service control-plane.service console-web.service || true
+  systemctl --user start \
+    axon-watch.service \
+    control-plane.service \
+    console-web.service
+  systemctl --user --no-pager --full status \
+    axon-watch.service \
+    control-plane.service \
+    console-web.service || true
 fi
 
-echo "==> Soft public cutover (:7734 -> :4173) + managed tunnel"
-if [[ -x "${repo_root}/scripts/ops/soft-public-cutover.sh" ]]; then
-  "${repo_root}/scripts/ops/soft-public-cutover.sh" || \
-    echo "WARN: soft-public-cutover failed; public hostname may stay degraded." >&2
-fi
+echo "==> Managed Cloudflare tunnel (ingress should be :4173)"
 curl -sS --max-time 10 -X POST \
   "${AXON_WATCH_CONTROL_PLANE_BASE_URL:-http://127.0.0.1:8787}/api/tunnel/start" \
   | python3 -m json.tool 2>/dev/null || \
   echo "WARN: managed tunnel start failed; check /api/tunnel/status." >&2
 
 echo "User linger should stay yes so services survive logout: loginctl enable-linger \$USER"
-echo "Operator surface: http://127.0.0.1:4173  (legacy :7734 autostart disabled; soft-rollback on :7735 via soft cutover)"
+echo "Operator surface: http://127.0.0.1:4173  (legacy axon-local / :7734 runtime retired; source retained)"
 echo "Hard CF ingress cutover (optional): CF_API_TOKEN=... ./scripts/ops/set-tunnel-ingress-4173.sh"

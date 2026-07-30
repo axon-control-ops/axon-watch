@@ -27,12 +27,14 @@ class RuntimeVaultIntegrationTests(unittest.TestCase):
 
     @patch("app.cli_runtime.catalog_snapshot.fetch_runtime_context")
     @patch("app.cli_runtime.catalog.find_cursor_cli", return_value="/usr/bin/cursor")
+    @patch("app.cli_runtime.catalog.find_claude_cli", return_value="")
     @patch("app.cli_runtime.catalog.find_codex_cli", return_value="")
     @patch("app.cli_runtime.auth_probes._run_command")
     def test_runtime_status_marks_vault_locked_without_cli_login(
         self,
         mock_run,
         _find_codex,
+        _find_claude,
         _find_cursor,
         mock_fetch_context,
     ) -> None:
@@ -54,12 +56,14 @@ class RuntimeVaultIntegrationTests(unittest.TestCase):
 
     @patch("app.cli_runtime.catalog_snapshot.fetch_runtime_context")
     @patch("app.cli_runtime.catalog.find_cursor_cli", return_value="/usr/bin/cursor")
+    @patch("app.cli_runtime.catalog.find_claude_cli", return_value="")
     @patch("app.cli_runtime.catalog.find_codex_cli", return_value="")
     @patch("app.cli_runtime.auth_probes._run_command")
     def test_runtime_status_ready_when_vault_feeds_cursor_key(
         self,
         mock_run,
         _find_codex,
+        _find_claude,
         _find_cursor,
         mock_fetch_context,
     ) -> None:

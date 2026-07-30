@@ -241,7 +241,7 @@ export function ideActivityBarTeamNeedsAttention(
   return buildIdeActivityBarTeamAttention(employees).count > 0;
 }
 
-/** Tooltip suffix for Team when roster teammates need attention after a failed or interrupted shift. */
+/** Tooltip suffix for Team when roster teammates need attention after a failed or interrupted job. */
 export function ideActivityBarTeamAttentionHint(
   employees: readonly CompanyEmployeeRecord[] | null | undefined,
 ): string | null {

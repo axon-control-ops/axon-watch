@@ -19,6 +19,7 @@ export function useDockDeliveryPipeline(input: {
             stage: employee.pipeline_stage,
             detail: employee.pipeline_detail,
             draftPrUrl: employee.draft_pr_url,
+            ciUrl: employee.ci_run_url,
             ciStatus: employee.ci_status,
           }
         : null,

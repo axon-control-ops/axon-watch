@@ -171,6 +171,16 @@ def build_continuous_worker_prompt(
         "Long-running OTA/Expo/EAS jobs: start once and wait for that shell tool; do not "
         "busy-poll with repeated shell probes every few seconds — check sparsely (~30–60s). "
     )
+    if workspace_id.strip() == "workspace_dashpro":
+        memory_clause += (
+            " Temporary self-hosted CI on this PC: prefer "
+            "`npm run ops:agents:quality` (subset) with "
+            "`DASHPRO_CI_MEMORY_PROFILE=self-hosted` / Jest maxWorkers=1. "
+            "Never run `ops:agents:quality:full`, Android CI, or parallel workflow_dispatch "
+            "while Cursor is open — the local runner is MemoryMax-capped at 10G and previously "
+            "OOM-froze the host at ~18G. Create/queue CI repair tasks for operator Start; "
+            "do not stack Quality Gates + Android + typecheck heaps. "
+        )
     prior_failure = _prior_failure_clause(workspace_id=workspace_id, role=role)
     roster_block = build_team_roster_context(workspace_id, viewer_role=role)
     roster_clause = f"\n\n{roster_block}" if roster_block else ""
@@ -180,14 +190,30 @@ def build_continuous_worker_prompt(
             " As Lead, treat the company team roster block as authoritative for "
             "teammates, roles, and owns — do not Glob/Grep/Read the tree to discover "
             "staffing before planning or delegating."
+            " Reporting chain: specialists → you → VAXON → operator Decide."
+            " After specialist completions, post a short Lead rollup (done / verified / next)."
+        )
+        if "[plan " in goal.lower() or goal.lower().startswith("lead: advance"):
+            lead_clause += (
+                " Parent-plan stickiness: the parent plan goal in this leased task is the "
+                "sole completion criteria. Specialist digs and CI findings are inputs — "
+                "do not restart a completed dig as the mission. Advance the plan; "
+                "escalate Decide for ship gates."
+            )
+    else:
+        lead_clause = (
+            " Reporting chain: finish with a Lead handoff (what changed, verified, "
+            "Blockers / Lead next). Do not escalate straight to the operator — Lead owns that."
         )
     return append_critical_review_clause(
         f"{identity} "
         f"This is a bounded continuous shift ({schedule}) for leased task {task_id}. "
         f"{prior_failure}"
-        f"Execute only this leased task — do not invent or self-select other work. "
+        f"Execute only this leased task — do not invent, assume, or self-select other work. "
+        f"The leased goal is the sole truth for this shift's scope. "
         f"Goal: {goal}.{acceptance_clause} "
-        "Do it with receipts and summarize what changed. Stay inside your role boundary."
+        "Do it with verified receipts and summarize what changed. "
+        "Stay inside your role boundary. Never hallucinate outcomes."
         f"{scope_clause}"
         f"{lead_clause}"
         f"{ci_clause}"

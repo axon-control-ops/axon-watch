@@ -211,8 +211,7 @@
 }
 
 .agent-dock-composer__approval-banner,
-.agent-dock-composer__debug-reproduce-banner,
-.agent-dock-composer__employee-failure-banner {
+.agent-dock-composer__debug-reproduce-banner {
   display: flex;
   flex-direction: column;
   gap: 0.45rem;
@@ -221,108 +220,117 @@
   border-radius: 0.45rem;
 }
 
-.agent-dock-composer__employee-failure-banner {
-  border: 1px solid rgba(255, 120, 100, 0.38);
-  background: rgba(90, 28, 24, 0.42);
+/* Cursor-soft attention / error notices above the composer */
+.agent-dock-notice {
+  display: flex;
+  align-items: stretch;
+  gap: 0.55rem;
+  margin: 0 0 0.45rem;
+  padding: 0.45rem 0.55rem 0.45rem 0;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  background: rgba(22, 22, 26, 0.92);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
 }
 
-.agent-dock-composer__employee-failure-banner--interrupted {
-  border-color: rgba(255, 180, 90, 0.34);
-  background: rgba(80, 52, 18, 0.42);
+.agent-dock-notice__rail {
+  flex: 0 0 3px;
+  margin: 0.15rem 0 0.15rem 0.45rem;
+  border-radius: 999px;
+  background: rgba(248, 113, 113, 0.72);
 }
 
-.agent-dock-composer__employee-failure-copy {
+.agent-dock-notice--interrupted .agent-dock-notice__rail {
+  background: rgba(251, 191, 36, 0.78);
+}
+
+.agent-dock-notice--error .agent-dock-notice__rail {
+  background: rgba(248, 113, 113, 0.55);
+}
+
+.agent-dock-notice__body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  min-width: 0;
+  flex: 1 1 auto;
+  padding: 0.05rem 0.15rem 0.05rem 0;
+}
+
+.agent-dock-notice__copy {
   margin: 0;
-  font-size: 0.62rem;
+  color: rgba(226, 232, 240, 0.92);
+  font-family: var(--font-ui);
+  font-size: 0.68rem;
   line-height: 1.45;
-  color: rgba(255, 210, 200, 0.96);
   overflow-wrap: anywhere;
 }
-
-.agent-dock-composer__employee-failure-banner--interrupted
-  .agent-dock-composer__employee-failure-copy {
-  color: rgba(255, 230, 195, 0.96);
+.agent-dock-notice--copy-only .agent-dock-notice__body { padding-block: 0.28rem; }
+.agent-dock-notice--error .agent-dock-notice__copy {
+  padding-right: 0.35rem;
+  color: rgba(254, 202, 202, 0.92);
 }
 
-.agent-dock-composer__employee-failure-actions {
+.agent-dock-notice__actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.35rem;
+  align-items: center;
+  gap: 0.45rem 0.65rem;
 }
 
-.agent-dock-composer__employee-failure-btn {
-  flex: 1 1 auto;
-  min-width: 5.5rem;
-  padding: 0.38rem 0.7rem;
-  border-radius: 0.35rem;
-  border: 1px solid rgba(255, 140, 120, 0.45);
-  background: rgba(120, 40, 32, 0.55);
-  color: rgba(255, 230, 220, 0.98);
-  font-size: 0.58rem;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
+.agent-dock-notice__primary {
+  display: inline-flex;
+  align-items: center;
+  min-height: 1.45rem;
+  padding: 0.18rem 0.55rem;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(248, 250, 252, 0.96);
+  font-family: var(--font-ui);
+  font-size: 0.62rem;
+  font-weight: 600;
+  line-height: 1;
   cursor: pointer;
 }
 
-.agent-dock-composer__employee-failure-btn--retry:hover:not(:disabled),
-.agent-dock-composer__employee-failure-btn--retry:focus-visible:not(:disabled) {
-  border-color: rgba(220, 110, 90, 0.62);
-  background: rgba(110, 36, 28, 0.72);
+.agent-dock-notice__primary:hover:not(:disabled) {
+  border-color: rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.12);
 }
 
-.agent-dock-composer__employee-failure-banner--interrupted
-  .agent-dock-composer__employee-failure-btn--retry {
-  border-color: rgba(255, 180, 90, 0.42);
-  background: rgba(100, 65, 18, 0.55);
-  color: rgba(255, 240, 210, 0.98);
-}
-
-.agent-dock-composer__employee-failure-banner--interrupted
-  .agent-dock-composer__employee-failure-btn--retry:hover:not(:disabled),
-.agent-dock-composer__employee-failure-banner--interrupted
-  .agent-dock-composer__employee-failure-btn--retry:focus-visible:not(:disabled) {
-  border-color: rgba(255, 200, 110, 0.58);
-  background: rgba(120, 78, 22, 0.72);
-}
-
-.agent-dock-composer__employee-failure-btn--receipts {
-  border-color: rgba(140, 190, 230, 0.42);
-  background: rgba(20, 40, 58, 0.72);
-  color: rgba(200, 230, 255, 0.95);
-}
-
-.agent-dock-composer__employee-failure-btn--receipts:hover:not(:disabled),
-.agent-dock-composer__employee-failure-btn--receipts:focus-visible:not(:disabled) {
-  border-color: rgba(120, 200, 255, 0.52);
-  background: rgba(24, 52, 78, 0.82);
-}
-
-.agent-dock-composer__employee-failure-btn--team {
-  border-color: rgba(0, 242, 255, 0.28);
-  background: rgba(8, 24, 36, 0.72);
-  color: rgba(160, 245, 255, 0.94);
-}
-
-.agent-dock-composer__employee-failure-btn--team:hover,
-.agent-dock-composer__employee-failure-btn--team:focus-visible {
-  border-color: rgba(0, 242, 255, 0.48);
-  background: rgba(12, 36, 52, 0.88);
-}
-
-.agent-dock-composer__employee-failure-btn:hover:not(:disabled) {
-  filter: brightness(1.08);
-}
-
-.agent-dock-composer__employee-failure-btn:focus-visible {
-  filter: brightness(1.08);
-  outline: 2px solid rgba(0, 242, 255, 0.55);
-  outline-offset: 2px;
-}
-
-.agent-dock-composer__employee-failure-btn:disabled {
+.agent-dock-notice__primary:disabled {
   opacity: 0.45;
   cursor: not-allowed;
-  filter: none;
+}
+
+.agent-dock-notice--interrupted .agent-dock-notice__primary {
+  border-color: rgba(251, 191, 36, 0.28);
+  background: rgba(251, 191, 36, 0.12);
+  color: rgba(254, 243, 199, 0.96);
+}
+
+.agent-dock-notice__link {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: rgba(148, 163, 184, 0.95);
+  font-family: var(--font-ui);
+  font-size: 0.62rem;
+  font-weight: 500;
+  line-height: 1.2;
+  text-decoration: underline;
+  text-underline-offset: 0.12em;
+  cursor: pointer;
+}
+
+.agent-dock-notice__link:hover:not(:disabled) {
+  color: rgba(226, 232, 240, 0.98);
+}
+
+.agent-dock-notice__link:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
 }
 
 .agent-dock-composer__approval-banner {
@@ -440,10 +448,10 @@
 
 .agent-dock-composer__access-status {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 0.4rem;
-  margin: 0.15rem 0 0.35rem;
-  padding: 0.28rem 0.4rem;
+  margin: 0 0 0.4rem;
+  padding: 0.32rem 0.45rem;
   border-radius: 7px;
   font-family: var(--font-mono);
   font-size: 0.54rem;
