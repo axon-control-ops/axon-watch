@@ -228,6 +228,7 @@ const selectedActions = computed(() =>
     ? employeeQuickActions(selectedEmployee.value, {
         autonomyMode: shell.operatorPresenceSettings.autonomy_mode,
         tasks: shell.workspaceTasksForCurrentWorkspace,
+        runs: shell.runs,
       })
     : [],
 );
@@ -235,9 +236,10 @@ const selectedActions = computed(() =>
 const handoffWaitingEmployeeIds = computed(() => {
   const mode = shell.operatorPresenceSettings.autonomy_mode;
   const tasks = shell.workspaceTasksForCurrentWorkspace;
+  const runs = shell.runs;
   return employees.value
     .filter((employee) =>
-      resolveEmployeeManualHandoff({ employee, autonomyMode: mode, tasks }).waiting,
+      resolveEmployeeManualHandoff({ employee, autonomyMode: mode, tasks, runs }).waiting,
     )
     .map((employee) => employee.employee_id);
 });

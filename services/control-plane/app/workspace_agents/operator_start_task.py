@@ -4,12 +4,14 @@ from __future__ import annotations
 
 from typing import Any
 
-from app.persistence import task_store
+from app.domain.run_state import is_terminal_phase
+from app.persistence import task_store, worker_scheduler_settings_store
 from app.runs.service import (
     RunNotFoundError,
     append_run_execution_receipt,
     create_run,
     get_run,
+    list_runs,
 )
 from app.workspace_agents.lead_fan_out import (
     _deps_completed,
@@ -22,14 +24,19 @@ class OperatorStartTaskError(ValueError):
     """Domain error for operator Start on the Task Board."""
 
 
-def _kick_queued_dispatch() -> list[dict[str, Any]]:
-    """Promote queued specialist runs even when continuous workers are paused (Manual)."""
+def _kick_queued_dispatch(run_id: str) -> list[dict[str, Any]]:
+    """Promote this specialist run even when continuous workers are paused (Manual)."""
     try:
         from app.workspace_agents.scheduler import kick_lead_fan_out_dispatch
 
-        return kick_lead_fan_out_dispatch(starts_bound=1)
-    except Exception:  # noqa: BLE001 — start still succeeds if kick is momentarily unavailable
-        return []
+        return kick_lead_fan_out_dispatch(
+            starts_bound=1,
+            target_run_id=run_id,
+        )
+    except Exception as exc:  # noqa: BLE001 — convert dispatch internals to operator-safe detail
+        raise OperatorStartTaskError(
+            f"handoff dispatch failed for {run_id}: {exc}"
+        ) from exc
 
 
 def _safe_get_run(run_id: str) -> dict[str, Any] | None:
@@ -40,6 +47,36 @@ def _safe_get_run(run_id: str) -> dict[str, Any] | None:
         return get_run(cleaned)
     except RunNotFoundError:
         return None
+
+
+def _dispatch_target_run(run_id: str) -> dict[str, Any]:
+    """Dispatch exactly one target run or fail visibly while leaving it retryable."""
+    kicked = _kick_queued_dispatch(run_id)
+    refreshed = _safe_get_run(run_id)
+    phase = str((refreshed or {}).get("phase") or "").strip().lower()
+    matched = next(
+        (row for row in kicked if str(row.get("run_id") or "").strip() == run_id),
+        None,
+    )
+    if matched is not None:
+        return refreshed if phase and phase != "queued" else matched
+    if phase and phase != "queued":
+        return refreshed or {}
+    raise OperatorStartTaskError(
+        "handoff remains queued; no worker dispatch slot is available or "
+        "worker dispatch is disabled"
+    )
+
+
+def _active_role_run(workspace_id: str, owner_role: str) -> dict[str, Any] | None:
+    for run in list_runs():
+        if str(run.get("workspace_id") or "").strip() != workspace_id:
+            continue
+        if str(run.get("employee_role") or "").strip().lower() != owner_role:
+            continue
+        if not is_terminal_phase(str(run.get("phase") or "").strip()):
+            return run
+    return None
 
 
 def operator_start_task(task_id: str) -> dict[str, Any]:
@@ -72,21 +109,15 @@ def operator_start_task(task_id: str) -> dict[str, Any]:
             raise OperatorStartTaskError(
                 f"task is already in progress (phase={phase or 'unknown'})"
             )
-        kicked = _kick_queued_dispatch()
-        thread_id = None
-        if run_id or kicked:
-            thread_id = _post_assignment_to_employee_thread(
-                workspace_id=workspace_id,
-                owner_role=owner_role,
-                run_id=run_id or str((kicked[0] if kicked else {}).get("run_id") or ""),
-                task_id=cleaned,
-                goal=str(task.get("goal") or "").strip(),
+        if not run_id:
+            raise OperatorStartTaskError(
+                "leased handoff is missing its queued run; cancel or repair the task"
             )
-        refreshed_run = _safe_get_run(run_id) if run_id else (kicked[0] if kicked else None)
+        advanced = _dispatch_target_run(run_id)
         return {
             "task": task_store.get_task(cleaned) or task,
-            "run": refreshed_run or run or {},
-            "thread_id": thread_id,
+            "run": advanced,
+            "thread_id": None,
         }
 
     if status != "open":
@@ -110,6 +141,20 @@ def operator_start_task(task_id: str) -> dict[str, Any]:
     if not bool(employee.get("enabled", True)):
         raise OperatorStartTaskError(
             f'teammate for role "{owner_role}" is disabled'
+        )
+    if not worker_scheduler_settings_store.is_employee_enabled(
+        workspace_id,
+        owner_role,
+        file_enabled=bool(employee.get("enabled", True)),
+    ):
+        raise OperatorStartTaskError(
+            f'teammate for role "{owner_role}" is paused in Fleet controls'
+        )
+    busy_run = _active_role_run(workspace_id, owner_role)
+    if busy_run is not None:
+        raise OperatorStartTaskError(
+            f'teammate for role "{owner_role}" already has active run '
+            f'{str(busy_run.get("run_id") or "unknown")}'
         )
 
     holder = f"operator-start-{workspace_id}-{owner_role}"
@@ -144,13 +189,9 @@ def operator_start_task(task_id: str) -> dict[str, Any]:
         task_id=cleaned,
         goal=goal,
     )
-    kicked = _kick_queued_dispatch()
-    advanced = next(
-        (row for row in kicked if str(row.get("run_id") or "") == run_id),
-        None,
-    )
+    advanced = _dispatch_target_run(run_id)
     return {
         "task": task_store.get_task(cleaned) or leased,
-        "run": advanced or _safe_get_run(run_id) or run,
+        "run": advanced,
         "thread_id": thread_id,
     }

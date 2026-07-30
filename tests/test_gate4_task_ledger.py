@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import sys
 import unittest
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from unittest.mock import patch
 
 from tests.support.control_plane_db import isolate_control_plane_db
 
@@ -97,6 +99,34 @@ class Gate4TaskLedgerTests(unittest.TestCase):
         still = task_store.get_task(created["task_id"])
         assert still is not None
         self.assertEqual("employee-workspace_dashpro-backend-1", still["lease_holder"])
+
+    def test_expired_lease_can_be_reacquired_in_the_same_transaction(self) -> None:
+        created = task_store.create_task(
+            workspace_id="workspace_dashpro",
+            goal="Retry stale manual handoff",
+            owner_role="integrations",
+            attempt_budget=3,
+        )
+        now = datetime(2026, 7, 30, 14, 0, tzinfo=timezone.utc)
+        with patch("app.persistence.task_store._utc_now", return_value=now):
+            task_store.lease_task(
+                created["task_id"],
+                lease_holder="stale-worker",
+                lease_seconds=30,
+            )
+
+        with patch(
+            "app.persistence.task_store._utc_now",
+            return_value=now + timedelta(seconds=31),
+        ):
+            reacquired = task_store.lease_task(
+                created["task_id"],
+                lease_holder="operator-start",
+            )
+
+        self.assertEqual("leased", reacquired["status"])
+        self.assertEqual("operator-start", reacquired["lease_holder"])
+        self.assertEqual(2, reacquired["attempts_used"])
 
     def test_attempt_budget_blocks_release_after_exhaustion(self) -> None:
         created = task_store.create_task(

@@ -1,4 +1,4 @@
-import type { CompanyEmployeeRecord } from '../../contracts/canonical';
+import type { CompanyEmployeeRecord, RunRecord } from '../../contracts/canonical';
 import type { WorkspaceTaskRecord } from '../../api/tasks-api';
 import { normalizeAutonomyMode } from '../../lib/operator-presence-settings';
 
@@ -34,6 +34,7 @@ export function resolveEmployeeManualHandoff(input: {
   employee: CompanyEmployeeRecord;
   autonomyMode: string | null | undefined;
   tasks: readonly WorkspaceTaskRecord[];
+  runs?: readonly Pick<RunRecord, 'run_id' | 'task_id'>[];
 }): EmployeeManualHandoff {
   if (normalizeAutonomyMode(input.autonomyMode) !== 'manual') {
     return { waiting: false, taskId: null, reason: null };
@@ -43,16 +44,37 @@ export function resolveEmployeeManualHandoff(input: {
   }
 
   const role = roleKey(input.employee.role);
-  if (!role || role === 'lead') {
-    // Lead rarely owns Waiting START tickets; glow stays on specialists.
-    const status = roleKey(input.employee.status);
-    if (status === 'assigned') {
-      return { waiting: true, taskId: null, reason: 'assigned' };
-    }
+  if (!role) {
     return { waiting: false, taskId: null, reason: null };
   }
 
   const byId = new Map(input.tasks.map((task) => [task.task_id, task]));
+  const status = roleKey(input.employee.status);
+  const activeRunId = input.employee.active_run_id?.trim() ?? '';
+  const activeRunTaskId =
+    input.runs?.find((run) => run.run_id.trim() === activeRunId)?.task_id?.trim() ?? '';
+  const assignedTask =
+    input.tasks.find(
+      (task) =>
+        roleKey(task.owner_role) === role &&
+        task.status === 'leased' &&
+        ((activeRunId && task.run_id?.trim() === activeRunId) ||
+          (activeRunTaskId && task.task_id === activeRunTaskId)),
+    ) ?? null;
+
+  // An assigned employee's bound run is authoritative. Never let an unrelated
+  // newer open task steal this Start button.
+  if (status === 'assigned' && (assignedTask || activeRunTaskId)) {
+    return {
+      waiting: true,
+      taskId: assignedTask?.task_id ?? activeRunTaskId,
+      reason: 'assigned',
+    };
+  }
+  if (['executing', 'working', 'running', 'starting', 'planning'].includes(status)) {
+    return { waiting: false, taskId: null, reason: null };
+  }
+
   const openTask = [...input.tasks]
     .filter(
       (task) =>
@@ -75,17 +97,10 @@ export function resolveEmployeeManualHandoff(input: {
     )
     .sort((left, right) => right.updated_at.localeCompare(left.updated_at))[0];
 
-  if (leasedQueued && roleKey(input.employee.status) === 'assigned') {
+  if (leasedQueued && status === 'assigned') {
     return { waiting: true, taskId: leasedQueued.task_id, reason: 'assigned' };
   }
 
-  if (roleKey(input.employee.status) === 'assigned') {
-    return {
-      waiting: true,
-      taskId: leasedQueued?.task_id ?? null,
-      reason: 'assigned',
-    };
-  }
-
+  // Do not show a handoff glow that has no actionable task behind it.
   return { waiting: false, taskId: null, reason: null };
 }

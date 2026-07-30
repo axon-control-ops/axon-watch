@@ -143,6 +143,7 @@ export function createWorkspaceTasksSlice(input: CreateWorkspaceTasksSliceInput)
   ): Promise<{
     task: WorkspaceTaskRecord;
     runId: string | null;
+    runPhase: string | null;
     threadId: string | null;
   } | null> {
     const workspaceId = input.currentWorkspace.value?.workspace_id?.trim() ?? '';
@@ -165,6 +166,7 @@ export function createWorkspaceTasksSlice(input: CreateWorkspaceTasksSliceInput)
       return {
         task: result.task,
         runId: String(result.run?.run_id || '').trim() || null,
+        runPhase: String(result.run?.phase || '').trim() || null,
         threadId: String(result.thread_id || '').trim() || null,
       };
     } catch (error) {

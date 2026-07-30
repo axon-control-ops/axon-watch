@@ -184,7 +184,14 @@ def operator_start(task_id: str) -> dict[str, Any]:
         lowered = detail.lower()
         if "not found" in lowered:
             raise HTTPException(status_code=404, detail=detail) from exc
-        if "blocked" in lowered or "only open" in lowered:
+        if (
+            "blocked" in lowered
+            or "only open" in lowered
+            or "remains queued" in lowered
+            or "already in progress" in lowered
+            or "already has active run" in lowered
+            or "paused in fleet controls" in lowered
+        ):
             raise HTTPException(status_code=409, detail=detail) from exc
         raise HTTPException(status_code=400, detail=detail) from exc
     except task_store.TaskLedgerError as exc:

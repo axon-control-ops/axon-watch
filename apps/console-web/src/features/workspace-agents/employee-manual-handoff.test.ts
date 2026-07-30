@@ -89,4 +89,61 @@ describe('resolveEmployeeManualHandoff', () => {
       }),
     ).toMatchObject({ waiting: true, reason: 'assigned', taskId: 'task_1' });
   });
+
+  it('starts the assigned run task before an unrelated newer open task', () => {
+    const assigned = task({
+      task_id: 'task_assigned',
+      status: 'leased',
+      run_id: 'run_assigned',
+      updated_at: '2026-07-30T14:00:00Z',
+    });
+    const unrelated = task({
+      task_id: 'task_unrelated',
+      status: 'open',
+      updated_at: '2026-07-30T15:00:00Z',
+    });
+
+    expect(
+      resolveEmployeeManualHandoff({
+        employee: employee({
+          status: 'assigned',
+          active_run_id: 'run_assigned',
+        }),
+        autonomyMode: 'manual',
+        tasks: [unrelated, assigned],
+      }),
+    ).toEqual({
+      waiting: true,
+      taskId: 'task_assigned',
+      reason: 'assigned',
+    });
+  });
+
+  it('resolves an assigned task from runs while the task snapshot is stale', () => {
+    expect(
+      resolveEmployeeManualHandoff({
+        employee: employee({
+          status: 'assigned',
+          active_run_id: 'run_assigned',
+        }),
+        autonomyMode: 'manual',
+        tasks: [],
+        runs: [{ run_id: 'run_assigned', task_id: 'task_assigned' }],
+      }),
+    ).toEqual({
+      waiting: true,
+      taskId: 'task_assigned',
+      reason: 'assigned',
+    });
+  });
+
+  it('does not glow when assigned has no actionable task', () => {
+    expect(
+      resolveEmployeeManualHandoff({
+        employee: employee({ status: 'assigned' }),
+        autonomyMode: 'manual',
+        tasks: [],
+      }),
+    ).toEqual({ waiting: false, taskId: null, reason: null });
+  });
 });

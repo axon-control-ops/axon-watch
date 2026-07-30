@@ -105,7 +105,7 @@ export async function cancelWorkspaceTask(
 
 export type OperatorStartTaskResult = {
   task: WorkspaceTaskRecord;
-  run: { run_id?: string; [key: string]: unknown };
+  run: { run_id?: string; phase?: string; [key: string]: unknown };
   thread_id: string | null;
 };
 

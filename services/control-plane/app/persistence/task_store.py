@@ -447,7 +447,7 @@ def lease_task(
         _assert_no_exclusive_path_conflict(connection, record)
 
         next_attempts = int(record["attempts_used"]) + 1
-        connection.execute(
+        cursor = connection.execute(
             """
             UPDATE workspace_tasks
             SET status = 'leased',
@@ -469,7 +469,10 @@ def lease_task(
                 task_key,
             ),
         )
-        if connection.total_changes != 1:
+        # `total_changes` is cumulative for the connection and also includes
+        # `_expire_stale_leases` above. Use this UPDATE's rowcount so a stale
+        # lease can expire and be reacquired atomically.
+        if cursor.rowcount != 1:
             connection.rollback()
             raise TaskLedgerError("task already leased")
         connection.commit()

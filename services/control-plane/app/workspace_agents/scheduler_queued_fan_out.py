@@ -25,10 +25,12 @@ def dispatch_queued_lead_fan_out_runs(
     executing_run_count: Callable[[], int],
     employee_for_role: Callable[[dict[str, Any], str, str], EmployeeConfig | None],
     dispatch_worker_run: Callable[..., None],
+    target_run_id: str | None = None,
 ) -> list[dict[str, Any]]:
-    """Promote Lead fan-out queued runs into Lane B without creating duplicate runs."""
+    """Promote queued handoff runs into Lane B without creating duplicate runs."""
     if not worker_dispatch_enabled() or starts_bound <= 0:
         return []
+    target = str(target_run_id or "").strip()
     started: list[dict[str, Any]] = []
     queued = [
         run
@@ -36,6 +38,7 @@ def dispatch_queued_lead_fan_out_runs(
         if str(run.get("phase") or "").strip() == "queued"
         and str(run.get("employee_role") or "").strip()
         and str(run.get("task_id") or "").strip()
+        and (not target or str(run.get("run_id") or "").strip() == target)
         and not is_terminal_phase(str(run.get("phase") or "").strip())
     ]
     queued.sort(

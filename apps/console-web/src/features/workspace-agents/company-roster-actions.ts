@@ -1,4 +1,4 @@
-import type { CompanyEmployeeRecord } from '../../contracts/canonical';
+import type { CompanyEmployeeRecord, RunRecord } from '../../contracts/canonical';
 import type { WorkspaceTaskRecord } from '../../api/tasks-api';
 import type { IdeComposerRestoreMode } from '../../lib/ide-composer-restore-request';
 import { SERVER_RESTART_CONTINUATION_PROMPT } from '../../lib/ide-run-recovery';
@@ -228,6 +228,7 @@ export function employeeQuickActions(
   options?: {
     autonomyMode?: string | null;
     tasks?: readonly WorkspaceTaskRecord[];
+    runs?: readonly Pick<RunRecord, 'run_id' | 'task_id'>[];
   },
 ): TeamMemberQuickAction[] {
   const failed = Boolean(employeeFailureLine(employee));
@@ -289,6 +290,7 @@ export function employeeQuickActions(
     employee,
     autonomyMode: options?.autonomyMode,
     tasks: options?.tasks ?? [],
+    runs: options?.runs,
   });
   if (handoff.waiting && handoff.taskId) {
     actions.unshift({

@@ -3883,6 +3883,7 @@ export const useShellStore = defineStore('shell', () => {
     hydrateWorkspaceIdeChat,
     createIdeThread,
     openOrFocusEmployeeIdeThread,
+    rehydrateWorkspaceIdeStreams,
     selectIdeThread,
     closeIdeThreadTab,
     loadTerminalSessions,

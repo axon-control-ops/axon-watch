@@ -191,6 +191,7 @@ def _dispatch_queued_lead_fan_out_runs(
     companies: dict[str, Any],
     starts_bound: int,
     active_bound: int,
+    target_run_id: str | None = None,
 ) -> list[dict[str, Any]]:
     """Promote Lead fan-out queued runs into Lane B without creating duplicate runs."""
     return dispatch_queued_lead_fan_out_runs(
@@ -200,10 +201,15 @@ def _dispatch_queued_lead_fan_out_runs(
         executing_run_count=_executing_run_count,
         employee_for_role=_employee_for_role,
         dispatch_worker_run=_dispatch_worker_run,
+        target_run_id=target_run_id,
     )
 
 
-def kick_lead_fan_out_dispatch(*, starts_bound: int = 3) -> list[dict[str, Any]]:
+def kick_lead_fan_out_dispatch(
+    *,
+    starts_bound: int = 3,
+    target_run_id: str | None = None,
+) -> list[dict[str, Any]]:
     """Start queued Lead fan-out runs even when continuous workers are paused.
 
     Operator Send / Lead decompose is an explicit handoff. Do not require
@@ -226,6 +232,7 @@ def kick_lead_fan_out_dispatch(*, starts_bound: int = 3) -> list[dict[str, Any]]
         companies=companies,
         starts_bound=bound,
         active_bound=active_bound,
+        target_run_id=target_run_id,
     )
 
 

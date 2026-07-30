@@ -80,11 +80,34 @@ export function useCompanyRosterControlActions(input: {
             input.shell.workspaceTasksError || 'Could not start handoff';
           return;
         }
+        if (!started.runId) {
+          controlError.value = 'Handoff start returned no run. Refresh and try again.';
+          return;
+        }
+        const phase = (started.runPhase ?? '').trim().toLowerCase();
+        if (!phase || phase === 'queued' || phase === 'starting') {
+          controlError.value =
+            'Handoff is still queued; worker dispatch did not start. Check capacity and try again.';
+          return;
+        }
+        const workspaceId = input.currentWorkspaceId.value?.trim();
         await Promise.all([
           input.loadCompany(),
+          workspaceId
+            ? input.shell.loadCompanyEmployees(workspaceId)
+            : Promise.resolve(),
           input.shell.loadRuns({ sync: false }),
-          input.shell.openOrFocusEmployeeIdeThread(employee, { forceRefresh: true }),
         ]);
+        const threadId = await input.shell.openOrFocusEmployeeIdeThread(employee, {
+          forceRefresh: true,
+        });
+        if (!threadId) {
+          controlError.value = 'Handoff started, but its IDE thread could not be opened.';
+          return;
+        }
+        if (workspaceId) {
+          await input.shell.rehydrateWorkspaceIdeStreams(workspaceId);
+        }
         input.shell.setLayoutMode('ide');
       } catch (error) {
         controlError.value =
