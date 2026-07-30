@@ -1,0 +1,34 @@
+{
+  "role": "Reed",
+  "task_id": "task-f34bd5c957f94816",
+  "failed_shift_run": "run_4d225a4bc792",
+  "this_run": "run_fc755ce5a28a",
+  "dedupe": "failed_shift:workspace_axon_watch:backend:run_4d225a4bc792",
+  "prior_gate6": {
+    "run_4d225a4bc792": "acceptance=fail \u00b7 policy=secret \u00b7 mode=contract \u00b7 paths=16",
+    "run_5ec983297756": "acceptance=fail \u00b7 policy=out_of_scope \u00b7 mode=contract \u00b7 paths=11"
+  },
+  "fixes": [
+    "list_changed_paths excludes .axon-si/",
+    "scripts/verify/run_gate6_{typecheck,tests,build}.sh isolation-aware",
+    "project.axon.yaml + contract wire those scripts; allow project.axon.yaml",
+    "test fixtures construct fake tokens at runtime",
+    "shared git info/exclude hides .axon-si for host Gate 6 until bound root has list_changed_paths fix"
+  ],
+  "local_acceptance_simulation": {
+    "passed": true,
+    "summary": "acceptance=pass \u00b7 lint,typecheck,test,build,security,diff_budget",
+    "changed_paths_count": 9
+  },
+  "targeted_tests": {
+    "command": "./scripts/dev/python.sh -m unittest -v tests.test_gate6_project_contract tests.test_gate6_verifier_contract",
+    "result": "OK",
+    "ran": 15
+  },
+  "verify_contracts": {
+    "command": "npm run verify:contracts",
+    "result": "failed",
+    "error": "tsc: not found in packages/shared-types (node_modules not installed in disposable isolation); npm error code 127"
+  },
+  "recorded_at": "2026-07-30T22:26:00Z"
+}

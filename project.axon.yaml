@@ -17,11 +17,11 @@ commands:
   lint:
     - npm run lint --if-present
   typecheck:
-    - npm run typecheck --workspace=apps/console-web
+    - ./scripts/verify/run_gate6_typecheck.sh
   test:
-    - ./scripts/verify/run_contract_unit_tests.sh
+    - ./scripts/verify/run_gate6_tests.sh
   build:
-    - npm run build --workspace=apps/console-web
+    - ./scripts/verify/run_gate6_build.sh
   security:
     - ./scripts/dev/python.sh scripts/guardrails/check_hotspot_changes.py
   diff_budget:
@@ -35,6 +35,7 @@ allowed_paths:
   - config/
   - docs/
   - .github/
+  - project.axon.yaml
 forbidden_path_globs:
   - "**/.env"
   - "**/secrets/**"

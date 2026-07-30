@@ -25,7 +25,11 @@ def check_timeout_seconds() -> float:
 
 
 def list_changed_paths(workspace_root: Path) -> list[str]:
-    """Return tracked+untracked changed paths relative to the workspace root."""
+    """Return tracked+untracked changed paths relative to the workspace root.
+
+    Excludes disposable ``.axon-si/`` sidecar files (same policy as workspace
+    delivery publish) so isolation metadata cannot fail Gate 6 out_of_scope.
+    """
     root = Path(workspace_root)
     if not root.is_dir():
         return []
@@ -51,8 +55,11 @@ def list_changed_paths(workspace_root: Path) -> list[str]:
         if " -> " in rest:
             rest = rest.split(" -> ", 1)[1].strip()
         cleaned = rest.strip().strip('"')
-        if cleaned:
-            paths.append(cleaned)
+        if not cleaned:
+            continue
+        if cleaned == ".axon-si" or cleaned.startswith(".axon-si/"):
+            continue
+        paths.append(cleaned)
     return paths
 
 
