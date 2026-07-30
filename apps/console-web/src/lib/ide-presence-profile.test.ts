@@ -144,4 +144,26 @@ describe('ide presence profile', () => {
       }),
     ).toBe(false);
   });
+
+  it('does not show Soft Attention Try again for fleet VAXON alerts alone', () => {
+    expect(
+      shouldSurfaceIdeEmployeeFailure({
+        profileState: 'alerting',
+        employeeFailureLine: null,
+        agentStreamActive: false,
+        kairoSpeechActive: false,
+      }),
+    ).toBe(false);
+  });
+
+  it('still shows Soft Attention when a teammate failed during a fleet alert', () => {
+    expect(
+      shouldSurfaceIdeEmployeeFailure({
+        profileState: 'alerting',
+        employeeFailureLine: 'Last job failed: npm test exited 1',
+        agentStreamActive: false,
+        kairoSpeechActive: false,
+      }),
+    ).toBe(true);
+  });
 });

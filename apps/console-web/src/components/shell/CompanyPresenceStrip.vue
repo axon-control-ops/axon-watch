@@ -20,6 +20,8 @@ const props = defineProps<{
   selectedEmployeeId: string | null;
   /** Employee ids currently mid IDE/agent stream (client-side busy overlay). */
   liveBusyEmployeeIds?: readonly string[];
+  /** Manual-mode handoff waiters — amber glow until Start now. */
+  handoffWaitingEmployeeIds?: readonly string[];
 }>();
 
 const emit = defineEmits<{
@@ -29,18 +31,23 @@ const emit = defineEmits<{
 const stripRef = ref<HTMLElement | null>(null);
 
 const liveBusySet = computed(() => new Set(props.liveBusyEmployeeIds ?? []));
+const handoffWaitingSet = computed(() => new Set(props.handoffWaitingEmployeeIds ?? []));
 
 const items = computed(() => {
   const next = sortEmployeesForPresenceStrip(props.employees).map((employee) => {
     const liveBusy = liveBusySet.value.has(employee.employee_id);
+    const handoffWaiting = !liveBusy && handoffWaitingSet.value.has(employee.employee_id);
     const failed = Boolean(employeeFailureLine(employee, { liveBusy }));
-    const avatar = buildEmployeeAvatar(employee, { liveBusy });
+    const avatar = buildEmployeeAvatar(employee, { liveBusy, handoffWaiting });
     const interrupted = failed && employeeShiftNeedsContinuation(employee);
     const paused = !employee.enabled && !failed && !liveBusy;
     const working = avatar.presence === 'working' || liveBusy;
+    const handoff = avatar.presence === 'handoff' || handoffWaiting;
     let presenceLabel = 'Idle';
     if (working) {
       presenceLabel = 'Busy';
+    } else if (handoff) {
+      presenceLabel = 'Handoff';
     } else if (interrupted) {
       presenceLabel = 'Retry';
     } else if (failed) {
@@ -57,6 +64,7 @@ const items = computed(() => {
       interrupted,
       paused,
       working,
+      handoff,
       presenceLabel,
       optionId: presenceStripOptionId(employee.employee_id),
     };
@@ -186,6 +194,7 @@ function onKeydown(event: KeyboardEvent): void {
           'company-presence-strip__btn--selected':
             selectedEmployeeId === item.employee.employee_id,
           'company-presence-strip__btn--busy': item.working,
+          'company-presence-strip__btn--handoff': item.handoff,
           'company-presence-strip__btn--lead': item.avatar.lead,
         }"
         :data-presence="item.avatar.presence"
@@ -206,8 +215,9 @@ function onKeydown(event: KeyboardEvent): void {
           :data-lead="item.avatar.lead ? 'true' : undefined"
         >
           <span
-            v-if="item.working"
+            v-if="item.working || item.handoff"
             class="company-presence-strip__busy-ring"
+            :class="{ 'company-presence-strip__busy-ring--handoff': item.handoff && !item.working }"
             aria-hidden="true"
           />
           <img

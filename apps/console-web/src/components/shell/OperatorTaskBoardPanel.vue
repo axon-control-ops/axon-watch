@@ -12,10 +12,7 @@ import {
   worstHudHoloTone,
   type HudHoloTone,
 } from '../../features/hud-holo/hud-holo-tones';
-import {
-  buildOperatorTaskBoardView,
-  type TaskBoardRow,
-} from '../../lib/operator-task-board-view';
+import { buildOperatorTaskBoardView, type TaskBoardRow } from '../../lib/operator-task-board-view';
 import {
   dismissDoneTaskId,
   dismissDoneTaskIds,
@@ -31,11 +28,13 @@ import { useShellStore } from '../../stores/shell';
 import OperatorTaskBoardColumns from './operator-task-board/OperatorTaskBoardColumns.vue';
 import OperatorTaskBoardCreateForm from './operator-task-board/OperatorTaskBoardCreateForm.vue';
 import { parseDependencies } from './operator-task-board/operator-task-board-helpers';
+import OperatorTaskBoardNextUp from './operator-task-board/OperatorTaskBoardNextUp.vue';
 import OperatorTaskBoardPlanFilter from './operator-task-board/OperatorTaskBoardPlanFilter.vue';
 import OperatorTaskBoardSelectedDrawer from './operator-task-board/OperatorTaskBoardSelectedDrawer.vue';
+import { useOperatorTaskBoardRouting } from './operator-task-board/use-operator-task-board-routing';
 
 const shell = useShellStore();
-
+const { openSpecialist, startTaskAndOpenOwner } = useOperatorTaskBoardRouting();
 const goalDraft = ref('');
 const ownerRoleDraft = ref('backend');
 const acceptanceDraft = ref('');
@@ -52,12 +51,25 @@ const schedulerError = ref<string | null>(null);
 const handoffRows = ref<IncomingHandoffRow[]>([]);
 const dismissedDoneIds = ref<Set<string>>(loadDismissedDoneTaskIds());
 
-const boardView = computed(() =>
-  buildOperatorTaskBoardView(
+const boardView = computed(() => {
+  const runPhaseByTaskId: Record<string, string> = {};
+  for (const run of shell.runs) {
+    const taskId = String(run.task_id || '').trim();
+    const phase = String(run.phase || '').trim();
+    if (taskId && phase) {
+      runPhaseByTaskId[taskId] = phase;
+    }
+    const runId = String(run.run_id || '').trim();
+    if (runId && phase) {
+      runPhaseByTaskId[runId] = phase;
+    }
+  }
+  return buildOperatorTaskBoardView(
     shell.workspaceTasksForCurrentWorkspace,
     shell.leadPlansForCurrentWorkspace,
-  ),
-);
+    runPhaseByTaskId,
+  );
+});
 
 const openHandoffRows = computed(() => handoffRows.value.slice(0, 6));
 
@@ -256,13 +268,9 @@ const selectedPlanAwaitingEngagement = computed(() => {
 });
 
 async function startTask(taskId: string): Promise<void> {
-  const started = await shell.startCurrentWorkspaceTask(taskId);
-  if (!started) {
-    return;
-  }
-  // Stay on the board; starting several tickets must not yank us into the IDE.
-  selectedTaskId.value = started.task.task_id;
-  await refreshScheduler();
+  await startTaskAndOpenOwner(
+    taskId, refreshScheduler, (startedTaskId) => (selectedTaskId.value = startedTaskId),
+  );
 }
 
 async function submitTask(): Promise<void> {
@@ -359,18 +367,6 @@ async function retryTask(row: TaskBoardRow): Promise<void> {
   }
 }
 
-async function openSpecialist(row: TaskBoardRow): Promise<void> {
-  const employee = shell.companyEmployeesForCurrentWorkspace.find(
-    (item) => String(item.role || '').trim().toLowerCase() === row.ownerRole.toLowerCase(),
-  );
-  if (!employee) {
-    shell.setLayoutMode('ide');
-    return;
-  }
-  await shell.openOrFocusEmployeeIdeThread(employee);
-  shell.setLayoutMode('ide');
-}
-
 function openAssociatedRun(row: TaskBoardRow): void {
   if (!row.runId) {
     return;
@@ -400,6 +396,14 @@ async function reviewLeadPlan(planId: string | null): Promise<void> {
 
 function openFleetControls(): void {
   shell.openOperatorPresenceSettingsPanel();
+}
+
+function activateNextUp(row: TaskBoardRow): void {
+  if (row.canStart) {
+    void startTask(row.taskId);
+    return;
+  }
+  selectTask(row.taskId);
 }
 </script>
 
@@ -461,6 +465,15 @@ function openFleetControls(): void {
           Fleet
         </button>
       </div>
+
+      <OperatorTaskBoardNextUp
+        :board-view="boardView"
+        :autonomy-mode="shell.operatorPresenceSettings.autonomy_mode"
+        :scheduler-effective="scheduler?.effective_enabled ?? false"
+        :mutating="shell.workspaceTasksMutating"
+        @activate="activateNextUp"
+        @open-fleet="openFleetControls"
+      />
 
       <section
         v-if="openHandoffRows.length"

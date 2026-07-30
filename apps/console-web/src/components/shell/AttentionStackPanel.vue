@@ -388,6 +388,7 @@ function approvalExplanation(): OperatorAlertExplanation {
           :key="signal.signal_id"
           class="dock-list__item dock-signal-row"
           :class="{ 'dock-signal-row--expanded': isSignalExpanded(signal.signal_id) }"
+          :data-signal-id="signal.signal_id"
         >
           <div class="dock-signal-row__main">
             <button

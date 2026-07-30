@@ -137,6 +137,55 @@ describe('focusAttentionSidebar', () => {
     expect(highlightedSignalId.value).toBe('signal_dash');
     expect(setCurrentWorkspace).toHaveBeenCalledWith('workspace_dashpro');
   });
+
+  it('opens the spoken alert details when Open Attention omits an id', () => {
+    const highlightedSignalId = ref<string | null>(null);
+    const setCurrentWorkspace = vi.fn();
+    const slice = createOperatorFocusSlice({
+      layoutMode: ref('operator'),
+      operatorBriefing: ref({
+        top_signals: [],
+        operator_presence: {
+          spoken_alert: { signal_id: 'signal_dash' },
+        },
+      }),
+      attentionSignals: ref([
+        {
+          signal_id: 'signal_other',
+          workspace_id: 'workspace_other',
+          title: 'Other warning',
+          severity: 'warning',
+        },
+        {
+          signal_id: 'signal_dash',
+          workspace_id: 'workspace_dashpro',
+          title: 'DashPro CI failed',
+          severity: 'critical',
+        },
+      ]),
+      highlightedSignalId,
+      ideAttentionPanelOpen: ref(false),
+      ideBriefingPanelOpen: ref(false),
+      ideExplorerCollapsed: ref(false),
+      signalsSeamEmphasized: ref(false),
+      missionControlEmphasized: ref(false),
+      connectorsEmphasized: ref(false),
+      briefingSeamEmphasized: ref(false),
+      operatorCenterView: ref('graph'),
+      dockHeroMode: ref('command'),
+      expandedDockSeams: ref(new Set()),
+      dockThreadSeamTouched: ref(false),
+      setDockHeroMode: vi.fn(),
+      restoreComposerDraft: vi.fn(),
+      setLayoutMode: vi.fn(),
+      setCurrentWorkspace,
+    } as unknown as Parameters<typeof createOperatorFocusSlice>[0]);
+
+    slice.focusAttentionSidebar();
+
+    expect(highlightedSignalId.value).toBe('signal_dash');
+    expect(setCurrentWorkspace).toHaveBeenCalledWith('workspace_dashpro');
+  });
 });
 
 describe('focusLiveOperations', () => {

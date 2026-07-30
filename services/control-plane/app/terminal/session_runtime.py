@@ -43,7 +43,7 @@ def ensure_runtime(
             _runtimes.pop(key, None)
 
         preferred = str(session.title or "").strip().lower()
-        if session.role == "operator" and preferred in {"", "bash"}:
+        if session.role == "operator" and not preferred:
             preferred = "zsh"
         runtime = TerminalSessionRuntime(
             workspace_id=str(workspace_id or "").strip(),

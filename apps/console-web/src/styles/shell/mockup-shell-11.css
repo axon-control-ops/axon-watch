@@ -537,12 +537,12 @@
   flex-direction: column;
   gap: 0.35rem;
   min-height: 0;
-  max-height: min(22rem, 38vh);
+  max-height: min(34rem, 62vh);
   padding: 0.45rem 0.55rem 0.55rem;
   border: 1px solid rgba(0, 242, 255, 0.14);
   border-radius: 0.45rem;
   background: rgba(0, 12, 20, 0.42);
-  overflow: hidden;
+  overflow: auto;
 }
 
 .operator-status-radar-panel__attention-head {

@@ -184,27 +184,81 @@ describe('buildOperatorTaskBoardView', () => {
     expect(blocked?.dependencyChips[0]?.blocking).toBe(true);
   });
 
-  it('only offers Start on unblocked open tasks', () => {
+  it('only offers Start on unblocked open tasks or queued leases', () => {
+    const view = buildOperatorTaskBoardView(
+      [
+        task({ task_id: 'task-dep', goal: 'Dependency', status: 'open' }),
+        task({
+          task_id: 'task-blocked',
+          goal: 'Blocked work',
+          status: 'open',
+          dependencies: ['task-dep'],
+        }),
+        task({
+          task_id: 'task-leased',
+          goal: 'Already running',
+          status: 'leased',
+          lease_holder: 'backend-1',
+          run_id: 'run_exec',
+        }),
+        task({
+          task_id: 'task-queued',
+          goal: 'Queued under Manual',
+          status: 'leased',
+          lease_holder: 'operator-start',
+          run_id: 'run_queued',
+        }),
+      ],
+      [],
+      {
+        'task-leased': 'executing',
+        run_exec: 'executing',
+        'task-queued': 'queued',
+        run_queued: 'queued',
+      },
+    );
+    const byId = (id: string) => view.rows.find((row) => row.taskId === id);
+
+    expect(byId('task-dep')?.canStart).toBe(true);
+    expect(byId('task-dep')?.nextActionLabel).toBe('Start specialist');
+    expect(byId('task-blocked')?.canStart).toBe(false);
+    expect(byId('task-blocked')?.nextActionLabel).toBe('Waiting on prerequisite');
+    expect(byId('task-leased')?.canStart).toBe(false);
+    expect(byId('task-leased')?.nextActionLabel).toBe('Follow progress');
+    expect(byId('task-queued')?.canStart).toBe(true);
+    expect(byId('task-queued')?.nextActionLabel).toBe('Start run');
+  });
+
+  it('puts actionable waiting tasks before blocked tickets', () => {
     const view = buildOperatorTaskBoardView([
-      task({ task_id: 'task-dep', goal: 'Dependency', status: 'open' }),
       task({
         task_id: 'task-blocked',
         goal: 'Blocked work',
         status: 'open',
         dependencies: ['task-dep'],
+        updated_at: '2026-07-22T12:05:00Z',
       }),
       task({
-        task_id: 'task-leased',
-        goal: 'Already running',
-        status: 'leased',
-        lease_holder: 'backend-1',
+        task_id: 'task-dep',
+        goal: 'Start this first',
+        status: 'open',
+        updated_at: '2026-07-22T12:01:00Z',
       }),
     ]);
-    const byId = (id: string) => view.rows.find((row) => row.taskId === id);
 
-    expect(byId('task-dep')?.canStart).toBe(true);
-    expect(byId('task-blocked')?.canStart).toBe(false);
-    expect(byId('task-leased')?.canStart).toBe(false);
+    expect(view.columns.find((column) => column.id === 'waiting')?.rows.map((row) => row.taskId)).toEqual([
+      'task-dep',
+      'task-blocked',
+    ]);
+  });
+
+  it('turns failed tickets into an explicit review next step', () => {
+    const view = buildOperatorTaskBoardView([
+      task({ task_id: 'task-failed', goal: 'Repair CI', status: 'failed' }),
+    ]);
+
+    expect(view.rows[0]?.nextActionLabel).toBe('Review failure');
+    expect(view.rows[0]?.nextActionHint).toContain('last outcome');
   });
 });
 

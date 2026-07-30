@@ -10,7 +10,13 @@ import {
 } from './company-roster-view';
 import { buildEmployeeFaceAvatarUrl } from './employee-face-avatar';
 
-export type EmployeePresenceTone = 'idle' | 'working' | 'failed' | 'interrupted' | 'paused';
+export type EmployeePresenceTone =
+  | 'idle'
+  | 'working'
+  | 'handoff'
+  | 'failed'
+  | 'interrupted'
+  | 'paused';
 
 export type EmployeeAvatarModel = {
   initials: string;
@@ -77,7 +83,7 @@ export function employeeIsLead(employee: CompanyEmployeeRecord): boolean {
 
 export function employeePresenceTone(
   employee: CompanyEmployeeRecord,
-  options?: { liveBusy?: boolean },
+  options?: { liveBusy?: boolean; handoffWaiting?: boolean },
 ): EmployeePresenceTone {
   // Live IDE/stream ownership wins over a stale last-shift failure — otherwise a
   // teammate mid-run keeps a red ring and never shows the busy border.
@@ -94,11 +100,16 @@ export function employeePresenceTone(
     return 'working';
   }
   // Lead mirrors workspace executing — ignore that for personal presence unless liveBusy.
-  if (employeeIsLead(employee)) {
+  if (employeeIsLead(employee) && !options?.handoffWaiting) {
     return 'idle';
   }
+  const status = (employee.status ?? '').trim();
+  // Assigned / Manual waiting handoff — amber ring, not green busy.
+  if (options?.handoffWaiting || status === 'assigned') {
+    return 'handoff';
+  }
   // Always-on "watching" is on-duty, not mid-shift busy — keep idle ring.
-  if (employeeIsWorking(employee.status) && (employee.status ?? '').trim() !== 'watching') {
+  if (employeeIsWorking(status) && status !== 'watching') {
     return 'working';
   }
   return 'idle';
@@ -106,7 +117,7 @@ export function employeePresenceTone(
 
 export function buildEmployeeAvatar(
   employee: CompanyEmployeeRecord,
-  options?: { liveBusy?: boolean },
+  options?: { liveBusy?: boolean; handoffWaiting?: boolean },
 ): EmployeeAvatarModel {
   const glow = employeeGlowTone(employee);
   const base = ROLE_PALETTE[glow] ?? ROLE_PALETTE.default;

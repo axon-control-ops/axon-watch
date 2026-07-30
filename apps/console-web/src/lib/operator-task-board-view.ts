@@ -6,6 +6,13 @@ export type TaskBoardColumnId = 'waiting' | 'in_progress' | 'done' | 'needs_atte
 export type TaskBoardBucket = 'open' | 'leased' | 'done' | 'failed' | 'cancelled';
 
 export type TaskBoardFilter = 'board' | 'history' | 'all';
+export type TaskBoardNextActionTone =
+  | 'start'
+  | 'waiting'
+  | 'progress'
+  | 'attention'
+  | 'review'
+  | 'done';
 
 export type TaskBoardDependencyChip = {
   taskId: string;
@@ -48,6 +55,10 @@ export type TaskBoardRow = {
   planGoal: string | null;
   /** Short plan chip label — never the full Lead fan-out essay. */
   planLabel: string | null;
+  planAwaitingEngagement: boolean;
+  nextActionLabel: string;
+  nextActionHint: string;
+  nextActionTone: TaskBoardNextActionTone;
   updatedAt: string;
   createdAt: string;
 };
@@ -162,10 +173,88 @@ export function summarizeTaskBoardLabel(text: string, max = 52): string {
   return `${base.slice(0, Math.max(8, max - 1)).trimEnd()}…`;
 }
 
+export function resolveTaskBoardNextAction(input: {
+  status: WorkspaceTaskStatus;
+  blockedByOpenDeps: boolean;
+  planAwaitingEngagement?: boolean;
+  /** Bound run phase when the task is leased (queued vs executing). */
+  runPhase?: string | null;
+}): {
+  label: string;
+  hint: string;
+  tone: TaskBoardNextActionTone;
+} {
+  if (input.status === 'failed') {
+    return {
+      label: 'Review failure',
+      hint: 'Open details, inspect the last outcome, then retry or reassign.',
+      tone: 'attention',
+    };
+  }
+  if (input.status === 'open' && input.blockedByOpenDeps) {
+    return {
+      label: 'Waiting on prerequisite',
+      hint: 'Finish the blocking task first; this ticket will stay queued.',
+      tone: 'waiting',
+    };
+  }
+  if (input.status === 'open') {
+    return {
+      label: 'Start specialist',
+      hint: 'Lease this ticket and open the assigned specialist thread.',
+      tone: 'start',
+    };
+  }
+  if (input.status === 'leased') {
+    const phase = String(input.runPhase || '')
+      .trim()
+      .toLowerCase();
+    if (!phase || phase === 'queued' || phase === 'starting') {
+      return {
+        label: 'Start run',
+        hint: 'Dispatch the queued specialist run into the IDE (Manual mode needs an explicit kick).',
+        tone: 'start',
+      };
+    }
+    return {
+      label: 'Follow progress',
+      hint: 'Open the run or specialist thread to review current work.',
+      tone: 'progress',
+    };
+  }
+  if (input.planAwaitingEngagement) {
+    return {
+      label: 'Review Lead plan',
+      hint: 'Open the VAXON review and close the Lead engagement when satisfied.',
+      tone: 'review',
+    };
+  }
+  if (input.status === 'completed') {
+    return {
+      label: 'Review result',
+      hint: 'Check the outcome and clear the completed ticket when done.',
+      tone: 'done',
+    };
+  }
+  return {
+    label: 'Archived',
+    hint: 'This ticket is no longer active.',
+    tone: 'done',
+  };
+}
+
+function runPhaseIsQueued(phase: string | null | undefined): boolean {
+  const cleaned = String(phase || '')
+    .trim()
+    .toLowerCase();
+  return !cleaned || cleaned === 'queued' || cleaned === 'starting';
+}
+
 function toRow(
   task: WorkspaceTaskRecord,
   byId: Map<string, WorkspaceTaskRecord>,
   planById: Map<string, LeadPlanRecord>,
+  runPhaseByTaskId: Record<string, string> = {},
 ): TaskBoardRow {
   const dependencyIds = Array.isArray(task.dependencies) ? task.dependencies : [];
   const dependencyChips: TaskBoardDependencyChip[] = dependencyIds.map((depId) => {
@@ -183,8 +272,20 @@ function toRow(
   const plan = planId ? planById.get(planId) : undefined;
   const column = columnForTask(task);
   const planGoal = plan?.goal?.trim() || null;
+  const planAwaitingEngagement = Boolean(plan?.awaiting_engagement);
+  const runPhase =
+    (task.run_id ? runPhaseByTaskId[task.task_id] || runPhaseByTaskId[task.run_id] : null) ?? null;
+  const nextAction = resolveTaskBoardNextAction({
+    status: task.status,
+    blockedByOpenDeps,
+    planAwaitingEngagement,
+    runPhase,
+  });
 
   const goalFull = task.goal.trim() || 'Untitled';
+  const canStartOpen = task.status === 'open' && !blockedByOpenDeps;
+  const canStartQueuedLease =
+    task.status === 'leased' && Boolean(task.run_id?.trim()) && runPhaseIsQueued(runPhase);
   return {
     taskId: task.task_id,
     goal: summarizeTaskBoardLabel(goalFull, TASK_CARD_GOAL_MAX),
@@ -197,7 +298,7 @@ function toRow(
     attemptsLabel: `${task.attempts_used}/${task.attempt_budget}`,
     canCancel: task.status === 'open' || task.status === 'leased',
     canRetry: task.status === 'failed' || task.status === 'cancelled',
-    canStart: task.status === 'open' && !blockedByOpenDeps,
+    canStart: canStartOpen || canStartQueuedLease,
     runId: task.run_id,
     acceptance: task.acceptance_criteria.trim(),
     risk: (task.risk || 'normal').trim() || 'normal',
@@ -215,9 +316,28 @@ function toRow(
     planKey: task.plan_key?.trim() || null,
     planGoal,
     planLabel: planGoal ? summarizeTaskBoardLabel(planGoal, PLAN_CHIP_LABEL_MAX) : null,
+    planAwaitingEngagement,
+    nextActionLabel: nextAction.label,
+    nextActionHint: nextAction.hint,
+    nextActionTone: nextAction.tone,
     updatedAt: task.updated_at,
     createdAt: task.created_at,
   };
+}
+
+function sortRowsByNextAction(left: TaskBoardRow, right: TaskBoardRow): number {
+  const priority: Record<TaskBoardNextActionTone, number> = {
+    attention: 0,
+    start: 1,
+    review: 2,
+    progress: 3,
+    waiting: 4,
+    done: 5,
+  };
+  return (
+    priority[left.nextActionTone] - priority[right.nextActionTone] ||
+    right.updatedAt.localeCompare(left.updatedAt)
+  );
 }
 
 export function filterTaskBoardRows(
@@ -236,6 +356,7 @@ export function filterTaskBoardRows(
 export function buildOperatorTaskBoardView(
   tasks: WorkspaceTaskRecord[],
   plans: LeadPlanRecord[] = [],
+  runPhaseByTaskId: Record<string, string> = {},
 ): OperatorTaskBoardView {
   const byId = new Map(tasks.map((task) => [task.task_id, task]));
   const planById = new Map(plans.map((plan) => [plan.plan_id, plan]));
@@ -262,16 +383,20 @@ export function buildOperatorTaskBoardView(
       plan_key: meta.planKey,
     };
   });
-  const rows = ordered.map((task) => toRow(task, byId, planById));
+  const rows = ordered.map((task) => toRow(task, byId, planById, runPhaseByTaskId));
 
-  const waiting = rows.filter((row) => row.column === 'waiting' && row.bucket !== 'cancelled');
+  const waiting = rows
+    .filter((row) => row.column === 'waiting' && row.bucket !== 'cancelled')
+    .sort(sortRowsByNextAction);
   const inProgress = rows.filter(
     (row) => row.column === 'in_progress' && row.bucket !== 'cancelled',
-  );
-  const done = rows.filter((row) => row.column === 'done' && row.bucket !== 'cancelled');
-  const needsAttention = rows.filter(
-    (row) => row.column === 'needs_attention' && row.bucket !== 'cancelled',
-  );
+  ).sort(sortRowsByNextAction);
+  const done = rows
+    .filter((row) => row.column === 'done' && row.bucket !== 'cancelled')
+    .sort(sortRowsByNextAction);
+  const needsAttention = rows
+    .filter((row) => row.column === 'needs_attention' && row.bucket !== 'cancelled')
+    .sort(sortRowsByNextAction);
   const historyRows = rows.filter((row) => row.bucket === 'cancelled');
 
   const counts = {

@@ -27,7 +27,7 @@ import {
   createKairoThinkingSpeechThrottle,
   TOOL_MILESTONE_INTERVAL_MS,
 } from './kairo-narration-throttle';
-import { dropWaitingKairoNarration } from './kairo-voice-queue';
+import { dropWaitingKairoNarration, stopActiveKairoNarration } from './kairo-voice-queue';
 import type { KairoVoiceSpeaker } from './kairo-voice-utterance';
 
 type Narrator = ReturnType<typeof createKairoAgentMilestoneNarrator>;
@@ -123,6 +123,13 @@ export function createChatStreamVoiceNarration(input: {
     agentMilestoneNarrator?.cancel();
     progressNarrator?.cancel();
     dropWaitingKairoNarration('stale_run_advance');
+  }
+
+  /** Stream ended — never leave mid-run intent TTS playing after Done/ask. */
+  function clearMidRunSpeechForStreamEnd(): void {
+    agentMilestoneNarrator?.cancel();
+    progressNarrator?.cancel();
+    stopActiveKairoNarration('stream_complete');
   }
 
   function threadStartAckLine(): string {
@@ -261,18 +268,20 @@ export function createChatStreamVoiceNarration(input: {
   function narrateCompletion(finalContent: string): void {
     const completion = narrationForCompletion(finalContent);
     if (toolNarrationEnabled) {
-      // Thinking already carried the "what I'll do" plan mid-run. Do not cancel
-      // that queue and re-speak a progress opener after the roster is IDLE.
+      // Always drain mid-run TTS first so "I am checking…" cannot speak after Done/ask.
+      clearMidRunSpeechForStreamEnd();
+      // Thinking already carried the "what I'll do" plan mid-run. Do not re-speak a
+      // progress opener after the roster is IDLE — unless this is an ask/reproduce cue.
       if (
         completion.key === 'done' &&
         thinkingCarriesUpdate &&
+        !completion.verbatim &&
         (isProgressOrIntentSentence(completion.message) ||
           completion.message === 'Done' ||
           completion.message === 'Shift complete.')
       ) {
         return;
       }
-      cancelStaleNarration();
       agentMilestoneNarrator?.narrate(completion);
       return;
     }
@@ -285,6 +294,8 @@ export function createChatStreamVoiceNarration(input: {
     ) {
       return;
     }
+    answerNarrator?.cancel();
+    stopActiveKairoNarration('stream_complete');
     answerNarrator?.narrate({
       ...completion,
       verbatim: true,
@@ -301,7 +312,7 @@ export function createChatStreamVoiceNarration(input: {
         : { key: 'failed' as const, message: errorSummary || 'Failed' };
 
     if (toolNarrationEnabled) {
-      cancelStaleNarration();
+      clearMidRunSpeechForStreamEnd();
       agentMilestoneNarrator?.narrate(failure);
       return;
     }
@@ -314,6 +325,8 @@ export function createChatStreamVoiceNarration(input: {
     ) {
       return;
     }
+    answerNarrator?.cancel();
+    stopActiveKairoNarration('stream_complete');
     answerNarrator?.narrate({
       ...failure,
       verbatim: true,

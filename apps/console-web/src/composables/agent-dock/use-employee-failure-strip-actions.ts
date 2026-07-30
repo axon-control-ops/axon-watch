@@ -34,23 +34,23 @@ export function useEmployeeFailureStripActions(shell: ShellStore): {
 
   const employee = computed(() => shell.activeIdeEmployeeRecord);
   const failureLine = computed(() => shell.activeIdeEmployeeFailureLine);
-  const closedWithConfidence = computed(() =>
-    latestIdeAgentTurnHasConfidence(shell.threadMessages),
-  );
 
-  const showFailureActions = computed(
-    () =>
-      !closedWithConfidence.value &&
+  const showFailureActions = computed(() => {
+    // Confidence close-out wins over a briefly stale roster failure row.
+    if (latestIdeAgentTurnHasConfidence(shell.threadMessages)) {
+      return false;
+    }
+    return (
       shouldSurfaceIdeEmployeeFailure({
         profileState: shell.ideDisplayKairoPresenceState,
         employeeFailureLine: failureLine.value,
         agentStreamActive: shell.agentStreamActive,
         kairoSpeechActive: shell.kairoSpeechActive,
-      }) &&
-      Boolean(employee.value),
-  );
+      }) && Boolean(employee.value)
+    );
+  });
 
-  /** Try again / Continue only for real failures — never after Confidence: N/10. */
+  /** Try again / Continue only while the authoritative roster still reports a failure. */
   const showRetryAction = computed(() => showFailureActions.value);
 
   const showExplainAction = computed(() =>

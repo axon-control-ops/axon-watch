@@ -102,7 +102,7 @@ function normalizeVaxonModelId(raw: unknown): string {
   return DEFAULT_VAXON_MODEL_ID;
 }
 
-function normalizeAutonomyMode(raw: unknown): AutonomyMode {
+export function normalizeAutonomyMode(raw: unknown): AutonomyMode {
   const value = String(raw ?? '').trim().toLowerCase();
   if (value === 'manual' || value === 'semi' || value === 'full') {
     return value;

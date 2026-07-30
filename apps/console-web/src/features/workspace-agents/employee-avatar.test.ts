@@ -88,6 +88,10 @@ describe('employee-avatar', () => {
       ),
     ).toBe('failed');
     expect(employeePresenceTone(employee({ status: 'idle' }))).toBe('idle');
+    expect(employeePresenceTone(employee({ status: 'assigned' }))).toBe('handoff');
+    expect(
+      employeePresenceTone(employee({ status: 'idle' }), { handoffWaiting: true }),
+    ).toBe('handoff');
     expect(
       employeePresenceTone(employee({ status: 'idle' }), { liveBusy: true }),
     ).toBe('working');

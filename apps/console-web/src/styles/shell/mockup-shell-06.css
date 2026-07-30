@@ -179,6 +179,27 @@
   position: relative;
 }
 
+.terminal-tabbar__new-group {
+  display: inline-flex;
+  align-items: stretch;
+  border-radius: 0.22rem;
+}
+
+.terminal-tabbar__new-group:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.terminal-tabbar--mockup
+  .terminal-tabbar__action-button.terminal-tabbar__action-button--new {
+  width: 1.45rem;
+}
+
+.terminal-tabbar--mockup
+  .terminal-tabbar__action-button.terminal-tabbar__action-button--profile {
+  width: 1.05rem;
+  margin-left: -0.1rem;
+}
+
 .terminal-tabbar__new-menu {
   position: absolute;
   top: calc(100% + 0.25rem);
@@ -241,6 +262,15 @@
 
 .terminal-tabbar--mockup .terminal-tabbar__action-button:hover .terminal-tabbar__action {
   color: rgba(0, 242, 255, 0.92);
+}
+
+.terminal-tabbar--mockup .terminal-tabbar__action-button:disabled {
+  cursor: default;
+  opacity: 0.38;
+}
+
+.terminal-tabbar--mockup .terminal-tabbar__action-button:disabled:hover .terminal-tabbar__action {
+  color: inherit;
 }
 
 .terminal-tabbar--mockup .terminal-tabbar__action {

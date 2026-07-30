@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { TaskBoardRow } from '../../../lib/operator-task-board-view';
 
-const props = defineProps<{
+defineProps<{
   row: TaskBoardRow;
   workspaceTasksMutating: boolean;
   leadPlansMutating: boolean;
@@ -18,22 +18,6 @@ const emit = defineEmits<{
   retryTask: [row: TaskBoardRow];
   reviewLeadPlan: [planId: string | null];
 }>();
-
-function nextStepCopy(): string {
-  if (props.row.canStart) {
-    return 'Start leases this ticket to the specialist and queues the run. Full Autonomy dispatches workers; or open the specialist to drive it in IDE.';
-  }
-  if (props.row.blockedByOpenDeps) {
-    return 'Blocked by unfinished dependencies — it stays in Waiting until those complete (or you cancel).';
-  }
-  if (props.row.bucket === 'leased') {
-    return 'Already leased / in progress. Open the run or specialist to follow the work.';
-  }
-  if (props.planAwaitingEngagement) {
-    return 'Lead Engage is open in VAXON — review the synthesis there, or dismiss the review chip when done.';
-  }
-  return 'Select an action below.';
-}
 </script>
 
 <template>
@@ -44,7 +28,9 @@ function nextStepCopy(): string {
         Close
       </button>
     </header>
-    <p class="operator-task-board__drawer-hint">{{ nextStepCopy() }}</p>
+    <p class="operator-task-board__drawer-hint">
+      <strong>{{ row.nextActionLabel }}.</strong> {{ row.nextActionHint }}
+    </p>
     <p><strong>Status</strong> {{ row.status }}</p>
     <p><strong>Role</strong> {{ row.ownerRole }}</p>
     <p><strong>Risk</strong> {{ row.risk }}</p>

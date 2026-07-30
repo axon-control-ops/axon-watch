@@ -4,6 +4,7 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import TerminalHost from './TerminalHost.vue';
 import WorkbenchIcon from './WorkbenchIcon.vue';
 import OperatorJarvisOpsPanel from './shell/OperatorJarvisOpsPanel.vue';
+import TerminalNewSessionMenu from './shell/TerminalNewSessionMenu.vue';
 import TerminalSessionRail from './shell/TerminalSessionRail.vue';
 import { useAgentTerminalMirror } from '../composables/useAgentTerminalMirror';
 import {
@@ -19,7 +20,10 @@ import {
   flushPendingOperatorTerminalCommand,
   focusSessionForPendingCommand,
 } from '../lib/workbench-terminal-pending-commands';
-import { terminalSessionTabLabel } from '../lib/terminal-session-view';
+import {
+  DEFAULT_OPERATOR_TERMINAL_SESSION_ID,
+  terminalSessionTabLabel,
+} from '../lib/terminal-session-view';
 import {
   resolveActiveVisibleTerminalSessionIds,
   resolveMirrorVisibleTerminalSessionIds,
@@ -54,6 +58,9 @@ const terminalHostRefs = ref<Record<string, TerminalHostInstance | null>>({});
 const visibleTerminalSessionIds = ref<string[]>([]);
 
 const activeTerminalSession = computed(() => shell.activeTerminalSession);
+const activeTerminalCanClose = computed(
+  () => activeTerminalSession.value.id !== DEFAULT_OPERATOR_TERMINAL_SESSION_ID,
+);
 const bottomTabs = computed(() => [
   { id: 'ops' as const, label: 'OPS' },
   { id: 'terminal' as const, label: 'TERMINAL' },
@@ -279,6 +286,9 @@ function killTerminalSession(sessionId: string): void {
 }
 
 function handleHeaderKill(): void {
+  if (!activeTerminalCanClose.value) {
+    return;
+  }
   killTerminalSession(activeTerminalSession.value.id);
 }
 
@@ -355,53 +365,11 @@ onBeforeUnmount(() => {
           </button>
         </div>
         <div class="terminal-tabbar__actions">
-          <div class="terminal-tabbar__new-wrap">
-            <button
-              type="button"
-              class="terminal-tabbar__action-button"
-              title="New terminal"
-              aria-label="New terminal"
-              aria-haspopup="menu"
-              :aria-expanded="showNewTerminalMenu"
-              @click.stop="toggleNewTerminalMenu"
-            >
-              <WorkbenchIcon name="plus" class="terminal-tabbar__action" :size="16" />
-            </button>
-            <div
-              v-if="showNewTerminalMenu"
-              class="terminal-tabbar__new-menu"
-              role="menu"
-              aria-label="Create terminal session"
-            >
-              <button
-                type="button"
-                class="terminal-tabbar__new-menu-item"
-                role="menuitem"
-                @click="createTerminalSession('zsh')"
-              >
-                <WorkbenchIcon name="shell-zsh" :size="14" />
-                <span>zsh · local</span>
-              </button>
-              <button
-                type="button"
-                class="terminal-tabbar__new-menu-item"
-                role="menuitem"
-                @click="createTerminalSession('bash')"
-              >
-                <WorkbenchIcon name="shell-bash" :size="14" />
-                <span>bash · local</span>
-              </button>
-              <button
-                type="button"
-                class="terminal-tabbar__new-menu-item terminal-tabbar__new-menu-item--agent"
-                role="menuitem"
-                @click="createTerminalSession('vaxon')"
-              >
-                <WorkbenchIcon name="terminal-agent" :size="14" />
-                <span>vaxon · agent</span>
-              </button>
-            </div>
-          </div>
+          <TerminalNewSessionMenu
+            :open="showNewTerminalMenu"
+            @create="createTerminalSession"
+            @toggle="toggleNewTerminalMenu"
+          />
           <button
             type="button"
             class="terminal-tabbar__action-button"
@@ -414,8 +382,9 @@ onBeforeUnmount(() => {
           <button
             type="button"
             class="terminal-tabbar__action-button"
-            title="Kill terminal"
-            aria-label="Kill terminal"
+            :title="activeTerminalCanClose ? 'Kill Terminal' : 'The default terminal stays available'"
+            :aria-label="activeTerminalCanClose ? 'Kill Terminal' : 'Default terminal cannot be killed'"
+            :disabled="!activeTerminalCanClose"
             @click="handleHeaderKill"
           >
             <WorkbenchIcon name="trash" class="terminal-tabbar__action" :size="16" />

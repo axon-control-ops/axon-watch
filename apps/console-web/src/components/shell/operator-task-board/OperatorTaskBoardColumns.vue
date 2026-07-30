@@ -126,13 +126,26 @@ function hiddenWaitingCount(column: OperatorTaskBoardView['columns'][number]): n
             @click="emit('selectTask', row.taskId)"
           >
             <span class="operator-task-board__item-top">
-              <span class="operator-task-board__item-status">{{ row.status }}</span>
+              <span
+                class="operator-task-board__item-status operator-task-board__item-action"
+                :class="`operator-task-board__item-action--${row.nextActionTone}`"
+              >
+                {{ row.nextActionLabel }}
+              </span>
               <span class="operator-task-board__item-role">{{ row.ownerRole }}</span>
             </span>
+            <span
+              v-if="row.planLabel"
+              class="operator-task-board__item-plan"
+              :title="row.planGoal ?? row.planLabel"
+            >
+              Lead · {{ row.planLabel }}
+            </span>
             <span class="operator-task-board__item-goal">{{ row.goal }}</span>
+            <span class="operator-task-board__item-next">{{ row.nextActionHint }}</span>
             <span class="operator-task-board__item-meta">
-              <template v-if="row.bucket !== 'done'">{{ row.attemptsLabel }}</template>
-              <template v-if="row.blockedByOpenDeps"> · blocked</template>
+              {{ row.status }}
+              <template v-if="row.bucket !== 'done'"> · attempts {{ row.attemptsLabel }}</template>
             </span>
             <span
               v-for="chip in row.dependencyChips.filter((item) => item.blocking).slice(0, 1)"
@@ -146,7 +159,7 @@ function hiddenWaitingCount(column: OperatorTaskBoardView['columns'][number]): n
             v-if="row.canStart"
             type="button"
             class="operator-task-board__item-start"
-            title="Start now — lease and queue specialist run"
+            title="Start now — lease/dispatch specialist run into the IDE"
             aria-label="Start waiting task"
             :disabled="workspaceTasksMutating"
             @click.stop="emit('startTask', row.taskId)"

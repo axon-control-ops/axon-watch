@@ -43,6 +43,8 @@ export function createAgentStreamIncrementalState(options?: {
   let thinkingBlockIndex = -1;
   let currentThinkingBody = '';
   const completedThinkingSpeechQueue: string[] = [];
+  /** True once the open thinking fence already queued a first speakable sentence. */
+  let openThinkingSpeechEmitted = false;
   let thinkingMilestoneEmitted = false;
   let toolCount = 0;
   let editCount = 0;
@@ -62,6 +64,7 @@ export function createAgentStreamIncrementalState(options?: {
     thinkingBlockIndex = -1;
     currentThinkingBody = '';
     completedThinkingSpeechQueue.length = 0;
+    openThinkingSpeechEmitted = false;
     thinkingMilestoneEmitted = false;
     toolCount = 0;
     editCount = 0;
@@ -81,21 +84,47 @@ export function createAgentStreamIncrementalState(options?: {
     );
   }
 
+  function queueClosedThinkingSpeech(): void {
+    if (openThinkingSpeechEmitted) {
+      // Already spoke the first complete sentence while the fence was open —
+      // do not re-queue the full block near stream end (plays after Done/ask).
+      return;
+    }
+    const complete = sanitizeAgentThinkingForOperator(currentThinkingBody, {
+      speakerName: personaName,
+    });
+    if (complete) {
+      completedThinkingSpeechQueue.push(complete);
+    }
+  }
+
+  function maybeQueueOpenThinkingSpeech(): void {
+    if (openThinkingSpeechEmitted) {
+      return;
+    }
+    const speakable = firstSpeakableAgentLiveBlock(
+      sanitizeAgentThinkingForOperator(currentThinkingBody, {
+        speakerName: personaName,
+      }),
+    );
+    if (speakable.length < 24) {
+      return;
+    }
+    completedThinkingSpeechQueue.push(speakable);
+    openThinkingSpeechEmitted = true;
+  }
+
   function processLine(line: string): NarrationMilestone[] {
     const milestones: NarrationMilestone[] = [];
 
     if (inBlock === 'thinking' && inThinkingBlock) {
       const trimmedEnd = line.trimEnd();
       if (BLOCK_CLOSE_RE.test(trimmedEnd)) {
-        const complete = sanitizeAgentThinkingForOperator(currentThinkingBody, {
-          speakerName: personaName,
-        });
-        if (complete) {
-          completedThinkingSpeechQueue.push(complete);
-        }
+        queueClosedThinkingSpeech();
         inBlock = null;
         inThinkingBlock = false;
         currentThinkingBody = '';
+        openThinkingSpeechEmitted = false;
         return milestones;
       }
       // Model sometimes glues the close fence onto the last sentence:
@@ -108,21 +137,18 @@ export function createAgentStreamIncrementalState(options?: {
           }
           currentThinkingBody += withoutClose;
         }
-        const complete = sanitizeAgentThinkingForOperator(currentThinkingBody, {
-          speakerName: personaName,
-        });
-        if (complete) {
-          completedThinkingSpeechQueue.push(complete);
-        }
+        queueClosedThinkingSpeech();
         inBlock = null;
         inThinkingBlock = false;
         currentThinkingBody = '';
+        openThinkingSpeechEmitted = false;
         return milestones;
       }
       if (currentThinkingBody) {
         currentThinkingBody += '\n';
       }
       currentThinkingBody += line;
+      maybeQueueOpenThinkingSpeech();
       return milestones;
     }
 
@@ -143,6 +169,7 @@ export function createAgentStreamIncrementalState(options?: {
       inThinkingBlock = true;
       inBlock = 'thinking';
       currentThinkingBody = '';
+      openThinkingSpeechEmitted = false;
       if (!thinkingMilestoneEmitted) {
         thinkingMilestoneEmitted = true;
         // Do not emit a canned "On it…" speakable milestone — wait for real thinking body.

@@ -170,6 +170,8 @@ import {
 import { listReattachIdeStreamThreadIds, listStaleIdeStreamThreadIds } from '../lib/stale-ide-stream-ui';
 import { resolveStreamingAgentMessageId } from '../lib/follow-busy-employee-ide-streams';
 import { composerSubmitBlockReason } from '../lib/composer-submit-block-reason';
+import { rewriteComposerAskOptionAnswer } from '../lib/composer-ask-option-rewrite';
+import { markQuestionAnswered } from '../lib/answered-agent-questions';
 import { humanizeNetworkError } from '../lib/humanize-network-error';
 import {
   localRuntimeDegradedActive,
@@ -1312,12 +1314,11 @@ export const useShellStore = defineStore('shell', () => {
     if (!workspaceId || !employeeId) {
       return null;
     }
-
     const title = employeeIdeThreadTitle(employee);
     const forceRefresh = options?.forceRefresh !== false;
-
     try {
       await loadIdeThreads(workspaceId);
+      if (currentWorkspace.value?.workspace_id !== workspaceId) return null;
       const existing = (ideThreadsByWorkspaceId.value[workspaceId] ?? []).find(
         (thread) => (thread.employee_id ?? '').trim() === employeeId,
       );
@@ -1336,6 +1337,7 @@ export const useShellStore = defineStore('shell', () => {
         employeeId,
         employeeRole: employee.role,
       });
+      if (currentWorkspace.value?.workspace_id !== workspaceId) return null;
       ideThreadsByWorkspaceId.value = {
         ...ideThreadsByWorkspaceId.value,
         [workspaceId]: sortIdeThreadsNewestFirst([
@@ -1606,7 +1608,7 @@ export const useShellStore = defineStore('shell', () => {
     focusCommandSeam,
   } = createOperatorFocusSlice({
     layoutMode,
-    operatorBriefing,
+    operatorBriefing, attentionSignals,
     highlightedSignalId,
     ideAttentionPanelOpen,
     ideBriefingPanelOpen,
@@ -2101,7 +2103,13 @@ export const useShellStore = defineStore('shell', () => {
     } = {},
   ): Promise<boolean> {
     const workspaceId = currentWorkspace.value?.workspace_id ?? '';
-    const content = (options.contentOverride ?? ideComposerDraft.value).trim();
+    let content = (options.contentOverride ?? ideComposerDraft.value).trim();
+    // Bare "1"/"2"/"3" against an open ask card → same Continue payload the card sends.
+    const askRewrite = rewriteComposerAskOptionAnswer(content, threadMessages.value);
+    if (askRewrite) {
+      content = askRewrite.content;
+      markQuestionAnswered(askRewrite.ask.messageId, askRewrite.ask.prompt);
+    }
     const blockedReason = composerSubmitBlockReason(workspaceId, content, commandMutationState.value, agentStreamActive.value);
     if (blockedReason) {
       commandMutationError.value = blockedReason;

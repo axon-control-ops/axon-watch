@@ -133,4 +133,29 @@ describe('narrationForCompletion', () => {
     expect(spokenCompletionSummary(plan)).toBe('Shift complete.');
     expect(spokenCompletionSummary(`${plan} Confidence: 8/10`)).toMatch(/confidence/i);
   });
+
+  it('treats gerund and future-tense mid-run intent as progress openers', () => {
+    expect(
+      isProgressOrIntentSentence(
+        'Sir King chose prep-and-run canary OTA. I am checking that we are on a clean development tree, then I will publish the canary update if that gate passes.',
+      ),
+    ).toBe(true);
+  });
+
+  it('speaks an ask waiting cue instead of mid-run intent on ask completion', () => {
+    const content = [
+      'The release gate blocked the publish.',
+      '',
+      ':::ask How should I clear the canary gate?',
+      '- 1 | Fix the tree and retry',
+      '- 2 | Skip canary for now',
+      '- 3 | Force publish anyway',
+      ':::',
+    ].join('\n');
+    expect(narrationForCompletion(content)).toEqual({
+      key: 'done',
+      message: 'I need your choice on the ask card.',
+      verbatim: true,
+    });
+  });
 });

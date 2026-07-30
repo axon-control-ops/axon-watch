@@ -313,6 +313,19 @@
   border-color: rgba(0, 242, 255, 0.28);
 }
 
+.company-roster__action--start-now {
+  border-color: rgba(242, 169, 59, 0.55);
+  color: rgba(255, 220, 150, 0.98);
+  background: rgba(120, 70, 10, 0.35);
+  font-weight: 700;
+}
+
+.company-roster__action--start-now:hover,
+.company-roster__action--start-now:focus-visible {
+  border-color: rgba(255, 190, 80, 0.85);
+  background: rgba(150, 90, 15, 0.45);
+}
+
 .company-roster__meta,
 .company-roster__owns {
   font-size: 0.64rem;

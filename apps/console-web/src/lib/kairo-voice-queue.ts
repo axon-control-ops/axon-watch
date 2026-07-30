@@ -86,6 +86,18 @@ export function dropWaitingKairoNarration(reason = 'stale_run_advance'): void {
   dropWaitingNarration(reason);
 }
 
+/**
+ * Drop waiting narration and stop an already-playing narration utterance.
+ * Used when a stream ends so mid-run "I am checking…" cannot keep speaking
+ * after Done / ask. Does not cut alerts or conversation replies.
+ */
+export function stopActiveKairoNarration(reason = 'stream_complete'): void {
+  dropWaitingNarration(reason);
+  if (activeJob?.priority === 'narration') {
+    stopKairoPlayback();
+  }
+}
+
 async function settleAfterUtterance(): Promise<void> {
   await new Promise<void>((resolve) => {
     globalThis.setTimeout(resolve, POST_UTTERANCE_SETTLE_MS);

@@ -27,6 +27,7 @@ const props = defineProps<{
   actions: TeamMemberQuickAction[];
   controlBusy: boolean;
   liveBusy?: boolean;
+  handoffWaiting?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -34,7 +35,12 @@ const emit = defineEmits<{
   talk: [];
 }>();
 
-const avatar = computed(() => buildEmployeeAvatar(props.employee));
+const avatar = computed(() =>
+  buildEmployeeAvatar(props.employee, {
+    liveBusy: props.liveBusy,
+    handoffWaiting: props.handoffWaiting,
+  }),
+);
 const failure = computed(() =>
   employeeFailureLine(props.employee, { liveBusy: props.liveBusy }),
 );
@@ -86,8 +92,9 @@ const displayActions = computed(() =>
           :data-lead="avatar.lead ? 'true' : undefined"
         >
           <span
-            v-if="avatar.presence === 'working'"
+            v-if="avatar.presence === 'working' || avatar.presence === 'handoff'"
             class="agent-persona-dock__busy-ring"
+            :class="{ 'agent-persona-dock__busy-ring--handoff': avatar.presence === 'handoff' }"
             aria-hidden="true"
           />
           <img
@@ -190,6 +197,7 @@ const displayActions = computed(() =>
           'company-roster__action--retry': action.id === 'retry',
           'company-roster__action--receipts': action.id === 'receipts',
           'company-roster__action--control': action.kind === 'control',
+          'company-roster__action--start-now': action.id === 'start_now',
         }"
         :disabled="controlBusy && action.kind === 'control'"
         @click="emit('action', action)"

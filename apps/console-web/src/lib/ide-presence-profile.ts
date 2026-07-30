@@ -100,7 +100,19 @@ export function shouldSurfaceIdeEmployeeFailure(input: {
   agentStreamActive: boolean;
   kairoSpeechActive: boolean;
 }): boolean {
-  return resolveIdeKairoChipState(input) === 'alerting';
+  // Fleet / VAXON `alerting` (e.g. DashPro Sentry) must not invent teammate Soft Attention.
+  if (!(input.employeeFailureLine ?? '').trim()) {
+    return false;
+  }
+  if (input.agentStreamActive || input.kairoSpeechActive) {
+    return false;
+  }
+  // Evaluate as idle so an unrelated fleet alert does not keep Try again stuck.
+  const chipState = resolveIdeKairoChipState({
+    ...input,
+    profileState: input.profileState === 'alerting' ? 'idle' : input.profileState,
+  });
+  return chipState === 'alerting';
 }
 
 export function ideShowKairoSidebarExpanded(profile: IdePresenceProfile): boolean {

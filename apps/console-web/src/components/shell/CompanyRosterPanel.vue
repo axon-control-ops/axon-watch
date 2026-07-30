@@ -27,6 +27,7 @@ import {
   markIntroSpokenToday,
   resolveTalkSpeakMode,
 } from '../../features/workspace-agents/company-roster-intro-prefs';
+import { resolveEmployeeManualHandoff } from '../../features/workspace-agents/employee-manual-handoff';
 import {
   employeeComposerOpenPayload,
   employeeQuickActions,
@@ -221,8 +222,23 @@ const selectedEmployee = computed(
 );
 
 const selectedActions = computed(() =>
-  selectedEmployee.value ? employeeQuickActions(selectedEmployee.value) : [],
+  selectedEmployee.value
+    ? employeeQuickActions(selectedEmployee.value, {
+        autonomyMode: shell.operatorPresenceSettings.autonomy_mode,
+        tasks: shell.workspaceTasksForCurrentWorkspace,
+      })
+    : [],
 );
+
+const handoffWaitingEmployeeIds = computed(() => {
+  const mode = shell.operatorPresenceSettings.autonomy_mode;
+  const tasks = shell.workspaceTasksForCurrentWorkspace;
+  return employees.value
+    .filter((employee) =>
+      resolveEmployeeManualHandoff({ employee, autonomyMode: mode, tasks }).waiting,
+    )
+    .map((employee) => employee.employee_id);
+});
 
 function selectEmployee(employee: CompanyEmployeeRecord): void {
   selectedEmployeeId.value = employee.employee_id;
@@ -335,6 +351,32 @@ async function onControlAction(
       await loadCompany();
     } catch (error) {
       controlError.value = error instanceof Error ? error.message : 'Could not stop job';
+    } finally {
+      controlBusyId.value = null;
+    }
+    return;
+  }
+  if (action.control === 'start_now') {
+    const taskId = action.taskId?.trim();
+    if (!taskId) {
+      return;
+    }
+    controlBusyId.value = employee.employee_id;
+    controlError.value = null;
+    try {
+      const started = await shell.startCurrentWorkspaceTask(taskId);
+      if (!started) {
+        controlError.value = shell.workspaceTasksError || 'Could not start handoff';
+        return;
+      }
+      await Promise.all([
+        loadCompany(),
+        shell.loadRuns({ sync: false }),
+        shell.openOrFocusEmployeeIdeThread(employee, { forceRefresh: true }),
+      ]);
+      shell.setLayoutMode('ide');
+    } catch (error) {
+      controlError.value = error instanceof Error ? error.message : 'Could not start handoff';
     } finally {
       controlBusyId.value = null;
     }
@@ -462,6 +504,7 @@ async function onPresenceSelect(employee: CompanyEmployeeRecord): Promise<void> 
         :employees="employees"
         :selected-employee-id="selectedEmployeeId"
         :live-busy-employee-ids="liveBusyEmployeeIds"
+        :handoff-waiting-employee-ids="handoffWaitingEmployeeIds"
         @select="onPresenceSelect"
       />
 
@@ -482,6 +525,7 @@ async function onPresenceSelect(employee: CompanyEmployeeRecord): Promise<void> 
           :actions="selectedActions"
           :control-busy="controlBusyId === selectedEmployee.employee_id"
           :live-busy="liveBusyEmployeeIds.includes(selectedEmployee.employee_id)"
+          :handoff-waiting="handoffWaitingEmployeeIds.includes(selectedEmployee.employee_id)"
           @talk="void startChat(selectedEmployee, 'talk')"
           @action="onQuickAction(selectedEmployee, $event)"
         />

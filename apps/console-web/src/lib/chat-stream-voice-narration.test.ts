@@ -16,9 +16,11 @@ vi.mock('./kairo-progress-narrator', () => ({
 
 vi.mock('./kairo-voice-queue', () => ({
   dropWaitingKairoNarration: vi.fn(),
+  stopActiveKairoNarration: vi.fn(),
 }));
 
 import { createKairoAgentMilestoneNarrator } from './kairo-agent-milestone-narrator';
+import { stopActiveKairoNarration } from './kairo-voice-queue';
 import { createChatStreamVoiceNarration } from './chat-stream-voice-narration';
 
 describe('createChatStreamVoiceNarration', () => {
@@ -150,11 +152,55 @@ describe('createChatStreamVoiceNarration', () => {
 
     expect(voice.speakStartBookend()).toBe(true);
     vi.mocked(voice.agentMilestoneNarrator!.narrate).mockClear();
+    vi.mocked(stopActiveKairoNarration).mockClear();
 
     voice.narrateCompletion(
       'Reading the parent dashboard survey payments wiring and the selected-child card styles next, then fix that card layout and produce a clear dashboard layout preview.',
     );
+    expect(stopActiveKairoNarration).toHaveBeenCalledWith('stream_complete');
     expect(voice.agentMilestoneNarrator?.narrate).not.toHaveBeenCalled();
+  });
+
+  it('stops mid-run speech and cues the ask card on completion', () => {
+    const voice = createChatStreamVoiceNarration({
+      composerMode: 'agent',
+      messageId: 'msg_ask',
+      sessionId: () => 'session',
+      workspaceId: () => 'workspace_dashpro',
+      narration: () => 'minimal',
+      narrateToolProgress: () => false,
+      voiceDeliveryAllowed: () => true,
+      operatorPrompt: () => 'prep canary OTA',
+      fullAccess: () => true,
+    });
+
+    expect(voice.speakStartBookend()).toBe(true);
+    vi.mocked(voice.agentMilestoneNarrator!.narrate).mockClear();
+    vi.mocked(stopActiveKairoNarration).mockClear();
+
+    voice.narrateCompletion(
+      [
+        ':::thinking',
+        'Sir King chose prep-and-run canary OTA. I am checking that we are on a clean development tree, then I will publish.',
+        ':::',
+        '',
+        'The release gate blocked the publish.',
+        '',
+        ':::ask How should I clear the canary gate?',
+        '- 1 | Fix the tree and retry',
+        '- 2 | Skip canary for now',
+        '- 3 | Force publish anyway',
+        ':::',
+      ].join('\n'),
+    );
+    expect(stopActiveKairoNarration).toHaveBeenCalledWith('stream_complete');
+    expect(voice.agentMilestoneNarrator?.narrate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        key: 'done',
+        verbatim: true,
+        message: 'I need your choice on the ask card.',
+      }),
+    );
   });
 
   it('still speaks a Confidence close-out after thinking carried intent', () => {

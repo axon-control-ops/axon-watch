@@ -74,10 +74,14 @@ withDefaults(
       <path d="M8 3.1v9.8M3.1 8h9.8" />
     </template>
     <template v-else-if="name === 'trash'">
-      <path d="M3.2 4.4h9.6" />
-      <path d="M5.5 4.4V3.35h5V4.4" />
-      <path d="M4.85 4.4l.55 8.1h5.2l.55-8.1" />
-      <path d="M6.55 6.7v4.2M9.45 6.7v4.2" />
+      <!-- VS Code/Cursor codicon-style kill-terminal glyph. -->
+      <path
+        fill="currentColor"
+        stroke="none"
+        fill-rule="evenodd"
+        clip-rule="evenodd"
+        d="M6.5 2h3l.5.5V4h3v1h-1v9l-.5.5h-7L4 14V5H3V4h3V2.5l.5-.5ZM7 4h2V3H7v1ZM5 5v8.5h6V5H5Zm2 1h1v6H7V6Zm2 0h1v6H9V6Z"
+      />
     </template>
     <template v-else-if="name === 'clear'">
       <!-- Eraser / clear scrollback -->

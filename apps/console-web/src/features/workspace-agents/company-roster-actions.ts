@@ -1,6 +1,8 @@
 import type { CompanyEmployeeRecord } from '../../contracts/canonical';
+import type { WorkspaceTaskRecord } from '../../api/tasks-api';
 import type { IdeComposerRestoreMode } from '../../lib/ide-composer-restore-request';
 import { SERVER_RESTART_CONTINUATION_PROMPT } from '../../lib/ide-run-recovery';
+import { resolveEmployeeManualHandoff } from './employee-manual-handoff';
 import {
   employeeDockReceiptRunId,
   employeeFailureLine,
@@ -17,7 +19,7 @@ export type TeamMemberChatKind = 'talk' | 'status' | 'assign' | 'retry' | 'recei
 
 export type TeamMemberSurfaceAction = 'briefing' | 'attention';
 
-export type TeamMemberControlAction = 'toggle_enabled' | 'stop';
+export type TeamMemberControlAction = 'toggle_enabled' | 'stop' | 'start_now';
 
 export interface TeamMemberQuickAction {
   id: TeamMemberChatKind | TeamMemberSurfaceAction | TeamMemberControlAction;
@@ -27,6 +29,8 @@ export interface TeamMemberQuickAction {
   surface?: TeamMemberSurfaceAction;
   control?: TeamMemberControlAction;
   composerMode?: IdeComposerRestoreMode;
+  /** Task id for Manual Start Now handoffs. */
+  taskId?: string;
 }
 
 function ownsSnippet(employee: CompanyEmployeeRecord): string {
@@ -219,7 +223,13 @@ export function employeeDockDisplayActions(
   return actions.filter((action) => action.id !== 'receipts');
 }
 
-export function employeeQuickActions(employee: CompanyEmployeeRecord): TeamMemberQuickAction[] {
+export function employeeQuickActions(
+  employee: CompanyEmployeeRecord,
+  options?: {
+    autonomyMode?: string | null;
+    tasks?: readonly WorkspaceTaskRecord[];
+  },
+): TeamMemberQuickAction[] {
   const failed = Boolean(employeeFailureLine(employee));
   const talkAction: TeamMemberQuickAction = {
     id: 'talk',
@@ -275,6 +285,21 @@ export function employeeQuickActions(employee: CompanyEmployeeRecord): TeamMembe
     },
   ];
 
+  const handoff = resolveEmployeeManualHandoff({
+    employee,
+    autonomyMode: options?.autonomyMode,
+    tasks: options?.tasks ?? [],
+  });
+  if (handoff.waiting && handoff.taskId) {
+    actions.unshift({
+      id: 'start_now',
+      label: 'Start now',
+      kind: 'control',
+      control: 'start_now',
+      taskId: handoff.taskId,
+    });
+  }
+
   if (employee.active_run_id) {
     actions.push({
       id: 'stop',
@@ -303,3 +328,4 @@ export function employeeQuickActions(employee: CompanyEmployeeRecord): TeamMembe
 
   return actions;
 }
+

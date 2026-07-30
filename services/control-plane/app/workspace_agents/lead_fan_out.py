@@ -130,7 +130,7 @@ def _roster_from_company(workspace_id: str) -> list[LeadPlanRosterMember]:
     return members
 
 
-def _employee_id_for_role(workspace_id: str, role: str) -> str | None:
+def _employee_for_role(workspace_id: str, role: str) -> dict[str, Any] | None:
     company = build_company_roster(workspace_id)
     rows = company.get("employees") if isinstance(company, dict) else None
     if not isinstance(rows, list):
@@ -140,9 +140,16 @@ def _employee_id_for_role(workspace_id: str, role: str) -> str | None:
         if not isinstance(row, dict):
             continue
         if str(row.get("role") or "").strip().lower() == want:
-            employee_id = str(row.get("employee_id") or "").strip()
-            return employee_id or None
+            return row
     return None
+
+
+def _employee_id_for_role(workspace_id: str, role: str) -> str | None:
+    employee = _employee_for_role(workspace_id, role)
+    if employee is None:
+        return None
+    employee_id = str(employee.get("employee_id") or "").strip()
+    return employee_id or None
 
 
 def _deps_completed(task: dict[str, Any]) -> bool:

@@ -190,21 +190,25 @@ export function isProgressOrIntentSentence(sentence: string): boolean {
   if (/^\s*(Retrying|Continuing)\b/i.test(text)) {
     return true;
   }
+  // Present / future intent: "I am checking…", "I'll publish…", "I will prep…"
   if (
-    /^\s*I(?:'m| am|'ll| will)\s+(?:going to |now )?(?:read|start|begin|retry|check|look|scan|inspect|open|review|draft|fix|update|wire|produce|analyze)\b/i.test(
+    /^\s*I(?:'m| am|'ll| will)\s+(?:going to |now )?(?:read(?:ing)?|start(?:ing)?|begin(?:ning)?|retry(?:ing)?|check(?:ing)?|look(?:ing)?|scan(?:ning)?|inspect(?:ing)?|open(?:ing)?|review(?:ing)?|draft(?:ing)?|fix(?:ing)?|update(?:ing)?|wire(?:ing)?|produc(?:e|ing)|analyz(?:e|ing)|publish(?:ing)?|prepar(?:e|ing)|run(?:ning)?)\b/i.test(
       text,
     )
   ) {
     return true;
   }
   if (
-    /^\s*(Reading|Checking|Looking|Scanning|Inspecting|Opening|Reviewing|Drafting|Analyzing|Working on|Next)\b/i.test(
+    /^\s*(Reading|Checking|Looking|Scanning|Inspecting|Opening|Reviewing|Drafting|Analyzing|Working on|Next|Publishing|Preparing)\b/i.test(
       text,
     )
   ) {
     return true;
   }
-  if (/\bnext,\s+then\b/i.test(text) || /\bthen (?:fix|produce|update|wire|check|read)\b/i.test(text)) {
+  if (
+    /\bnext,\s+then\b/i.test(text) ||
+    /\bthen (?:I will |I'll |fix|produce|update|wire|check|read|publish|prep)\b/i.test(text)
+  ) {
     return true;
   }
   return false;
@@ -270,6 +274,14 @@ export function narrationForCompletion(content: string): NarrationMilestone {
     return {
       key: 'done',
       message: 'Waiting for you to reproduce the bug.',
+      verbatim: true,
+    };
+  }
+  // Ask pause: stop mid-run intent speech and cue the operator to the card.
+  if (/:::ask\b/m.test(content)) {
+    return {
+      key: 'done',
+      message: 'I need your choice on the ask card.',
       verbatim: true,
     };
   }
