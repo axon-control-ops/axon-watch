@@ -447,12 +447,19 @@ class RunStaleReconcileTests(unittest.TestCase):
                 daemon=True,
             )
             worker.start()
-            time.sleep(0.15)
+            # Heartbeat is on a 50ms interval under the patch; wait for the receipt
+            # instead of a fixed sleep (CI load made 150ms flake).
+            deadline = time.monotonic() + 2.0
+            receipt_types: list[str] = []
+            while time.monotonic() < deadline:
+                history = run_store.list_history(get_run(run_id)["history_ref"])
+                receipt_types = [
+                    str(item.get("receipt", {}).get("type") or "") for item in history
+                ]
+                if "worker_heartbeat" in receipt_types:
+                    break
+                time.sleep(0.05)
             reaped = reap_stale_employee_runs(stale_seconds=600)
-            history = run_store.list_history(get_run(run_id)["history_ref"])
-            receipt_types = [
-                str(item.get("receipt", {}).get("type") or "") for item in history
-            ]
             release.set()
             worker.join(timeout=5.0)
 
