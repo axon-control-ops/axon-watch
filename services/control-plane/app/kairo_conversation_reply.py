@@ -23,25 +23,21 @@ QuestionFocus = Literal[
     "general",
     "followup",
 ]
-
 _OPEN_QUESTION_RE = re.compile(
     r"\b(why|how|explain|tell me (?:more|about)|what happened|what went wrong|"
     r"walk me through|can you elaborate)\b",
     re.IGNORECASE,
 )
-
 _APPROVAL_RE = re.compile(r"\b(approval|approvals|approve|awaiting)\b", re.IGNORECASE)
 _SIGNAL_RE = re.compile(r"\b(signal|signals|sentry|posthog|monitor|inbox|incident)\b", re.IGNORECASE)
 _RUN_RE = re.compile(r"\b(run|runs|running|executing|review|queue)\b", re.IGNORECASE)
 _FLEET_RE = re.compile(r"\b(fleet|workspace|workspaces|health|nominal)\b", re.IGNORECASE)
+# Bare "runtime" = CLI readiness; exclude canary/staging/production/prod/dev runtime.
 _RUNTIME_RE = re.compile(
-    r"\b("
-    r"cli(?:\s+runtime)?|cursor(?:\s+cli)?|codex|agent\s+dispatch|lane\s+b|"
+    r"\b(cli(?:\s+runtime)?|cursor(?:\s+cli)?|codex|agent\s+dispatch|lane\s+b|"
     r"vault|auth|login|api\s+key|"
-    # Bare "runtime" is CLI readiness — not deployment targets like Canary runtime.
-    r"(?<!canary\s)(?<!staging\s)(?<!production\s)(?<!prod\s)(?<!dev\s)runtime"
-    r")\b",
-    re.IGNORECASE,
+    r"(?<!canary\s)(?<!staging\s)(?<!production\s)(?<!prod\s)(?<!dev\s)runtime)\b",
+    re.I,
 )
 _HEALTH_RE = re.compile(
     r"\b("
@@ -60,7 +56,7 @@ _FOLLOWUP_RE = re.compile(
 )
 _ACTIVITY_RE = re.compile(
     r"\b(just did|just do|doing|latest|recent|recently|last thing|last run|activity)\b",
-    re.IGNORECASE,
+    re.I,
 )
 def is_open_style_question(content: str) -> bool:
     return bool(_OPEN_QUESTION_RE.search(content.strip()))

@@ -208,9 +208,35 @@ def cleanup_after_task_completed(completed: dict[str, Any]) -> list[dict[str, An
         return []
 
 
+def safe_reconcile_workspace_waiting_duplicates(
+    workspace_id: str,
+    *,
+    log: Any | None = None,
+) -> dict[str, Any]:
+    """Best-effort Lead reconcile; never raises into scheduler/check-in ticks."""
+    try:
+        return reconcile_workspace_waiting_duplicates(workspace_id=workspace_id)
+    except Exception:  # noqa: BLE001
+        if log is not None:
+            try:
+                log.exception(
+                    "lead waiting-duplicate reconcile failed for %s",
+                    workspace_id,
+                )
+            except Exception:  # noqa: BLE001
+                pass
+        return {
+            "workspace_id": workspace_id,
+            "cancelled_vs_completed": [],
+            "cancelled_open_clones": [],
+            "cancelled_count": 0,
+        }
+
+
 __all__ = [
     "cancel_open_clone_duplicates",
     "cancel_waiting_duplicates_of_completed_task",
     "cleanup_after_task_completed",
     "reconcile_workspace_waiting_duplicates",
+    "safe_reconcile_workspace_waiting_duplicates",
 ]

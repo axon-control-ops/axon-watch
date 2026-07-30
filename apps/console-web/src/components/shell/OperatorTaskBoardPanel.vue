@@ -31,6 +31,7 @@ import { parseDependencies } from './operator-task-board/operator-task-board-hel
 import OperatorTaskBoardNextUp from './operator-task-board/OperatorTaskBoardNextUp.vue';
 import OperatorTaskBoardPlanFilter from './operator-task-board/OperatorTaskBoardPlanFilter.vue';
 import OperatorTaskBoardSelectedDrawer from './operator-task-board/OperatorTaskBoardSelectedDrawer.vue';
+import { confirmCancelAllWaiting, confirmClearDuplicateWaiting } from './operator-task-board/task-board-waiting-clear';
 import { useOperatorTaskBoardRouting } from './operator-task-board/use-operator-task-board-routing';
 
 const shell = useShellStore();
@@ -336,34 +337,17 @@ function clearVisibleDone(): void {
 }
 
 async function cancelAllWaiting(): Promise<void> {
-  const waiting = boardView.value.counts.waiting;
-  if (!waiting || shell.workspaceTasksMutating) {
-    return;
-  }
-  const confirmed = window.confirm(
-    `Cancel all ${waiting} waiting task(s) on this workspace? Bound queued runs will stop too.`,
-  );
-  if (!confirmed) {
-    return;
-  }
-  await shell.cancelWaitingWorkspaceTasks();
-  selectedTaskId.value = null;
-  await refreshScheduler();
+  if (await confirmCancelAllWaiting({
+    waitingCount: boardView.value.counts.waiting, mutating: shell.workspaceTasksMutating,
+    cancelAll: () => shell.cancelWaitingWorkspaceTasks(),
+  })) { selectedTaskId.value = null; await refreshScheduler(); }
 }
 
 async function clearDuplicateWaiting(): Promise<void> {
-  if (shell.workspaceTasksMutating) {
-    return;
-  }
-  const confirmed = window.confirm(
-    'Clear waiting tasks that duplicate completed work or each other? Distinct follow-ups stay.',
-  );
-  if (!confirmed) {
-    return;
-  }
-  await shell.clearDuplicateWaitingWorkspaceTasks();
-  selectedTaskId.value = null;
-  await refreshScheduler();
+  if (await confirmClearDuplicateWaiting({
+    mutating: shell.workspaceTasksMutating,
+    clearDuplicates: () => shell.clearDuplicateWaitingWorkspaceTasks(),
+  })) { selectedTaskId.value = null; await refreshScheduler(); }
 }
 
 async function retryTask(row: TaskBoardRow): Promise<void> {
