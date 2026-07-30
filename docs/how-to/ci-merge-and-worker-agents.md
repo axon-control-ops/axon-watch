@@ -1,14 +1,18 @@
 # CI, merge workflow, and worker agents
 
-**Updated:** 2026-07-29
+**Updated:** 2026-07-30
 
 This chapter explains how Axon-X lands code through GitHub CI, how that relates
 to the `dev` branch, and how **company employee agents** (the roster in IDE /
 Mission Control) work — including how to tell whether they are actually running
 and how good the automation is today.
 
+It also covers **DashPro self-hosted CI** (plain English + RAM) and why
+**canary OTA** is not an “EAS Build” in the Expo UI.
+
 **Related:** [`docs/CI_GATES.md`](../CI_GATES.md), [`docs/planning/EXECUTION_PLAN.md`](../planning/EXECUTION_PLAN.md),
-[`recent-operator-features.md`](recent-operator-features.md)
+[`recent-operator-features.md`](recent-operator-features.md),
+[`docs/planning/DASHPRO_CI_AGENT_PLAYBOOK.md`](../planning/DASHPRO_CI_AGENT_PLAYBOOK.md)
 
 ---
 
@@ -368,6 +372,103 @@ branches, or SA-2 coaching — that is the next execution slices on `dev`.
 
 ---
 
+## DashPro self-hosted CI — plain English
+
+### The one-sentence version
+
+GitHub Actions for DashPro’s heavy Android / Quality pipeline does **not** rent
+GitHub’s cloud machines by default. It asks **your PC** (a registered “runner”
+named like `edudashpro-dashpro-2`) to do the work. If that runner is offline or
+busy, the Actions UI shows **Queued**.
+
+### How it works (kitchen analogy)
+
+1. You push a branch or open a PR → GitHub posts a job on the Actions board.
+2. The workflow says: “Only a machine tagged `self-hosted` + `dashpro` may take this.”
+3. The runner service on this host (`actions-runner-dashpro.service`) is the waiter
+   that claims those jobs and runs the scripts (npm, Jest, Android tools, …).
+4. When the waiter is asleep (GitHub status **offline**) or already serving another
+   table (**busy**), new jobs wait in line — that is the yellow **Queued** state.
+5. Axon company agents (Cass / Soren / Dana) are **not** the GitHub runner. They
+   are separate Cursor workers. The Actions “Agents” tab on github.com is also
+   unrelated GitHub product UI.
+
+### Will this drain our RAM?
+
+**It can — and it has before.** Quality Gates previously peaked near ~18G RAM /
+heavy swap and froze the desktop. That is why the runner unit is capped:
+
+| Limit | Value | Meaning |
+|-------|-------|---------|
+| `MemoryHigh` | 8G | Soft pressure — kernel starts reclaiming |
+| `MemoryMax` | 10G | Hard kill ceiling for the runner cgroup |
+| `MemorySwapMax` | 4G | Cap on swap the runner may use |
+
+Idle listener is usually well under **1G**. A Quality Gates / Unit Tests /
+Android job can climb toward the cap. **Do not** stack a full Android CI graph
+with Cursor open **and** a local Expo/EAS OTA export (OTA scripts also set
+`NODE_OPTIONS=--max-old-space-size=8192`). Prefer one heavy job at a time.
+
+Check live pressure:
+
+```bash
+systemctl --user status actions-runner-dashpro.service
+free -h
+gh api repos/axon-control-ops/dashpro/actions/runners --jq '.runners[] | {name,status,busy}'
+```
+
+If systemd shows the service **running** but GitHub still says **offline**, the
+listener lost its session — restart the user unit, then confirm GitHub status
+flips to `online`:
+
+```bash
+systemctl --user restart actions-runner-dashpro.service
+```
+
+### What “worker / run_…” means in the Actions header
+
+That string is usually the **git branch name** from a company worker
+(`worker/run_<id>`), not proof that a runner is currently executing the job.
+
+---
+
+## DashPro canary OTA vs EAS Build — why you may not see a build
+
+### Plain English
+
+**Canary OTA** (`npm run ota:canary` in the DashPro project) publishes a
+**JavaScript/asset update** to the Expo **`operator-canary`** branch via
+`eas update`. That is **not** a native store binary rebuild.
+
+| You might look for | What canary OTA actually is |
+|--------------------|-----------------------------|
+| **EAS Build** (new APK/AAB/IPA) | **No** — not this path |
+| **EAS Update** / Updates feed for branch `operator-canary` | **Yes** — after local export finishes |
+| GitHub Actions “Android CI/CD Pipeline” | Separate — PR/push CI on the self-hosted runner |
+| Team dock “Watch CI” / draft PR chips | GitHub delivery receipts — **not** Expo Update URLs |
+
+### Why Dana’s thread looks busy but Expo still shows no build
+
+Typical sequence for `ota:canary`:
+
+1. Release guard checks the branch/gates.
+2. `eas update …` starts → **local** `expo export` (iOS + Android) with a large
+   Node heap — this can take many minutes and uses ~1G+ RSS on the host.
+3. Only after export succeeds does the update upload to Expo’s cloud.
+4. Until step 3, the Expo dashboard has **no new Update** (and never an EAS Build
+   for this command).
+
+Watch progress on:
+
+- Dana’s **IDE thread / terminal** (the live `expo export` / `eas update` lines)
+- Expo dashboard → **Updates** (branch `operator-canary`), not Builds
+- Host processes: `pgrep -af 'eas update|expo export'`
+
+Axon Mission Control does **not** currently mirror Expo Update URLs the way it
+mirrors GitHub PR/CI links on the Team dock.
+
+---
+
 ## Quick reference commands
 
 ```bash
@@ -380,6 +481,10 @@ gh pr create --base dev --head feat/my-slice --title "..." --body "..."
 
 # PR checks
 gh pr checks
+
+# DashPro self-hosted runner (this PC)
+systemctl --user status actions-runner-dashpro.service
+gh api repos/axon-control-ops/dashpro/actions/runners --jq '.runners[] | {name,status,busy}'
 
 # Worker scheduler tests
 PYTHONPATH=services/control-plane python3 -B -m unittest tests.test_workspace_agent_scheduler -q

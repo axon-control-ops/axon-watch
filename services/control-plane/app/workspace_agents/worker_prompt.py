@@ -193,6 +193,13 @@ def build_continuous_worker_prompt(
             " Reporting chain: specialists → you → VAXON → operator Decide."
             " After specialist completions, post a short Lead rollup (done / verified / next)."
         )
+        if "[plan " in goal.lower() or goal.lower().startswith("lead: advance"):
+            lead_clause += (
+                " Parent-plan stickiness: the parent plan goal in this leased task is the "
+                "sole completion criteria. Specialist digs and CI findings are inputs — "
+                "do not restart a completed dig as the mission. Advance the plan; "
+                "escalate Decide for ship gates."
+            )
     else:
         lead_clause = (
             " Reporting chain: finish with a Lead handoff (what changed, verified, "

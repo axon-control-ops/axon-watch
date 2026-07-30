@@ -204,11 +204,16 @@ def ingest_workflow_run_event(
         )
 
     task_id = str(leased.get("task_id") or "")
-    ci_store.attach_task(key, task_id, status="repairing")
+    parked_plan = str(leased.get("parked_under_plan") or "").strip()
+    ci_store.attach_task(
+        key,
+        task_id,
+        status="parked_under_plan" if parked_plan else "repairing",
+    )
 
     should_dispatch = binding.dispatch_on_ingest if dispatch is None else dispatch
     run_record = None
-    if should_dispatch:
+    if should_dispatch and not parked_plan:
         run_record = dispatch_repair_run(
             binding=binding,
             leased_task=leased,

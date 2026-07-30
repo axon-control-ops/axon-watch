@@ -7,6 +7,11 @@
 **Scope of this playbook:** detection, triage, fix, escalate, and follow-up.
 **Not in scope:** committing, pushing, merging, or releasing unless someone explicitly asks.
 
+**Operator plain-English (self-hosted runner, RAM caps, canary OTA vs EAS Build):**
+see handbook chapter
+[`docs/how-to/ci-merge-and-worker-agents.md`](../how-to/ci-merge-and-worker-agents.md)
+(sections *DashPro self-hosted CI* and *DashPro canary OTA vs EAS Build*).
+
 ---
 
 ## What Dash Pro said about the CI work

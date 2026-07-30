@@ -4,14 +4,14 @@ from __future__ import annotations
 
 import logging
 import re
-import time
 from datetime import datetime, timezone
 from typing import Any
 from uuid import uuid4
 
-from app.persistence import chat_store, task_store
+from app.persistence import chat_store
 from app.workspace_agents.lead_checkin_assign import SPECIALIST_ROLES
 from app.workspace_agents.lead_fan_out import _employee_id_for_role
+from app.workspace_agents.lead_takeover_followup import enqueue_lead_follow_up_task
 from app.workspace_agents.lead_text import (
     lead_summary_from_reply as _lead_summary_from_reply,
     strip_thinking as _strip_thinking,
@@ -147,6 +147,7 @@ def build_lead_takeover_message(
     run_id: str,
     plan_id: str | None = None,
     task_id: str | None = None,
+    parent_plan_goal: str | None = None,
 ) -> str:
     name = (employee_name or employee_role or "specialist").strip()
     role = (employee_role or "specialist").strip()
@@ -162,8 +163,13 @@ def build_lead_takeover_message(
         lines.append(f"Task: {task_id}")
     if plan_id:
         lines.append(f"Plan: {plan_id}")
+    parent_ask = _truncate(parent_plan_goal or "", max_len=240)
+    if parent_ask:
+        lines.append(f"Parent ask (sole truth): {parent_ask}")
     goal_line = _truncate(goal, max_len=240)
-    if goal_line:
+    if goal_line and goal_line != parent_ask:
+        lines.append(f"Specialist goal: {goal_line}")
+    elif goal_line and not parent_ask:
         lines.append(f"Goal: {goal_line}")
     outcome_line = _truncate(outcome, max_len=200)
     if outcome_line:
@@ -171,7 +177,12 @@ def build_lead_takeover_message(
     if excerpt:
         lines.extend(["", "Specialist report:", excerpt])
     lines.extend(["", "My read (Lead):"])
-    if status == "completed":
+    if parent_ask:
+        lines.append(
+            f"I still own completing: {parent_ask}. "
+            f"{name}'s dig is an input — I will not restart it as the mission."
+        )
+    elif status == "completed":
         lines.append(
             f"{name} finished their slice. I own the handoff now — "
             "cross-team decisions and next assignments stay with me until you Decide."
@@ -181,7 +192,7 @@ def build_lead_takeover_message(
             f"{name}'s job {status}. I will triage blockers and reassign if needed."
         )
     if lead_next:
-        lines.extend(["", f"Lead next (from specialist): {lead_next}"])
+        lines.extend(["", f"Decision needed (from specialist): {lead_next}"])
     else:
         lines.extend(
             [
@@ -198,49 +209,6 @@ def build_lead_takeover_message(
         ]
     )
     return "\n".join(lines)
-
-
-def enqueue_lead_follow_up_task(
-    *,
-    workspace_id: str,
-    employee_name: str,
-    employee_role: str,
-    lead_next: str,
-    run_id: str,
-) -> dict[str, Any] | None:
-    """Create an open Lead-owned follow-up so the continuous loop stays explicit."""
-    workspace = workspace_id.strip()
-    next_line = _truncate(lead_next or "Review specialist completion and decide next handoff.", max_len=220)
-    if not workspace:
-        return None
-    # Dedupe open follow-ups for the same run.
-    for status in ("open", "leased"):
-        for row in task_store.list_tasks(workspace_id=workspace, status=status, limit=100):
-            if str(row.get("owner_role") or "").strip().lower() != "lead":
-                continue
-            goal = str(row.get("goal") or "")
-            if run_id and run_id in goal:
-                return row
-    name = (employee_name or employee_role or "specialist").strip()
-    try:
-        return task_store.create_task(
-            workspace_id=workspace,
-            goal=(
-                f"Lead follow-up after {name} ({employee_role}): {next_line} "
-                f"[from run {run_id}]"
-            ),
-            acceptance_criteria=(
-                "Post a Lead decision: assign next specialist, approve ship, or ask the operator. "
-                "Never invent status. Prefer verified receipts; consult official docs when needed. "
-                "Suggest a concrete next step. End with Confidence: N/10."
-            ),
-            risk="normal",
-            owner_role="lead",
-            attempt_budget=2,
-        )
-    except task_store.TaskLedgerError as exc:
-        logger.warning("lead follow-up task create failed: %s", exc)
-        return None
 
 
 def post_lead_takeover_report(
@@ -297,6 +265,18 @@ def post_lead_takeover_report(
             "vaxon_flash": vaxon_flash,
         }
 
+    from app.workspace_agents.lead_plan_control import controlling_lead_plan
+
+    controlling = controlling_lead_plan(
+        workspace_id,
+        plan_id=plan_id,
+        task_id=task_id,
+    )
+    resolved_plan_id = str((controlling or {}).get("plan_id") or plan_id or "").strip() or None
+    parent_plan_goal = str((controlling or {}).get("goal") or "").strip() or None
+    blockers = extract_blockers(reply_text)
+    lead_next = extract_lead_next(reply_text)
+
     content = build_lead_takeover_message(
         employee_name=employee_name,
         employee_role=role,
@@ -305,8 +285,9 @@ def post_lead_takeover_report(
         outcome=outcome,
         reply_text=reply_text,
         run_id=cleaned_run,
-        plan_id=plan_id,
+        plan_id=resolved_plan_id,
         task_id=task_id,
+        parent_plan_goal=parent_plan_goal,
     )
     created_at = _utc_now_iso()
     system_message = chat_store.save_message(
@@ -332,9 +313,8 @@ def post_lead_takeover_report(
         }
     )
     follow_up = None
-    lead_next = extract_lead_next(reply_text)
     # Full-autonomy loops must keep ownership after both successful and failed
-    # specialist shifts. The Lead decides whether to verify, retry, or reassign.
+    # specialist shifts. Sticky plan follow-ups keep the original ask as sole truth.
     if create_follow_up_task and phase in {"completed", "failed"}:
         follow_up = enqueue_lead_follow_up_task(
             workspace_id=workspace_id,
@@ -342,6 +322,11 @@ def post_lead_takeover_report(
             employee_role=role,
             lead_next=lead_next,
             run_id=cleaned_run,
+            phase=phase,
+            blockers=blockers,
+            specialist_goal=goal,
+            plan_id=resolved_plan_id,
+            task_id=task_id,
         )
     vaxon_flash: dict[str, Any] | None = None
     try:
@@ -358,7 +343,7 @@ def post_lead_takeover_report(
             lead_summary=_lead_summary_from_reply(reply_text),
             lead_thread_id=thread_id,
             lead_message_id=str(agent_message.get("message_id") or "") or None,
-            blockers=extract_blockers(reply_text),
+            blockers=blockers,
         )
     except Exception as exc:  # noqa: BLE001 — Lead takeover must not fail closed on VAXON flash
         logger.warning("ad-hoc VAXON takeover flash failed: %s", exc)
@@ -384,6 +369,7 @@ def post_lead_takeover_report(
                 phase=phase,
                 reply_text=reply_text,
                 lead_name=lead_name,
+                parent_plan_goal=parent_plan_goal,
             ),
             receipt_id=f"lead_takeover_voice_{cleaned_run}",
             kind="lead_takeover",
@@ -399,6 +385,7 @@ def post_lead_takeover_report(
         "run_id": cleaned_run,
         "lead_next": lead_next,
         "follow_up_task_id": (follow_up or {}).get("task_id"),
+        "controlling_plan_id": resolved_plan_id,
         "vaxon_flash": vaxon_flash,
         "spoken": spoken,
     }

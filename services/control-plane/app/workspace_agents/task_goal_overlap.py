@@ -12,7 +12,10 @@ _DEDUPE_KEY_RE = re.compile(
     r"(?:dedupe_key|\[dedupe\])[=:\s]+([a-z0-9:._\-]+)",
     re.I,
 )
-_LEAD_FOLLOWUP_RE = re.compile(r"^\s*lead\s+follow-up\s+after\b", re.I)
+_LEAD_FOLLOWUP_RE = re.compile(
+    r"^\s*lead\s+(?:follow-up\s+after|:\s*advance)\b",
+    re.I,
+)
 
 
 def normalize_goal_core(goal: str) -> str:

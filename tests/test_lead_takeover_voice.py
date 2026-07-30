@@ -38,6 +38,27 @@ class LeadTakeoverVoiceTests(unittest.TestCase):
         self.assertIn("hold OTA", line)
         self.assertNotIn("Confidence:", line)
 
+    def test_takeover_spoken_line_names_parent_ask_first(self) -> None:
+        line = build_lead_takeover_spoken_line(
+            employee_name="Cass",
+            employee_role="watcher",
+            phase="completed",
+            reply_text=(
+                "Payments contract check failed.\n"
+                "Lead: open Marco for contract coverage.\n"
+                "Confidence: 9/10"
+            ),
+            lead_name="Dana",
+            parent_plan_goal="Push OTA to canary",
+        )
+        self.assertIn("Parent ask remains: Push OTA to canary", line)
+        self.assertIn("will not restart it as the mission", line)
+        self.assertLess(
+            line.index("Parent ask remains"),
+            line.index("Cass (watcher) just completed"),
+        )
+        self.assertNotIn("Confidence:", line)
+
     def test_synthesis_spoken_line_lists_specialists(self) -> None:
         line = build_lead_synthesis_spoken_line(
             goal="Ship payments card",

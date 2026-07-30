@@ -18,10 +18,6 @@ import {
 } from '../../lib/agent-message-markdown';
 import { createTranscriptSegmentCache } from '../../lib/conversation-transcript-segment-cache';
 import { sanitizeAgentThinkingForOperator, THINKING_SPEECH_FALLBACK } from '../../lib/agent-live-line-view';
-import {
-  addressFormForSpeaker,
-  buildStreamingAckLine,
-} from '../../lib/agent-streaming-ack';
 import { prepareAgentTerminalOpen } from '../../lib/agent-terminal-open';
 import {
   shouldShowAgentTerminalBackgroundControl,
@@ -159,34 +155,8 @@ function toggleThinking(key: string, open: boolean): void {
   };
 }
 
-function lastOperatorPrompt(): string {
-  const messages =
-    shell.layoutMode === 'ide' ? shell.threadMessages : shell.operatorThreadMessages;
-  for (let index = messages.length - 1; index >= 0; index -= 1) {
-    const entry = messages[index];
-    if (entry?.role === 'operator') {
-      return String(entry.content ?? '').trim();
-    }
-  }
-  return '';
-}
-
-function streamingAckLine(): string {
-  const address = shell.activeIdeEmployee
-    ? addressFormForSpeaker('employee')
-    : addressFormForSpeaker('vaxon');
-  return buildStreamingAckLine({
-    operatorPrompt: lastOperatorPrompt(),
-    address,
-  });
-}
-
 function thinkingBodyText(text: string): string {
-  return sanitizeAgentThinkingForOperator(text) || streamingAckLine() || THINKING_SPEECH_FALLBACK;
-}
-
-function emptyStreamingAck(): string {
-  return streamingAckLine() || THINKING_SPEECH_FALLBACK;
+  return sanitizeAgentThinkingForOperator(text) || THINKING_SPEECH_FALLBACK;
 }
 
 function isEmptyStreamingAgent(message: OperatorThreadEntry): boolean {
@@ -297,9 +267,9 @@ async function copyTerminalOutput(output: string): Promise<void> {
   <p
     v-else-if="isEmptyStreamingAgent(message)"
     class="conversation-seam__content conversation-seam__content--agent conversation-seam__content--typing"
+    aria-label="Agent responding"
   >
     <span class="conversation-seam__typing-dot" aria-hidden="true" />
-    {{ emptyStreamingAck() }}
   </p>
 
   <div
@@ -328,7 +298,7 @@ async function copyTerminalOutput(output: string): Promise<void> {
             {{ isThinkingExpanded(segmentKey(message.message_id, segmentIndex), segment.open) ? '▾' : '▸' }}
           </span>
           <span v-if="segment.open && isStreamingMessage(message.message_id)">
-            {{ segment.text.trim() ? thinkingPreview(segment.text, 120) : emptyStreamingAck() }}
+            {{ segment.text.trim() ? thinkingPreview(segment.text, 120) : 'Thinking…' }}
           </span>
           <span v-else class="agent-block__thinking-preview">
             Thought — {{ thinkingPreview(segment.text) }}

@@ -165,6 +165,94 @@ class LeadTakeoverTests(unittest.TestCase):
         self.assertEqual("open", follow.get("status"))
         self.assertEqual("lead", follow.get("owner_role"))
 
+    def test_sticky_follow_up_binds_to_ota_plan_goal(self) -> None:
+        from app.persistence import chat_store, task_store
+        from app.workspace_agents import lead_plan_store
+        from app.workspace_agents.lead_takeover import post_lead_takeover_report
+
+        plan = lead_plan_store.persist_plan(
+            workspace_id="workspace_dashpro",
+            plan={"goal": "Push OTA to canary", "mode": "fan_out"},
+            plan_key_to_task_id={},
+        )
+        with (
+            patch("app.live_events.broadcast_material_change"),
+            patch("app.live_events.broadcast_spoken_line", return_value=1),
+        ):
+            takeover = post_lead_takeover_report(
+                workspace_id="workspace_dashpro",
+                run_id="run_cass_ci_loop_1",
+                employee_role="watcher",
+                employee_name="Cass",
+                phase="completed",
+                goal="Investigate payments contract CI failure on main",
+                reply_text=(
+                    "Payments safety check failed — contract registration missing.\n"
+                    "Blockers / Lead next: Lead: open Marco to lead contract coverage onto main.\n"
+                    "Confidence: 9/10"
+                ),
+                plan_id=str(plan["plan_id"]),
+            )
+
+        self.assertEqual("posted", takeover.get("status"))
+        self.assertEqual(plan["plan_id"], takeover.get("controlling_plan_id"))
+        follow = task_store.get_task(str(takeover.get("follow_up_task_id")))
+        assert follow is not None
+        goal = str(follow.get("goal") or "")
+        self.assertIn("Lead: advance", goal)
+        self.assertIn("Push OTA to canary", goal)
+        self.assertIn(f"[plan {plan['plan_id']}]", goal)
+        self.assertIn("Decision needed:", goal)
+        self.assertIn("sole truth", str(follow.get("acceptance_criteria") or "").lower())
+
+        messages = chat_store.list_thread_messages(str(takeover.get("thread_id")))
+        agent = next(m for m in messages if m.get("role") == "agent")
+        content = str(agent.get("content") or "")
+        self.assertIn("Parent ask (sole truth): Push OTA to canary", content)
+        self.assertIn("will not restart it as the mission", content)
+
+    def test_controlling_plan_ignores_completed_plan_id(self) -> None:
+        from app.workspace_agents import lead_plan_store
+        from app.workspace_agents.lead_plan_control import controlling_lead_plan
+
+        plan = lead_plan_store.persist_plan(
+            workspace_id="workspace_dashpro",
+            plan={"goal": "Push OTA to canary", "mode": "fan_out"},
+            plan_key_to_task_id={},
+        )
+        lead_plan_store.set_plan_status(str(plan["plan_id"]), "completed")
+        self.assertIsNone(
+            controlling_lead_plan(
+                "workspace_dashpro",
+                plan_id=str(plan["plan_id"]),
+            )
+        )
+
+    def test_suppresses_ad_hoc_follow_up_that_reopens_same_dig(self) -> None:
+        from app.workspace_agents.lead_takeover import post_lead_takeover_report
+
+        dig = "Investigate payments contract CI failure on main"
+        with (
+            patch("app.live_events.broadcast_material_change"),
+            patch("app.live_events.broadcast_spoken_line", return_value=1),
+        ):
+            takeover = post_lead_takeover_report(
+                workspace_id="workspace_dashpro",
+                run_id="run_cass_redig_1",
+                employee_role="watcher",
+                employee_name="Cass",
+                phase="completed",
+                goal=dig,
+                reply_text=(
+                    f"Still looking at the same failure.\n"
+                    f"Blockers / Lead next: Lead: keep investigating payments contract CI failure on main.\n"
+                    f"Confidence: 8/10"
+                ),
+            )
+
+        self.assertEqual("posted", takeover.get("status"))
+        self.assertIsNone(takeover.get("follow_up_task_id"))
+
     def test_lead_shift_completion_posts_vaxon_flash(self) -> None:
         from app.persistence import chat_store
         from app.workspace_agents import lead_adhoc_receipt_store

@@ -34,22 +34,30 @@ def build_lead_takeover_spoken_line(
     phase: str,
     reply_text: str | None,
     lead_name: str = "Lead",
+    parent_plan_goal: str | None = None,
 ) -> str:
-    """TTS-friendly Lead takeover — specialist excerpt + Lead read + next."""
+    """TTS-friendly Lead takeover — parent ask first, then specialist dig."""
     name = (employee_name or employee_role or "specialist").strip()
     role = (employee_role or "specialist").strip()
     status = "completed" if phase == "completed" else (phase or "ended")
     lead = (lead_name or "Lead").strip() or "Lead"
     from app.workspace_agents.lead_takeover import extract_lead_next
 
-    excerpt = truncate_text(strip_confidence_lines(reply_text), max_len=320)
+    parent_ask = truncate_text(parent_plan_goal, max_len=160)
+    excerpt = truncate_text(strip_confidence_lines(reply_text), max_len=240)
     lead_next = extract_lead_next(reply_text)
-    parts = [
-        f"{lead} here. {name} ({role}) just {status}.",
-    ]
+    parts = [f"{lead} here."]
+    if parent_ask:
+        parts.append(f"Parent ask remains: {parent_ask}.")
+    parts.append(f"{name} ({role}) just {status}.")
     if excerpt:
         parts.append(f"Specialist report: {excerpt}")
-    if status == "completed":
+    if parent_ask:
+        parts.append(
+            f"My read: I still own completing {parent_ask}. "
+            f"{name}'s dig is an input — I will not restart it as the mission."
+        )
+    elif status == "completed":
         parts.append(
             f"My read: {name} finished their slice. I own the handoff — "
             "cross-team decisions stay with me until you Decide."
@@ -59,7 +67,7 @@ def build_lead_takeover_spoken_line(
             f"My read: {name}'s job {status}. I will triage blockers and reassign if needed."
         )
     if lead_next:
-        parts.append(f"Lead next: {lead_next}")
+        parts.append(f"Decision needed: {lead_next}")
     else:
         parts.append(
             "Lead next: review their report, confirm any Decide gates, then assign or approve."

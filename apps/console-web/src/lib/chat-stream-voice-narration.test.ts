@@ -97,7 +97,7 @@ describe('createChatStreamVoiceNarration', () => {
     expect(voice.answerNarrator?.narrate).not.toHaveBeenCalled();
   });
 
-  it('speaks the same thread ack on start, not a forced receipts line or persona meta', () => {
+  it('does not speak a canned start ack — waits for model live text', () => {
     const voice = createChatStreamVoiceNarration({
       composerMode: 'agent',
       messageId: 'msg_4',
@@ -116,19 +116,20 @@ describe('createChatStreamVoiceNarration', () => {
       }),
     });
 
-    expect(voice.speakStartBookend()).toBe(true);
-    expect(voice.agentMilestoneNarrator?.narrate).toHaveBeenCalledWith(
-      expect.objectContaining({
-        key: 'start',
-        verbatim: true,
-        message: 'Working that now, Sir King.',
-      }),
-    );
+    expect(voice.speakStartBookend()).toBe(false);
+    expect(voice.agentMilestoneNarrator?.narrate).not.toHaveBeenCalled();
 
     voice.maybeSpeakThinkingBlock(
       'Assuming the Lindi persona for the EDP Excellence workspace. Reviewing her last shift receipts.',
     );
     expect(voice.agentMilestoneNarrator?.narrate).toHaveBeenCalledTimes(1);
+    expect(voice.agentMilestoneNarrator?.narrate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        key: 'start',
+        verbatim: true,
+        message: 'Reviewing my last shift receipts.',
+      }),
+    );
   });
 
   it('skips post-IDLE progress openers when mid-run thinking already carried intent', () => {
@@ -150,7 +151,11 @@ describe('createChatStreamVoiceNarration', () => {
       }),
     });
 
-    expect(voice.speakStartBookend()).toBe(true);
+    expect(
+      voice.maybeSpeakThinkingBlock(
+        'Reading the payments card styles and planning the layout fix.',
+      ),
+    ).toBe(true);
     vi.mocked(voice.agentMilestoneNarrator!.narrate).mockClear();
     vi.mocked(stopActiveKairoNarration).mockClear();
 
@@ -174,7 +179,11 @@ describe('createChatStreamVoiceNarration', () => {
       fullAccess: () => true,
     });
 
-    expect(voice.speakStartBookend()).toBe(true);
+    expect(
+      voice.maybeSpeakThinkingBlock(
+        'Sir King chose prep-and-run canary OTA. Checking the development tree next.',
+      ),
+    ).toBe(true);
     vi.mocked(voice.agentMilestoneNarrator!.narrate).mockClear();
     vi.mocked(stopActiveKairoNarration).mockClear();
 
@@ -216,7 +225,9 @@ describe('createChatStreamVoiceNarration', () => {
       fullAccess: () => true,
     });
 
-    expect(voice.speakStartBookend()).toBe(true);
+    expect(
+      voice.maybeSpeakThinkingBlock('Reading the payments wiring next.'),
+    ).toBe(true);
     vi.mocked(voice.agentMilestoneNarrator!.narrate).mockClear();
 
     voice.narrateCompletion(

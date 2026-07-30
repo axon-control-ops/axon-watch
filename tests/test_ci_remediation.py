@@ -240,6 +240,116 @@ class CiRemediationTests(unittest.TestCase):
         self.assertIn("Gate 9 CI remediation", prompt)
         self.assertIn("report-outcome", prompt)
 
+    def test_repair_parks_under_ship_intent_lead_plan(self) -> None:
+        from app.ci_remediation.classify import classify_workflow_run_event
+        from app.ci_remediation.config import match_binding
+        from app.ci_remediation.dispatch_repair import create_and_lease_repair_task
+        from app.persistence import task_store
+        from app.workspace_agents import lead_plan_store
+        from app.workspace_agents.config_loader import EmployeeConfig
+        from app.workspace_agents.worker_prompt import build_continuous_worker_prompt
+
+        lead_plan_store.reset_store()
+        self.addCleanup(lead_plan_store.reset_store)
+
+        plan = lead_plan_store.persist_plan(
+            workspace_id="workspace_axon_watch",
+            plan={"goal": "Push OTA to canary for DashPro", "mode": "fan_out"},
+            plan_key_to_task_id={},
+        )
+        classified = classify_workflow_run_event(_failure_payload())
+        assert classified is not None
+        binding = match_binding(
+            github_owner="axon-control-ops",
+            github_repo="axon-watch",
+            workflow_name="Axon-X Fast Gate",
+        )
+        assert binding is not None
+
+        with mock.patch("app.live_events.broadcast_material_change"):
+            parked = create_and_lease_repair_task(
+                binding=binding,
+                classified=classified,
+                dedupe_key="ci:park-test",
+            )
+
+        self.assertEqual(plan["plan_id"], parked.get("parked_under_plan"))
+        task = task_store.get_task(str(parked.get("task_id") or ""))
+        assert task is not None
+        self.assertEqual("open", task["status"])
+        self.assertEqual("lead", task["owner_role"])
+        self.assertIn("Lead: advance", str(task["goal"]))
+        self.assertIn("Push OTA to canary", str(task["goal"]))
+        self.assertIn(f"[plan {plan['plan_id']}]", str(task["goal"]))
+        receipts = lead_plan_store.list_receipts(str(plan["plan_id"]))
+        self.assertTrue(any(row.get("kind") == "ci_finding_parked" for row in receipts))
+
+        lead = EmployeeConfig(name="Dana", role="lead", owns="plans")
+        prompt = build_continuous_worker_prompt(
+            workspace_id="workspace_axon_watch",
+            employee=lead,
+            task=task,
+        )
+        self.assertIn("Parent-plan stickiness", prompt)
+
+    def test_park_reuses_existing_sticky_lead_follow_up(self) -> None:
+        from app.ci_remediation.classify import classify_workflow_run_event
+        from app.ci_remediation.config import match_binding
+        from app.ci_remediation.dispatch_repair import create_and_lease_repair_task
+        from app.persistence import task_store
+        from app.workspace_agents import lead_plan_store
+
+        lead_plan_store.reset_store()
+        self.addCleanup(lead_plan_store.reset_store)
+
+        plan = lead_plan_store.persist_plan(
+            workspace_id="workspace_axon_watch",
+            plan={"goal": "Push OTA to canary", "mode": "fan_out"},
+            plan_key_to_task_id={},
+        )
+        sticky = task_store.create_task(
+            workspace_id="workspace_axon_watch",
+            goal=(
+                f'Lead: advance "Push OTA to canary" toward Done '
+                f'[plan {plan["plan_id"]}] — after Cass (watcher) completed.'
+            ),
+            acceptance_criteria="Sole truth: advance the plan.",
+            owner_role="lead",
+            attempt_budget=2,
+        )
+        classified = classify_workflow_run_event(_failure_payload())
+        assert classified is not None
+        binding = match_binding(
+            github_owner="axon-control-ops",
+            github_repo="axon-watch",
+            workflow_name="Axon-X Fast Gate",
+        )
+        assert binding is not None
+
+        with mock.patch("app.live_events.broadcast_material_change"):
+            parked = create_and_lease_repair_task(
+                binding=binding,
+                classified=classified,
+                dedupe_key="ci:park-reuse",
+            )
+
+        self.assertEqual(sticky["task_id"], parked.get("task_id"))
+        self.assertEqual(plan["plan_id"], parked.get("parked_under_plan"))
+        open_lead = [
+            row
+            for row in task_store.list_tasks(
+                workspace_id="workspace_axon_watch",
+                status="open",
+                limit=50,
+            )
+            if str(row.get("owner_role") or "") == "lead"
+        ]
+        self.assertEqual(1, len(open_lead))
+        receipts = lead_plan_store.list_receipts(str(plan["plan_id"]))
+        parked_receipts = [row for row in receipts if row.get("kind") == "ci_finding_parked"]
+        self.assertEqual(1, len(parked_receipts))
+        self.assertTrue((parked_receipts[0].get("payload") or {}).get("reused_sticky_lead_task"))
+
     def test_webhook_route_hmac(self) -> None:
         from fastapi import FastAPI
         from fastapi.testclient import TestClient

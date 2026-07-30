@@ -30,7 +30,7 @@ Use it to:
 2. [Handbook map](#handbook-map) — who reads what
 3. [Operator manual](#operator-manual) — daily rituals
 3.5. [Runtime auth, CLI, and tools](#runtime-auth-cli-and-tools) — Pro vs API key, native vs Cursor
-3.6. [CI, merge, and worker agents](how-to/ci-merge-and-worker-agents.md) — Fast Gate, `dev`, roster; [Gate 9 CI remediation](how-to/ci-remediation-gate9.md)
+3.6. [CI, merge, and worker agents](how-to/ci-merge-and-worker-agents.md) — Fast Gate, `dev`, roster; DashPro self-hosted CI + RAM; canary OTA vs EAS Build; [Gate 9 CI remediation](how-to/ci-remediation-gate9.md)
 3.65. [Autonomy gates & service identity](how-to/autonomy-gates-and-service-identity.md) — Gate 4 tasks, scheduler off, watch token + mTLS
 3.66. [Recent operator features](how-to/recent-operator-features.md) — task board, concurrent tabs, galaxy labels, Lead planner, CI watch
 3.67. [Auto-loop status & credits](how-to/auto-loop-and-credits.md) — are we autonomous yet? Cursor / API budget for multi-project

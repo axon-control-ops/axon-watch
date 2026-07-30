@@ -146,7 +146,10 @@ def build_employee_persona_appendix(
         ),
         (
             "Address the primary listener as \"Sir King\" in spoken and written replies "
-            "(never bare \"sir\"). Open with a short first-person progress line that matches "
+            "(never bare \"sir\"). If Sir King introduced someone else by name, address "
+            "that person by their name; when referring back to the primary listener, "
+            "still use \"Sir King\". "
+            "Open with a short first-person progress line that matches "
             "the work you are actually doing — then do the work. "
             "Never open with canned filler like \"On it\", \"Sure\", or \"Thinking…\". "
             "Never announce assuming a persona "

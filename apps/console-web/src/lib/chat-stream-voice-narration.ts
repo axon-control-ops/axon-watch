@@ -15,10 +15,6 @@ import {
   thinkingSpeechSimilarity,
 } from './agent-live-line-view';
 import {
-  addressFormForSpeaker,
-  buildStreamingAckLine,
-} from './agent-streaming-ack';
-import {
   shouldNarrateAgentEvent,
   shouldSpeakLiveThinkingBlock,
 } from './kairo-narration-policy';
@@ -38,7 +34,7 @@ export type ChatStreamVoiceNarration = {
   progressNarrator: ProgressNarrator | null;
   agentMilestoneNarrator: Narrator | null;
   answerNarrator: Narrator | null;
-  /** Speak the same start line the thread shows (ack or first model live line). */
+  /** Reserved: start bookend is model-only (no canned UI ack). */
   speakStartBookend: () => boolean;
   maybeSpeakThinkingBlock: (spokenBlock: string) => boolean;
   narrateAgentMilestone: (
@@ -132,15 +128,6 @@ export function createChatStreamVoiceNarration(input: {
     stopActiveKairoNarration('stream_complete');
   }
 
-  function threadStartAckLine(): string {
-    const active = speaker?.() ?? null;
-    const kind = active?.kind === 'employee' ? 'employee' : active?.kind ?? 'vaxon';
-    return buildStreamingAckLine({
-      operatorPrompt: input.operatorPrompt(),
-      address: addressFormForSpeaker(kind),
-    });
-  }
-
   function speakVerbatimStart(line: string): boolean {
     const message = line.trim();
     if (
@@ -165,8 +152,8 @@ export function createChatStreamVoiceNarration(input: {
   }
 
   function speakStartBookend(): boolean {
-    // Match the thread placeholder (e.g. "Working that now, Sir King.") — not a forced receipts line.
-    return speakVerbatimStart(threadStartAckLine());
+    // No canned ack — wait for the model's first live thinking/reply line.
+    return false;
   }
 
   function maybeSpeakThinkingBlock(spokenBlock: string): boolean {
@@ -176,9 +163,9 @@ export function createChatStreamVoiceNarration(input: {
     const cleaned = sanitizeAgentThinkingForOperator(spokenBlock, {
       speakerName: speaker?.()?.name ?? null,
     });
-    // First breath: prefer the model live line shown in-thread; else the same ack the UI shows.
+    // First breath: only real model text — never a console template.
     if (thinkingThrottle.spokenCount() === 0) {
-      return speakVerbatimStart(cleaned || threadStartAckLine());
+      return cleaned ? speakVerbatimStart(cleaned) : false;
     }
     if (!cleaned) {
       return false;
