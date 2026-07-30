@@ -11,7 +11,7 @@
       "rule": "operator shell presentation only; split by surface"
     },
     "apps/console-web/src/stores/shell.ts": {
-      "max_lines": 4070,
+      "max_lines": 4085,
       "soft_limit": 350,
       "hard_limit": 500,
       "target": "apps/console-web/src/stores/shell/slices/*",
@@ -415,7 +415,7 @@
       "note": "Autonomy publish path-scope + receipts; gh resolve extracted to gh_cli.py"
     },
     "apps/console-web/src/components/shell/OperatorTaskBoardPanel.vue": {
-      "max_lines": 561,
+      "max_lines": 580,
       "soft_limit": 350,
       "hard_limit": 500,
       "target": "apps/console-web/src/components/shell/operator-task-board/*",

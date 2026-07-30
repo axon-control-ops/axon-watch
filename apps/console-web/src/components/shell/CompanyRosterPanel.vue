@@ -35,14 +35,13 @@ import {
   type TeamMemberQuickAction,
   type TeamMemberSurfaceAction,
 } from '../../features/workspace-agents/company-roster-actions';
-import { patchWorkspaceEmployeeEnabled } from '../../api/worker-scheduler-api';
-import { stopRun } from '../../api/runs-api';
 import type { CompanyEmployeeRecord } from '../../contracts/canonical';
 import { focusAgentDockComposerInput } from '../../lib/agent-dock-composer-focus';
 import { requestIdeComposerMode } from '../../lib/ide-composer-restore-request';
 import { employeeVoiceSpeaker } from '../../lib/kairo-voice-utterance';
 import { runEmployeeShiftRetry } from '../../lib/run-employee-shift-retry';
 import { navigateToSettingsSection } from '../../lib/settings-section-route';
+import { useCompanyRosterControlActions } from '../../composables/use-company-roster-control-actions';
 import { useShellStore } from '../../stores/shell';
 
 const shell = useShellStore();
@@ -81,8 +80,11 @@ const dockRootRef = ref<HTMLElement | null>(null);
 const presenceStripRef = ref<{ focusEmployee: (employeeId: string | null | undefined) => void } | null>(
   null,
 );
-const controlBusyId = ref<string | null>(null);
-const controlError = ref<string | null>(null);
+const { controlBusyId, controlError, onControlAction } = useCompanyRosterControlActions({
+  shell,
+  currentWorkspaceId,
+  loadCompany,
+});
 
 function scrollDockIntoView(): void {
   void nextTick(() => {
@@ -315,72 +317,6 @@ function openSurface(surface: TeamMemberSurfaceAction): void {
     return;
   }
   shell.focusKairoBriefing();
-}
-
-async function onControlAction(
-  employee: CompanyEmployeeRecord,
-  action: TeamMemberQuickAction,
-): Promise<void> {
-  if (action.control === 'toggle_enabled') {
-    const workspaceId = currentWorkspaceId.value?.trim();
-    if (!workspaceId) {
-      return;
-    }
-    controlBusyId.value = employee.employee_id;
-    controlError.value = null;
-    try {
-      await patchWorkspaceEmployeeEnabled(workspaceId, employee.employee_id, !employee.enabled);
-      await loadCompany();
-    } catch (error) {
-      controlError.value =
-        error instanceof Error ? error.message : 'Could not update agent enabled state';
-    } finally {
-      controlBusyId.value = null;
-    }
-    return;
-  }
-  if (action.control === 'stop') {
-    const runId = employee.active_run_id?.trim();
-    if (!runId) {
-      return;
-    }
-    controlBusyId.value = employee.employee_id;
-    controlError.value = null;
-    try {
-      await stopRun(runId);
-      await loadCompany();
-    } catch (error) {
-      controlError.value = error instanceof Error ? error.message : 'Could not stop job';
-    } finally {
-      controlBusyId.value = null;
-    }
-    return;
-  }
-  if (action.control === 'start_now') {
-    const taskId = action.taskId?.trim();
-    if (!taskId) {
-      return;
-    }
-    controlBusyId.value = employee.employee_id;
-    controlError.value = null;
-    try {
-      const started = await shell.startCurrentWorkspaceTask(taskId);
-      if (!started) {
-        controlError.value = shell.workspaceTasksError || 'Could not start handoff';
-        return;
-      }
-      await Promise.all([
-        loadCompany(),
-        shell.loadRuns({ sync: false }),
-        shell.openOrFocusEmployeeIdeThread(employee, { forceRefresh: true }),
-      ]);
-      shell.setLayoutMode('ide');
-    } catch (error) {
-      controlError.value = error instanceof Error ? error.message : 'Could not start handoff';
-    } finally {
-      controlBusyId.value = null;
-    }
-  }
 }
 
 function onQuickAction(employee: CompanyEmployeeRecord, action: TeamMemberQuickAction): void {

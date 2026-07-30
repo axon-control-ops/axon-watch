@@ -1,0 +1,59 @@
+/* Manual handoff waiting glow — keep agent-persona-dock.css under ratchet. */
+
+.company-presence-strip__avatar[data-presence='handoff'] {
+  box-shadow: 0 0 0 2px rgba(20, 30, 40, 0.9), 0 0 0 3px rgba(242, 169, 59, 0.9),
+    0 0 16px rgba(242, 169, 59, 0.45);
+  animation: presence-avatar-handoff-glow 1.8s ease-in-out infinite;
+}
+
+.company-presence-strip__busy-ring--handoff {
+  border-color: rgba(242, 169, 59, 0.45);
+  border-top-color: rgba(255, 210, 120, 0.95);
+}
+
+.agent-persona-dock__avatar[data-presence='handoff'] {
+  box-shadow: 0 0 0 2px rgba(12, 20, 30, 0.95), 0 0 0 3px rgba(242, 169, 59, 0.88),
+    0 0 16px rgba(242, 169, 59, 0.42);
+  animation: presence-avatar-handoff-glow 1.8s ease-in-out infinite;
+}
+
+.agent-persona-dock[data-presence='handoff'] {
+  border-color: rgba(242, 169, 59, 0.35);
+}
+
+.agent-persona-dock__busy-ring--handoff {
+  border-color: rgba(242, 169, 59, 0.5);
+  border-top-color: rgba(255, 210, 120, 0.95);
+}
+
+.company-roster__action--start-now {
+  border-color: rgba(242, 169, 59, 0.55);
+  color: rgba(255, 220, 150, 0.98);
+  background: rgba(120, 70, 10, 0.35);
+  font-weight: 700;
+}
+
+.company-roster__action--start-now:hover,
+.company-roster__action--start-now:focus-visible {
+  border-color: rgba(255, 190, 80, 0.85);
+  background: rgba(150, 90, 15, 0.45);
+}
+
+@keyframes presence-avatar-handoff-glow {
+  0%,
+  100% {
+    filter: brightness(1);
+    transform: scale(1);
+  }
+  50% {
+    filter: brightness(1.14);
+    transform: scale(1.025);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .company-presence-strip__avatar[data-presence='handoff'],
+  .agent-persona-dock__avatar[data-presence='handoff'] {
+    animation: none;
+  }
+}
