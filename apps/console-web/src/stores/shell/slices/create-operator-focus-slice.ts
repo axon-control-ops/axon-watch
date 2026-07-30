@@ -198,6 +198,32 @@ export function createOperatorFocusSlice(input: CreateOperatorFocusSliceInput) {
     }
   }
 
+  /**
+   * Mission Control hosts VAXON in the LIVE OPERATIONS thread seam, not the
+   * briefing seam, so briefing focus would collapse the panel we want to show.
+   */
+  function focusLiveOperations(): void {
+    if (input.layoutMode.value === 'ide') {
+      input.setLayoutMode('operator');
+    }
+    if (input.operatorCenterView.value === 'graph') {
+      setOperatorCenterView('grid');
+    }
+    if (!input.expandedDockSeams.value.has('thread')) {
+      const next = new Set(input.expandedDockSeams.value);
+      next.add('thread');
+      input.expandedDockSeams.value = next;
+    }
+    if (typeof window !== 'undefined') {
+      window.requestAnimationFrame(() => {
+        document.getElementById('mission-control-live-ops')?.scrollIntoView({
+          behavior: 'smooth',
+          block: 'nearest',
+        });
+      });
+    }
+  }
+
   function focusKairoBriefing(): void {
     if (input.layoutMode.value === 'ide') {
       openIdeBriefingPanel();
@@ -251,6 +277,7 @@ export function createOperatorFocusSlice(input: CreateOperatorFocusSliceInput) {
 
   return {
     focusAttentionSidebar,
+    focusLiveOperations,
     closeIdeAttentionPanel,
     closeIdeBriefingPanel,
     openIdeBriefingPanel,

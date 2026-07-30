@@ -1602,6 +1602,7 @@ export const useShellStore = defineStore('shell', () => {
     setOperatorCenterView,
     afterRunLifecycleMutation,
     focusKairoBriefing,
+    focusLiveOperations,
     focusCommandSeam,
   } = createOperatorFocusSlice({
     layoutMode,
@@ -4013,6 +4014,7 @@ export const useShellStore = defineStore('shell', () => {
     focusOperatorTaskBoard,
     focusWatchConnectors,
     focusKairoBriefing,
+    focusLiveOperations,
     deliverKairoSpokenAlert,
     speakOperatorBriefing,
     speakKairoConversationLine,

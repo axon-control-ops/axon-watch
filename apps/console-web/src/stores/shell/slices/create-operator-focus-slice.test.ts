@@ -138,3 +138,43 @@ describe('focusAttentionSidebar', () => {
     expect(setCurrentWorkspace).toHaveBeenCalledWith('workspace_dashpro');
   });
 });
+
+describe('focusLiveOperations', () => {
+  it('expands the LIVE OPERATIONS thread seam instead of collapsing it', () => {
+    const expandedDockSeams = ref(new Set<string>());
+    const operatorCenterView = ref<'grid' | 'graph'>('graph');
+    const layoutMode = ref<'ide' | 'operator'>('ide');
+    const setLayoutMode = vi.fn((mode: 'ide' | 'operator') => {
+      layoutMode.value = mode;
+    });
+    const setDockHeroMode = vi.fn();
+    const slice = createOperatorFocusSlice({
+      layoutMode,
+      operatorBriefing: ref(null),
+      highlightedSignalId: ref(null),
+      ideAttentionPanelOpen: ref(false),
+      ideBriefingPanelOpen: ref(false),
+      ideExplorerCollapsed: ref(false),
+      signalsSeamEmphasized: ref(false),
+      missionControlEmphasized: ref(false),
+      connectorsEmphasized: ref(false),
+      briefingSeamEmphasized: ref(false),
+      operatorCenterView,
+      dockHeroMode: ref('command'),
+      expandedDockSeams,
+      dockThreadSeamTouched: ref(false),
+      setDockHeroMode,
+      restoreComposerDraft: vi.fn(),
+      setLayoutMode,
+      setCurrentWorkspace: vi.fn(),
+    } as unknown as Parameters<typeof createOperatorFocusSlice>[0]);
+
+    slice.focusLiveOperations();
+
+    expect(setLayoutMode).toHaveBeenCalledWith('operator');
+    // Brain Galaxy hides the live-ops dock, so the grid view must win.
+    expect(operatorCenterView.value).toBe('grid');
+    expect(expandedDockSeams.value.has('thread')).toBe(true);
+    expect(setDockHeroMode).not.toHaveBeenCalled();
+  });
+});

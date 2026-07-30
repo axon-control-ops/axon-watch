@@ -198,6 +198,7 @@ onUnmounted(() => {
 
 <template>
   <section
+    id="mission-control-live-ops"
     class="mc-live-ops"
     :class="{
       'mc-live-ops--busy': liveBadge,

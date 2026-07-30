@@ -183,6 +183,29 @@ describe('buildOperatorTaskBoardView', () => {
     expect(blocked?.blockedByOpenDeps).toBe(true);
     expect(blocked?.dependencyChips[0]?.blocking).toBe(true);
   });
+
+  it('only offers Start on unblocked open tasks', () => {
+    const view = buildOperatorTaskBoardView([
+      task({ task_id: 'task-dep', goal: 'Dependency', status: 'open' }),
+      task({
+        task_id: 'task-blocked',
+        goal: 'Blocked work',
+        status: 'open',
+        dependencies: ['task-dep'],
+      }),
+      task({
+        task_id: 'task-leased',
+        goal: 'Already running',
+        status: 'leased',
+        lease_holder: 'backend-1',
+      }),
+    ]);
+    const byId = (id: string) => view.rows.find((row) => row.taskId === id);
+
+    expect(byId('task-dep')?.canStart).toBe(true);
+    expect(byId('task-blocked')?.canStart).toBe(false);
+    expect(byId('task-leased')?.canStart).toBe(false);
+  });
 });
 
 describe('columnForTask', () => {

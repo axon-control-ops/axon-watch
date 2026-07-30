@@ -235,13 +235,14 @@ async function reopenLeadPlan(planId: string | null | undefined): Promise<void> 
   const opened = await shell.reopenCurrentLeadPlanEngagement(cleaned);
   if (opened) {
     planFilterId.value = cleaned;
-    shell.focusKairoBriefing();
+    shell.focusLiveOperations();
   }
   await shell.loadOperatorBriefing({ background: true, light: true });
 }
 
-function openVaxonReview(_planId?: string | null): void {
-  shell.focusKairoBriefing();
+function openVaxonReview(planId?: string | null): void {
+  planFilterId.value = String(planId || '').trim() || planFilterId.value;
+  shell.focusLiveOperations();
 }
 
 const selectedPlanAwaitingEngagement = computed(() => {
@@ -259,13 +260,9 @@ async function startTask(taskId: string): Promise<void> {
   if (!started) {
     return;
   }
+  // Stay on the board; starting several tickets must not yank us into the IDE.
   selectedTaskId.value = started.task.task_id;
   await refreshScheduler();
-  const row =
-    boardView.value.rows.find((item) => item.taskId === started.task.task_id) ?? null;
-  if (row) {
-    await openSpecialist(row);
-  }
 }
 
 async function submitTask(): Promise<void> {
