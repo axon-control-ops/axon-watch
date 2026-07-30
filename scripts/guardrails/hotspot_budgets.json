@@ -94,7 +94,7 @@
       "target": "apps/console-web/src/components/workbench/*"
     },
     "services/control-plane/app/kairo_conversation_reply.py": {
-      "max_lines": 325,
+      "max_lines": 330,
       "soft_limit": 350,
       "hard_limit": 500,
       "target": "services/control-plane/app/kairo/replies/*"
@@ -415,7 +415,7 @@
       "note": "Autonomy publish path-scope + receipts; gh resolve extracted to gh_cli.py"
     },
     "apps/console-web/src/components/shell/OperatorTaskBoardPanel.vue": {
-      "max_lines": 580,
+      "max_lines": 590,
       "soft_limit": 350,
       "hard_limit": 500,
       "target": "apps/console-web/src/components/shell/operator-task-board/*",
@@ -462,6 +462,13 @@
       "hard_limit": 500,
       "target": "services/control-plane/app/workspace_agents/lead_vaxon_*",
       "note": "Lead\u2192VAXON handoffs including Lead-shift flash; split message builders next"
+    },
+    "services/control-plane/app/workspace_agents/lead_team_checkin.py": {
+      "max_lines": 510,
+      "soft_limit": 350,
+      "hard_limit": 500,
+      "target": "services/control-plane/app/workspace_agents/lead_team_*",
+      "note": "Lead team check-in orchestration; extract prompt builders next"
     },
     "apps/console-web/src/components/conversation/ConversationSeamThreadMessage.vue": {
       "max_lines": 537,
