@@ -10,7 +10,6 @@ import {
 import { persistIdeExplorerCollapsed } from '../../../lib/ide-layout-prefs';
 import type { DockSeamId } from '../../../lib/dock-seam-layout';
 import type { DockHeroMode } from '../../../lib/dock-hero-mode';
-import type { LeftSidebarMode } from '../../../lib/left-sidebar-mode';
 import type { LayoutMode } from '../types';
 
 interface CreateOperatorFocusSliceInput {
@@ -28,10 +27,10 @@ interface CreateOperatorFocusSliceInput {
   dockHeroMode: Ref<DockHeroMode>;
   expandedDockSeams: Ref<Set<DockSeamId>>;
   dockThreadSeamTouched: Ref<boolean>;
-  setLeftSidebarMode: (mode: LeftSidebarMode) => void;
   setDockHeroMode: (mode: DockHeroMode) => void;
   restoreComposerDraft: (content: string) => void;
   setLayoutMode: (mode: LayoutMode) => void;
+  setCurrentWorkspace: (workspaceId: string) => void;
 }
 
 export function createOperatorFocusSlice(input: CreateOperatorFocusSliceInput) {
@@ -61,7 +60,20 @@ export function createOperatorFocusSlice(input: CreateOperatorFocusSliceInput) {
       input.ideExplorerCollapsed.value = false;
       persistIdeExplorerCollapsed(false);
     } else {
-      input.setLeftSidebarMode('attention');
+      // Mission Control Attention strip lives under Fleet Health (left rail hidden).
+      setOperatorCenterView('grid');
+      const highlightedId = input.highlightedSignalId.value;
+      const signalWorkspaceId =
+        (highlightedId
+          ? topSignals.find((signal) => signal.signal_id === highlightedId)?.workspace_id
+          : null) ??
+        (signalId?.trim()
+          ? topSignals.find((signal) => signal.signal_id === signalId.trim())?.workspace_id
+          : null) ??
+        null;
+      if (signalWorkspaceId?.trim()) {
+        input.setCurrentWorkspace(signalWorkspaceId.trim());
+      }
     }
 
     input.signalsSeamEmphasized.value = true;

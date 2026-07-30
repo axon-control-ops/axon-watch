@@ -146,6 +146,8 @@ onUnmounted(() => {
         'console-shell--operator': shell.layoutMode === 'operator',
         'console-shell--brain-galaxy':
           shell.layoutMode === 'operator' && shell.operatorBrainGalaxyActive,
+        'console-shell--mission-control':
+          shell.layoutMode === 'operator' && !shell.operatorBrainGalaxyActive,
         'console-shell--glass3d': !isFoundationSurface,
         'console-shell--vault': isVaultSurface,
         'console-shell--data': isDataSurface,

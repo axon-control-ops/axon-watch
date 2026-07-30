@@ -20,10 +20,8 @@ const {
   autonomyMode,
   autonomousOn,
   readiness,
-  effectiveLabel,
   effectiveTone,
   workersWantedOn,
-  modeCopy,
   enableAutonomous,
   disableAutonomous,
   hardKill,
@@ -33,7 +31,6 @@ const {
 const feed = ref<AutonomyStatusFeed | null>(null);
 const confirmOpen = ref(false);
 const feedError = ref<string | null>(null);
-const feedUpdatedAt = ref<number | null>(null);
 const resolvingId = ref<string | null>(null);
 let feedTimer: ReturnType<typeof setInterval> | null = null;
 
@@ -58,10 +55,33 @@ const workerStateLabel = computed(() => {
     return 'Running';
   }
   if (autonomousOn.value) {
-    return 'Configured · not effective';
+    return 'Armed';
   }
   return 'Paused';
 });
+
+const telemetryLine = computed(() => {
+  const parts = [workerStateLabel.value, autonomyMode.value];
+  const scan = feed.value?.last_scan;
+  if (scan) {
+    parts.push(`+${scan.created_count ?? 0}`);
+    if ((scan.escalated_count ?? 0) > 0) {
+      parts.push(`↑${scan.escalated_count}`);
+    }
+  }
+  if (readiness.value && readiness.value.grade !== 'ready') {
+    parts.push(`${readiness.value.score}/100`);
+  }
+  return parts.join(' · ');
+});
+
+const showAlert = computed(
+  () =>
+    Boolean(actionMessage.value) ||
+    Boolean(feedError.value) ||
+    Boolean(status.value?.blocked_by_env) ||
+    Boolean(readiness.value && readiness.value.grade !== 'ready'),
+);
 
 async function reloadFeed(): Promise<void> {
   try {
@@ -69,7 +89,6 @@ async function reloadFeed(): Promise<void> {
     if (feed.value.autonomy_mode !== shell.operatorPresenceSettings.autonomy_mode) {
       await shell.loadOperatorPresenceSettings({ reportError: false });
     }
-    feedUpdatedAt.value = Date.now();
     feedError.value = null;
   } catch (error) {
     feedError.value =
@@ -149,315 +168,512 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <section class="mc-autonomy" aria-label="VAXON autonomous control">
-    <div class="mc-autonomy__row">
+  <section
+    class="orb-hud"
+    :data-tone="effectiveTone"
+    :data-armed="autonomousOn ? 'true' : 'false'"
+    aria-label="VAXON orb controls"
+  >
+    <div class="orb-hud__glow" aria-hidden="true" />
+    <div class="orb-hud__arc" aria-hidden="true" />
+
+    <div class="orb-hud__ring">
       <button
         type="button"
-        class="mc-autonomy__toggle"
+        class="orb-hud__chip orb-hud__chip--prime"
         :data-on="autonomousOn ? 'true' : 'false'"
         :disabled="saving || killing"
         :aria-pressed="autonomousOn"
+        :title="autonomousOn ? 'Turn autonomous off' : 'Turn autonomous on'"
         @click="void onToggleAutonomous()"
       >
-        {{ autonomousOn ? 'AUTONOMOUS ON' : 'AUTONOMOUS OFF' }}
+        <span class="orb-hud__chip-dot" aria-hidden="true" />
+        {{ autonomousOn ? 'AUTO ON' : 'AUTO OFF' }}
       </button>
-      <span
-        class="mc-autonomy__state"
-        :data-tone="effectiveTone"
-        role="status"
-      >
-        {{ workerStateLabel }}
-      </span>
+
       <button
         type="button"
-        class="mc-autonomy__kill"
+        class="orb-hud__chip orb-hud__chip--kill"
         :disabled="killing || saving || (!workersWantedOn && (status?.active_run_count ?? 0) === 0)"
-        title="Hard-kill continuous workers (demotes to Semi)"
+        title="Hard-kill continuous workers"
         @click="void onHardKill()"
       >
-        {{ killing ? 'Killing…' : 'Hard-kill' }}
+        {{ killing ? '…' : 'KILL' }}
+      </button>
+
+      <button
+        type="button"
+        class="orb-hud__chip"
+        title="Advanced autonomy settings"
+        @click="openAdvanced"
+      >
+        ADV
+      </button>
+
+      <button
+        type="button"
+        class="orb-hud__chip orb-hud__chip--icon"
+        title="Refresh autonomy status"
+        @click="void refreshAll()"
+      >
+        ↻
       </button>
     </div>
 
-    <p class="mc-autonomy__copy" role="note">
-      {{ modeCopy[autonomyMode] }}
-      <button type="button" class="mc-autonomy__link" @click="openAdvanced">
-        Advanced
-      </button>
+    <p class="orb-hud__telemetry" role="status">
+      <span class="orb-hud__telemetry-pulse" :data-tone="effectiveTone" aria-hidden="true" />
+      <span>{{ telemetryLine }}</span>
     </p>
 
     <p
-      v-if="actionMessage"
-      class="mc-autonomy__banner"
+      v-if="showAlert && actionMessage"
+      class="orb-hud__whisper"
       :data-tone="actionTone"
       role="status"
     >
       {{ actionMessage }}
     </p>
-
-    <p v-if="feedError" class="mc-autonomy__banner" data-tone="error" role="alert">
-      Status may be stale · {{ feedError }}
+    <p v-else-if="feedError" class="orb-hud__whisper" data-tone="error" role="alert">
+      {{ feedError }}
+    </p>
+    <p v-else-if="status?.blocked_by_env" class="orb-hud__whisper" data-tone="warn" role="status">
+      Host brake on
     </p>
 
-    <p v-if="status?.blocked_by_env" class="mc-autonomy__warn" role="status">
-      Host brake on (AXON_WATCH_WORKER_SCHEDULER=0). Full mode saves, but workers stay blocked.
-    </p>
-
-    <p v-if="readiness && readiness.grade !== 'ready'" class="mc-autonomy__warn" role="status">
-      Readiness {{ readiness.score }}/100 ({{ readiness.grade }})
-      <span v-if="readiness.blockers.length"> — {{ readiness.blockers[0] }}</span>
-    </p>
-
-    <div v-if="confirmOpen" class="mc-autonomy__confirm" role="dialog" aria-label="Confirm autonomous mode">
-      <p>
-        Turn AUTONOMOUS ON? VAXON will attend errors, warnings, and handoffs with isolated
-        workers. Critical or dangerous actions still ask you.
-      </p>
-      <div class="mc-autonomy__confirm-actions">
+    <div
+      v-if="confirmOpen"
+      class="orb-hud__sheet"
+      role="dialog"
+      aria-label="Confirm autonomous mode"
+    >
+      <p>Enable full autonomy? Critical actions still ask you.</p>
+      <div class="orb-hud__sheet-actions">
         <button type="button" @click="cancelConfirm">Cancel</button>
-        <button type="button" class="mc-autonomy__confirm-go" @click="void confirmEnable()">
+        <button type="button" class="orb-hud__sheet-go" @click="void confirmEnable()">
           Enable
         </button>
       </div>
     </div>
 
-    <ul v-if="pendingCritical.length" class="mc-autonomy__critical" aria-label="Needs your decision">
-      <li v-for="item in pendingCritical.slice(0, 3)" :key="item.receipt_id">
-        <strong>Needs you</strong>
-        <span>{{ item.title || item.kind }}</span>
-        <small v-if="item.detail">{{ item.detail }}</small>
-        <small v-if="item.payload?.reason">Reason · {{ item.payload.reason }}</small>
-        <div class="mc-autonomy__decision-actions">
-          <button
-            type="button"
-            :disabled="Boolean(resolvingId)"
-            @click="void resolveDecision(item, 'rejected')"
-          >
-            Reject
-          </button>
-          <button
-            type="button"
-            class="mc-autonomy__decision-approve"
-            :disabled="Boolean(resolvingId)"
-            @click="void resolveDecision(item, 'approved')"
-          >
-            {{ resolvingId === item.receipt_id ? 'Saving…' : 'Approve exact task' }}
-          </button>
-        </div>
-      </li>
-    </ul>
-    <p v-if="pendingCriticalTotal > 3" class="mc-autonomy__warn">
-      +{{ pendingCriticalTotal - 3 }} more decisions in this workspace
-    </p>
-
-    <div class="mc-autonomy__meta">
-      <span>
-        Mode · {{ autonomyMode }}
-      </span>
-      <span v-if="feed?.last_scan">
-        Last scan
-        <template v-if="feed.last_scan.scanned_at">
-          · {{ new Date(feed.last_scan.scanned_at).toLocaleTimeString() }}
-        </template>
-        · dispatched {{ feed.last_scan.created_count ?? 0 }} · escalated
-        {{ feed.last_scan.escalated_count ?? 0 }}
-      </span>
-      <span v-if="feedUpdatedAt">Feed refreshed · {{ new Date(feedUpdatedAt).toLocaleTimeString() }}</span>
-      <button type="button" class="mc-autonomy__link" @click="void refreshAll()">
-        Refresh
-      </button>
+    <div v-if="pendingCritical.length" class="orb-hud__sheet orb-hud__sheet--critical">
+      <ul aria-label="Needs your decision">
+        <li v-for="item in pendingCritical.slice(0, 2)" :key="item.receipt_id">
+          <strong>Needs you</strong>
+          <span>{{ item.title || item.kind }}</span>
+          <div class="orb-hud__sheet-actions">
+            <button
+              type="button"
+              :disabled="Boolean(resolvingId)"
+              @click="void resolveDecision(item, 'rejected')"
+            >
+              Reject
+            </button>
+            <button
+              type="button"
+              class="orb-hud__sheet-go"
+              :disabled="Boolean(resolvingId)"
+              @click="void resolveDecision(item, 'approved')"
+            >
+              {{ resolvingId === item.receipt_id ? '…' : 'Approve' }}
+            </button>
+          </div>
+        </li>
+      </ul>
+      <p v-if="pendingCriticalTotal > 2" class="orb-hud__whisper" data-tone="warn">
+        +{{ pendingCriticalTotal - 2 }} more
+      </p>
     </div>
   </section>
 </template>
 
 <style scoped>
-.mc-autonomy {
+.orb-hud {
+  --orb-hud-cyan: rgba(110, 235, 255, 0.95);
+  --orb-hud-ink: rgba(2, 10, 18, 0.2);
+  position: absolute;
+  left: 0.35rem;
+  right: 0.35rem;
+  bottom: 0.35rem;
+  z-index: 4;
   display: grid;
-  gap: 0.45rem;
-  padding: 0.55rem 0.65rem;
-  border-top: 1px solid color-mix(in srgb, var(--hud-cyan, #5ee7ff) 18%, transparent);
-  background: color-mix(in srgb, #041018 72%, transparent);
+  justify-items: center;
+  gap: 0.28rem;
+  padding: 0.85rem 0.35rem 0.2rem;
+  pointer-events: none;
+  isolation: isolate;
 }
 
-.mc-autonomy__row {
+.orb-hud__glow {
+  position: absolute;
+  inset: auto 0 0 0;
+  height: 4.2rem;
+  background:
+    radial-gradient(ellipse 85% 90% at 50% 100%, rgba(0, 180, 255, 0.16), transparent 72%),
+    linear-gradient(180deg, transparent, rgba(1, 8, 16, 0.28));
+  pointer-events: none;
+  z-index: 0;
+  border-radius: 0 0 0.7rem 0.7rem;
+}
+
+.orb-hud[data-armed='true'] .orb-hud__glow {
+  background:
+    radial-gradient(ellipse 85% 90% at 50% 100%, rgba(40, 255, 170, 0.14), transparent 72%),
+    linear-gradient(180deg, transparent, rgba(1, 12, 14, 0.22));
+}
+
+.orb-hud__arc {
+  display: none;
+}
+
+.orb-hud[data-armed='true'] .orb-hud__arc {
+  border-color: rgba(90, 255, 190, 0.35);
+  box-shadow:
+    0 -0.35rem 1.2rem rgba(40, 255, 170, 0.14),
+    inset 0 1px 0 rgba(180, 255, 220, 0.2);
+}
+
+.orb-hud__arc::after {
+  content: '';
+  position: absolute;
+  left: 8%;
+  right: 8%;
+  top: -1px;
+  height: 2px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(120, 240, 255, 0.15),
+    rgba(180, 250, 255, 0.95),
+    rgba(120, 240, 255, 0.15),
+    transparent
+  );
+  animation: orb-hud-scan 2.8s linear infinite;
+}
+
+.orb-hud__ring {
+  position: relative;
+  z-index: 2;
   display: flex;
   flex-wrap: wrap;
+  justify-content: center;
   align-items: center;
-  gap: 0.45rem;
+  gap: 0.35rem;
+  pointer-events: auto;
 }
 
-.mc-autonomy__toggle {
-  border: 1px solid color-mix(in srgb, var(--hud-cyan, #5ee7ff) 45%, transparent);
-  background: color-mix(in srgb, #0b2430 80%, transparent);
-  color: #d7f7ff;
-  font: 650 0.68rem/1 ui-monospace, SFMono-Regular, Menlo, monospace;
-  letter-spacing: 0.08em;
-  padding: 0.35rem 0.55rem;
-  cursor: pointer;
-}
-
-.mc-autonomy__toggle[data-on='true'] {
-  border-color: color-mix(in srgb, #3dff9a 55%, transparent);
-  background: color-mix(in srgb, #0d3a28 75%, transparent);
-  color: #c8ffe0;
-}
-
-.mc-autonomy__state {
-  font: 600 0.65rem/1 ui-monospace, SFMono-Regular, Menlo, monospace;
-  letter-spacing: 0.06em;
+.orb-hud__chip {
+  position: relative;
+  appearance: none;
+  border: 1px solid rgba(110, 220, 255, 0.42);
+  border-radius: 999px;
+  padding: 0.32rem 0.65rem;
+  color: rgba(210, 245, 255, 0.94);
+  background: rgba(4, 18, 28, 0.42);
+  box-shadow:
+    inset 0 0 0 1px rgba(140, 235, 255, 0.1),
+    0 0 0.65rem rgba(0, 180, 255, 0.14);
+  backdrop-filter: blur(8px);
+  font: 650 0.56rem/1 var(--font-mono, ui-monospace, monospace);
+  letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: #9ec9d6;
-}
-
-.mc-autonomy__state[data-tone='running'] {
-  color: #7dffb2;
-}
-
-.mc-autonomy__state[data-tone='blocked'],
-.mc-autonomy__state[data-tone='paused'] {
-  color: #ffd27a;
-}
-
-.mc-autonomy__kill {
-  margin-left: auto;
-  border: 1px solid color-mix(in srgb, #ff6b6b 50%, transparent);
-  background: color-mix(in srgb, #3a1010 70%, transparent);
-  color: #ffd0d0;
-  font: 600 0.62rem/1 ui-monospace, SFMono-Regular, Menlo, monospace;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-  padding: 0.3rem 0.45rem;
   cursor: pointer;
+  transition:
+    border-color 160ms ease,
+    box-shadow 160ms ease,
+    color 160ms ease,
+    transform 160ms ease,
+    background 160ms ease;
 }
 
-.mc-autonomy__kill:disabled,
-.mc-autonomy__toggle:disabled {
-  opacity: 0.55;
+.orb-hud__chip:hover:not(:disabled) {
+  transform: translateY(-1px);
+  border-color: rgba(140, 240, 255, 0.72);
+  box-shadow:
+    inset 0 0 0 1px rgba(160, 245, 255, 0.16),
+    0 0 1rem rgba(0, 220, 255, 0.28);
+  color: rgba(235, 252, 255, 0.98);
+}
+
+.orb-hud__chip:disabled {
+  opacity: 0.45;
   cursor: not-allowed;
 }
 
-.mc-autonomy__copy,
-.mc-autonomy__meta,
-.mc-autonomy__banner,
-.mc-autonomy__warn {
+.orb-hud__chip--prime {
+  padding-left: 0.55rem;
+  min-width: 5.6rem;
+}
+
+.orb-hud__chip--prime .orb-hud__chip-dot {
+  display: inline-block;
+  width: 0.35rem;
+  height: 0.35rem;
+  margin-right: 0.35rem;
+  border-radius: 50%;
+  background: rgba(160, 200, 220, 0.55);
+  box-shadow: 0 0 0.35rem rgba(120, 200, 230, 0.35);
+  vertical-align: 0.02rem;
+}
+
+.orb-hud__chip--prime[data-on='true'] {
+  border-color: rgba(90, 255, 190, 0.65);
+  color: rgba(210, 255, 235, 0.98);
+  background:
+    linear-gradient(180deg, rgba(20, 80, 55, 0.45), rgba(4, 28, 18, 0.55)),
+    rgba(4, 28, 18, 0.4);
+  box-shadow:
+    inset 0 0 0 1px rgba(140, 255, 210, 0.14),
+    0 0 1.1rem rgba(40, 255, 170, 0.28);
+  animation: orb-hud-armed 2.4s ease-in-out infinite;
+}
+
+.orb-hud__chip--prime[data-on='true'] .orb-hud__chip-dot {
+  background: rgba(90, 255, 190, 0.95);
+  box-shadow: 0 0 0.55rem rgba(70, 255, 180, 0.75);
+}
+
+.orb-hud__chip--kill {
+  border-color: rgba(255, 120, 140, 0.45);
+  color: rgba(255, 210, 220, 0.95);
+  background:
+    linear-gradient(180deg, rgba(70, 18, 28, 0.4), rgba(28, 8, 12, 0.5)),
+    rgba(28, 8, 12, 0.35);
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 140, 160, 0.1),
+    0 0 0.7rem rgba(255, 70, 100, 0.12);
+}
+
+.orb-hud__chip--kill:hover:not(:disabled) {
+  border-color: rgba(255, 140, 160, 0.8);
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 160, 180, 0.18),
+    0 0 1rem rgba(255, 80, 110, 0.28);
+}
+
+.orb-hud__chip--icon {
+  min-width: 1.9rem;
+  padding-left: 0.45rem;
+  padding-right: 0.45rem;
+  letter-spacing: 0;
+}
+
+.orb-hud__telemetry {
+  position: relative;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
   margin: 0;
-  font: 0.68rem/1.35 system-ui, sans-serif;
-  color: #9eb8c4;
+  max-width: 100%;
+  padding: 0.12rem 0.55rem;
+  color: rgba(160, 215, 235, 0.82);
+  font: 0.52rem/1.2 var(--font-mono, ui-monospace, monospace);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  text-shadow: 0 0 0.55rem rgba(0, 200, 255, 0.25);
+  pointer-events: none;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-.mc-autonomy__banner[data-tone='ok'] {
-  color: #8dffb8;
+.orb-hud__telemetry-pulse {
+  width: 0.35rem;
+  height: 0.35rem;
+  border-radius: 50%;
+  background: rgba(140, 200, 220, 0.7);
+  box-shadow: 0 0 0.4rem rgba(100, 210, 255, 0.45);
+  flex: 0 0 auto;
 }
 
-.mc-autonomy__banner[data-tone='error'] {
-  color: #ff9a9a;
+.orb-hud__telemetry-pulse[data-tone='running'] {
+  background: rgba(90, 255, 190, 0.95);
+  box-shadow: 0 0 0.55rem rgba(70, 255, 180, 0.7);
+  animation: orb-hud-pulse 1.4s ease-in-out infinite;
 }
 
-.mc-autonomy__banner[data-tone='warn'],
-.mc-autonomy__warn {
-  color: #ffd27a;
+.orb-hud__telemetry-pulse[data-tone='paused'],
+.orb-hud__telemetry-pulse[data-tone='blocked'] {
+  background: rgba(255, 210, 120, 0.9);
+  box-shadow: 0 0 0.45rem rgba(255, 190, 90, 0.45);
 }
 
-.mc-autonomy__link {
-  border: 0;
-  background: transparent;
-  color: #7fd7ff;
-  font: inherit;
-  text-decoration: underline;
-  cursor: pointer;
-  padding: 0;
-  margin-left: 0.35rem;
+.orb-hud__whisper {
+  position: relative;
+  z-index: 2;
+  margin: 0;
+  max-width: 92%;
+  text-align: center;
+  color: rgba(170, 210, 225, 0.85);
+  font: 0.55rem/1.25 system-ui, sans-serif;
+  pointer-events: none;
 }
 
-.mc-autonomy__confirm {
+.orb-hud__whisper[data-tone='ok'] {
+  color: rgba(150, 255, 200, 0.92);
+}
+
+.orb-hud__whisper[data-tone='error'] {
+  color: rgba(255, 160, 170, 0.95);
+}
+
+.orb-hud__whisper[data-tone='warn'],
+.orb-hud__whisper[data-tone='pending'] {
+  color: rgba(255, 210, 140, 0.95);
+}
+
+.orb-hud__sheet {
+  position: relative;
+  z-index: 3;
+  width: min(100%, 18rem);
   display: grid;
   gap: 0.4rem;
-  padding: 0.5rem;
-  border: 1px solid color-mix(in srgb, #ffd27a 40%, transparent);
-  background: color-mix(in srgb, #2a2108 70%, transparent);
+  margin-top: 0.1rem;
+  padding: 0.55rem 0.6rem;
+  border: 1px solid rgba(255, 210, 120, 0.35);
+  border-radius: 0.65rem;
+  background:
+    linear-gradient(180deg, rgba(40, 30, 8, 0.55), rgba(12, 10, 4, 0.72)),
+    rgba(8, 8, 4, 0.55);
+  box-shadow:
+    0 0 1.4rem rgba(0, 0, 0, 0.35),
+    inset 0 0 0 1px rgba(255, 230, 160, 0.08);
+  backdrop-filter: blur(12px);
+  pointer-events: auto;
+  animation: orb-hud-sheet-in 180ms ease-out;
 }
 
-.mc-autonomy__confirm p {
+.orb-hud__sheet--critical {
+  border-color: rgba(255, 120, 140, 0.4);
+  background:
+    linear-gradient(180deg, rgba(50, 12, 18, 0.55), rgba(16, 4, 8, 0.72)),
+    rgba(16, 4, 8, 0.55);
+  max-height: 6.5rem;
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+
+.orb-hud__sheet p,
+.orb-hud__sheet span {
   margin: 0;
-  font: 0.7rem/1.35 system-ui, sans-serif;
-  color: #ffe7b0;
+  color: rgba(255, 235, 200, 0.95);
+  font: 0.62rem/1.3 system-ui, sans-serif;
 }
 
-.mc-autonomy__confirm-actions {
-  display: flex;
-  gap: 0.4rem;
-  justify-content: flex-end;
-}
-
-.mc-autonomy__confirm-actions button {
-  border: 1px solid color-mix(in srgb, #9ec9d6 35%, transparent);
-  background: transparent;
-  color: #d7f7ff;
-  font: 0.65rem/1 system-ui, sans-serif;
-  padding: 0.28rem 0.45rem;
-  cursor: pointer;
-}
-
-.mc-autonomy__confirm-go {
-  border-color: color-mix(in srgb, #3dff9a 55%, transparent) !important;
-  background: color-mix(in srgb, #0d3a28 75%, transparent) !important;
-}
-
-.mc-autonomy__critical {
+.orb-hud__sheet ul {
   list-style: none;
   margin: 0;
   padding: 0;
   display: grid;
-  gap: 0.3rem;
-}
-
-.mc-autonomy__critical li {
-  display: grid;
-  gap: 0.1rem;
-  padding: 0.35rem 0.45rem;
-  border: 1px solid color-mix(in srgb, #ff6b6b 35%, transparent);
-  background: color-mix(in srgb, #2a1010 65%, transparent);
-  font: 0.66rem/1.3 system-ui, sans-serif;
-  color: #ffd0d0;
-}
-
-.mc-autonomy__critical strong {
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  font-size: 0.58rem;
-  color: #ff9a9a;
-}
-
-.mc-autonomy__critical small {
-  color: #e7bcbc;
-  overflow-wrap: anywhere;
-}
-
-.mc-autonomy__decision-actions {
-  display: flex;
   gap: 0.35rem;
-  justify-content: flex-end;
-  margin-top: 0.2rem;
 }
 
-.mc-autonomy__decision-actions button {
-  border: 1px solid color-mix(in srgb, #ff9a9a 45%, transparent);
-  background: transparent;
-  color: #ffd0d0;
-  font: 0.62rem/1 system-ui, sans-serif;
-  padding: 0.3rem 0.4rem;
+.orb-hud__sheet li {
+  display: grid;
+  gap: 0.15rem;
+  color: rgba(255, 220, 225, 0.95);
+  font: 0.6rem/1.25 system-ui, sans-serif;
+}
+
+.orb-hud__sheet strong {
+  font-size: 0.5rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: rgba(255, 160, 175, 0.95);
+}
+
+.orb-hud__sheet-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.35rem;
+}
+
+.orb-hud__sheet-actions button {
+  border: 1px solid rgba(160, 210, 230, 0.35);
+  border-radius: 999px;
+  background: rgba(4, 16, 24, 0.45);
+  color: rgba(220, 245, 255, 0.95);
+  font: 0.58rem/1 system-ui, sans-serif;
+  padding: 0.28rem 0.55rem;
   cursor: pointer;
 }
 
-.mc-autonomy__decision-approve {
-  border-color: color-mix(in srgb, #ffd27a 50%, transparent) !important;
-  color: #ffe7b0 !important;
+.orb-hud__sheet-go {
+  border-color: rgba(90, 255, 190, 0.55) !important;
+  color: rgba(210, 255, 230, 0.98) !important;
+  background: rgba(10, 40, 28, 0.55) !important;
 }
 
-.mc-autonomy__meta {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.45rem;
-  align-items: center;
+@keyframes orb-hud-arc-breathe {
+  0%,
+  100% {
+    opacity: 0.55;
+    transform: scaleX(0.98);
+  }
+  50% {
+    opacity: 1;
+    transform: scaleX(1);
+  }
+}
+
+@keyframes orb-hud-scan {
+  0% {
+    transform: translateX(-18%);
+    opacity: 0.25;
+  }
+  50% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateX(18%);
+    opacity: 0.25;
+  }
+}
+
+@keyframes orb-hud-armed {
+  0%,
+  100% {
+    box-shadow:
+      inset 0 0 0 1px rgba(140, 255, 210, 0.12),
+      0 0 0.85rem rgba(40, 255, 170, 0.2);
+  }
+  50% {
+    box-shadow:
+      inset 0 0 0 1px rgba(160, 255, 220, 0.22),
+      0 0 1.35rem rgba(50, 255, 180, 0.38);
+  }
+}
+
+@keyframes orb-hud-pulse {
+  0%,
+  100% {
+    transform: scale(0.9);
+    opacity: 0.7;
+  }
+  50% {
+    transform: scale(1.15);
+    opacity: 1;
+  }
+}
+
+@keyframes orb-hud-sheet-in {
+  from {
+    opacity: 0;
+    transform: translateY(0.35rem) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .orb-hud__arc,
+  .orb-hud__arc::after,
+  .orb-hud__chip--prime[data-on='true'],
+  .orb-hud__telemetry-pulse[data-tone='running'],
+  .orb-hud__sheet {
+    animation: none;
+  }
 }
 </style>

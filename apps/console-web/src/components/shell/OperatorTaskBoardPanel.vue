@@ -17,6 +17,11 @@ import {
   type TaskBoardRow,
 } from '../../lib/operator-task-board-view';
 import {
+  dismissDoneTaskId,
+  dismissDoneTaskIds,
+  loadDismissedDoneTaskIds,
+} from '../../lib/task-board-dismissed-done';
+import {
   incomingHandoffHeadline,
   mapWorkspaceHandoffRows,
   type IncomingHandoffRow,
@@ -45,6 +50,7 @@ const planFilterId = ref<string | 'all'>('all');
 const scheduler = ref<WorkerSchedulerStatus | null>(null);
 const schedulerError = ref<string | null>(null);
 const handoffRows = ref<IncomingHandoffRow[]>([]);
+const dismissedDoneIds = ref<Set<string>>(loadDismissedDoneTaskIds());
 
 const boardView = computed(() =>
   buildOperatorTaskBoardView(
@@ -89,15 +95,34 @@ const selectedRow = computed(() =>
 );
 
 const visibleColumns = computed(() => {
-  if (planFilterId.value === 'all') {
-    return boardView.value.columns;
-  }
-  return boardView.value.columns.map((column) => ({
-    ...column,
-    rows: column.rows.filter((row) => row.planId === planFilterId.value),
-    count: column.rows.filter((row) => row.planId === planFilterId.value).length,
-  }));
+  const source =
+    planFilterId.value === 'all'
+      ? boardView.value.columns
+      : boardView.value.columns.map((column) => ({
+          ...column,
+          rows: column.rows.filter((row) => row.planId === planFilterId.value),
+          count: column.rows.filter((row) => row.planId === planFilterId.value).length,
+        }));
+
+  const withDismissals = source.map((column) => {
+    if (column.id !== 'done') {
+      return column;
+    }
+    const rows = column.rows.filter((row) => !dismissedDoneIds.value.has(row.taskId));
+    return {
+      ...column,
+      rows,
+      count: rows.length,
+    };
+  });
+
+  const active = withDismissals.filter((column) => column.count > 0);
+  return active.length > 0 ? active : withDismissals;
 });
+
+const doneVisibleCount = computed(
+  () => visibleColumns.value.find((column) => column.id === 'done')?.count ?? 0,
+);
 
 const holoTone = computed<HudHoloTone>(() => {
   const buckets = boardView.value.rows
@@ -202,6 +227,47 @@ async function closeLeadPlan(planId: string | null | undefined): Promise<void> {
   await shell.loadOperatorBriefing({ background: true, light: true });
 }
 
+async function reopenLeadPlan(planId: string | null | undefined): Promise<void> {
+  const cleaned = String(planId || '').trim();
+  if (!cleaned) {
+    return;
+  }
+  const opened = await shell.reopenCurrentLeadPlanEngagement(cleaned);
+  if (opened) {
+    planFilterId.value = cleaned;
+    shell.focusKairoBriefing();
+  }
+  await shell.loadOperatorBriefing({ background: true, light: true });
+}
+
+function openVaxonReview(_planId?: string | null): void {
+  shell.focusKairoBriefing();
+}
+
+const selectedPlanAwaitingEngagement = computed(() => {
+  const planId = selectedRow.value?.planId;
+  if (!planId) {
+    return false;
+  }
+  return boardView.value.planGroups.some(
+    (group) => group.planId === planId && group.awaitingEngagement,
+  );
+});
+
+async function startTask(taskId: string): Promise<void> {
+  const started = await shell.startCurrentWorkspaceTask(taskId);
+  if (!started) {
+    return;
+  }
+  selectedTaskId.value = started.task.task_id;
+  await refreshScheduler();
+  const row =
+    boardView.value.rows.find((item) => item.taskId === started.task.task_id) ?? null;
+  if (row) {
+    await openSpecialist(row);
+  }
+}
+
 async function submitTask(): Promise<void> {
   if (!canCreate.value) {
     return;
@@ -241,6 +307,27 @@ async function submitTask(): Promise<void> {
 
 async function cancelTask(taskId: string): Promise<void> {
   await shell.cancelCurrentWorkspaceTask(taskId);
+}
+
+function dismissDoneTask(taskId: string): void {
+  dismissedDoneIds.value = dismissDoneTaskId(taskId, dismissedDoneIds.value);
+  if (selectedTaskId.value === taskId) {
+    selectedTaskId.value = null;
+  }
+}
+
+function clearVisibleDone(): void {
+  const doneIds =
+    boardView.value.columns
+      .find((column) => column.id === 'done')
+      ?.rows.map((row) => row.taskId) ?? [];
+  if (!doneIds.length) {
+    return;
+  }
+  dismissedDoneIds.value = dismissDoneTaskIds(doneIds, dismissedDoneIds.value);
+  if (selectedTaskId.value && doneIds.includes(selectedTaskId.value)) {
+    selectedTaskId.value = null;
+  }
 }
 
 async function cancelAllWaiting(): Promise<void> {
@@ -339,24 +426,35 @@ function openFleetControls(): void {
         </div>
         <div class="operator-task-board__header-actions">
           <span class="operator-task-board__headline">{{ boardView.headline }}</span>
-          <button
-            v-if="boardView.counts.waiting > 0"
-            type="button"
-            class="operator-task-board__cancel-waiting"
-            :disabled="shell.workspaceTasksMutating"
-            title="Cancel every open/waiting task so Leads are not buried"
-            @click="void cancelAllWaiting()"
-          >
-            Cancel all waiting ({{ boardView.counts.waiting }})
-          </button>
-          <button
-            type="button"
-            class="operator-task-board__add"
-            :aria-expanded="showCreate ? 'true' : 'false'"
-            @click="showCreate = !showCreate"
-          >
-            {{ showCreate ? 'Hide form' : 'Add task' }}
-          </button>
+          <div class="operator-task-board__header-buttons">
+            <button
+              v-if="doneVisibleCount > 0"
+              type="button"
+              class="operator-task-board__clear-done"
+              title="Hide completed tickets from this board (session only)"
+              @click="clearVisibleDone()"
+            >
+              Clear done ({{ doneVisibleCount }})
+            </button>
+            <button
+              v-if="boardView.counts.waiting > 0"
+              type="button"
+              class="operator-task-board__cancel-waiting"
+              :disabled="shell.workspaceTasksMutating"
+              title="Cancel every open/waiting task so Leads are not buried"
+              @click="void cancelAllWaiting()"
+            >
+              Cancel all waiting ({{ boardView.counts.waiting }})
+            </button>
+            <button
+              type="button"
+              class="operator-task-board__add"
+              :aria-expanded="showCreate ? 'true' : 'false'"
+              @click="showCreate = !showCreate"
+            >
+              {{ showCreate ? 'Hide form' : '+ Add task' }}
+            </button>
+          </div>
         </div>
       </header>
 
@@ -404,6 +502,8 @@ function openFleetControls(): void {
         :lead-plans-mutating="shell.leadPlansMutating"
         @update:plan-filter-id="planFilterId = $event"
         @close-lead-plan="void closeLeadPlan($event)"
+        @reopen-lead-plan="void reopenLeadPlan($event)"
+        @open-vaxon-review="openVaxonReview($event)"
       />
 
       <OperatorTaskBoardCreateForm
@@ -437,7 +537,10 @@ function openFleetControls(): void {
         :show-history="showHistory"
         :workspace-tasks-mutating="shell.workspaceTasksMutating"
         @select-task="selectTask"
+        @start-task="void startTask($event)"
         @cancel-task="void cancelTask($event)"
+        @dismiss-done="dismissDoneTask"
+        @cancel-all-waiting="void cancelAllWaiting()"
         @update:show-history="showHistory = $event"
       />
 
@@ -446,9 +549,12 @@ function openFleetControls(): void {
         :row="selectedRow"
         :workspace-tasks-mutating="shell.workspaceTasksMutating"
         :lead-plans-mutating="shell.leadPlansMutating"
+        :plan-awaiting-engagement="selectedPlanAwaitingEngagement"
         @close="selectedTaskId = null"
+        @start-task="void startTask($event)"
         @open-associated-run="openAssociatedRun"
         @open-specialist="void openSpecialist($event)"
+        @open-vaxon-review="openVaxonReview(selectedRow.planId)"
         @cancel-task="void cancelTask($event)"
         @retry-task="void retryTask($event)"
         @review-lead-plan="void reviewLeadPlan($event)"

@@ -103,6 +103,23 @@ export async function cancelWorkspaceTask(
   );
 }
 
+export type OperatorStartTaskResult = {
+  task: WorkspaceTaskRecord;
+  run: { run_id?: string; [key: string]: unknown };
+  thread_id: string | null;
+};
+
+export async function operatorStartWorkspaceTask(
+  taskId: string,
+): Promise<OperatorStartTaskResult> {
+  const encoded = encodeURIComponent(taskId);
+  return fetchJson<OperatorStartTaskResult>(
+    `/api/tasks/${encoded}/operator-start`,
+    { method: 'POST' },
+    'operator start task failed',
+  );
+}
+
 export type CancelWorkspaceTasksBatchResult = {
   workspace_id: string;
   cancelled_count: number;

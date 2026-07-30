@@ -15,11 +15,16 @@ import {
   fleetHealthHeadlineWithCompanyBusy,
 } from '../../lib/operator-fleet-health-view';
 import { useShellStore } from '../../stores/shell';
+import WorkspaceAddForm from './WorkspaceAddForm.vue';
 
 const shell = useShellStore();
 const rootEl = ref<HTMLElement | null>(null);
+const showAddWorkspaceForm = ref(false);
 
-useOrbFieldReactiveHost({ root: rootEl });
+useOrbFieldReactiveHost({
+  root: rootEl,
+  enabled: () => shell.layoutMode === 'operator' && shell.operatorBrainGalaxyActive,
+});
 
 const busyEmployeeCountByWorkspace = computed(() => {
   const counts: Record<string, number> = {};
@@ -98,7 +103,22 @@ function selectWorkspace(workspaceId: string): void {
           <p class="operator-fleet-grid__eyebrow">Second brain</p>
           <h3 class="operator-fleet-grid__title">Fleet health</h3>
         </div>
-        <span class="operator-fleet-grid__headline">{{ headline }}</span>
+        <div class="operator-fleet-grid__header-meta">
+          <span class="operator-fleet-grid__headline">{{ headline }}</span>
+          <WorkspaceAddForm
+            v-if="showAddWorkspaceForm"
+            @registered="showAddWorkspaceForm = false"
+            @cancel="showAddWorkspaceForm = false"
+          />
+          <button
+            v-else
+            type="button"
+            class="operator-fleet-grid__new"
+            @click="showAddWorkspaceForm = true"
+          >
+            + New Workspace
+          </button>
+        </div>
       </header>
 
       <p v-if="shell.operatorFleetHealthError" class="operator-fleet-grid__error" role="alert">
@@ -116,19 +136,48 @@ function selectWorkspace(workspaceId: string): void {
             {
               'operator-fleet-grid__item--selected': cell.isSelected,
               'operator-fleet-grid__item--busy': cell.isBusy,
+              'operator-fleet-grid__item--has-attention':
+                cell.openSignals > 0 || cell.pendingApprovals > 0 || cell.criticalSignals > 0,
             },
           ]"
         >
           <button
             type="button"
             class="operator-fleet-grid__button"
+            :title="`${cell.label} — ${cell.summary}${cell.detail ? ` · ${cell.detail}` : ''}`"
             @click="selectWorkspace(cell.workspaceId)"
           >
-            <span class="operator-fleet-grid__label">
-              {{ cell.label }}
+            <span class="operator-fleet-grid__label-row">
+              <span class="operator-fleet-grid__name">{{ cell.label }}</span>
+            </span>
+            <span class="operator-fleet-grid__badges">
               <span v-if="cell.isBoundProject" class="operator-fleet-grid__badge">project</span>
               <span v-if="cell.isBusy" class="operator-fleet-grid__badge operator-fleet-grid__badge--live">
                 live
+              </span>
+              <span
+                v-if="cell.criticalSignals > 0"
+                class="operator-fleet-grid__badge operator-fleet-grid__badge--critical"
+              >
+                {{ cell.criticalSignals }} critical
+              </span>
+              <span
+                v-else-if="cell.openSignals > 0"
+                class="operator-fleet-grid__badge operator-fleet-grid__badge--signal"
+              >
+                {{ cell.openSignals }} signal{{ cell.openSignals === 1 ? '' : 's' }}
+              </span>
+              <span
+                v-if="cell.pendingApprovals > 0"
+                class="operator-fleet-grid__badge operator-fleet-grid__badge--approval"
+              >
+                {{ cell.pendingApprovals }} approval{{ cell.pendingApprovals === 1 ? '' : 's' }}
+              </span>
+              <span
+                v-if="cell.reviewReady > 0"
+                class="operator-fleet-grid__badge operator-fleet-grid__badge--review"
+              >
+                {{ cell.reviewReady }} review
               </span>
             </span>
             <span class="operator-fleet-grid__summary">{{ cell.summary }}</span>

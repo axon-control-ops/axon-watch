@@ -1,6 +1,6 @@
 import type { KairoNarrationLevel } from '../contracts/canonical';
 
-import { narrationForCompletion } from './kairo-agent-narration';
+import { narrationForCompletion, isProgressOrIntentSentence } from './kairo-agent-narration';
 import type { NarrationMilestone } from './kairo-agent-narration';
 import { createKairoAgentMilestoneNarrator } from './kairo-agent-milestone-narrator';
 import {
@@ -261,6 +261,17 @@ export function createChatStreamVoiceNarration(input: {
   function narrateCompletion(finalContent: string): void {
     const completion = narrationForCompletion(finalContent);
     if (toolNarrationEnabled) {
+      // Thinking already carried the "what I'll do" plan mid-run. Do not cancel
+      // that queue and re-speak a progress opener after the roster is IDLE.
+      if (
+        completion.key === 'done' &&
+        thinkingCarriesUpdate &&
+        (isProgressOrIntentSentence(completion.message) ||
+          completion.message === 'Done' ||
+          completion.message === 'Shift complete.')
+      ) {
+        return;
+      }
       cancelStaleNarration();
       agentMilestoneNarrator?.narrate(completion);
       return;

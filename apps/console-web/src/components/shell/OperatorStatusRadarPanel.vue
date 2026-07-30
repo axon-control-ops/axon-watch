@@ -40,6 +40,7 @@ import OperatorIncidentFeedPanel from './OperatorIncidentFeedPanel.vue';
 import OperatorRunStripPanel from './OperatorRunStripPanel.vue';
 import OperatorStatusRadarPanelHeader from './OperatorStatusRadarPanelHeader.vue';
 import OperatorTaskBoardPanel from './OperatorTaskBoardPanel.vue';
+import AttentionStackPanel from './AttentionStackPanel.vue';
 
 const props = defineProps<{
   terminalVisible: boolean;
@@ -380,6 +381,24 @@ function handleOperatorQuickGuideAction(actionId: OperatorQuickGuideActionId): v
       />
 
       <OperatorFleetHealthGrid />
+
+      <section
+        id="mission-control-attention"
+        class="operator-status-radar-panel__attention"
+        aria-label="Attention for current workspace"
+      >
+        <header class="operator-status-radar-panel__attention-head">
+          <p class="operator-status-radar-panel__attention-eyebrow">Attention</p>
+          <p class="operator-status-radar-panel__attention-scope">
+            {{
+              shell.currentWorkspace?.display_name?.trim() ||
+              shell.currentWorkspace?.workspace_id ||
+              'Current workspace'
+            }}
+          </p>
+        </header>
+        <AttentionStackPanel variant="sidebar" sections="attention-only" />
+      </section>
 
       <OperatorTaskBoardPanel />
 

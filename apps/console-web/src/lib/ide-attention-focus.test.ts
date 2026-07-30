@@ -8,7 +8,7 @@ import {
 describe('ide-attention-focus', () => {
   it('routes IDE attention focus to the IDE panel anchor', () => {
     expect(resolveAttentionFocusScrollTarget('ide')).toBe('ide-attention-panel');
-    expect(resolveAttentionFocusScrollTarget('operator')).toBe('dock-seam-signals');
+    expect(resolveAttentionFocusScrollTarget('operator')).toBe('mission-control-attention');
   });
 
   it('prefers an explicit signal id when provided', () => {

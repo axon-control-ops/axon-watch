@@ -178,6 +178,38 @@ export function agentTurnHasConfidenceRating(content: string): boolean {
   return Number.isFinite(score) && score >= 1 && score <= 10;
 }
 
+/**
+ * Mid-shift / future-tense openers that must not be spoken as the end-of-run
+ * bookend after the roster has already flipped to IDLE.
+ */
+export function isProgressOrIntentSentence(sentence: string): boolean {
+  const text = sentence.trim();
+  if (!text) {
+    return true;
+  }
+  if (/^\s*(Retrying|Continuing)\b/i.test(text)) {
+    return true;
+  }
+  if (
+    /^\s*I(?:'m| am|'ll| will)\s+(?:going to |now )?(?:read|start|begin|retry|check|look|scan|inspect|open|review|draft|fix|update|wire|produce|analyze)\b/i.test(
+      text,
+    )
+  ) {
+    return true;
+  }
+  if (
+    /^\s*(Reading|Checking|Looking|Scanning|Inspecting|Opening|Reviewing|Drafting|Analyzing|Working on|Next)\b/i.test(
+      text,
+    )
+  ) {
+    return true;
+  }
+  if (/\bnext,\s+then\b/i.test(text) || /\bthen (?:fix|produce|update|wire|check|read)\b/i.test(text)) {
+    return true;
+  }
+  return false;
+}
+
 /** First one or two sentences from the final agent reply for end-of-run narration. */
 export function spokenCompletionSummary(content: string): string {
   const cleaned = cleanAgentReplyText(content);
@@ -201,16 +233,12 @@ export function spokenCompletionSummary(content: string): string {
     return `Shift complete. Confidence ${score} out of 10.`;
   }
   const sentences = flat.match(/[^.!?]+[.!?]+/g) ?? [];
-  const usable = sentences.filter(
-    (sentence) =>
-      !/^\s*(Retrying|Continuing|I(?:'ll| will) (?:read|start|begin|retry))\b/i.test(
-        sentence.trim(),
-      ),
-  );
-  const pool = usable.length ? usable : sentences;
-  if (pool.length > 0) {
-    let summary = (pool[0] ?? '').trim();
-    const second = pool[1];
+  const usable = sentences.filter((sentence) => !isProgressOrIntentSentence(sentence));
+  // Never fall back to filtered progress openers — that is what makes Priya
+  // announce "Reading… next, then fix…" after IDLE.
+  if (usable.length > 0) {
+    let summary = (usable[0] ?? '').trim();
+    const second = usable[1];
     if (summary.length < 120 && second) {
       summary = `${summary} ${second.trim()}`;
     }
@@ -219,8 +247,14 @@ export function spokenCompletionSummary(content: string): string {
     }
     return summary;
   }
+  if (sentences.length > 0) {
+    return 'Shift complete.';
+  }
   if (flat.length <= COMPLETION_SUMMARY_MAX) {
-    return flat;
+    return isProgressOrIntentSentence(flat) ? 'Shift complete.' : flat;
+  }
+  if (isProgressOrIntentSentence(flat)) {
+    return 'Shift complete.';
   }
   return `${flat.slice(0, COMPLETION_SUMMARY_MAX - 1).trim()}…`;
 }

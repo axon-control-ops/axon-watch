@@ -100,6 +100,27 @@ export function createLeadPlansSlice(input: CreateLeadPlansSliceInput) {
     }
   }
 
+  async function reopenCurrentLeadPlanEngagement(planId: string): Promise<boolean> {
+    const workspaceId = input.currentWorkspace.value?.workspace_id?.trim() ?? '';
+    const cleaned = planId.trim();
+    if (!workspaceId || !cleaned) {
+      return false;
+    }
+    leadPlansMutating.value = true;
+    try {
+      await setLeadPlanStatus(cleaned, 'awaiting_engagement');
+      await loadLeadPlans(workspaceId);
+      leadPlansError.value = null;
+      return true;
+    } catch (error) {
+      leadPlansError.value =
+        error instanceof Error ? error.message : 'Failed to re-open Lead review';
+      return false;
+    } finally {
+      leadPlansMutating.value = false;
+    }
+  }
+
   async function synthesizeCurrentLeadPlan(planId: string): Promise<boolean> {
     const workspaceId = input.currentWorkspace.value?.workspace_id?.trim() ?? '';
     const cleaned = planId.trim();
@@ -171,6 +192,7 @@ export function createLeadPlansSlice(input: CreateLeadPlansSliceInput) {
     loadLeadPlans,
     fanOutCurrentWorkspaceLeadPlan,
     closeCurrentLeadPlanEngagement,
+    reopenCurrentLeadPlanEngagement,
     synthesizeCurrentLeadPlan,
   };
 }

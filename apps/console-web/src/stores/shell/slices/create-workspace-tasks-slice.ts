@@ -5,6 +5,7 @@ import {
   cancelWorkspaceTasksBatch,
   createWorkspaceTask,
   fetchWorkspaceTasks,
+  operatorStartWorkspaceTask,
   type CreateWorkspaceTaskInput,
   type WorkspaceTaskRecord,
 } from '../../../api/tasks-api';
@@ -137,6 +138,39 @@ export function createWorkspaceTasksSlice(input: CreateWorkspaceTasksSliceInput)
     }
   }
 
+  async function startCurrentWorkspaceTask(
+    taskId: string,
+  ): Promise<{ task: WorkspaceTaskRecord; runId: string | null } | null> {
+    const workspaceId = input.currentWorkspace.value?.workspace_id?.trim() ?? '';
+    const cleanedTask = taskId.trim();
+    if (!workspaceId || !cleanedTask) {
+      return null;
+    }
+    workspaceTasksMutating.value = true;
+    try {
+      const result = await operatorStartWorkspaceTask(cleanedTask);
+      const previous = workspaceTasksById.value[workspaceId] ?? [];
+      workspaceTasksById.value = {
+        ...workspaceTasksById.value,
+        [workspaceId]: previous.map((row) =>
+          row.task_id === result.task.task_id ? result.task : row,
+        ),
+      };
+      workspaceTasksError.value = null;
+      await loadWorkspaceTasks(workspaceId);
+      return {
+        task: result.task,
+        runId: String(result.run?.run_id || '').trim() || null,
+      };
+    } catch (error) {
+      workspaceTasksError.value =
+        error instanceof Error ? error.message : 'Failed to start waiting task';
+      return null;
+    } finally {
+      workspaceTasksMutating.value = false;
+    }
+  }
+
   const workspaceTasksForCurrentWorkspace = computed(() => {
     const workspaceId = input.currentWorkspace.value?.workspace_id;
     if (!workspaceId) {
@@ -170,5 +204,6 @@ export function createWorkspaceTasksSlice(input: CreateWorkspaceTasksSliceInput)
     createCurrentWorkspaceTask,
     cancelCurrentWorkspaceTask,
     cancelWaitingWorkspaceTasks,
+    startCurrentWorkspaceTask,
   };
 }

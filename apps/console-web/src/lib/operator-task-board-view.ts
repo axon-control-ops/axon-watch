@@ -28,6 +28,8 @@ export type TaskBoardRow = {
   attemptsLabel: string;
   canCancel: boolean;
   canRetry: boolean;
+  /** Open + unblocked — operator can Start (lease + queue run). */
+  canStart: boolean;
   runId: string | null;
   acceptance: string;
   risk: string;
@@ -141,7 +143,7 @@ function sortNewest(left: WorkspaceTaskRecord, right: WorkspaceTaskRecord): numb
 
 /** Shared plan-chip width so row labels match plan-group chips. */
 const PLAN_CHIP_LABEL_MAX = 28;
-const TASK_CARD_GOAL_MAX = 64;
+const TASK_CARD_GOAL_MAX = 96;
 
 /** Compact operator-facing label for plan chips and dependency tags. */
 export function summarizeTaskBoardLabel(text: string, max = 52): string {
@@ -195,6 +197,7 @@ function toRow(
     attemptsLabel: `${task.attempts_used}/${task.attempt_budget}`,
     canCancel: task.status === 'open' || task.status === 'leased',
     canRetry: task.status === 'failed' || task.status === 'cancelled',
+    canStart: task.status === 'open' && !blockedByOpenDeps,
     runId: task.run_id,
     acceptance: task.acceptance_criteria.trim(),
     risk: (task.risk || 'normal').trim() || 'normal',
@@ -332,11 +335,13 @@ export function buildOperatorTaskBoardView(
 
   if (counts.needsAttention > 0) {
     headline = `${counts.needsAttention} need attention · ${liveCount} live`;
-    purpose = 'Failed work needs retry before the queue clears.';
+    purpose =
+      'Click a ticket for details. Start queues the specialist; Engage means Lead review in VAXON.';
     emptyCopy = 'Empty.';
   } else if (liveCount > 0) {
     headline = `${counts.inProgress} in progress · ${counts.waiting} waiting`;
-    purpose = 'Dependency chips mark blockers.';
+    purpose =
+      'Waiting = queued. Click → Start to lease, or open the specialist. Engage = VAXON Lead review.';
     emptyCopy = 'Empty.';
   } else if (counts.done > 0) {
     headline = `${counts.done} done`;

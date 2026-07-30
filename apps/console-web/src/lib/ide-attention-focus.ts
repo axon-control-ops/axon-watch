@@ -7,10 +7,14 @@ export type AttentionTopSignal = {
   title: string;
 };
 
+export type AttentionFocusScrollTarget =
+  | 'mission-control-attention'
+  | 'ide-attention-panel';
+
 export function resolveAttentionFocusScrollTarget(
   layoutMode: AttentionFocusLayoutMode,
-): 'dock-seam-signals' | 'ide-attention-panel' {
-  return layoutMode === 'ide' ? 'ide-attention-panel' : 'dock-seam-signals';
+): AttentionFocusScrollTarget {
+  return layoutMode === 'ide' ? 'ide-attention-panel' : 'mission-control-attention';
 }
 
 export function resolveDefaultHighlightedSignalId(

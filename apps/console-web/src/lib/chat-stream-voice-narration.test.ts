@@ -129,6 +129,61 @@ describe('createChatStreamVoiceNarration', () => {
     expect(voice.agentMilestoneNarrator?.narrate).toHaveBeenCalledTimes(1);
   });
 
+  it('skips post-IDLE progress openers when mid-run thinking already carried intent', () => {
+    const voice = createChatStreamVoiceNarration({
+      composerMode: 'agent',
+      messageId: 'msg_6',
+      sessionId: () => 'session',
+      workspaceId: () => 'workspace_dashpro',
+      narration: () => 'minimal',
+      narrateToolProgress: () => false,
+      voiceDeliveryAllowed: () => true,
+      operatorPrompt: () => 'fix the payments card',
+      fullAccess: () => true,
+      speaker: () => ({
+        kind: 'employee',
+        id: 'employee-priya',
+        name: 'Priya',
+        roleLabel: 'Frontend',
+      }),
+    });
+
+    expect(voice.speakStartBookend()).toBe(true);
+    vi.mocked(voice.agentMilestoneNarrator!.narrate).mockClear();
+
+    voice.narrateCompletion(
+      'Reading the parent dashboard survey payments wiring and the selected-child card styles next, then fix that card layout and produce a clear dashboard layout preview.',
+    );
+    expect(voice.agentMilestoneNarrator?.narrate).not.toHaveBeenCalled();
+  });
+
+  it('still speaks a Confidence close-out after thinking carried intent', () => {
+    const voice = createChatStreamVoiceNarration({
+      composerMode: 'agent',
+      messageId: 'msg_7',
+      sessionId: () => 'session',
+      workspaceId: () => 'workspace_dashpro',
+      narration: () => 'minimal',
+      narrateToolProgress: () => false,
+      voiceDeliveryAllowed: () => true,
+      operatorPrompt: () => 'fix the payments card',
+      fullAccess: () => true,
+    });
+
+    expect(voice.speakStartBookend()).toBe(true);
+    vi.mocked(voice.agentMilestoneNarrator!.narrate).mockClear();
+
+    voice.narrateCompletion(
+      'Reading the wiring next.\n\nCritical Review: payments card layout is restored.\n\nConfidence: 8/10',
+    );
+    expect(voice.agentMilestoneNarrator?.narrate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        key: 'done',
+        message: expect.stringMatching(/Critical Review|Confidence/i),
+      }),
+    );
+  });
+
   it('prefers sanitized model live text over the ack when thinking arrives first', () => {
     const voice = createChatStreamVoiceNarration({
       composerMode: 'agent',

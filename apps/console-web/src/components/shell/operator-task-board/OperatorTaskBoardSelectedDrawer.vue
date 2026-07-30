@@ -1,30 +1,50 @@
 <script setup lang="ts">
 import type { TaskBoardRow } from '../../../lib/operator-task-board-view';
 
-defineProps<{
+const props = defineProps<{
   row: TaskBoardRow;
   workspaceTasksMutating: boolean;
   leadPlansMutating: boolean;
+  planAwaitingEngagement?: boolean;
 }>();
 
 const emit = defineEmits<{
   close: [];
+  startTask: [taskId: string];
   openAssociatedRun: [row: TaskBoardRow];
   openSpecialist: [row: TaskBoardRow];
+  openVaxonReview: [];
   cancelTask: [taskId: string];
   retryTask: [row: TaskBoardRow];
   reviewLeadPlan: [planId: string | null];
 }>();
+
+function nextStepCopy(): string {
+  if (props.row.canStart) {
+    return 'Start leases this ticket to the specialist and queues the run. Full Autonomy dispatches workers; or open the specialist to drive it in IDE.';
+  }
+  if (props.row.blockedByOpenDeps) {
+    return 'Blocked by unfinished dependencies — it stays in Waiting until those complete (or you cancel).';
+  }
+  if (props.row.bucket === 'leased') {
+    return 'Already leased / in progress. Open the run or specialist to follow the work.';
+  }
+  if (props.planAwaitingEngagement) {
+    return 'Lead Engage is open in VAXON — review the synthesis there, or dismiss the review chip when done.';
+  }
+  return 'Select an action below.';
+}
 </script>
 
 <template>
-  <aside class="operator-task-board__drawer" data-orb-field aria-label="Selected task">
+  <aside class="operator-task-board__drawer" aria-label="Selected task">
     <header class="operator-task-board__drawer-head">
       <h4>{{ row.goalFull || row.goal }}</h4>
       <button type="button" class="operator-task-board__cancel" @click="emit('close')">
         Close
       </button>
     </header>
+    <p class="operator-task-board__drawer-hint">{{ nextStepCopy() }}</p>
     <p><strong>Status</strong> {{ row.status }}</p>
     <p><strong>Role</strong> {{ row.ownerRole }}</p>
     <p><strong>Risk</strong> {{ row.risk }}</p>
@@ -55,6 +75,15 @@ const emit = defineEmits<{
     <p><strong>Updated</strong> {{ row.updatedAt }}</p>
     <div class="operator-task-board__drawer-actions">
       <button
+        v-if="row.canStart"
+        type="button"
+        class="operator-task-board__submit"
+        :disabled="workspaceTasksMutating"
+        @click="emit('startTask', row.taskId)"
+      >
+        Start now
+      </button>
+      <button
         v-if="row.runId"
         type="button"
         class="operator-task-board__submit"
@@ -64,6 +93,14 @@ const emit = defineEmits<{
       </button>
       <button type="button" class="operator-task-board__submit" @click="emit('openSpecialist', row)">
         Open specialist
+      </button>
+      <button
+        v-if="planAwaitingEngagement"
+        type="button"
+        class="operator-task-board__submit"
+        @click="emit('openVaxonReview')"
+      >
+        Open VAXON review
       </button>
       <button
         v-if="row.canCancel"

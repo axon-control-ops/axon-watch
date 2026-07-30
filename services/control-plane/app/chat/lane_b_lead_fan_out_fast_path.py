@@ -5,6 +5,7 @@ from __future__ import annotations
 import threading
 from typing import Any, Callable
 
+from app.chat.lead_fan_out_transcript import format_lead_fan_out_agent_message
 from app.workspace_agents.lead_fan_out import LeadFanOutError, materialize_lead_fan_out
 from app.workspace_agents.lead_handoff_receipt import record_lead_handoff_run
 from app.workspace_agents.lead_task_plan import (
@@ -18,40 +19,24 @@ def _format_fan_out_reply(
     lead_name: str,
     materialize: dict[str, Any],
 ) -> str:
-    runs = list(materialize.get("runs") or [])
-    deferred = list(materialize.get("deferred") or [])
     receipt = materialize.get("receipt") or {}
-    lines = [
-        f"Sir King — I assigned the specialists via Lead fan-out "
-        f"(plan `{materialize.get('plan_id')}`).",
-        "",
-    ]
-    if runs:
-        lines.append("Queued for continuous dispatch:")
-        for run in runs:
-            role = str(run.get("owner_role") or "?").strip()
-            run_id = str(run.get("run_id") or "").strip()
-            task_id = str(run.get("task_id") or "").strip()
-            lines.append(f"- {role}: run `{run_id}` · task `{task_id}`")
-        lines.append("")
-    if deferred:
-        lines.append(f"Deferred (dependencies): {len(deferred)}")
-        lines.append("")
     summary = str(receipt.get("summary") or "").strip()
+    notes = []
     if summary:
-        lines.append(summary)
+        notes.append(summary)
     else:
-        lines.append(
+        notes.append(
             f"Materialized {len(materialize.get('tasks') or [])} tasks; "
-            f"queued {len(runs)} ready runs."
+            f"queued {len(materialize.get('runs') or [])} ready runs."
         )
-    lines.append(
-        "I did not write kickoff markdown — continuous worker owns the start. "
-        f"— {lead_name}"
+    notes.append("Continuous worker owns the start — I did not write kickoff markdown.")
+    return format_lead_fan_out_agent_message(
+        lead_name=lead_name,
+        materialize=materialize,
+        mode="fan_out",
+        fleet_lines=notes,
+        headline="I assigned the specialists via Lead fan-out.",
     )
-    lines.append("")
-    lines.append("Confidence: 8/10")
-    return "\n".join(lines)
 
 
 def _kick_continuous_dispatch() -> None:

@@ -147,7 +147,7 @@ def workspace_lead_replan(workspace_id: str, body: LeadReplanRequest) -> dict[st
 
 
 class LeadPlanStatusRequest(BaseModel):
-    status: Literal["completed", "cancelled"] = "completed"
+    status: Literal["completed", "cancelled", "awaiting_engagement"] = "completed"
 
 
 @router.post("/api/lead/plans/{plan_id}/status")

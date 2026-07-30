@@ -74,6 +74,7 @@
   flex: 0 0 auto;
   display: grid;
   gap: 0.45rem;
+  max-height: 11rem;
   padding: 0.7rem 0.75rem 0.75rem;
   border-radius: 0.55rem;
   border: 1px solid rgba(0, 220, 255, 0.32);
@@ -84,7 +85,9 @@
   box-shadow:
     inset 0 0 0 1px rgba(0, 200, 255, 0.08),
     0 0 1.1rem rgba(0, 160, 220, 0.16);
-  overflow: hidden;
+  overflow: auto;
+  overscroll-behavior: contain;
+  min-height: 0;
 }
 
 .mc-transmission::before {

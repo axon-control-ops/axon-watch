@@ -1,4 +1,8 @@
 import { parseAskOptions, resolveAskBlockPrompt, tryParseClarifyingMarkdown } from '../agent-question-view';
+import {
+  parseLeadFanOutFenceBody,
+  tryParseLegacyLeadFanOutText,
+} from '../lead-fan-out-card';
 import { sanitizeResearchCardTitle, sanitizeResearchSnippet } from '../research-snippet';
 import { inferResearchBlockKind, type ResearchBlockKind } from '../research-provider';
 import type { AgentTranscriptSegment, ResearchTranscriptItem } from './types';
@@ -13,6 +17,7 @@ import {
   DEBUG_REPRODUCE_HEADER_RE,
   EDIT_HEADER_RE,
   IMAGE_HEADER_RE,
+  LEAD_FAN_OUT_HEADER_RE,
   RESEARCH_HEADER_RE,
   RESEARCH_ITEM_RE,
   RESEARCH_KIND_RE,
@@ -47,6 +52,21 @@ function upgradeClarifyingTextSegments(
   for (const segment of segments) {
     if (segment.kind !== 'text') {
       next.push(segment);
+      continue;
+    }
+    const leadFanOut = tryParseLegacyLeadFanOutText(segment.text);
+    if (leadFanOut) {
+      next.push({
+        kind: 'lead-fan-out',
+        planId: leadFanOut.planId,
+        mode: leadFanOut.mode,
+        leadName: leadFanOut.leadName,
+        title: leadFanOut.title,
+        queued: leadFanOut.queued,
+        deferred: leadFanOut.deferred,
+        assignments: leadFanOut.assignments,
+        notes: leadFanOut.notes,
+      });
       continue;
     }
     const question = tryParseClarifyingMarkdown(segment.text);
@@ -160,6 +180,39 @@ export function parseAgentTranscriptBlocksUncached(
         index += 1;
       }
       segments.push({ kind: 'plan', planId, title });
+      continue;
+    }
+
+    const leadFanOutMatch = line.match(LEAD_FAN_OUT_HEADER_RE);
+    if (leadFanOutMatch) {
+      flushText();
+      const titleHint = (leadFanOutMatch[1] || '').trim() || 'Fan-out';
+      const body: string[] = [];
+      index += 1;
+      while (index < lines.length) {
+        if (lines[index].trimEnd() === ':::') {
+          index += 1;
+          break;
+        }
+        body.push(lines[index]);
+        index += 1;
+      }
+      const card = parseLeadFanOutFenceBody(body.join('\n'), titleHint);
+      if (card) {
+        segments.push({
+          kind: 'lead-fan-out',
+          planId: card.planId,
+          mode: card.mode,
+          leadName: card.leadName,
+          title: card.title,
+          queued: card.queued,
+          deferred: card.deferred,
+          assignments: card.assignments,
+          notes: card.notes,
+        });
+      } else {
+        segments.push({ kind: 'text', text: body.join('\n').trim() });
+      }
       continue;
     }
 

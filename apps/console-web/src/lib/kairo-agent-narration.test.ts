@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   agentTurnHasConfidenceRating,
+  isProgressOrIntentSentence,
   liveThinkingText,
   narrationForCompletion,
   narrationMilestonesForDelta,
@@ -123,5 +124,13 @@ describe('narrationForCompletion', () => {
       verbatim: true,
     });
     expect(spokenCompletionSummary(content)).not.toContain('Keep Debug mode on');
+  });
+
+  it('does not speak progress openers as the end-of-run bookend', () => {
+    const plan =
+      'Reading the parent dashboard survey payments wiring and the selected-child card styles next, then fix that card layout and produce a clear dashboard layout preview.';
+    expect(isProgressOrIntentSentence(plan)).toBe(true);
+    expect(spokenCompletionSummary(plan)).toBe('Shift complete.');
+    expect(spokenCompletionSummary(`${plan} Confidence: 8/10`)).toMatch(/confidence/i);
   });
 });

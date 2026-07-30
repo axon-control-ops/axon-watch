@@ -221,84 +221,88 @@ onUnmounted(() => {
       class="mc-live-ops__orb-stage"
       :data-speaking="shell.kairoSpeechActive ? 'true' : 'false'"
       :data-mode="modeChip"
+      :data-autonomy="fullAutonomyActive ? 'armed' : autonomyMode"
     >
-      <KairoGalaxyOrb placement-mode="embedded" />
-      <div class="mc-live-ops__orb-labels" aria-hidden="true">
-        <p class="mc-live-ops__orb-name">{{ OPERATOR_PERSONA_NAME }}</p>
-        <span class="mc-live-ops__orb-wave" />
-        <p class="mc-live-ops__orb-tagline">{{ OPERATOR_PERSONA_OPS_TAGLINE }}</p>
+      <div class="mc-live-ops__orb-visual">
+        <KairoGalaxyOrb placement-mode="embedded" />
+        <div class="mc-live-ops__orb-labels" aria-hidden="true">
+          <p class="mc-live-ops__orb-name">{{ OPERATOR_PERSONA_NAME }}</p>
+          <span class="mc-live-ops__orb-wave" />
+          <p class="mc-live-ops__orb-tagline">{{ OPERATOR_PERSONA_OPS_TAGLINE }}</p>
+        </div>
+        <MissionControlAutonomyControl />
       </div>
     </div>
 
-    <MissionControlAutonomyControl />
-
-    <article
-      class="mc-transmission"
-      :data-mode="transmission.mode"
-      :aria-live="transmission.mode === 'transmitting' ? 'polite' : 'off'"
-      aria-label="VAXON transmission"
-    >
-      <header class="mc-transmission__header">
-        <span class="mc-transmission__pulse" aria-hidden="true" />
-        <p class="mc-transmission__eyebrow">{{ transmission.eyebrow }}</p>
-        <span class="mc-transmission__badge">{{ transmission.mode }}</span>
-      </header>
-      <p
-        class="mc-transmission__body"
-        :data-empty="transmission.empty ? 'true' : 'false'"
+    <div class="mc-live-ops__scroll">
+      <article
+        class="mc-transmission"
+        :data-mode="transmission.mode"
+        :aria-live="transmission.mode === 'transmitting' ? 'polite' : 'off'"
+        aria-label="VAXON transmission"
       >
-        {{ transmission.body }}
-      </p>
-      <div v-if="asksForReply" class="mc-transmission__actions">
-        <button type="button" :disabled="pending" @click="void sendReply('yes')">
-          {{ affirmCta }}
-        </button>
-        <button type="button" :disabled="pending" @click="void sendReply('not now')">
-          Not now
-        </button>
+        <header class="mc-transmission__header">
+          <span class="mc-transmission__pulse" aria-hidden="true" />
+          <p class="mc-transmission__eyebrow">{{ transmission.eyebrow }}</p>
+          <span class="mc-transmission__badge">{{ transmission.mode }}</span>
+        </header>
+        <p
+          class="mc-transmission__body"
+          :data-empty="transmission.empty ? 'true' : 'false'"
+        >
+          {{ transmission.body }}
+        </p>
+        <div v-if="asksForReply" class="mc-transmission__actions">
+          <button type="button" :disabled="pending" @click="void sendReply('yes')">
+            {{ affirmCta }}
+          </button>
+          <button type="button" :disabled="pending" @click="void sendReply('not now')">
+            Not now
+          </button>
+        </div>
+      </article>
+
+      <div class="mc-live-ops__modes" role="status" aria-label="Voice mode">
+        <span
+          class="mc-live-ops__mode"
+          :data-active="modeChip === 'speaking' ? 'true' : 'false'"
+        >
+          Speaking
+        </span>
+        <span
+          class="mc-live-ops__mode"
+          :data-active="modeChip === 'listening' ? 'true' : 'false'"
+        >
+          Listening
+        </span>
+        <span
+          class="mc-live-ops__mode"
+          :data-active="modeChip === 'autonomous' ? 'true' : 'false'"
+        >
+          Autonomous
+        </span>
+        <span
+          class="mc-live-ops__mode"
+          :data-active="modeChip === 'standby' ? 'true' : 'false'"
+        >
+          Standby
+        </span>
       </div>
-    </article>
 
-    <div class="mc-live-ops__modes" role="status" aria-label="Voice mode">
-      <span
-        class="mc-live-ops__mode"
-        :data-active="modeChip === 'speaking' ? 'true' : 'false'"
-      >
-        Speaking
-      </span>
-      <span
-        class="mc-live-ops__mode"
-        :data-active="modeChip === 'listening' ? 'true' : 'false'"
-      >
-        Listening
-      </span>
-      <span
-        class="mc-live-ops__mode"
-        :data-active="modeChip === 'autonomous' ? 'true' : 'false'"
-      >
-        Autonomous
-      </span>
-      <span
-        class="mc-live-ops__mode"
-        :data-active="modeChip === 'standby' ? 'true' : 'false'"
-      >
-        Standby
-      </span>
+      <ul class="mc-live-ops__stream" aria-label="Live updates">
+        <li
+          v-for="item in streamItems"
+          :key="item.id"
+          class="mc-live-ops__stream-item"
+          :data-tone="item.tone"
+          :data-kind="item.kind"
+        >
+          <span class="mc-live-ops__stream-at">{{ item.at }}</span>
+          <span class="mc-live-ops__stream-agent">{{ item.agent }}</span>
+          <span class="mc-live-ops__stream-text">{{ item.text }}</span>
+        </li>
+      </ul>
     </div>
-
-    <ul class="mc-live-ops__stream" aria-label="Live updates">
-      <li
-        v-for="item in streamItems"
-        :key="item.id"
-        class="mc-live-ops__stream-item"
-        :data-tone="item.tone"
-        :data-kind="item.kind"
-      >
-        <span class="mc-live-ops__stream-at">{{ item.at }}</span>
-        <span class="mc-live-ops__stream-agent">{{ item.agent }}</span>
-        <span class="mc-live-ops__stream-text">{{ item.text }}</span>
-      </li>
-    </ul>
 
     <div class="mc-live-ops__reply">
       <form class="mc-live-ops__reply-form" @submit.prevent="void sendReply()">

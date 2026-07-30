@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   buildFleetHealthGridCells,
+  compactFleetHealthDetail,
   fleetHealthHeadline,
   sortFleetHealthRows,
   type FleetHealthSnapshot,
@@ -89,6 +90,8 @@ describe('operator-fleet-health-view', () => {
       'review',
     );
     expect(cells.find((cell) => cell.workspaceId === 'workspace_dashpro')?.isBusy).toBe(true);
+    expect(cells.find((cell) => cell.workspaceId === 'workspace_dashpro')?.openSignals).toBe(1);
+    expect(cells.find((cell) => cell.workspaceId === 'workspace_dashpro')?.reviewReady).toBe(1);
     expect(cells.find((cell) => cell.workspaceId === 'workspace_dashpro')?.summary).toContain(
       'active',
     );
@@ -149,5 +152,21 @@ describe('operator-fleet-health-view', () => {
     });
     expect(cells.some((cell) => cell.workspaceId === 'workspace_tps')).toBe(true);
     expect(cells.find((cell) => cell.workspaceId === 'workspace_tps')?.isSelected).toBe(true);
+  });
+
+  it('compacts multi-line signal dumps into one card detail line', () => {
+    expect(
+      compactFleetHealthDetail(
+        'Email needs follow-up\naxon-watch: PR run\nFailed: CI\n(+6 more)',
+        'workspace_axon_watch',
+      ),
+    ).toBe('Email needs follow-up');
+
+    expect(
+      compactFleetHealthDetail(
+        'A'.repeat(80),
+        'workspace_axon_watch',
+      ),
+    ).toMatch(/…$/);
   });
 });

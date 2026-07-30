@@ -68,7 +68,7 @@ export async function fetchLeadPlan(planId: string): Promise<LeadPlanRecord> {
 
 export async function setLeadPlanStatus(
   planId: string,
-  status: 'completed' | 'cancelled',
+  status: 'completed' | 'cancelled' | 'awaiting_engagement',
 ): Promise<LeadPlanRecord> {
   const encoded = encodeURIComponent(planId);
   return fetchJson<LeadPlanRecord>(

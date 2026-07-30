@@ -348,10 +348,20 @@ async function copyTerminalOutput(output: string): Promise<void> {
       </div>
 
       <ConversationAgentStructuredBlock
-        v-else-if="segment.kind === 'plan' || segment.kind === 'question' || segment.kind === 'research'"
+        v-else-if="
+          segment.kind === 'plan' ||
+          segment.kind === 'question' ||
+          segment.kind === 'research' ||
+          segment.kind === 'lead-fan-out'
+        "
         :segment="segment"
         :workspace-id="shell.currentWorkspace?.workspace_id ?? null"
-        :live="segment.kind !== 'plan' && segment.open && isStreamingMessage(message.message_id)"
+        :live="
+          segment.kind !== 'plan' &&
+          segment.kind !== 'lead-fan-out' &&
+          segment.open &&
+          isStreamingMessage(message.message_id)
+        "
         :message-id="message.message_id"
         :segment-index="segmentIndex"
         :answered-option="

@@ -1007,6 +1007,7 @@ export const useShellStore = defineStore('shell', () => {
     createCurrentWorkspaceTask,
     cancelCurrentWorkspaceTask,
     cancelWaitingWorkspaceTasks,
+    startCurrentWorkspaceTask,
   } = createWorkspaceTasksSlice({
     currentWorkspace,
   });
@@ -1020,6 +1021,7 @@ export const useShellStore = defineStore('shell', () => {
     loadLeadPlans,
     fanOutCurrentWorkspaceLeadPlan,
     closeCurrentLeadPlanEngagement,
+    reopenCurrentLeadPlanEngagement,
     synthesizeCurrentLeadPlan,
   } = createLeadPlansSlice({
     currentWorkspace,
@@ -1616,10 +1618,10 @@ export const useShellStore = defineStore('shell', () => {
     dockHeroMode,
     expandedDockSeams,
     dockThreadSeamTouched,
-    setLeftSidebarMode,
     setDockHeroMode,
     restoreComposerDraft,
     setLayoutMode,
+    setCurrentWorkspace,
   });
 
   const {
@@ -3791,6 +3793,7 @@ export const useShellStore = defineStore('shell', () => {
     createCurrentWorkspaceTask,
     cancelCurrentWorkspaceTask,
     cancelWaitingWorkspaceTasks,
+    startCurrentWorkspaceTask,
     leadPlansByWorkspaceId,
     leadPlansForCurrentWorkspace,
     leadPlanIdByTaskId,
@@ -3799,6 +3802,7 @@ export const useShellStore = defineStore('shell', () => {
     loadLeadPlans,
     fanOutCurrentWorkspaceLeadPlan,
     closeCurrentLeadPlanEngagement,
+    reopenCurrentLeadPlanEngagement,
     synthesizeCurrentLeadPlan,
     ideThreadsForCurrentWorkspace,
     openIdeThreadTabsForCurrentWorkspace,

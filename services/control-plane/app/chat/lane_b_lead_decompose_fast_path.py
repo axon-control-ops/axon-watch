@@ -5,6 +5,7 @@ from __future__ import annotations
 import threading
 from typing import Any, Callable
 
+from app.chat.lead_fan_out_transcript import format_lead_fan_out_agent_message
 from app.workspace_agents import build_company_roster
 from app.workspace_agents.lead_fan_out import LeadFanOutError, materialize_lead_fan_out
 from app.workspace_agents.lead_handoff_receipt import record_lead_handoff_run
@@ -97,39 +98,16 @@ def _format_decompose_reply(
     kick_started: int = 0,
 ) -> str:
     runs = list(materialize.get("runs") or [])
-    deferred = list(materialize.get("deferred") or [])
-    tasks = list(materialize.get("tasks") or [])
-    lines = [
-        f"Sir King — I decomposed the work and assigned specialists "
-        f"(plan `{materialize.get('plan_id')}`).",
-        "",
-    ]
-    if tasks:
-        lines.append("Assignments:")
-        for task in tasks:
-            role = str(task.get("owner_role") or "?").strip()
-            goal = " ".join(str(task.get("goal") or "").split())
-            if len(goal) > 140:
-                goal = f"{goal[:139].rstrip()}…"
-            lines.append(f"- {role}: {goal or '(no goal)'}")
-        lines.append("")
-    if runs:
-        lines.append(f"Queued runs: {len(runs)}")
-        lines.append("")
-    if deferred:
-        lines.append(f"Deferred (dependencies): {len(deferred)}")
-        lines.append("")
-    lines.extend(_fleet_status_lines(kick_started=kick_started, queued_run_count=len(runs)))
-    superseded = list(materialize.get("superseded_tasks") or [])
-    if superseded:
-        lines.append(
-            f"Cleared {len(superseded)} overlapping stale queue task(s) so this handoff can move."
-        )
-    lines.append(f"— {lead_name.strip() or 'Lead'}")
-    # Soft Attention / Critical Review suppressors key off this close-out line.
-    lines.append("")
-    lines.append("Confidence: 8/10")
-    return "\n".join(lines)
+    return format_lead_fan_out_agent_message(
+        lead_name=lead_name,
+        materialize=materialize,
+        mode=str(materialize.get("mode") or "decompose"),
+        fleet_lines=_fleet_status_lines(kick_started=kick_started, queued_run_count=len(runs)),
+        headline=(
+            "I decomposed the work and assigned specialists. "
+            "Open each specialist thread after their dispatch starts."
+        ),
+    )
 
 
 def _kick_continuous_dispatch() -> int:

@@ -47,6 +47,10 @@ export type FleetHealthGridCell = {
   isBusy: boolean;
   activeRuns: number;
   busyAgents: number;
+  openSignals: number;
+  criticalSignals: number;
+  pendingApprovals: number;
+  reviewReady: number;
 };
 
 const PRODUCTION_WORKSPACE_ORDER = [
@@ -91,6 +95,23 @@ export function sortFleetHealthRows(
 
     return left.display_name.localeCompare(right.display_name);
   });
+}
+
+/** Keep fleet card detail to one compact line (API titles can be multi-signal dumps). */
+export function compactFleetHealthDetail(
+  topSignalTitle: string | null | undefined,
+  workspaceId: string,
+): string {
+  const raw = topSignalTitle?.trim() || workspaceId;
+  const firstLine =
+    raw
+      .split(/\r?\n| · | \| /)
+      .map((part) => part.trim())
+      .find((part) => part.length > 0) ?? workspaceId;
+  if (firstLine.length <= 72) {
+    return firstLine;
+  }
+  return `${firstLine.slice(0, 69).trimEnd()}…`;
 }
 
 export function buildFleetHealthGridCells(input: {
@@ -155,7 +176,7 @@ export function buildFleetHealthGridCells(input: {
     const isBusy =
       row.active_runs > 0 || row.executing_count > 0 || busyAgents > 0;
     const summary = parts.length > 0 ? parts.join(' · ') : 'Nominal';
-    const detail = row.top_signal_title?.trim() || row.workspace_id;
+    const detail = compactFleetHealthDetail(row.top_signal_title, row.workspace_id);
 
     return {
       workspaceId: row.workspace_id,
@@ -168,6 +189,10 @@ export function buildFleetHealthGridCells(input: {
       isBusy,
       activeRuns: row.active_runs,
       busyAgents,
+      openSignals: row.open_signals_count,
+      criticalSignals: row.critical_signals_count,
+      pendingApprovals: row.pending_approvals_count,
+      reviewReady: row.review_ready_count,
     };
   });
 }

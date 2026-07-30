@@ -38,7 +38,13 @@ export function useOrbFieldReactiveHost(options: {
   }
 
   function readOrbBox(): OrbFieldBox | null {
-    if (!shell.voiceOrbVisible || shell.layoutMode === 'ide') {
+    // Mission Control uses the embedded LIVE OPS orb — never drive card bites from it
+    // or from a stale Brain Graph dock position (ghost circle until scroll).
+    if (
+      !shell.voiceOrbVisible ||
+      shell.layoutMode === 'ide' ||
+      !shell.operatorBrainGalaxyActive
+    ) {
       return null;
     }
     return measureVoiceOrbLiveBox() ?? voiceOrbBoxFromPosition(shell.voiceOrbPosition);
@@ -173,7 +179,13 @@ export function useOrbFieldReactiveHost(options: {
   });
 
   watch(
-    () => [shell.voiceOrbPosition?.x, shell.voiceOrbPosition?.y, shell.voiceOrbVisible, shell.layoutMode],
+    () => [
+      shell.voiceOrbPosition?.x,
+      shell.voiceOrbPosition?.y,
+      shell.voiceOrbVisible,
+      shell.layoutMode,
+      shell.operatorBrainGalaxyActive,
+    ],
     () => {
       if (!shell.voiceOrbDragging) {
         schedule();

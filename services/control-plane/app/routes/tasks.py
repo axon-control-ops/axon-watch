@@ -169,6 +169,28 @@ def cancel_task(task_id: str, body: TaskCancelRequest | None = None) -> dict[str
     return cancelled
 
 
+@router.post("/api/tasks/{task_id}/operator-start")
+def operator_start(task_id: str) -> dict[str, Any]:
+    """Lease a Waiting task and queue a specialist run (operator Start)."""
+    from app.workspace_agents.operator_start_task import (
+        OperatorStartTaskError,
+        operator_start_task,
+    )
+
+    try:
+        return operator_start_task(task_id)
+    except OperatorStartTaskError as exc:
+        detail = str(exc)
+        lowered = detail.lower()
+        if "not found" in lowered:
+            raise HTTPException(status_code=404, detail=detail) from exc
+        if "blocked" in lowered or "only open" in lowered:
+            raise HTTPException(status_code=409, detail=detail) from exc
+        raise HTTPException(status_code=400, detail=detail) from exc
+    except task_store.TaskLedgerError as exc:
+        raise _http_error(exc) from exc
+
+
 class TaskCancelBatchRequest(BaseModel):
     task_ids: list[str] = Field(default_factory=list)
     scope: str = ""  # "waiting" = all open tasks in workspace

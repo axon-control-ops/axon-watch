@@ -1,6 +1,7 @@
 /** Parse block-annotated agent transcripts (:::thinking / :::edit / :::tool / :::terminal). */
 
 import { sanitizeAgentThinkingForOperator, THINKING_SPEECH_FALLBACK } from './agent-live-line-view';
+import { tryParseLegacyLeadFanOutText } from './lead-fan-out-card';
 
 export type {
   AgentTranscriptSegment,
@@ -24,7 +25,15 @@ import {
 } from './agent-transcript/parse-transcript-blocks';
 
 export function agentContentHasTranscriptBlocks(content: string): boolean {
-  return /^:::(thinking|edit|tool|plan|ask|terminal|research|image|debug-reproduce)\b/m.test(content);
+  if (
+    /^:::(thinking|edit|tool|plan|ask|terminal|research|image|debug-reproduce|lead-fan-out)\b/m.test(
+      content,
+    )
+  ) {
+    return true;
+  }
+  // Legacy Lead essays (pre-fence) still get the cinematic fan-out card.
+  return tryParseLegacyLeadFanOutText(content) != null;
 }
 
 export function countAgentTranscriptHeaders(content: string): {
