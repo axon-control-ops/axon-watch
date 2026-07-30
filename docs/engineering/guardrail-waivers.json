@@ -1,4 +1,11 @@
 {
   "version": 1,
-  "waivers": []
+  "waivers": [
+    {
+      "file": "apps/console-web/src/stores/shell.ts",
+      "reason": "Mission Control holographic branch wires task-board Start/Engage and operator-focus slices; FS-003 extraction continues on this feature branch.",
+      "expiry": "2026-08-30",
+      "follow_up": "Extract remaining mission-control wiring into shell slices and lower the shell.ts ratchet below 4068 lines."
+    }
+  ]
 }
