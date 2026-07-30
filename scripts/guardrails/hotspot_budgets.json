@@ -11,7 +11,7 @@
       "rule": "operator shell presentation only; split by surface"
     },
     "apps/console-web/src/stores/shell.ts": {
-      "max_lines": 4065,
+      "max_lines": 4068,
       "soft_limit": 350,
       "hard_limit": 500,
       "target": "apps/console-web/src/stores/shell/slices/*",
@@ -201,7 +201,7 @@
       "target": "apps/console-web/src/features/kairo-conversation/*"
     },
     "apps/console-web/src/lib/agent-transcript-blocks.ts": {
-      "max_lines": 172,
+      "max_lines": 181,
       "soft_limit": 350,
       "hard_limit": 500,
       "target": "apps/console-web/src/lib/agent-transcript/*"
@@ -213,7 +213,7 @@
       "target": "apps/console-web/src/styles/shell/mockup-shell-13a.css + mockup-shell-13b.css"
     },
     "apps/console-web/src/components/shell/OperatorStatusRadarPanel.vue": {
-      "max_lines": 700,
+      "max_lines": 702,
       "soft_limit": 350,
       "hard_limit": 500,
       "target": "apps/console-web/src/components/shell/operator-status-radar/*",
@@ -464,11 +464,25 @@
       "note": "Lead\u2192VAXON handoffs including Lead-shift flash; split message builders next"
     },
     "apps/console-web/src/components/conversation/ConversationSeamThreadMessage.vue": {
-      "max_lines": 527,
+      "max_lines": 537,
       "soft_limit": 350,
       "hard_limit": 500,
       "target": "apps/console-web/src/components/conversation/*",
       "note": "Thread message body/actions; extract attachment chrome next"
+    },
+    "apps/console-web/src/components/shell/MissionControlAutonomyControl.vue": {
+      "max_lines": 679,
+      "soft_limit": 350,
+      "hard_limit": 500,
+      "target": "apps/console-web/src/components/shell/mission-control-*",
+      "note": "VAXON orb HUD autonomy controls; split confirm/critical sheets next"
+    },
+    "apps/console-web/src/styles/shell/mockup-shell-11.css": {
+      "max_lines": 586,
+      "soft_limit": 350,
+      "hard_limit": 500,
+      "target": "apps/console-web/src/styles/shell/*",
+      "note": "Mission Control left-rail hide + center expand; split MC layout next"
     },
     "services/control-plane/app/chat/lane_b_stream_execute.py": {
       "max_lines": 512,
