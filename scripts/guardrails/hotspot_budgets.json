@@ -401,11 +401,18 @@
       "note": "Gate 4 leased-task create_run binding; extract next"
     },
     "services/control-plane/app/persistence/task_store.py": {
-      "max_lines": 830,
+      "max_lines": 931,
       "soft_limit": 350,
       "hard_limit": 500,
       "target": "services/control-plane/app/persistence/*",
-      "note": "Gate 4/5 task ledger + exclusive-path lease conflicts"
+      "note": "Gate 4/5 task ledger + reopen/re-budget + usage-limit attempt refund"
+    },
+    "services/control-plane/app/workspace_agents/worker_dispatch.py": {
+      "max_lines": 504,
+      "soft_limit": 350,
+      "hard_limit": 500,
+      "target": "services/control-plane/app/workspace_agents/worker_*",
+      "note": "Continuous worker dispatch; usage-limit attempt refund on finalize"
     },
     "services/control-plane/app/workspace_delivery/publish.py": {
       "max_lines": 601,
