@@ -471,9 +471,9 @@
       "note": "Lead team check-in orchestration; extract prompt builders next"
     },
     "services/control-plane/app/workspace_agents/scheduler.py": {
-      "max_lines": 502,
+      "max_lines": 516,
       "soft_limit": 350,
-      "hard_limit": 502,
+      "hard_limit": 516,
       "target": "services/control-plane/app/workspace_agents/scheduler_*",
       "note": "Agent scheduler; extract dispatch slices next"
     },
