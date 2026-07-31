@@ -89,7 +89,7 @@
         {
           "name": "Soren",
           "role": "integrations",
-          "owns": "DashPro GitHub Actions on self-hosted runners (runs-on: self-hosted; never ubuntu-latest), Vercel linkage, secrets/CI wiring, runner health, and production deploy readiness"
+          "owns": "DashPro GitHub Actions on self-hosted runners (runs-on: self-hosted; never ubuntu-latest), Vercel linkage, secrets/CI wiring, runner health, and production deploy readiness",
           "schedule": "continuous",
           "azure_voice_id": "en-US-SaraNeural"
         }
