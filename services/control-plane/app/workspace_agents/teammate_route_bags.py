@@ -66,6 +66,8 @@ _ROLE_BAGS: list[tuple[str, int, list[re.Pattern[str]]]] = [
             re.compile(r"\bworkflow\b", re.I),
             re.compile(r"\bsecrets?\b", re.I),
             re.compile(r"\brunner\b", re.I),
+            re.compile(r"\bself[- ]hosted\b", re.I),
+            re.compile(r"\bubuntu-latest\b", re.I),
             re.compile(r"\bsdk\b", re.I),
             re.compile(r"\bconnector\b", re.I),
             re.compile(r"\beas\b", re.I),

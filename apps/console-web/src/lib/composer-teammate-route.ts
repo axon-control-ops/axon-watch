@@ -105,6 +105,8 @@ const ROLE_BAGS: RoleBag[] = [
       /\bworkflow\b/i,
       /\bsecrets?\b/i,
       /\brunner\b/i,
+      /\bself[- ]hosted\b/i,
+      /\bubuntu-latest\b/i,
       /\bsdk\b/i,
       /\bconnector\b/i,
       /\beas\b/i,

@@ -56,6 +56,24 @@ class WorkspaceWorkerPromptTests(unittest.TestCase):
         self.assertIn("Confidence: X/10", prompt)
         self.assertNotIn("bare FAILED", prompt.replace("never a bare FAILED", ""))
 
+    def test_dashpro_prompt_locks_self_hosted_ci(self) -> None:
+        with patch(
+            "app.workspace_agents.worker_prompt.build_team_roster_context",
+            return_value="",
+        ):
+            prompt = build_continuous_worker_prompt(
+                workspace_id="workspace_dashpro",
+                employee=EmployeeConfig(
+                    name="Soren",
+                    role="integrations",
+                    owns="DashPro GitHub Actions on self-hosted runners",
+                    schedule="continuous",
+                ),
+            )
+        self.assertIn("runs-on: self-hosted", prompt)
+        self.assertIn("ubuntu-latest", prompt)
+        self.assertIn("billing-blocked", prompt)
+
     def test_prompt_includes_prior_failure_detail_for_retry(self) -> None:
         with patch(
             "app.workspace_agents.worker_prompt.latest_role_run_outcome",

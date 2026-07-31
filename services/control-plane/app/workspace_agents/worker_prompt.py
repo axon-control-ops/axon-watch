@@ -147,6 +147,21 @@ def build_continuous_worker_prompt(
             "run URL + conclusion. Fix file-size ratchet failures via "
             "`scripts/guardrails/hotspot_budgets.json` or extraction — do not ignore red CI. "
         )
+    if workspace_id.strip() == "workspace_dashpro" and role in {
+        "watcher",
+        "backend",
+        "integrations",
+        "lead",
+    }:
+        ci_clause += (
+            " DashPro CI policy (operator-locked): all `.github/workflows/*` must use "
+            "`runs-on: self-hosted` (runner label includes self-hosted / dashpro). "
+            "Never switch jobs back to `ubuntu-latest` or other GitHub-hosted runners — "
+            "hosted minutes are billing-blocked and fail in seconds while the self-hosted "
+            "runner sits idle. On red/queued CI: check `gh run view` + "
+            "`gh api repos/{owner}/{repo}/actions/runners` for runner online/busy; "
+            "fix workflow YAML / secrets / self-hosted capacity — do not thrash hosted CI. "
+        )
     goal_l = goal.lower()
     if "ci repair:" in goal_l or "gate 9" in goal_l or "fast gate" in goal_l:
         ci_clause += (

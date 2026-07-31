@@ -60,7 +60,7 @@
         {
           "name": "Dana",
           "role": "lead",
-          "owns": "DashPro priorities; Expo/React Native app UI + parent dashboard + OTA/canary publish; monitor CI→PR→main; ensure green builds reach Vercel production; coach upgrades",
+          "owns": "DashPro priorities; Expo/React Native app UI + parent dashboard + OTA/canary publish; monitor self-hosted CI→PR→main (never reintroduce ubuntu-latest); ensure green builds reach Vercel production; coach upgrades",
           "schedule": "on_demand",
           "primary": true,
           "azure_voice_id": "en-US-AriaNeural"
@@ -68,7 +68,7 @@
         {
           "name": "Cass",
           "role": "watcher",
-          "owns": "DashPro signals, runtime/public health, CI red builds, and Vercel deploy unhealthy alerts",
+          "owns": "DashPro signals, runtime/public health, self-hosted CI red/queued builds (runner edudashpro-dashpro-2), and Vercel deploy unhealthy alerts",
           "schedule": "always_on",
           "azure_voice_id": "en-US-DavisNeural"
         },
@@ -82,14 +82,14 @@
         {
           "name": "Marco",
           "role": "backend",
-          "owns": "DashPro APIs, services, and quality-gate CI failures",
+          "owns": "DashPro APIs, services, and quality-gate failures on self-hosted CI (not GitHub-hosted minutes)",
           "schedule": "continuous",
           "azure_voice_id": "en-US-GuyNeural"
         },
         {
           "name": "Soren",
           "role": "integrations",
-          "owns": "DashPro GitHub Actions, Vercel linkage, secrets/CI wiring, and production deploy readiness",
+          "owns": "DashPro GitHub Actions on self-hosted runners (runs-on: self-hosted; never ubuntu-latest), Vercel linkage, secrets/CI wiring, runner health, and production deploy readiness"
           "schedule": "continuous",
           "azure_voice_id": "en-US-SaraNeural"
         }
