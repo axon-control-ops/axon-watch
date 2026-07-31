@@ -9,10 +9,38 @@ import {
   resolveIdeInterruptTooltip,
   shouldShowIdeInterruptAttentionAction,
   shouldShowIdeInterruptStop,
+  shouldShowIdeInterruptStrip,
   truncateInterruptLabel,
 } from './ide-interrupt-panel-view';
 
 describe('ide interrupt panel view', () => {
+  it('keeps the attention strip mounted for interrupt tier or pending approvals', () => {
+    expect(
+      shouldShowIdeInterruptStrip({
+        presenceProfile: 'interrupt',
+        pendingApprovalsCount: 0,
+      }),
+    ).toBe(true);
+    expect(
+      shouldShowIdeInterruptStrip({
+        presenceProfile: 'voice',
+        pendingApprovalsCount: 1,
+      }),
+    ).toBe(true);
+    expect(
+      shouldShowIdeInterruptStrip({
+        presenceProfile: 'voice',
+        pendingApprovalsCount: 0,
+      }),
+    ).toBe(false);
+    expect(
+      shouldShowIdeInterruptStrip({
+        presenceProfile: 'quiet',
+        pendingApprovalsCount: 0,
+      }),
+    ).toBe(false);
+  });
+
   it('prioritizes watch connectivity over bootstrap info signals in the headline', () => {
     expect(
       resolveIdeInterruptHeadline({

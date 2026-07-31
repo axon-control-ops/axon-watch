@@ -22,6 +22,19 @@ function isActionableInterruptSignal(signal: IdeInterruptTopSignal | null | unde
   return severity === 'critical' || severity === 'high' || severity === 'medium';
 }
 
+/**
+ * The attention strip normally follows the `interrupt` presence tier, but a voice
+ * session resolves the tier to `voice`, which would hide approvals that are still
+ * blocking the agent. Pending approvals are the human-in-the-loop gate, so they keep
+ * the strip mounted regardless of tier.
+ */
+export function shouldShowIdeInterruptStrip(input: {
+  presenceProfile: string;
+  pendingApprovalsCount: number;
+}): boolean {
+  return input.presenceProfile === 'interrupt' || input.pendingApprovalsCount > 0;
+}
+
 export function resolveIdeInterruptHeadline(input: {
   pendingApprovalsCount: number;
   topSignal: IdeInterruptTopSignal | null | undefined;

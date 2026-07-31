@@ -86,6 +86,19 @@ def _css_bundle_ok(console_base_url: str, timeout_seconds: float) -> None:
         )
 
 
+def _ensure_agent_dock_open(page: Any, timeout_ms: int) -> None:
+    """Open the agent dock if it is collapsed.
+
+    The conversation seam lives inside the agent dock (AgentDock.vue), which renders a
+    collapsed `.agent-dock-reopen` button instead of the transcript. Mission Control
+    starts with the dock collapsed, so the seam is absent until it is reopened.
+    """
+    reopen = page.locator(".agent-dock-reopen")
+    if reopen.count() > 0:
+        reopen.first.click()
+    page.wait_for_selector(".agent-dock", timeout=timeout_ms)
+
+
 def _run_browser_checks(
     *,
     console_base_url: str,
@@ -134,33 +147,56 @@ def _run_browser_checks(
 
             layout_group.get_by_role("button", name="OPERATOR", exact=True).click()
             page.wait_for_selector(".console-shell--operator", timeout=timeout_ms)
-            page.wait_for_selector(".conversation-seam", timeout=timeout_ms)
-            record("operator_mode", True, "operator layout and conversation seam visible")
+            # RightDock.vue mounts AgentDock only in IDE mode; operator/Mission Control
+            # gets the live-ops dock instead, so assert that rather than the seam.
+            page.wait_for_selector(".dock-stack--live-ops", timeout=timeout_ms)
+            record("operator_mode", True, "operator layout and live-ops dock visible")
             page.screenshot(path=str(output_dir / "02-operator-mode.png"), full_page=False)
 
             layout_group.get_by_role("button", name="IDE", exact=True).click()
             page.wait_for_selector(".console-shell--ide", timeout=timeout_ms)
+            _ensure_agent_dock_open(page, timeout_ms)
+            page.wait_for_selector(".conversation-seam", timeout=timeout_ms)
             page.wait_for_selector(".agent-dock-composer", timeout=timeout_ms)
-            page.get_by_label("Agent composer").wait_for(timeout=timeout_ms)
-            record("ide_mode", True, "IDE layout and agent composer visible")
+            composer = page.get_by_label("Agent composer")
+            composer.wait_for(timeout=timeout_ms)
+            record("ide_mode", True, "IDE layout, conversation seam, and agent composer visible")
             page.screenshot(path=str(output_dir / "03-ide-mode.png"), full_page=False)
+
+            # Command entry lives in the IDE agent composer; prove it accepts input
+            # rather than only that it rendered. The composer is disabled until a
+            # workspace hydrates, so wait for that before typing.
+            probe_text = "axon smoke probe"
+            try:
+                page.wait_for_selector(
+                    "#agent-dock-composer-input:not([disabled])", timeout=timeout_ms
+                )
+                composer.fill(probe_text)
+                page.wait_for_function(
+                    """(expected) => {
+                      const el = document.querySelector('#agent-dock-composer-input');
+                      return Boolean(el && el.value === expected);
+                    }""",
+                    arg=probe_text,
+                    timeout=timeout_ms,
+                )
+                composer.fill("")
+                record("command_entry", True, "agent composer accepts operator input")
+            except PlaywrightTimeoutError:
+                record(
+                    "command_entry",
+                    False,
+                    "agent composer stayed disabled (no workspace hydrated from control plane)",
+                )
 
             layout_group.get_by_role("button", name="OPERATOR", exact=True).click()
             page.wait_for_selector(".console-shell--operator", timeout=timeout_ms)
-            command_input = page.locator(
-                'textarea[aria-label="Operator command"], input[aria-label="Operator command"]'
-            )
-            try:
-                command_input.first.wait_for(timeout=timeout_ms)
-                record("operator_command", True, "operator command input visible")
-            except PlaywrightTimeoutError:
-                record(
-                    "operator_command",
-                    False,
-                    "operator command input not found (dock hero may be collapsed)",
-                )
+            # Mission Control's operator surface is the status radar, not a command seam
+            # (DockHeroPanel/CommandSeamPanel were retired with the redesign).
+            page.wait_for_selector(".operator-status-radar-panel", timeout=timeout_ms)
+            record("operator_mission_control", True, "operator mission control radar visible")
 
-            page.screenshot(path=str(output_dir / "04-operator-command.png"), full_page=False)
+            page.screenshot(path=str(output_dir / "04-operator-mission-control.png"), full_page=False)
 
             failed = [item for item in checks if not item["ok"]]
             if failed:

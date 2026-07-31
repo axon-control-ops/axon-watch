@@ -44,8 +44,8 @@
 
 @media (max-width: 960px) {
   .console-shell--mockup {
-    --topbar-height: 50px;
-    --statusbar-height: 34px;
+    --topbar-height: 3.125rem;
+    --statusbar-height: 2.125rem;
     --shell-gutter: 0.42rem;
     min-width: 720px;
     overflow-x: auto;

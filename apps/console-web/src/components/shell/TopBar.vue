@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, watch } from 'vue';
+import { computed } from 'vue';
 
 import IdeInterruptPanel from '../ide/IdeInterruptPanel.vue';
 import KairoPresenceBar from './KairoPresenceBar.vue';
@@ -9,6 +9,7 @@ import AxonProductLogo from '../../components/AxonProductLogo.vue';
 import { navigateToAppSurface, type AppSurface } from '../../lib/app-surface-route';
 import { useAppSurface } from '../../composables/useAppSurface';
 import { openOperatorStandup } from '../../features/kairo-conversation/open-operator-standup';
+import { shouldShowIdeInterruptStrip } from '../../lib/ide-interrupt-panel-view';
 import { useShellStore } from '../../stores/shell';
 
 const shell = useShellStore();
@@ -40,7 +41,10 @@ const showIdeInterruptTopbar = computed(
   () =>
     activeSurface.value === 'console' &&
     shell.layoutMode === 'ide' &&
-    shell.idePresenceProfile === 'interrupt',
+    shouldShowIdeInterruptStrip({
+      presenceProfile: shell.idePresenceProfile,
+      pendingApprovalsCount: shell.pendingApprovalsCount,
+    }),
 );
 
 function openSurface(surface: AppSurface): void {
@@ -54,43 +58,6 @@ function openSettings(): void {
 async function openStandup(): Promise<void> {
   await openOperatorStandup(shell);
 }
-
-// #region agent log
-watch(
-  () => [activeSurface.value, shell.layoutMode, shell.idePresenceProfile, showIdeInterruptTopbar.value],
-  () => {
-    void nextTick(() => {
-      const grid = document.querySelector<HTMLElement>('.topbar-mockup__grid');
-      const columns = grid
-        ? getComputedStyle(grid).gridTemplateColumns
-        : null;
-      fetch('http://127.0.0.1:7706/ingest/90bcaec2-2b39-4d4a-84b5-157c12735440', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': 'db8bb4' },
-        body: JSON.stringify({
-          sessionId: 'db8bb4',
-          runId: 'post-fix',
-          hypothesisId: 'H4',
-          location: 'TopBar.vue:strip-slot-state',
-          message: 'topbar slot state and grid track sizing',
-          data: {
-            activeSurface: activeSurface.value,
-            layoutMode: shell.layoutMode,
-            idePresenceProfile: shell.idePresenceProfile,
-            showIdeInterruptTopbar: showIdeInterruptTopbar.value,
-            topbarChipCount: shell.topbarChips.length,
-            gridTemplateColumns: columns,
-            gridHeightPx: grid ? Math.round(grid.getBoundingClientRect().height * 100) / 100 : null,
-            interruptStripPresent: Boolean(document.querySelector('.ide-interrupt-topbar')),
-          },
-          timestamp: Date.now(),
-        }),
-      }).catch(() => {});
-    });
-  },
-  { immediate: true },
-);
-// #endregion
 </script>
 
 <template>

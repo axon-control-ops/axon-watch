@@ -15,10 +15,8 @@ export function resolveIdePresenceProfile(input: {
   agentStreamActive?: boolean;
   voiceSessionActive?: boolean;
 }): IdePresenceProfile {
-  if (input.voiceSessionActive) {
-    return 'voice';
-  }
-
+  // Interrupt beats voice. A speaking session must not hide human-in-the-loop
+  // gates (approvals, high/critical signals, watch health, blocked runs).
   if (input.pendingApprovals > 0) {
     return 'interrupt';
   }
@@ -33,6 +31,10 @@ export function resolveIdePresenceProfile(input: {
 
   if (input.primaryRunPhase === 'awaiting_approval') {
     return 'interrupt';
+  }
+
+  if (input.voiceSessionActive) {
+    return 'voice';
   }
 
   if (input.agentStreamActive) {

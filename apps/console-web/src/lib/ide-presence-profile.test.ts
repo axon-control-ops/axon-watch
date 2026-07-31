@@ -48,6 +48,46 @@ describe('ide presence profile', () => {
     ).toBe('interrupt');
   });
 
+  it('keeps interrupt ahead of voice when approvals or critical signals are open', () => {
+    expect(
+      resolveIdePresenceProfile({
+        pendingApprovals: 1,
+        criticalSignals: 0,
+        highSignals: 0,
+        watchConnected: true,
+        degradedActive: false,
+        primaryRunPhase: 'executing',
+        voiceSessionActive: true,
+      }),
+    ).toBe('interrupt');
+
+    expect(
+      resolveIdePresenceProfile({
+        pendingApprovals: 0,
+        criticalSignals: 1,
+        highSignals: 0,
+        watchConnected: true,
+        degradedActive: false,
+        primaryRunPhase: 'executing',
+        voiceSessionActive: true,
+      }),
+    ).toBe('interrupt');
+  });
+
+  it('uses voice when nothing interrupt-worthy is open', () => {
+    expect(
+      resolveIdePresenceProfile({
+        pendingApprovals: 0,
+        criticalSignals: 0,
+        highSignals: 0,
+        watchConnected: true,
+        degradedActive: false,
+        primaryRunPhase: 'executing',
+        voiceSessionActive: true,
+      }),
+    ).toBe('voice');
+  });
+
   it('hides watch chip in IDE quiet tier when watch is healthy', () => {
     expect(
       ideShowWatchInStatusBar({

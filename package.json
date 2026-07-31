@@ -76,7 +76,7 @@
     "verify:parity-d6": "./scripts/verify/parity-d6-dock-and-startup.sh",
     "verify:phase-d": "./scripts/verify/phase-d-platform-retirement.sh",
     "verify:production-operator": "./scripts/verify/production-operator-smoke.sh",
-    "verify:console-web": "npm run verify:css-imports && npm run typecheck -w @axon-watch/console-web && npm run test -w @axon-watch/console-web && npm run build -w @axon-watch/console-web",
+    "verify:console-web": "./scripts/verify/console-web.sh",
     "dev:console-desktop": "npm run tauri -w @axon-watch/console-desktop -- dev",
     "build:desktop:linux": "./scripts/desktop/build-portable-deb.sh",
     "verify:desktop": "./scripts/desktop/verify-desktop.sh",

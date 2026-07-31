@@ -39,8 +39,10 @@
   --state-degraded: #ff9d00;
 
   --radius-shell: 4px;
-  --topbar-height: 58px;
-  --statusbar-height: 42px;
+  /* Relative units so the chrome grows with text resizing instead of clipping its
+     own children — WCAG 2.2 SC 1.4.4. 3.625rem/2.625rem = 58px/42px at a 16px root. */
+  --topbar-height: 3.625rem;
+  --statusbar-height: 2.625rem;
   --shell-gutter: 0.85rem;
 
   --motion-fast: 120ms;

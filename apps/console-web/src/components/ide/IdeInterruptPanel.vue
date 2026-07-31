@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, ref, watch } from 'vue';
+import { computed } from 'vue';
 
 import {
   isIdeInterruptStopDisabled,
@@ -10,6 +10,7 @@ import {
   resolveIdeInterruptTooltip,
   shouldShowIdeInterruptAttentionAction,
   shouldShowIdeInterruptStop,
+  shouldShowIdeInterruptStrip,
 } from '../../lib/ide-interrupt-panel-view';
 import {
   localRuntimeDegradedActive,
@@ -21,7 +22,12 @@ import { useShellStore } from '../../stores/shell';
 const shell = useShellStore();
 
 const showPanel = computed(
-  () => shell.layoutMode === 'ide' && shell.idePresenceProfile === 'interrupt',
+  () =>
+    shell.layoutMode === 'ide' &&
+    shouldShowIdeInterruptStrip({
+      presenceProfile: shell.idePresenceProfile,
+      pendingApprovalsCount: shell.pendingApprovalsCount,
+    }),
 );
 
 const topSignal = computed(() => shell.operatorBriefing?.top_signals[0] ?? null);
@@ -120,84 +126,11 @@ function stopActiveRun(): void {
 
   void shell.stopPrimaryRun();
 }
-
-// #region agent log
-const debugStripRef = ref<HTMLElement | null>(null);
-
-function agentLogStripGeometry(phase: string): void {
-  const strip = debugStripRef.value;
-  if (!strip) {
-    return;
-  }
-  const summary = strip.querySelector<HTMLElement>('.ide-interrupt-topbar__summary');
-  const badge = strip.querySelector<HTMLElement>('.ide-interrupt-topbar__badge');
-  const grid = strip.closest<HTMLElement>('.topbar-mockup__grid');
-  const pill = grid?.querySelector<HTMLElement>('.kairo-presence-module');
-  const identity = grid?.querySelector<HTMLElement>('.topbar-mockup__identity-zone');
-  const stripBox = strip.getBoundingClientRect();
-  const stripStyle = getComputedStyle(strip);
-  const rootFont = parseFloat(getComputedStyle(document.documentElement).fontSize);
-  const payload = {
-    sessionId: 'db8bb4',
-    runId: 'post-fix',
-    hypothesisId: 'H1,H2,H3,H4,H5',
-    location: 'IdeInterruptPanel.vue:strip-geometry',
-    message: `attention strip geometry (${phase})`,
-    data: {
-      phase,
-      rootFontPx: rootFont,
-      topbarHeightToken: getComputedStyle(document.documentElement)
-        .getPropertyValue('--topbar-height')
-        .trim(),
-      stripHeightPx: Math.round(stripBox.height * 100) / 100,
-      stripWidthPx: Math.round(stripBox.width * 100) / 100,
-      stripCssHeight: stripStyle.height,
-      stripCssMaxHeight: stripStyle.maxHeight,
-      stripCssMaxWidth: stripStyle.maxWidth,
-      gridRowHeightPx: grid ? Math.round(grid.getBoundingClientRect().height * 100) / 100 : null,
-      gridColumnWidthPx: strip.parentElement
-        ? Math.round(strip.getBoundingClientRect().width * 100) / 100
-        : null,
-      siblingPillHeightPx: pill ? Math.round(pill.getBoundingClientRect().height * 100) / 100 : null,
-      siblingIdentityHeightPx: identity
-        ? Math.round(identity.getBoundingClientRect().height * 100) / 100
-        : null,
-      summaryFontPx: summary ? getComputedStyle(summary).fontSize : null,
-      badgeFontPx: badge ? getComputedStyle(badge).fontSize : null,
-      summaryScrollWidth: summary?.scrollWidth ?? null,
-      summaryClientWidth: summary?.clientWidth ?? null,
-      summaryTextClipped: summary ? summary.scrollWidth > summary.clientWidth + 1 : null,
-      stripScrollHeight: strip.scrollHeight,
-      stripClientHeight: strip.clientHeight,
-      stripContentClipped: strip.scrollHeight > strip.clientHeight + 1,
-      labelText: compactLabel.value,
-    },
-    timestamp: Date.now(),
-  };
-  fetch('http://127.0.0.1:7706/ingest/90bcaec2-2b39-4d4a-84b5-157c12735440', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': 'db8bb4' },
-    body: JSON.stringify(payload),
-  }).catch(() => {});
-}
-
-onMounted(() => {
-  void nextTick(() => agentLogStripGeometry('mounted'));
-});
-
-watch(compactLabel, () => {
-  void nextTick(() => agentLogStripGeometry('label-change'));
-});
-
-(window as unknown as Record<string, unknown>).__axonDebugStripMeasure = (phase: string) =>
-  agentLogStripGeometry(phase);
-// #endregion
 </script>
 
 <template>
   <div
     v-if="showPanel"
-    ref="debugStripRef"
     class="ide-interrupt-topbar"
     role="status"
     aria-live="polite"
@@ -251,6 +184,9 @@ watch(compactLabel, () => {
    resized up to 200% — WCAG 2.2 SC 1.4.4, failure F69. */
 .ide-interrupt-topbar {
   display: flex;
+  /* .topbar-mockup__runtime-strip defaults to wrap for the operator chip row;
+     the strip is a single line so the badge, headline, and controls stay aligned. */
+  flex-wrap: nowrap;
   align-items: center;
   gap: 0.35rem;
   min-width: min(100%, 13rem);

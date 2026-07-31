@@ -18,13 +18,14 @@
 }
 
 /* The attention strip track carries a headline plus run controls, so it gets a
-   floor instead of collapsing to 0. min(..., 100%) keeps narrow viewports from
-   overflowing the topbar. */
+   floor instead of collapsing to 0, and the presence-pill track is trimmed to the
+   pill's actual width so the extra room does not come out of the controls column.
+   min(..., 100%) keeps narrow viewports from overflowing the topbar. */
 .console-shell--ide .topbar-mockup__grid--ide-interrupt {
   grid-template-columns:
     minmax(10rem, 0.9fr)
-    minmax(min(23rem, 100%), 1.9fr)
-    minmax(11rem, 14rem)
+    minmax(min(21rem, 100%), 1.9fr)
+    minmax(7.5rem, 9rem)
     auto;
 }
 
