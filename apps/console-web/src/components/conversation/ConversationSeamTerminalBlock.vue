@@ -2,6 +2,7 @@
 import { computed, ref, watch } from 'vue';
 
 import type { AgentTranscriptSegment } from '../../lib/agent-transcript-blocks';
+import { shouldShowConversationTerminalOutput } from '../../lib/conversation-terminal-display';
 
 type TerminalSegment = Extract<AgentTranscriptSegment, { kind: 'terminal' }>;
 
@@ -25,28 +26,29 @@ const mirrorBadge = computed(() => props.terminalMirrorBadge(props.segment.open)
 const isMirrored = computed(() => Boolean(mirrorBadge.value));
 
 watch(isMirrored, (mirrored) => {
-  // When mirror arms, collapse chat body so the dock owns the scrollback.
-  if (mirrored) {
+  // When mirror arms on a finished card, collapse chat body so the dock owns scrollback.
+  // Open+streaming cards keep chat output via shouldShowConversationTerminalOutput.
+  if (mirrored && !(props.segment.open && props.streaming)) {
     expandedInChat.value = false;
   }
 });
 
-const showFullOutput = computed(() => {
-  if (!props.segment.output) {
-    return false;
-  }
-  // Cursor-like: when watching in the terminal dock, chat keeps a receipt only.
-  if (isMirrored.value && !expandedInChat.value) {
-    return false;
-  }
-  return true;
-});
+const showFullOutput = computed(() =>
+  shouldShowConversationTerminalOutput({
+    hasOutput: Boolean(props.segment.output),
+    open: props.segment.open,
+    streaming: props.streaming,
+    mirrored: isMirrored.value,
+    expandedInChat: expandedInChat.value,
+  }),
+);
 
 const statusHint = computed(() => {
+  if (props.segment.open && props.streaming && isMirrored.value) {
+    return 'Live output streams here and in the vaxon terminal below.';
+  }
   if (isMirrored.value && !expandedInChat.value) {
-    return props.segment.open && props.streaming
-      ? 'Live output is in the vaxon terminal below — agent stream stays here as a receipt.'
-      : 'Full output is in the vaxon terminal below.';
+    return 'Full output is in the vaxon terminal below.';
   }
   return null;
 });

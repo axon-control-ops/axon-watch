@@ -57,7 +57,8 @@ class ControlPlaneWorkspaceHandoffsTests(unittest.TestCase):
         assert task is not None
         self.assertEqual("workspace_alpha", task["workspace_id"])
         self.assertEqual("Review bootstrap follow-up", task["goal"])
-        self.assertEqual("open", task["status"])
+        # Soft autostart may lease immediately when capacity allows; otherwise open.
+        self.assertIn(task["status"], {"open", "leased"})
 
     def test_handoff_summary_excludes_background_employee_runs_from_counts(self) -> None:
         create_run(

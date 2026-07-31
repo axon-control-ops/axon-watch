@@ -121,7 +121,18 @@ def probe_monitor_slice(config: dict[str, object]) -> list[dict[str, object]]:
                 workspace_id=workspace_id,
             )
         elif check_type == "posthog_recent_events":
-            status, detail = check_posthog_recent_events(env=env)
+            limit = max(1, int(entry.get("limit") or 5))
+            if entry.get("timeout_ms") is not None:
+                timeout_seconds = max(1.0, float(entry.get("timeout_ms") or 20000) / 1000.0)
+            else:
+                timeout_seconds = max(1.0, float(entry.get("timeout_seconds") or 20))
+            retries = max(0, int(entry.get("retries") or 1))
+            status, detail = check_posthog_recent_events(
+                env=env,
+                limit=limit,
+                timeout_seconds=timeout_seconds,
+                retries=retries,
+            )
         elif check_type == "supabase_storage_quota":
             status, detail = check_supabase_storage_quota(env=env)
         elif check_type == "http_health":

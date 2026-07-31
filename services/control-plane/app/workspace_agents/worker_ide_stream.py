@@ -8,15 +8,21 @@ from datetime import datetime, timezone
 from typing import Any
 from uuid import uuid4
 
+from app.chat.chat_stream_defer import finish_chat_stream
 from app.chat.lane_b_stream_execute import lane_b_system_content
 from app.chat.progress_milestones import (
     persist_stream_delta,
     publish_completion_milestone,
     publish_stream_error_milestone,
 )
-from app.chat.stream_hub import clear_chat_stream_buffer, close_chat_stream, publish_chat_stream_event
+from app.chat.stream_hub import clear_chat_stream_buffer, publish_chat_stream_event
 from app.cli_runtime.research_stream_blocks import normalize_transcript_content
 from app.persistence import chat_store
+from app.terminal.active_chat_stream import (
+    clear_active_chat_stream,
+    register_active_chat_stream,
+)
+from app.terminal.agent_job_chat import merge_active_agent_job_terminals
 from app.workspace_agents import build_company_roster
 from app.workspace_agents.config_loader import EmployeeConfig
 
@@ -165,6 +171,12 @@ def prepare_worker_ide_stream(
             "source": "continuous_worker",
         },
     )
+    register_active_chat_stream(
+        workspace_id=workspace_id,
+        thread_id=thread_id,
+        message_id=agent_message_id,
+        run_id=run_id,
+    )
     return WorkerIdeStream(
         thread_id=thread_id,
         agent_message_id=agent_message_id,
@@ -199,6 +211,10 @@ def finalize_worker_ide_stream(
 ) -> None:
     updated_at = _utc_now()
     agent_content = normalize_transcript_content(str(reply_text or ""))
+    agent_content = merge_active_agent_job_terminals(
+        stream.agent_message_id,
+        agent_content,
+    )
     chat_store.update_message_content(
         message_id=stream.agent_message_id,
         content=agent_content,
@@ -223,9 +239,11 @@ def finalize_worker_ide_stream(
         verification_warnings=[],
         run_record=run_record,
     )
-    publish_chat_stream_event(
-        stream.thread_id,
-        {
+    clear_active_chat_stream(message_id=stream.agent_message_id)
+    finish_chat_stream(
+        thread_id=stream.thread_id,
+        message_id=stream.agent_message_id,
+        terminal_payload={
             "type": "chat_stream_done",
             "thread_id": stream.thread_id,
             "message_id": stream.agent_message_id,
@@ -238,12 +256,11 @@ def finalize_worker_ide_stream(
             "source": "continuous_worker",
         },
     )
-    close_chat_stream(stream.thread_id)
-    clear_chat_stream_buffer(stream.thread_id)
 
 
 def fail_worker_ide_stream(stream: WorkerIdeStream, *, error: str, run_id: str) -> None:
     fallback = str(error or "").strip() or "continuous worker dispatch failed"
+    fallback = merge_active_agent_job_terminals(stream.agent_message_id, fallback)
     updated_at = _utc_now()
     chat_store.update_message_content(
         message_id=stream.agent_message_id,
@@ -262,9 +279,11 @@ def fail_worker_ide_stream(stream: WorkerIdeStream, *, error: str, run_id: str) 
         message_id=stream.agent_message_id,
         error=fallback,
     )
-    publish_chat_stream_event(
-        stream.thread_id,
-        {
+    clear_active_chat_stream(message_id=stream.agent_message_id)
+    finish_chat_stream(
+        thread_id=stream.thread_id,
+        message_id=stream.agent_message_id,
+        terminal_payload={
             "type": "chat_stream_error",
             "thread_id": stream.thread_id,
             "message_id": stream.agent_message_id,
@@ -274,5 +293,3 @@ def fail_worker_ide_stream(stream: WorkerIdeStream, *, error: str, run_id: str) 
             "source": "continuous_worker",
         },
     )
-    close_chat_stream(stream.thread_id)
-    clear_chat_stream_buffer(stream.thread_id)

@@ -168,8 +168,14 @@ def build_continuous_worker_prompt(
         "`typecheck` with large NODE_OPTIONS heaps unless the operator explicitly asked. "
         "Prefer editing + targeted tests. Never launch a second heavy server if one is "
         "already listening. Axon-X operator UI is :4173 — do not start legacy :7734. "
-        "Long-running OTA/Expo/EAS jobs: start once and wait for that shell tool; do not "
-        "busy-poll with repeated shell probes every few seconds — check sparsely (~30–60s). "
+        "Long-running OTA/Expo/EAS jobs: do not block on Cursor shellToolCall for the heavy "
+        "job — bare `npm run ota:canary` / `eas update` in Cursor shell orphans the ship if "
+        "Axon stale-fails the run. Start once via `axon-agent-terminal-job --workspace "
+        f"{workspace_id.strip() or '<workspace_id>'} -- <command>` (PATH helper; not a "
+        "relative DashPro path) so live output can stream into chat + vaxon; poll "
+        "`axon-agent-terminal-job --status <job_id> --workspace "
+        f"{workspace_id.strip() or '<workspace_id>'}` sparsely (~30–60s), not busy-poll loops. "
+        "Close with the Expo Updates branch/group receipt (operator-canary), not an EAS Build URL. "
     )
     if workspace_id.strip() == "workspace_dashpro":
         memory_clause += (

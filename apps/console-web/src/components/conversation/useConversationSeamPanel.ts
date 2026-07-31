@@ -175,11 +175,6 @@ export function useConversationSeamPanel(rootRef: Ref<HTMLElement | null>, listR
     return sanitizeAgentThinkingForOperator(text) || THINKING_SPEECH_FALLBACK;
   }
 
-  /** Empty while waiting for the first model tokens — never a canned spoken line. */
-  function emptyStreamingAck(): string {
-    return '';
-  }
-
   async function copyTerminalOutput(output: string): Promise<void> {
     if (typeof navigator === 'undefined' || !navigator.clipboard || !output.trim()) {
       return;
@@ -328,7 +323,6 @@ export function useConversationSeamPanel(rootRef: Ref<HTMLElement | null>, listR
     showTerminalBackgroundControl,
     terminalMirrorBadge,
     thinkingBodyText,
-    emptyStreamingAck,
     copyTerminalOutput,
     isThinkingExpanded,
     toggleThinking,

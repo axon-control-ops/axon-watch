@@ -180,8 +180,14 @@ def persist_stream_delta(
     updated_at: str,
 ) -> str:
     from app.cli_runtime.research_stream_blocks import normalize_transcript_content
+    from app.terminal.agent_job_chat import merge_active_agent_job_terminals
 
     normalized_accumulated = normalize_transcript_content(accumulated)
+    # Preserve live Axon agent-terminal job fences when Cursor assembler overwrites.
+    normalized_accumulated = merge_active_agent_job_terminals(
+        message_id,
+        normalized_accumulated,
+    )
     chat_store.update_message_content(
         message_id=message_id,
         content=normalized_accumulated,

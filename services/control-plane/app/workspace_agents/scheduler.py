@@ -286,6 +286,20 @@ def run_continuous_worker_tick(
     except Exception:  # noqa: BLE001 — never block scheduler on work sources
         logger.exception("scheduled company work sources failed")
 
+    # Semi / Manual pause continuous specialist leasing, but Lead-owned board
+    # tickets still need operator_start + kick so they do not sit Waiting.
+    try:
+        from app.workspace_agents.lead_board_pickup import pickup_open_lead_board_tasks
+
+        lead_picked = pickup_open_lead_board_tasks(starts_bound=2)
+        if lead_picked:
+            logger.info(
+                "continuous worker tick picked up %s open Lead ticket(s)",
+                len(lead_picked),
+            )
+    except Exception:  # noqa: BLE001 — never block scheduler on Lead pickup
+        logger.exception("lead board pickup failed")
+
     if not scheduler_enabled():
         return []
 

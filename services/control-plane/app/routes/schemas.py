@@ -69,6 +69,9 @@ class CreateTerminalSessionRequest(BaseModel):
 class EnqueueAgentTerminalJobRequest(BaseModel):
     command: str
     run_id: str | None = None
+    stream_to_chat: bool | None = None
+    thread_id: str | None = None
+    message_id: str | None = None
 
 
 class RenameTerminalSessionRequest(BaseModel):

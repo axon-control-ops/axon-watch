@@ -359,12 +359,21 @@ export type AgentTerminalJobRecord = {
   status: string;
   created_at: string;
   receipt: string;
+  stream_to_chat?: boolean;
+  thread_id?: string | null;
+  message_id?: string | null;
   agent_terminal_session: TerminalSessionRecord;
 };
 
 export async function enqueueWorkspaceAgentTerminalJob(
   workspaceId: string,
-  options: { command: string; run_id?: string | null },
+  options: {
+    command: string;
+    run_id?: string | null;
+    stream_to_chat?: boolean | null;
+    thread_id?: string | null;
+    message_id?: string | null;
+  },
 ): Promise<AgentTerminalJobRecord> {
   const encodedWorkspaceId = encodeURIComponent(workspaceId);
   return fetchJson<AgentTerminalJobRecord>(
@@ -375,6 +384,9 @@ export async function enqueueWorkspaceAgentTerminalJob(
       body: JSON.stringify({
         command: options.command,
         run_id: options.run_id ?? null,
+        stream_to_chat: options.stream_to_chat ?? null,
+        thread_id: options.thread_id ?? null,
+        message_id: options.message_id ?? null,
       }),
     },
     'workspace agent terminal job enqueue failed',

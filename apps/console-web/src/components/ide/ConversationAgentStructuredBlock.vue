@@ -2,6 +2,7 @@
 import type { AgentQuestionOption } from '../../lib/agent-question-view';
 import type { AgentTranscriptSegment } from '../../lib/agent-transcript-blocks';
 import AgentLeadFanOutBlock from './AgentLeadFanOutBlock.vue';
+import AgentLeadStandupBlock from './AgentLeadStandupBlock.vue';
 import AgentPlanBlock from './AgentPlanBlock.vue';
 import AgentQuestionBlock from './AgentQuestionBlock.vue';
 import AgentResearchBlock from './AgentResearchBlock.vue';
@@ -9,7 +10,11 @@ import AgentResearchBlock from './AgentResearchBlock.vue';
 defineProps<{
   segment: Extract<
     AgentTranscriptSegment,
-    { kind: 'plan' } | { kind: 'question' } | { kind: 'research' } | { kind: 'lead-fan-out' }
+    | { kind: 'plan' }
+    | { kind: 'question' }
+    | { kind: 'research' }
+    | { kind: 'lead-fan-out' }
+    | { kind: 'lead-standup' }
   >;
   workspaceId: string | null;
   live?: boolean;
@@ -30,6 +35,16 @@ defineProps<{
     :deferred="segment.deferred"
     :assignments="segment.assignments"
     :notes="segment.notes"
+  />
+  <AgentLeadStandupBlock
+    v-else-if="segment.kind === 'lead-standup'"
+    :lead-name="segment.leadName"
+    :title="segment.title"
+    :intro="segment.intro"
+    :body-markdown="segment.bodyMarkdown"
+    :confidence="segment.confidence"
+    :verification-notice="segment.verificationNotice"
+    :workspace-id="workspaceId"
   />
   <AgentPlanBlock
     v-else-if="segment.kind === 'plan'"

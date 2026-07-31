@@ -38,4 +38,13 @@ export type AgentTranscriptSegment =
       deferred: number;
       assignments: Array<{ role: string; goal: string }>;
       notes: string[];
+    }
+  | {
+      kind: 'lead-standup';
+      leadName: string;
+      title: string;
+      intro: string;
+      bodyMarkdown: string;
+      confidence: string | null;
+      verificationNotice: string | null;
     };

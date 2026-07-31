@@ -163,6 +163,60 @@ class LeadFanOutDispatchKickTests(unittest.TestCase):
         begin.assert_called_once()
         self.assertEqual("run_target", begin.call_args.args[0])
 
+    def test_queued_fan_out_skips_when_same_role_already_executing(self) -> None:
+        runs = [
+            {
+                "run_id": "run_lead_busy",
+                "workspace_id": "workspace_demo",
+                "employee_role": "lead",
+                "task_id": "task_busy",
+                "phase": "executing",
+                "started_at": "2026-07-30T13:00:00Z",
+            },
+            {
+                "run_id": "run_lead_queued",
+                "workspace_id": "workspace_demo",
+                "employee_role": "lead",
+                "task_id": "task_queued",
+                "phase": "queued",
+                "started_at": "2026-07-30T14:00:00Z",
+            },
+        ]
+        with (
+            patch(
+                "app.workspace_agents.scheduler_queued_fan_out.worker_dispatch_enabled",
+                return_value=True,
+            ),
+            patch(
+                "app.workspace_agents.scheduler_queued_fan_out.list_runs",
+                return_value=runs,
+            ),
+            patch(
+                "app.workspace_agents.scheduler_queued_fan_out.begin_execution",
+            ) as begin,
+            patch.object(
+                worker_scheduler_settings_store,
+                "is_employee_enabled",
+                return_value=True,
+            ),
+        ):
+            started = dispatch_queued_lead_fan_out_runs(
+                companies={"workspace_demo": object()},
+                starts_bound=2,
+                active_bound=4,
+                executing_run_count=lambda: 1,
+                employee_for_role=lambda *_args: EmployeeConfig(
+                    name="Mira",
+                    role="lead",
+                    owns="Lead",
+                    schedule="on_demand",
+                ),
+                dispatch_worker_run=lambda **_kwargs: None,
+            )
+
+        self.assertEqual(started, [])
+        begin.assert_not_called()
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -7,6 +7,7 @@ from typing import Any
 from app.workspace_agents.catalog import ROLE_CATALOG, _DEFAULT_OWNS, _DEFAULT_ROLE_NAMES
 from app.workspace_agents.config_loader import _role_label
 from app.workspace_agents.critical_review_clause import AGENT_STANDING_ACCURACY_CLAUSE
+from app.workspace_agents.fleet_leads_context import build_fleet_leads_context
 from app.workspace_agents.team_roster_context import build_team_roster_context
 
 EMPLOYEE_PERSONA_MARKER = "Employee persona (authoritative for this thread):"
@@ -99,12 +100,20 @@ def build_employee_persona_appendix(
         owns=owns,
     )
     roster_block = build_team_roster_context(workspace_id, viewer_role=role)
+    fleet_block = ""
     lead_clause = ""
     if role.strip().lower() == "lead":
+        fleet_block = build_fleet_leads_context()
         lead_clause = (
             "As Lead, you already know your company team from the roster block below. "
             "Plan, prioritize, and hand off using those names/roles/owns — "
             "never rediscover staffing by searching the tree.\n"
+            "Use the fleet leads map for ownership outside this company. "
+            "App UI / Expo / EAS Update → DashPro (workspace_dashpro, Dana). "
+            "Centre ops / letters → Young Eagles (workspace_young_eagles_day_care, Imani). "
+            "Axon console → Axon-X (workspace_axon_watch, Mira). "
+            "Prefer POST /api/workspaces/{source}/handoffs over doing foreign work "
+            "in the wrong repo.\n"
             "When Sir King says assign / start / get all agents working, do not write "
             "START NOW kickoff markdown or claim specialists are working without run "
             "receipts. Prefer the Lead fan-out path (queued specialist runs + continuous "
@@ -123,7 +132,10 @@ def build_employee_persona_appendix(
             "After every substantive job (yours or a teammate outcome you are synthesizing), "
             "close with a short Lead stand-up summary. Lead with a line like "
             "\"Here's where things stand and what I changed.\" then cover: done, verified, "
-            "open risks, and next step. Do not dump raw specialist transcripts — "
+            "open risks, and next step. Put status tables on their own lines as real "
+            "GitHub-flavored markdown (blank line, then `| Col |` header, then `|---|`, "
+            "then rows) — never glue bold text into the table (`**Title*| Col |` is wrong). "
+            "Do not dump raw specialist transcripts — "
             "synthesize into that Lead report.\n"
         )
     else:
@@ -196,6 +208,8 @@ def build_employee_persona_appendix(
         parts.append(lead_clause.rstrip())
     if roster_block:
         parts.append(roster_block)
+    if fleet_block:
+        parts.append(fleet_block)
     return "\n".join(parts)
 
 

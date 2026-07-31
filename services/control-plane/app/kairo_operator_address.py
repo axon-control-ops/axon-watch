@@ -26,20 +26,20 @@ def apply_operator_address(
 ) -> str:
     """Apply Sir King / guest-name addressing rules.
 
-    - Guest active: replace sir / Sir King with the guest name (utterance directed at them).
-    - No guest: bare "sir" becomes "Sir King" for every speaker (VAXON and company agents).
+    - No guest: bare "sir" becomes "Sir King" for every speaker.
+    - Guest active: keep "Sir King" (primary listener); rewrite bare "sir"
+      to the guest name (utterance directed at the introduced person).
+    - ``speaker_kind`` is retained for call-site compatibility; address form
+      no longer differs by speaker when the primary listener is addressed.
     """
+    del speaker_kind  # API compatibility; no speaker-specific rewrite path.
     cleaned = str(text or "")
     if not cleaned:
         return cleaned
 
     name = str(guest_name or "").strip()
-    if name:
-        cleaned = _SIR_KING_RE.sub(name, cleaned)
-        cleaned = _SIR_RE.sub(name, cleaned)
-        return cleaned
 
-    # Avoid double-expanding "Sir King".
+    # Hold "Sir King" so bare-sir rewrites cannot corrupt it.
     placeholders: list[str] = []
 
     def _hold(match: re.Match[str]) -> str:
@@ -47,9 +47,13 @@ def apply_operator_address(
         return f"\0ADDR{len(placeholders) - 1}\0"
 
     held = _SIR_KING_RE.sub(_hold, cleaned)
-    held = _SIR_RE.sub(OPERATOR_ADDRESS_FULL, held)
+    if name:
+        held = _SIR_RE.sub(name, held)
+    else:
+        held = _SIR_RE.sub(OPERATOR_ADDRESS_FULL, held)
     for index, original in enumerate(placeholders):
-        held = held.replace(f"\0ADDR{index}\0", original)
+        # Normalize held Sir King tokens to the canonical form.
+        held = held.replace(f"\0ADDR{index}\0", OPERATOR_ADDRESS_FULL)
     return held
 
 

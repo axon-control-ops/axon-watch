@@ -14,7 +14,10 @@
     {
       "id": "dashpro_posthog_recent_events",
       "type": "posthog_recent_events",
-      "service": "PostHog"
+      "service": "PostHog",
+      "limit": 5,
+      "timeout_seconds": 20,
+      "retries": 1
     },
     {
       "id": "dashpro_supabase_storage_quota",

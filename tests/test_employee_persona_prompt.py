@@ -101,6 +101,14 @@ class EmployeePersonaPromptTests(unittest.TestCase):
                 "- Priya (Frontend / frontend) — owns: payments UI\n"
                 "Do NOT Glob, Grep, or Read the filesystem to discover teammates"
             ),
+        ), patch(
+            "app.workspace_agents.employee_persona_prompt.build_fleet_leads_context",
+            return_value=(
+                "Fleet leads map (authoritative — prefer handoffs over foreign work):\n"
+                "- Dana · DashPro (workspace_dashpro) [product app: DashPro] — owns: app UI\n"
+                "- Imani · Young Eagles (workspace_young_eagles_day_care) "
+                "[client ops: Young Eagles] — owns: centre ops"
+            ),
         ):
             appendix = build_employee_persona_appendix(
                 workspace_id="workspace_dashpro",
@@ -113,6 +121,10 @@ class EmployeePersonaPromptTests(unittest.TestCase):
         self.assertIn("Here's where things stand and what I changed.", appendix)
         self.assertIn("Priya (Frontend / frontend)", appendix)
         self.assertIn("Do NOT Glob, Grep, or Read", appendix)
+        self.assertIn("Fleet leads map (authoritative", appendix)
+        self.assertIn("App UI / Expo / EAS Update → DashPro (workspace_dashpro, Dana)", appendix)
+        self.assertIn("workspace_young_eagles_day_care", appendix)
+        self.assertIn("workspace_axon_watch", appendix)
 
     def test_specialist_appendix_requires_lead_handoff_without_name_stamping(self) -> None:
         roster_row = {

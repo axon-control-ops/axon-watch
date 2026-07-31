@@ -3,8 +3,8 @@ import {
   parseLeadFanOutFenceBody,
   tryParseLegacyLeadFanOutText,
 } from '../lead-fan-out-card';
-import { sanitizeResearchCardTitle, sanitizeResearchSnippet } from '../research-snippet';
-import { inferResearchBlockKind, type ResearchBlockKind } from '../research-provider';
+import { parseLeadStandupReport } from '../lead-standup-card';
+import { sanitizeResearchCardTitle, sanitizeResearchSnippet } from '../research-snippet';import { inferResearchBlockKind, type ResearchBlockKind } from '../research-provider';
 import type { AgentTranscriptSegment, ResearchTranscriptItem } from './types';
 import {
   dedupeProseText,
@@ -66,6 +66,19 @@ function upgradeClarifyingTextSegments(
         deferred: leadFanOut.deferred,
         assignments: leadFanOut.assignments,
         notes: leadFanOut.notes,
+      });
+      continue;
+    }
+    const standup = parseLeadStandupReport(segment.text);
+    if (standup) {
+      next.push({
+        kind: 'lead-standup',
+        leadName: standup.leadName,
+        title: standup.title,
+        intro: standup.intro,
+        bodyMarkdown: standup.bodyMarkdown,
+        confidence: standup.confidence,
+        verificationNotice: standup.verificationNotice,
       });
       continue;
     }

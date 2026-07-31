@@ -56,10 +56,18 @@ class ParticipantMemoryTests(unittest.TestCase):
         self.assertIsNone(update_participant_from_utterance(session, "talk to me"))
         self.assertIsNone(get_active_participant(session))
 
-    def test_apply_participant_address_replaces_sir(self) -> None:
+    def test_apply_participant_address_replaces_bare_sir_with_guest(self) -> None:
         line = apply_participant_address("All set, sir — ready for review.", "Sarah")
         self.assertIn("Sarah", line)
-        self.assertNotIn("sir", line.lower())
+        self.assertNotRegex(line, r"(?i)\bsir\b(?!\s+king)")
+
+    def test_guest_active_preserves_sir_king_for_primary_listener(self) -> None:
+        line = apply_participant_address(
+            "Sarah, Sir King asked for the status — here it is.",
+            "Sarah",
+        )
+        self.assertIn("Sir King", line)
+        self.assertIn("Sarah", line)
 
     def test_agents_use_sir_king_when_no_guest(self) -> None:
         line = apply_participant_address(

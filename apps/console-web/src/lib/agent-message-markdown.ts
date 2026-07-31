@@ -53,6 +53,46 @@ export function normalizeEmptyHeaderMarkdownTables(markdown: string): string {
   return out.join('\n');
 }
 
+/**
+ * Repair common agent prose that breaks GFM so replies don't show as raw pipes/bullets.
+ * Example bug: `**Here's where things stand*| Step | … |` (bold glued to table).
+ */
+export function normalizeAgentProseMarkdown(markdown: string): string {
+  let text = String(markdown || '').replace(/\r\n/g, '\n');
+  if (!text.trim()) {
+    return text;
+  }
+
+  // Unicode bullets → GFM list markers.
+  text = text.replace(/(^|\n)\s*[•‣▪◦]\s+/g, '$1- ');
+
+  // Bold label glued into a table header: **Title*| Col | → **Title**\n\n| Col |
+  text = text.replace(
+    /\*\*([^*\n|]+?)\*\|(\s*[^|\n]+\|)/g,
+    (_full, title: string, rest: string) => `**${title.trim()}**\n\n|${rest}`,
+  );
+  // Same pattern without the stray closing star: **Title| Col |
+  text = text.replace(
+    /\*\*([^*\n|]+)\|(\s*[^|\n]+\|)/g,
+    (_full, title: string, rest: string) => `**${title.trim()}**\n\n|${rest}`,
+  );
+
+  // Ensure a blank line before a GFM table that follows prose on the previous line.
+  const lines = text.split('\n');
+  const out: string[] = [];
+  for (let i = 0; i < lines.length; i += 1) {
+    const line = lines[i] ?? '';
+    const prev = out.length ? (out[out.length - 1] ?? '') : '';
+    const isTableRow = /^\|.+\|\s*$/.test(line.trim());
+    const prevIsTable = /^\|.+\|\s*$/.test(prev.trim()) || /^\|?\s*:?-{3,}/.test(prev.trim());
+    if (isTableRow && prev.trim() && !prevIsTable) {
+      out.push('');
+    }
+    out.push(line);
+  }
+  return out.join('\n');
+}
+
 const MARKDOWN_HINT_PATTERN =
   /(^|\n)\s{0,3}(#{1,6}\s|[-*+]\s|\d+\.\s|```|>\s|\|.+\|)|(\*\*|__|`[^`]+`|\[[^\]]+\]\([^)]+\))/;
 
@@ -149,7 +189,9 @@ export function renderAgentMessageMarkdown(
   options: { workspaceId?: string | null } = {},
 ): string {
   const parts = splitAgentMessageForPreview(content);
-  const normalized = normalizeEmptyHeaderMarkdownTables(parts.markdownSource);
+  const normalized = normalizeEmptyHeaderMarkdownTables(
+    normalizeAgentProseMarkdown(parts.markdownSource),
+  );
   const linked = linkifyWorkspacePathsInMarkdown(normalized);
   const html = marked.parse(linked, { async: false }) as string;
   return rewriteMarkdownImageSources(html, options);

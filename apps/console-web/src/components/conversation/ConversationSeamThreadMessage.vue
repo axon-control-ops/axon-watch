@@ -322,13 +322,15 @@ async function copyTerminalOutput(output: string): Promise<void> {
           segment.kind === 'plan' ||
           segment.kind === 'question' ||
           segment.kind === 'research' ||
-          segment.kind === 'lead-fan-out'
+          segment.kind === 'lead-fan-out' ||
+          segment.kind === 'lead-standup'
         "
         :segment="segment"
         :workspace-id="shell.currentWorkspace?.workspace_id ?? null"
         :live="
           segment.kind !== 'plan' &&
           segment.kind !== 'lead-fan-out' &&
+          segment.kind !== 'lead-standup' &&
           segment.open &&
           isStreamingMessage(message.message_id)
         "

@@ -8,6 +8,8 @@
 | `axonfixconnectors.sh` | One-word **`axonfixconnectors`** — diagnose/fix tunnel + required connectors (vault 503 / token missing) |
 | `install-bin-wrappers.sh` | Symlink `bin/axonhealth`, `axonrestart`, `axonrevive`, `axonfixconnectors` into `~/.local/bin/` |
 | `change-verify-loop.sh` | Local change → critical-review clause → `npm run verify:contracts` (supports `--watch`, `--head-only`) |
+| `axon-agent-terminal-job.sh` / `bin/axon-agent-terminal-job` | Enqueue Axon-owned PTY job (OTA/EAS live chat tee + vaxon); `--status` polls job |
+| `watch-fast-gate.sh` | Poll Axon-X Fast Gate for the current branch / run id |
 | `validate_deployment_config.py` | Validate dedicated-server topology + infra artifacts |
 | `run-service.sh` | Start one service using deployment env (systemd wrapper) |
 | `install-user-always-on.sh` | Install/enable user systemd units so the stack stays up on a powered host |

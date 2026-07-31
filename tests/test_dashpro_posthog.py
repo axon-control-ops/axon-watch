@@ -57,6 +57,44 @@ class DashProPostHogMonitorTests(unittest.TestCase):
         self.assertIn("2 recent event(s)", detail)
         self.assertIn("dashboard_loaded", detail)
 
+    def test_timeout_retries_once_then_succeeds(self) -> None:
+        class _FakeResponse:
+            def __init__(self, status: int, payload):
+                self.status = status
+                self._payload = payload
+
+            def read(self):
+                return json.dumps(self._payload).encode("utf-8")
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, exc_type, exc, tb):
+                return False
+
+        calls = {"n": 0}
+
+        def fake_urlopen(req, timeout=0):
+            calls["n"] += 1
+            self.assertEqual(20, timeout)
+            if calls["n"] == 1:
+                raise TimeoutError("The read operation timed out")
+            return _FakeResponse(200, {"results": [{"event": "session_started"}]})
+
+        with patch.object(dashpro_posthog, "urlopen", side_effect=fake_urlopen):
+            status, detail = dashpro_posthog.check_posthog_recent_events(
+                env={
+                    "POSTHOG_PERSONAL_API_KEY": "phx_test",
+                    "DASHPRO_POSTHOG_PROJECT_ID": "proj_123",
+                },
+                timeout_seconds=20,
+                retries=1,
+            )
+
+        self.assertEqual(2, calls["n"])
+        self.assertEqual("ok", status)
+        self.assertIn("session_started", detail)
+
     def test_transport_failure_downgrades_to_warning(self) -> None:
         with patch.object(
             dashpro_posthog,

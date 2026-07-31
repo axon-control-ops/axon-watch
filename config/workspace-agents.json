@@ -60,7 +60,7 @@
         {
           "name": "Dana",
           "role": "lead",
-          "owns": "DashPro priorities; monitor CI→PR→main; ensure green builds reach Vercel production; coach upgrades",
+          "owns": "DashPro priorities; Expo/React Native app UI + parent dashboard + OTA/canary publish; monitor CI→PR→main; ensure green builds reach Vercel production; coach upgrades",
           "schedule": "on_demand",
           "primary": true,
           "azure_voice_id": "en-US-AriaNeural"
@@ -183,7 +183,7 @@
         {
           "name": "Imani",
           "role": "lead",
-          "owns": "Centre priorities, parent comms order, and handoffs",
+          "owns": "Centre priorities, parent/graduation/letter ops order, and handoffs; app UI / parent dashboard / Expo OTA live in DashPro (Dana) — hand off there, do not implement in this client tree",
           "schedule": "on_demand",
           "primary": true,
           "azure_voice_id": "en-ZA-LeahNeural"

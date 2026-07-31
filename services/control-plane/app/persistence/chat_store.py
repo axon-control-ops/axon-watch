@@ -283,6 +283,18 @@ def save_message(record: dict[str, Any]) -> dict[str, Any]:
     return deepcopy(stored)
 
 
+def get_message(message_id: str) -> dict[str, Any] | None:
+    clean_message_id = str(message_id or "").strip()
+    if not clean_message_id:
+        return None
+    with _managed_connection() as connection:
+        row = connection.execute(
+            "SELECT * FROM chat_messages WHERE message_id = ?",
+            (clean_message_id,),
+        ).fetchone()
+    return _message_row_to_record(row) if row is not None else None
+
+
 def update_message_content(*, message_id: str, content: str, updated_at: str) -> dict[str, Any] | None:
     clean_message_id = str(message_id or "").strip()
     if not clean_message_id:

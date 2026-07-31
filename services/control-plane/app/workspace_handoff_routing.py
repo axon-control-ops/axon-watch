@@ -67,6 +67,84 @@ def _lead_employee(workspace_id: str) -> dict[str, str] | None:
     return None
 
 
+def try_autostart_handoff_task(task_id: str) -> dict[str, Any]:
+    """Best-effort operator_start + kick; never fails the handoff route.
+
+    Works under Semi (scheduler paused) because operator_start kicks Lane B
+    dispatch the same way Lead Send does.
+    """
+    cleaned = str(task_id or "").strip()
+    if not cleaned:
+        return {"status": "skipped", "detail": "missing task_id"}
+    from app.workspace_agents.operator_start_task import (
+        OperatorStartTaskError,
+        operator_start_task,
+    )
+
+    try:
+        result = operator_start_task(cleaned)
+    except OperatorStartTaskError as exc:
+        detail = str(exc)
+        # operator_start_task already calls kick_lead_fan_out_dispatch; when the
+        # kick leaves the run queued it raises "remains queued" after leasing.
+        task = task_store.get_task(cleaned) or {}
+        run_id = str(task.get("run_id") or "").strip()
+        task_status = str(task.get("status") or "").strip().lower()
+        detail_l = detail.lower()
+        if "remains queued" in detail_l or (
+            task_status == "leased" and run_id and "queued" in detail_l
+        ):
+            status = "queued"
+        else:
+            status = "waiting"
+        return {
+            "status": status,
+            "run_id": run_id,
+            "detail": detail,
+        }
+    except Exception as exc:  # noqa: BLE001 — soft-fail start
+        logger.exception("handoff autostart failed for %s", cleaned)
+        return {"status": "error", "detail": str(exc)}
+
+    run = result.get("run") or {}
+    run_id = str(run.get("run_id") or "").strip()
+    phase = str(run.get("phase") or "").strip().lower()
+    if phase == "queued":
+        return {
+            "status": "queued",
+            "run_id": run_id,
+            "detail": "ticket leased; waiting on a dispatch slot",
+        }
+    return {
+        "status": "started",
+        "run_id": run_id,
+        "phase": phase,
+        "detail": f"started ({phase or 'running'})",
+    }
+
+
+def _start_status_line(start: dict[str, Any] | None) -> str:
+    if not start:
+        return ""
+    status = str(start.get("status") or "").strip().lower()
+    detail = _truncate(str(start.get("detail") or ""), max_len=160)
+    run_id = str(start.get("run_id") or "").strip()
+    if status == "started":
+        bit = f"Auto-started on the target board (run {run_id})." if run_id else "Auto-started on the target board."
+        return bit
+    if status in {"queued", "waiting"}:
+        bit = (
+            "Ticket is on the target board but waiting on a dispatch slot "
+            "(capacity or busy owner)."
+        )
+        if detail:
+            bit = f"{bit} ({detail})"
+        return bit
+    if status == "error":
+        return f"Ticket routed; auto-start soft-failed ({detail or 'unknown error'})."
+    return ""
+
+
 def _post_target_thread_messages(
     *,
     workspace_id: str,
@@ -78,6 +156,7 @@ def _post_target_thread_messages(
     employee_id: str,
     employee_role: str,
     employee_name: str,
+    start: dict[str, Any] | None = None,
 ) -> str | None:
     created_at = _utc_now_iso()
     thread = chat_store.find_thread_for_employee(
@@ -119,10 +198,14 @@ def _post_target_thread_messages(
     ]
     if reason_line:
         agent_lines.append(f"Reason: {reason_line}")
-    agent_lines.append(
-        "This task is on the target workspace board. "
-        "Pick it up here or ask Lead to fan it out."
-    )
+    start_line = _start_status_line(start)
+    if start_line:
+        agent_lines.append(start_line)
+    else:
+        agent_lines.append(
+            "This task is on the target workspace board. "
+            "Pick it up here or ask Lead to fan it out."
+        )
     chat_store.save_message(
         {
             "message_id": f"message_agent_{uuid4().hex}",
@@ -145,6 +228,7 @@ def _post_source_ack(
     task_id: str,
     routed_name: str,
     task_text: str,
+    start: dict[str, Any] | None = None,
 ) -> str | None:
     lead = _lead_employee(workspace_id)
     if lead is None:
@@ -167,6 +251,8 @@ def _post_source_ack(
         )
     thread_id = str(thread["thread_id"])
     target_label = _workspace_label(target_workspace_id)
+    target_lead = _lead_employee(target_workspace_id)
+    target_lead_name = (target_lead or {}).get("name") or "Lead"
     chat_store.save_message(
         {
             "message_id": f"message_system_{uuid4().hex}",
@@ -181,6 +267,9 @@ def _post_source_ack(
             "created_at": created_at,
         }
     )
+    follow = _start_status_line(start)
+    if not follow:
+        follow = "Watch that workspace board for live follow-through."
     chat_store.save_message(
         {
             "message_id": f"message_agent_{uuid4().hex}",
@@ -189,9 +278,11 @@ def _post_source_ack(
             "run_id": None,
             "role": "agent",
             "content": (
-                f"I handed “{_truncate(task_text, max_len=160)}” to {target_label}. "
-                f"{routed_name} owns the ticket there. "
-                "Switch workspaces when you want live follow-through."
+                f"I handed “{_truncate(task_text, max_len=160)}” to {target_label} "
+                f"({target_workspace_id}). "
+                f"{routed_name} owns the ticket there; {target_lead_name} is the "
+                f"company Lead. {follow} "
+                "Switch workspaces when you want the live thread."
             ),
             "created_at": created_at,
         }
@@ -256,6 +347,10 @@ def route_cross_workspace_ticket(handoff: dict[str, Any]) -> dict[str, Any]:
         return handoff
 
     task_id = str(task.get("task_id") or "").strip()
+    start: dict[str, Any] | None = None
+    if task_id:
+        start = try_autostart_handoff_task(task_id)
+
     communication_thread_id = None
     source_communication_thread_id = None
     if routed_employee_id:
@@ -270,6 +365,7 @@ def route_cross_workspace_ticket(handoff: dict[str, Any]) -> dict[str, Any]:
                 employee_id=routed_employee_id,
                 employee_role=routed_role or "lead",
                 employee_name=routed_name,
+                start=start,
             )
         except Exception:  # noqa: BLE001 — task still exists without chat
             logger.exception("target handoff communication failed for %s", handoff_id)
@@ -282,6 +378,7 @@ def route_cross_workspace_ticket(handoff: dict[str, Any]) -> dict[str, Any]:
             task_id=task_id,
             routed_name=routed_name,
             task_text=task_text,
+            start=start,
         )
     except Exception:  # noqa: BLE001 — target ticket still valid
         logger.exception("source handoff ack failed for %s", handoff_id)

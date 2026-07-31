@@ -24,7 +24,11 @@ from app.routes.schemas import (
     WorkspaceComposerPrefsRequest,
     WriteWorkspaceFileRequest,
 )
-from app.terminal.agent_jobs import enqueue_agent_terminal_job, list_agent_terminal_jobs
+from app.terminal.agent_jobs import (
+    enqueue_agent_terminal_job,
+    get_agent_terminal_job,
+    list_agent_terminal_jobs,
+)
 from app.terminal.session_handler import handle_terminal_session
 from app.terminal.session_registry import (
     create_session,
@@ -355,6 +359,9 @@ def workspace_terminal_agent_jobs_enqueue(
             workspace_id=workspace_id,
             command=body.command,
             run_id=body.run_id,
+            stream_to_chat=body.stream_to_chat,
+            thread_id=body.thread_id,
+            message_id=body.message_id,
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
@@ -371,6 +378,18 @@ def workspace_terminal_agent_jobs_list(
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     items = list_agent_terminal_jobs(workspace_id, limit=limit)
     return {"workspace_id": workspace_id, "items": items, "count": len(items)}
+
+
+@router.get("/api/workspaces/{workspace_id}/terminal/agent-jobs/{job_id}")
+def workspace_terminal_agent_job_get(workspace_id: str, job_id: str) -> dict[str, object]:
+    try:
+        get_workspace_record(workspace_id)
+    except WorkspaceNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    record = get_agent_terminal_job(job_id)
+    if record is None or str(record.get("workspace_id") or "") != str(workspace_id).strip():
+        raise HTTPException(status_code=404, detail="agent terminal job not found")
+    return record
 
 
 @router.get("/api/workspaces/{workspace_id}/files")

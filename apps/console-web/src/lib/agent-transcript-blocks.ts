@@ -2,6 +2,7 @@
 
 import { sanitizeAgentThinkingForOperator, THINKING_SPEECH_FALLBACK } from './agent-live-line-view';
 import { tryParseLegacyLeadFanOutText } from './lead-fan-out-card';
+import { looksLikeLeadStandupReport } from './lead-standup-card';
 
 export type {
   AgentTranscriptSegment,
@@ -32,8 +33,10 @@ export function agentContentHasTranscriptBlocks(content: string): boolean {
   ) {
     return true;
   }
-  // Legacy Lead essays (pre-fence) still get the cinematic fan-out card.
-  return tryParseLegacyLeadFanOutText(content) != null;
+  // Legacy Lead essays (pre-fence) still get the cinematic fan-out / stand-up cards.
+  return (
+    tryParseLegacyLeadFanOutText(content) != null || looksLikeLeadStandupReport(content)
+  );
 }
 
 export function countAgentTranscriptHeaders(content: string): {

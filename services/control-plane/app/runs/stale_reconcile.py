@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import logging
 import os
+import re
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any
 
 from app.domain.run_state import is_terminal_phase
@@ -16,8 +18,18 @@ logger = logging.getLogger(__name__)
 DEFAULT_STALE_SECONDS = 720.0
 # Lead shifts coordinate specialists and often run longer than a single CLI turn.
 DEFAULT_LEAD_STALE_SECONDS = 1800.0
+# Canary/production OTA (expo export + eas update) regularly exceeds 30 minutes when
+# Dana blocks on Cursor shellToolCall — do not stale-fail Mid-export.
+DEFAULT_OTA_LEAD_STALE_SECONDS = 5400.0
 _STALE_SUMMARY = "Continuous worker run exceeded stale timeout"
 _PAUSED_ABANDON_SUMMARY = "Paused continuous worker run abandoned after stale timeout"
+_OTA_RUN_TEXT_RE = re.compile(
+    r"(?i)\b(?:ota(?:\s*canary|\s*production)?|canary\s*ota|eas\s+update|expo\s+export)\b"
+)
+_HOST_SHIP_CMDLINE_RE = re.compile(
+    r"(?i)(?:npm\s+run\s+ota(?::[\w-]*)?|ota:(?:canary|production)|"
+    r"eas(?:-wrapper)?\s+update|expo\s+export)"
+)
 
 # Phases that mean a role is still doing (or waiting on) in-flight work.
 BUSY_EMPLOYEE_PHASES = frozenset(
@@ -52,6 +64,61 @@ def employee_run_stale_seconds_for_role(role: str | None) -> float:
         except ValueError:
             pass
     return max(base, DEFAULT_LEAD_STALE_SECONDS)
+
+
+def run_looks_like_ota_ship(record: dict[str, Any] | None) -> bool:
+    """True when the run summary/detail is an OTA / EAS ship job."""
+    if not isinstance(record, dict):
+        return False
+    blob = " ".join(
+        str(record.get(key) or "")
+        for key in ("summary", "detail", "current_step")
+    )
+    return bool(_OTA_RUN_TEXT_RE.search(blob))
+
+
+def employee_run_stale_seconds_for_record(record: dict[str, Any] | None) -> float:
+    """TTL for a concrete run — OTA Lead ships get a longer default than board work."""
+    role = str((record or {}).get("employee_role") or "").strip().lower()
+    base = employee_run_stale_seconds_for_role(role)
+    if role != "lead" or not run_looks_like_ota_ship(record):
+        return base
+    raw = os.environ.get("AXON_WATCH_OTA_LEAD_RUN_STALE_SECONDS", "").strip()
+    if raw:
+        try:
+            return max(base, float(raw))
+        except ValueError:
+            pass
+    return max(base, DEFAULT_OTA_LEAD_STALE_SECONDS)
+
+
+def host_long_running_ship_active() -> bool:
+    """True when a local Expo/EAS/OTA ship process is still running.
+
+    Used as a fail-closed guard so we do not mark Dana's Lead run failed while
+    ``expo export`` / ``eas update`` continues (orphaned Cursor shell case).
+    """
+    proc = Path("/proc")
+    if not proc.is_dir():
+        return False
+    try:
+        entries = list(proc.iterdir())
+    except OSError:
+        return False
+    for entry in entries:
+        name = entry.name
+        if not name.isdigit():
+            continue
+        try:
+            raw = (entry / "cmdline").read_bytes()
+        except OSError:
+            continue
+        if not raw:
+            continue
+        cmdline = raw.replace(b"\x00", b" ").decode("utf-8", errors="ignore")
+        if _HOST_SHIP_CMDLINE_RE.search(cmdline):
+            return True
+    return False
 
 
 def _parse_iso(value: object) -> datetime | None:
@@ -103,9 +170,16 @@ def _run_idle_age_seconds(record: dict[str, Any], *, now: datetime) -> float | N
     return max(0.0, (now - stamp).total_seconds())
 
 
-def _normalize_cutoff(stale_seconds: float | None, *, role: str | None = None) -> float:
+def _normalize_cutoff(
+    stale_seconds: float | None,
+    *,
+    role: str | None = None,
+    record: dict[str, Any] | None = None,
+) -> float:
     if stale_seconds is not None:
         return max(60.0, float(stale_seconds))
+    if record is not None:
+        return employee_run_stale_seconds_for_record(record)
     return employee_run_stale_seconds_for_role(role)
 
 
@@ -222,12 +296,28 @@ def reap_stale_employee_runs(
         phase = str(record.get("phase") or "").strip()
         if is_terminal_phase(phase):
             continue
-        cutoff = _normalize_cutoff(stale_seconds, role=role)
+        cutoff = _normalize_cutoff(stale_seconds, role=role, record=record)
         age = _run_idle_age_seconds(record, now=moment)
         if age is None or age < cutoff:
             continue
         run_id = str(record.get("run_id") or "").strip()
         if not run_id:
+            continue
+
+        # OTA ships often block Cursor shell with no stream chunks — idle age looks
+        # dead while expo/eas is still working. Prefer keeping the Lead run alive.
+        if (
+            phase == "executing"
+            and run_looks_like_ota_ship(record)
+            and host_long_running_ship_active()
+        ):
+            logger.info(
+                "skipping stale reap for OTA lead run %s — host ship process still active "
+                "(idle_s=%.0f cutoff_s=%.0f)",
+                run_id,
+                age,
+                cutoff,
+            )
             continue
 
         if phase == "paused":
@@ -284,8 +374,12 @@ def reap_stale_employee_runs(
 __all__ = [
     "BUSY_EMPLOYEE_PHASES",
     "DEFAULT_LEAD_STALE_SECONDS",
+    "DEFAULT_OTA_LEAD_STALE_SECONDS",
     "DEFAULT_STALE_SECONDS",
     "employee_run_stale_seconds",
+    "employee_run_stale_seconds_for_record",
     "employee_run_stale_seconds_for_role",
+    "host_long_running_ship_active",
     "reap_stale_employee_runs",
+    "run_looks_like_ota_ship",
 ]

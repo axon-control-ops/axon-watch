@@ -3,8 +3,6 @@
 from __future__ import annotations
 
 import logging
-import threading
-import time
 from dataclasses import dataclass
 from datetime import datetime, timezone
 
@@ -13,16 +11,16 @@ from app.chat.lane_b_generated_image_actions import (
     bind_agent_generated_images,
     lane_b_open_file_ui_action,
 )
+from app.chat.chat_stream_defer import finish_chat_stream
+from app.chat.lane_b_stream_progress import build_lane_b_stream_on_chunk
 from app.chat.reply_verification import verify_lane_b_reply
 from app.cli_runtime.approval_gate import is_tool_capable_composer_mode
 from app.cli_runtime.research_stream_blocks import normalize_transcript_content
 from app.chat.progress_milestones import (
-    persist_stream_delta,
     publish_completion_milestone,
     publish_stream_error_milestone,
 )
 from app.plans.service import maybe_attach_plan_artifact
-from app.chat.stream_hub import close_chat_stream, clear_chat_stream_buffer, publish_chat_stream_event
 from app.kairo.turn_memory import remember_turn
 from app.persistence import chat_store
 from app.runs.service import (
@@ -33,6 +31,11 @@ from app.runs.service import (
     fail_run,
     get_run,
 )
+from app.terminal.active_chat_stream import (
+    clear_active_chat_stream,
+    register_active_chat_stream,
+)
+from app.terminal.agent_job_chat import merge_active_agent_job_terminals
 from app.terminal.workspace_roots import WorkspaceRootError, resolve_workspace_root
 from app.workspace_agents.critical_review_clause import (
     MISSING_CONFIDENCE_DETAIL,
@@ -45,9 +48,6 @@ from app.workspace_agents.employee_first_person import (
 )
 
 logger = logging.getLogger(__name__)
-
-# Keep role-tagged IDE turns ahead of the stale reaper during long Cursor sessions.
-_LANE_B_PROGRESS_RECEIPT_MIN_SECONDS = 60.0
 
 
 @dataclass(frozen=True)
@@ -310,39 +310,17 @@ def execute_lane_b_stream(job: LaneBStreamJob) -> None:
     dispatched = False
     run_record = None
     lane_b_result: dict[str, object] = {}
-    milestone_content = ""
-    progress_lock = threading.Lock()
-    last_progress_at = 0.0
-
-    def on_chunk(accumulated: str, delta: str) -> None:
-        nonlocal milestone_content, last_progress_at
-        milestone_content = persist_stream_delta(
-            thread_id=job.thread_id,
-            message_id=job.agent_message_id,
-            previous_content=milestone_content,
-            accumulated=accumulated,
-            delta=delta,
-            updated_at=_utc_now(),
-        )
-        # Role-tagged IDE turns need non-heartbeat receipts or the 12-minute stale
-        # reaper treats a long Cursor agent session as hung (especially Lead).
-        run_id = str(job.dispatch_run_id or "").strip()
-        if not run_id:
-            return
-        now = time.monotonic()
-        with progress_lock:
-            if now - last_progress_at < _LANE_B_PROGRESS_RECEIPT_MIN_SECONDS:
-                return
-            last_progress_at = now
-        try:
-            append_run_execution_receipt(
-                run_id,
-                receipt_type="worker_progress",
-                receipt_summary="IDE agent turn still executing",
-                actor="cli_runtime",
-            )
-        except (RunLifecycleError, RunNotFoundError):
-            return
+    register_active_chat_stream(
+        workspace_id=job.workspace_id,
+        thread_id=job.thread_id,
+        message_id=job.agent_message_id,
+        run_id=job.dispatch_run_id,
+    )
+    on_chunk, _get_milestone_content = build_lane_b_stream_on_chunk(
+        thread_id=job.thread_id,
+        agent_message_id=job.agent_message_id,
+        dispatch_run_id=job.dispatch_run_id,
+    )
 
     try:
         lane_b_result = generate_lane_b_result(
@@ -390,6 +368,10 @@ def execute_lane_b_stream(job: LaneBStreamJob) -> None:
             source_message_id=job.agent_message_id,
             agent_content=agent_content,
             created_at=updated_at,
+        )
+        agent_content = merge_active_agent_job_terminals(
+            job.agent_message_id,
+            agent_content,
         )
         chat_store.update_message_content(
             message_id=job.agent_message_id,
@@ -456,9 +438,10 @@ def execute_lane_b_stream(job: LaneBStreamJob) -> None:
             lane_b_result=lane_b_result,
             agent_content=agent_content,
         )
-        publish_chat_stream_event(
-            job.thread_id,
-            {
+        finish_chat_stream(
+            thread_id=job.thread_id,
+            message_id=job.agent_message_id,
+            terminal_payload={
                 "type": "chat_stream_done",
                 "thread_id": job.thread_id,
                 "message_id": job.agent_message_id,
@@ -475,6 +458,7 @@ def execute_lane_b_stream(job: LaneBStreamJob) -> None:
         )
     except Exception as exc:
         fallback = str(exc).strip() or "runtime stream failed"
+        fallback = merge_active_agent_job_terminals(job.agent_message_id, fallback)
         updated_at = _utc_now()
         chat_store.update_message_content(
             message_id=job.agent_message_id,
@@ -495,9 +479,10 @@ def execute_lane_b_stream(job: LaneBStreamJob) -> None:
             message_id=job.agent_message_id,
             error=fallback,
         )
-        publish_chat_stream_event(
-            job.thread_id,
-            {
+        finish_chat_stream(
+            thread_id=job.thread_id,
+            message_id=job.agent_message_id,
+            terminal_payload={
                 "type": "chat_stream_error",
                 "thread_id": job.thread_id,
                 "message_id": job.agent_message_id,
@@ -508,5 +493,4 @@ def execute_lane_b_stream(job: LaneBStreamJob) -> None:
             },
         )
     finally:
-        close_chat_stream(job.thread_id)
-        clear_chat_stream_buffer(job.thread_id)
+        clear_active_chat_stream(job.workspace_id, message_id=job.agent_message_id)

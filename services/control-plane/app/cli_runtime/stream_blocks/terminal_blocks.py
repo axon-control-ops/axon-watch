@@ -152,6 +152,76 @@ def terminal_close_body(output: str) -> str:
     return ":::\n"
 
 
+def axon_job_terminal_marker(job_id: str) -> str:
+    clean = str(job_id or "").strip()
+    return f"# axon-job:{clean}" if clean else ""
+
+
+def render_axon_job_terminal_fence(
+    *,
+    command: str,
+    job_id: str,
+    body: str,
+    closed: bool,
+    exit_code: int | None = None,
+) -> str:
+    """Render an open or closed live `:::terminal` fence tagged with a job id."""
+    clean_job = str(job_id or "").strip()
+    if not clean_job:
+        return ""
+    started = terminal_started_block(command, f"axon-job:{clean_job}")
+    if not started:
+        return ""
+    text_body = str(body or "")
+    if exit_code is not None and closed:
+        exit_line = f"\n[exit {int(exit_code)}]"
+        if exit_line.strip() not in text_body:
+            text_body = f"{text_body.rstrip()}{exit_line}\n"
+    if not closed:
+        return f"{started}{text_body}"
+    trimmed = terminal_output_preview(text_body) if text_body.strip() else ""
+    if trimmed:
+        return f"{started}{trimmed}\n:::\n"
+    return f"{started}:::\n"
+
+
+def upsert_axon_job_terminal_fence(content: str, fence: str, *, job_id: str) -> str:
+    """Insert or replace the live fence for ``job_id`` inside transcript content."""
+    clean_job = str(job_id or "").strip()
+    rendered = str(fence or "")
+    if not clean_job or not rendered.strip():
+        return content
+    marker = f"# axon-job:{clean_job}"
+    text = str(content or "")
+    if marker not in text:
+        if not text.strip():
+            return rendered.lstrip("\n") if rendered.startswith("\n") else rendered
+        return text.rstrip() + "\n" + rendered.lstrip("\n")
+
+    # Replace from the :::terminal line that owns this marker through either
+    # the closing ::: or end-of-string (open fence).
+    pattern = re.compile(
+        rf"\n?:::terminal[^\n]*\n{re.escape(marker)}\n"
+        r"(?:.*?)(?=\n:::terminal |\n:::\n|\Z)",
+        re.DOTALL,
+    )
+    replacement = rendered if rendered.startswith("\n") else f"\n{rendered.lstrip()}"
+    # If fence is closed, include trailing ::: in rendered; open fences have no :::.
+    if rendered.rstrip().endswith(":::"):
+        closed_pattern = re.compile(
+            rf"\n?:::terminal[^\n]*\n{re.escape(marker)}\n"
+            r"(?:.*?)(?:\n:::\n|\Z)",
+            re.DOTALL,
+        )
+        updated, count = closed_pattern.subn(replacement + ("\n" if not replacement.endswith("\n") else ""), text, count=1)
+        if count:
+            return updated
+    updated, count = pattern.subn(replacement, text, count=1)
+    if count:
+        return updated
+    return text.rstrip() + "\n" + rendered.lstrip("\n")
+
+
 def terminal_started_block_from_event(event: dict[str, Any]) -> str:
     """Open a live `:::terminal` block when a shell tool call starts (Cursor parity)."""
     if event.get("type") != "tool_call" or event.get("subtype") != "started":

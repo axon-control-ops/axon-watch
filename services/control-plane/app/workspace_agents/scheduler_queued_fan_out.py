@@ -11,10 +11,37 @@ from app.domain.run_state import is_terminal_phase
 from app.persistence import task_store, worker_scheduler_settings_store
 from app.runs.begin_execution import begin_execution
 from app.runs.service import RunLifecycleError, list_runs
+from app.runs.stale_reconcile import BUSY_EMPLOYEE_PHASES
 from app.workspace_agents.config_loader import EmployeeConfig
 from app.workspace_agents.worker_dispatch import worker_dispatch_enabled
 
 logger = logging.getLogger(__name__)
+
+
+def _role_busy_elsewhere(
+    *,
+    workspace_id: str,
+    role: str,
+    exclude_run_id: str,
+) -> bool:
+    """True when another in-flight run already owns this workspace role."""
+    cleaned_workspace = workspace_id.strip()
+    cleaned_role = role.strip().lower()
+    exclude = exclude_run_id.strip()
+    if not cleaned_workspace or not cleaned_role:
+        return False
+    for run in list_runs():
+        run_id = str(run.get("run_id") or "").strip()
+        if exclude and run_id == exclude:
+            continue
+        if str(run.get("workspace_id") or "").strip() != cleaned_workspace:
+            continue
+        if str(run.get("employee_role") or "").strip().lower() != cleaned_role:
+            continue
+        phase = str(run.get("phase") or "").strip()
+        if phase in BUSY_EMPLOYEE_PHASES and not is_terminal_phase(phase):
+            return True
+    return False
 
 
 def dispatch_queued_lead_fan_out_runs(
@@ -74,6 +101,18 @@ def dispatch_queued_lead_fan_out_runs(
             role,
             file_enabled=bool(employee.enabled),
         ):
+            continue
+        if _role_busy_elsewhere(
+            workspace_id=workspace_id,
+            role=role,
+            exclude_run_id=run_id,
+        ):
+            logger.info(
+                "queued fan-out skipped run=%s role=%s workspace=%s: role already busy",
+                run_id,
+                role,
+                workspace_id,
+            )
             continue
         try:
             advanced = begin_execution(
