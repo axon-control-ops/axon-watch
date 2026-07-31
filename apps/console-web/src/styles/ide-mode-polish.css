@@ -17,10 +17,13 @@
   color: rgba(165, 180, 252, 0.88);
 }
 
+/* The attention strip track carries a headline plus run controls, so it gets a
+   floor instead of collapsing to 0. min(..., 100%) keeps narrow viewports from
+   overflowing the topbar. */
 .console-shell--ide .topbar-mockup__grid--ide-interrupt {
   grid-template-columns:
     minmax(10rem, 0.9fr)
-    minmax(0, 1.6fr)
+    minmax(min(23rem, 100%), 1.9fr)
     minmax(11rem, 14rem)
     auto;
 }

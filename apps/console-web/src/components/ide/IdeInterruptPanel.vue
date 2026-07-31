@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, nextTick, onMounted, ref, watch } from 'vue';
 
 import {
   isIdeInterruptStopDisabled,
@@ -120,11 +120,84 @@ function stopActiveRun(): void {
 
   void shell.stopPrimaryRun();
 }
+
+// #region agent log
+const debugStripRef = ref<HTMLElement | null>(null);
+
+function agentLogStripGeometry(phase: string): void {
+  const strip = debugStripRef.value;
+  if (!strip) {
+    return;
+  }
+  const summary = strip.querySelector<HTMLElement>('.ide-interrupt-topbar__summary');
+  const badge = strip.querySelector<HTMLElement>('.ide-interrupt-topbar__badge');
+  const grid = strip.closest<HTMLElement>('.topbar-mockup__grid');
+  const pill = grid?.querySelector<HTMLElement>('.kairo-presence-module');
+  const identity = grid?.querySelector<HTMLElement>('.topbar-mockup__identity-zone');
+  const stripBox = strip.getBoundingClientRect();
+  const stripStyle = getComputedStyle(strip);
+  const rootFont = parseFloat(getComputedStyle(document.documentElement).fontSize);
+  const payload = {
+    sessionId: 'db8bb4',
+    runId: 'post-fix',
+    hypothesisId: 'H1,H2,H3,H4,H5',
+    location: 'IdeInterruptPanel.vue:strip-geometry',
+    message: `attention strip geometry (${phase})`,
+    data: {
+      phase,
+      rootFontPx: rootFont,
+      topbarHeightToken: getComputedStyle(document.documentElement)
+        .getPropertyValue('--topbar-height')
+        .trim(),
+      stripHeightPx: Math.round(stripBox.height * 100) / 100,
+      stripWidthPx: Math.round(stripBox.width * 100) / 100,
+      stripCssHeight: stripStyle.height,
+      stripCssMaxHeight: stripStyle.maxHeight,
+      stripCssMaxWidth: stripStyle.maxWidth,
+      gridRowHeightPx: grid ? Math.round(grid.getBoundingClientRect().height * 100) / 100 : null,
+      gridColumnWidthPx: strip.parentElement
+        ? Math.round(strip.getBoundingClientRect().width * 100) / 100
+        : null,
+      siblingPillHeightPx: pill ? Math.round(pill.getBoundingClientRect().height * 100) / 100 : null,
+      siblingIdentityHeightPx: identity
+        ? Math.round(identity.getBoundingClientRect().height * 100) / 100
+        : null,
+      summaryFontPx: summary ? getComputedStyle(summary).fontSize : null,
+      badgeFontPx: badge ? getComputedStyle(badge).fontSize : null,
+      summaryScrollWidth: summary?.scrollWidth ?? null,
+      summaryClientWidth: summary?.clientWidth ?? null,
+      summaryTextClipped: summary ? summary.scrollWidth > summary.clientWidth + 1 : null,
+      stripScrollHeight: strip.scrollHeight,
+      stripClientHeight: strip.clientHeight,
+      stripContentClipped: strip.scrollHeight > strip.clientHeight + 1,
+      labelText: compactLabel.value,
+    },
+    timestamp: Date.now(),
+  };
+  fetch('http://127.0.0.1:7706/ingest/90bcaec2-2b39-4d4a-84b5-157c12735440', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': 'db8bb4' },
+    body: JSON.stringify(payload),
+  }).catch(() => {});
+}
+
+onMounted(() => {
+  void nextTick(() => agentLogStripGeometry('mounted'));
+});
+
+watch(compactLabel, () => {
+  void nextTick(() => agentLogStripGeometry('label-change'));
+});
+
+(window as unknown as Record<string, unknown>).__axonDebugStripMeasure = (phase: string) =>
+  agentLogStripGeometry(phase);
+// #endregion
 </script>
 
 <template>
   <div
     v-if="showPanel"
+    ref="debugStripRef"
     class="ide-interrupt-topbar"
     role="status"
     aria-live="polite"
@@ -172,24 +245,27 @@ function stopActiveRun(): void {
 </template>
 
 <style scoped>
+/* Height follows the topbar's compact-chip convention (.kairo-presence-module--chip)
+   so the strip reads as a sibling of the ATTENTION pill rather than a hairline.
+   min-height (not height/max-height) keeps text from being clipped when it is
+   resized up to 200% — WCAG 2.2 SC 1.4.4, failure F69. */
 .ide-interrupt-topbar {
   display: flex;
   align-items: center;
-  gap: 0.28rem;
-  min-width: 0;
-  max-width: min(36vw, 24rem);
-  height: 1.2rem;
-  max-height: 1.2rem;
-  padding: 0 0.32rem;
+  gap: 0.35rem;
+  min-width: min(100%, 13rem);
+  max-width: min(48vw, 34rem);
+  min-height: 2.2rem;
+  padding: 0.2rem 0.5rem;
   border: 1px solid rgba(255, 120, 72, 0.32);
-  border-radius: 0.22rem;
+  border-radius: 0.28rem;
   background: rgba(24, 12, 8, 0.82);
   box-shadow: none;
 }
 
 .ide-interrupt-topbar__badge {
   flex-shrink: 0;
-  font-size: 0.46rem;
+  font-size: 0.58rem;
   letter-spacing: 0.06em;
   font-weight: 700;
   color: rgba(255, 160, 120, 0.95);
@@ -199,8 +275,8 @@ function stopActiveRun(): void {
   margin: 0;
   min-width: 0;
   flex: 1 1 auto;
-  font-size: 0.52rem;
-  line-height: 1.1;
+  font-size: 0.72rem;
+  line-height: 1.25;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -209,21 +285,23 @@ function stopActiveRun(): void {
 .ide-interrupt-topbar__actions {
   display: flex;
   align-items: center;
-  gap: 0.14rem;
+  gap: 0.25rem;
   flex-shrink: 0;
 }
 
+/* 24px floor keeps these pointer targets at the WCAG 2.2 SC 2.5.8 minimum. */
 .ide-interrupt-topbar__button {
   border: 1px solid rgba(255, 255, 255, 0.14);
-  border-radius: 0.18rem;
+  border-radius: 0.22rem;
   background: rgba(255, 255, 255, 0.04);
   color: inherit;
   cursor: pointer;
   font: inherit;
-  font-size: 0.48rem;
+  font-size: 0.64rem;
   letter-spacing: 0.03em;
   line-height: 1;
-  padding: 0.1rem 0.28rem;
+  min-height: 24px;
+  padding: 0.25rem 0.5rem;
   white-space: nowrap;
 }
 

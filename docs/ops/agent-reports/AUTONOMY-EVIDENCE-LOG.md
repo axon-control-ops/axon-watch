@@ -233,3 +233,30 @@ Template:
 - acceptance evidence: `acceptance=pass · intent=gate6_acceptance · actor=lead-retry-receipt · summary=Lead follow-up task-950c0b6e0dd045d7 completed; Fast Gate failure triaged (5 ratchet files); health+console+watch green; 35 unit tests OK; hotspot guardrail pass; Rowan kept on file-size patrols; Reed stale-timeout on backend thread; ship not approved`
 - residual risks: Rowan Gate 6 still failing on watcher thread (`run_e3833796838b`); Reed stale timeout (`run_b0690547509b`); DashPro Sentry critical needs Sir King Decide; Gate-verify plans still awaiting engagement (4 per briefing)
 - next gate unlocked: Rowan shrink 5 ratchet files with verifier green; Jules on `OperatorTaskBoardPanel.vue`; Reed on `lead_vaxon_handoff.py`; Sir King Decide DashPro Sentry
+
+### Lead continuous shift retry (Critical Review) — 2026-07-31
+- owner: lead (`run_c58f590bc5fb`; prior fail `run_b7542dbf6a23` — Critical Review Clause missing Confidence line; task `task-130a2378537642ae`)
+- commit: evidence append only (no push this shift)
+- commands run: `GET /health` + `/api/runtime/summary` + `/api/briefing` + `/api/workspaces/workspace_axon_watch/company`; console `:5173` (200); `gh run list` + `gh run view 30648759025`; `./scripts/dev/python.sh -m unittest` Lead+run_outcome (26 OK); `scripts/guardrails/check_hotspot_changes.py` pass
+- pass/fail: pass for bounded Lead retry — fleet rollup, Fast Gate green on feature branch, coach assignments for Rowan/Quinn Gate 6, upgrade notes, Gate 6 acceptance receipt documented
+- exit criteria met: yes for bounded Lead shift (priorities / hierarchy / Fast Gate triage / coach workspace leads / propose upgrades)
+- Fast Gate: **success** on `feat/mission-control-holographic` — https://github.com/axon-control-ops/axon-watch/actions/runs/30648759025 (PR #43 pipeline also cites success run `30587150556` on roster)
+- fleet: control-plane ok · watch connected · connectors 6/6 ok · active_runs [] · open Axon-X tasks 3 (Rowan failed_shift `task-b5db77cda2ad427c`, Quinn failed_shift `task-1f499843c3424aa9`, cross-workspace DashPro control-plane fix for Dana)
+- acceptance evidence: `acceptance=pass · intent=gate6_acceptance · actor=lead-retry-receipt · summary=Health+console+watch green; Fast Gate success 30648759025; Reed/Jules last runs completed with CI green; Rowan+Quinn coached to clear Gate 6 acceptance on their threads; briefing advises DashPro Sentry critical (811 events, 5 issues) — Dana owns product fix; 15 Lead-team plans awaiting engagement in Mission Control; 26 unit tests OK; hotspot guardrail pass; ship not approved`
+- coach decisions: Rowan → finish `task-b5db77cda2ad427c` with verifier + Confidence; Quinn → same on `task-1f499843c3424aa9`; Dana → DashPro Sentry + Fees/usage blockers per open handoff task; do not re-run Lead failed_shift duplicates while these three are open
+- upgrade proposals: (1) keep Critical Review + Confidence as hard completion gate for every employee reply; (2) surface Gate 6 acceptance template in specialist prompts to cut Rowan/Quinn repeat fails; (3) batch-review the 15 waiting Lead-team plans or cancel stale ones to reduce briefing noise
+- residual risks: Rowan (`run_b6849d047d26`) and Quinn (`run_01bb18cb3b92`) still Gate 6-blocked until their threads post passing acceptance; DashPro production errors need product decision; `shell.ts` still under active hotspot waiver until 2026-08-30
+- next gate unlocked: Rowan and Quinn retry on their assigned failed_shift tasks; Sir King Decide on DashPro Sentry signal; VAXON engage waiting Lead-team plans when ready
+
+### Integrations continuous shift retry (Gate 6) — 2026-07-31
+- owner: integrations (`run_a9c535fdb8ac`; prior fail `run_01bb18cb3b92` — `acceptance=fail · failed_checks=typecheck,test,build · mode=contract · paths=0`; failed_shift task `task-1f499843c3424aa9`)
+- commit: not requested this shift (local fixes only)
+- commands run: `GET /api/runs/run_01bb18cb3b92` + history; `GET /api/runtime/summary` + `/api/workspaces/workspace_axon_watch/company`; `gh run list` Fast Gate success `30648759025`; `npm run verify:console-web` (after typecheck fix); `./scripts/verify/run_contract_unit_tests.sh`; Gate 6 eval via `verifier_contract.ensure_acceptance_before_publish` profile (contract mode)
+- pass/fail: pass for bounded integrations retry — root-caused Gate 6 on billing-decide task; cleared local typecheck blocker; connectors/watch/Fast Gate receipts documented
+- exit criteria met: yes for investigate + fix Gate 6 blocker on integrations thread (not ship)
+- root cause: `task-08447b7718d745bf` correctly recorded GitHub Actions org billing blocker (runs `30639426185`, `30639425682`, `30639425946`) but worker isolation published **paths=0**; contract still ran typecheck/test/build and failed (partial mock in `create-operator-focus-slice.test.ts` plus host OOM on default heap during vue-tsc). Critical Review on that run passed **9/10** — delivery failed on Gate 6 only.
+- fleet: control-plane ok · watch connected · connectors 6/6 ok · Axon-X Fast Gate green on `feat/mission-control-holographic` — https://github.com/axon-control-ops/axon-watch/actions/runs/30648759025
+- code change: `apps/console-web/src/stores/shell/slices/create-operator-focus-slice.test.ts` — `as unknown as` cast on partial `operatorBriefing` mock (unblocks vue-tsc / Gate 6 contract checks)
+- acceptance evidence (this retry scope): `acceptance=pass · intent=gate6_acceptance · actor=integrations-retry-receipt · summary=run_01bb18cb3b92 triaged (billing-not-code + paths=0 Gate 6 miss); verify:console-web+contract unit tests green locally; Fast Gate 30648759025; watch 6/6 connectors; reverted stray IdeActivityBar whitespace; ship not approved`
+- residual risks: DashPro org billing still blocks dashpro main CI until Sir King fixes payment/spend limit; Rowan Gate 6 still open on watcher thread; decision-only tasks may need Reed policy so Gate 6 does not require full build when paths=0
+- next gate unlocked: Lead close `task-1f499843c3424aa9` after publish; Sir King billing on axon-control-ops; Jules owns any further IdeActivityBar product polish

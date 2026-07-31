@@ -121,7 +121,7 @@ describe('focusAttentionSidebar', () => {
       restoreComposerDraft: vi.fn(),
       setLayoutMode: vi.fn(),
       setCurrentWorkspace: vi.fn(),
-    } as Parameters<typeof createOperatorFocusSlice>[0]);
+    } as unknown as Parameters<typeof createOperatorFocusSlice>[0]);
 
     slice.toggleIdeAttentionPanel();
     expect(ideAttentionPanelOpen.value).toBe(true);
