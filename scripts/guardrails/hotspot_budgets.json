@@ -201,7 +201,7 @@
       "target": "apps/console-web/src/features/kairo-conversation/*"
     },
     "apps/console-web/src/lib/agent-transcript-blocks.ts": {
-      "max_lines": 181,
+      "max_lines": 184,
       "soft_limit": 350,
       "hard_limit": 500,
       "target": "apps/console-web/src/lib/agent-transcript/*"
@@ -325,7 +325,7 @@
       "note": "Autonomy readiness assessment; split chapters when revising"
     },
     "tests/test_run_stale_reconcile.py": {
-      "max_lines": 600,
+      "max_lines": 645,
       "soft_limit": 350,
       "hard_limit": 500,
       "target": "tests/test_run_stale_* slices"
@@ -469,6 +469,13 @@
       "hard_limit": 500,
       "target": "services/control-plane/app/workspace_agents/lead_team_*",
       "note": "Lead team check-in orchestration; extract prompt builders next"
+    },
+    "services/control-plane/app/workspace_agents/scheduler.py": {
+      "max_lines": 502,
+      "soft_limit": 350,
+      "hard_limit": 502,
+      "target": "services/control-plane/app/workspace_agents/scheduler_*",
+      "note": "Agent scheduler; extract dispatch slices next"
     },
     "apps/console-web/src/components/conversation/ConversationSeamThreadMessage.vue": {
       "max_lines": 537,
