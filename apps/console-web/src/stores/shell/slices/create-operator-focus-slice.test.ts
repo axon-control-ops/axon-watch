@@ -98,6 +98,37 @@ describe('focusAttentionSidebar', () => {
     expect(setCurrentWorkspace).not.toHaveBeenCalled();
   });
 
+  it('toggles the IDE attention panel from the activity bar', () => {
+    const ideAttentionPanelOpen = ref(false);
+    const slice = createOperatorFocusSlice({
+      layoutMode: ref('ide'),
+      operatorBriefing: ref({
+        top_signals: [{ signal_id: 'signal_a', title: 'Needs review' }],
+      }),
+      highlightedSignalId: ref<string | null>(null),
+      ideAttentionPanelOpen,
+      ideBriefingPanelOpen: ref(false),
+      ideExplorerCollapsed: ref(true),
+      signalsSeamEmphasized: ref(false),
+      missionControlEmphasized: ref(false),
+      connectorsEmphasized: ref(false),
+      briefingSeamEmphasized: ref(false),
+      operatorCenterView: ref('graph'),
+      dockHeroMode: ref('command'),
+      expandedDockSeams: ref(new Set()),
+      dockThreadSeamTouched: ref(false),
+      setDockHeroMode: vi.fn(),
+      restoreComposerDraft: vi.fn(),
+      setLayoutMode: vi.fn(),
+      setCurrentWorkspace: vi.fn(),
+    } as Parameters<typeof createOperatorFocusSlice>[0]);
+
+    slice.toggleIdeAttentionPanel();
+    expect(ideAttentionPanelOpen.value).toBe(true);
+    slice.toggleIdeAttentionPanel();
+    expect(ideAttentionPanelOpen.value).toBe(false);
+  });
+
   it('switches Mission Control to grid and selects the signal workspace', () => {
     const setCurrentWorkspace = vi.fn();
     const operatorCenterView = ref<'grid' | 'graph'>('graph');

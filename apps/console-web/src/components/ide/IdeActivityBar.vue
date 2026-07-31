@@ -98,6 +98,8 @@ watch(
   { immediate: true },
 );
 
+const attentionBadgeCount = computed(() => shell.leftSidebarAttentionBadgeCount);
+
 const items: Array<{ id: IdeActivityView; label: string }> = [
   { id: 'team', label: 'Team' },
   { id: 'explorer', label: 'Explorer' },
@@ -107,6 +109,30 @@ const items: Array<{ id: IdeActivityView; label: string }> = [
   { id: 'terminal', label: 'Terminal' },
   { id: 'agent', label: 'Agent Dock' },
 ];
+
+function attentionTitle(): string {
+  const count = attentionBadgeCount.value;
+  const base = shell.ideAttentionPanelOpen
+    ? 'Attention · Click to close'
+    : 'Attention';
+  return count > 0 ? `${base} · ${count} needing review` : base;
+}
+
+function attentionAriaLabel(): string {
+  const count = attentionBadgeCount.value;
+  if (shell.ideAttentionPanelOpen) {
+    return count > 0
+      ? `Close attention panel (${count} items)`
+      : 'Close attention panel';
+  }
+  return count > 0
+    ? `Open attention panel (${count} items)`
+    : 'Open attention panel';
+}
+
+function selectAttention(): void {
+  shell.toggleIdeAttentionPanel();
+}
 
 const agentDockExpanded = computed(() => !shell.agentDockCollapsed);
 
@@ -286,6 +312,27 @@ function selectView(view: IdeActivityView): void {
 
 <template>
   <nav class="ide-activity-bar" aria-label="IDE activity bar">
+    <button
+      type="button"
+      class="ide-activity-bar__button ide-activity-bar__button--attention"
+      :class="{
+        'ide-activity-bar__button--active': shell.ideAttentionPanelOpen,
+        'ide-activity-bar__button--attention-hot': attentionBadgeCount > 0,
+      }"
+      :aria-label="attentionAriaLabel()"
+      :aria-pressed="shell.ideAttentionPanelOpen"
+      :title="attentionTitle()"
+      @click="selectAttention"
+    >
+      <IdeActivityIcon name="attention" class="ide-activity-bar__icon" />
+      <span
+        v-if="attentionBadgeCount > 0"
+        class="ide-activity-bar__badge ide-activity-bar__badge--attention"
+        aria-hidden="true"
+      >
+        {{ attentionBadgeCount }}
+      </span>
+    </button>
     <button
       v-for="item in items"
       :key="item.id"

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 withDefaults(
   defineProps<{
-    name: 'explorer' | 'search' | 'git' | 'run' | 'team' | 'terminal' | 'agent';
+    name: 'attention' | 'explorer' | 'search' | 'git' | 'run' | 'team' | 'terminal' | 'agent';
     size?: number;
   }>(),
   { size: 18 },
@@ -21,7 +21,12 @@ withDefaults(
     stroke-linejoin="round"
     aria-hidden="true"
   >
-    <template v-if="name === 'explorer'">
+    <template v-if="name === 'attention'">
+      <path d="M12 3.5 20.5 18.5H3.5L12 3.5Z" />
+      <path d="M12 9.2v4.6" />
+      <circle cx="12" cy="16.4" r="0.85" fill="currentColor" stroke="none" />
+    </template>
+    <template v-else-if="name === 'explorer'">
       <path d="M3.75 7.5A2.25 2.25 0 0 1 6 5.25h4.2l2.1 2.25H18A2.25 2.25 0 0 1 20.25 9.75v6.75A2.25 2.25 0 0 1 18 18.75H6A2.25 2.25 0 0 1 3.75 16.5z" />
     </template>
     <template v-else-if="name === 'search'">

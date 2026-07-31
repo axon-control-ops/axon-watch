@@ -1595,6 +1595,7 @@ export const useShellStore = defineStore('shell', () => {
 
   const {
     focusAttentionSidebar,
+    toggleIdeAttentionPanel,
     closeIdeAttentionPanel,
     closeIdeBriefingPanel,
     openIdeBriefingPanel,
@@ -3842,6 +3843,7 @@ export const useShellStore = defineStore('shell', () => {
     ideExplorerCollapsed,
     ideAttentionPanelOpen,
     closeIdeAttentionPanel,
+    toggleIdeAttentionPanel,
     ideBriefingPanelOpen,
     closeIdeBriefingPanel,
     openIdeBriefingPanel,

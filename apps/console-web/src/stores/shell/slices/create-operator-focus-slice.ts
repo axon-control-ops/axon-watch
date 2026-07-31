@@ -52,6 +52,19 @@ export function createOperatorFocusSlice(input: CreateOperatorFocusSliceInput) {
     persistIdeExplorerCollapsed(false);
   }
 
+  /** IDE activity-bar Attention control: open stack or close if already open. */
+  function toggleIdeAttentionPanel(): void {
+    if (input.layoutMode.value !== 'ide') {
+      focusAttentionSidebar();
+      return;
+    }
+    if (input.ideAttentionPanelOpen.value) {
+      closeIdeAttentionPanel();
+      return;
+    }
+    focusAttentionSidebar();
+  }
+
   function focusAttentionSidebar(signalId?: string | null): void {
     const topSignals = input.operatorBriefing.value?.top_signals ?? [];
     const focusSignals: AttentionTopSignal[] = [];
@@ -310,6 +323,7 @@ export function createOperatorFocusSlice(input: CreateOperatorFocusSliceInput) {
 
   return {
     focusAttentionSidebar,
+    toggleIdeAttentionPanel,
     focusLiveOperations,
     closeIdeAttentionPanel,
     closeIdeBriefingPanel,
