@@ -1,10 +1,13 @@
+import type { ComposerClipboardImage } from '../../lib/composer-clipboard-paste';
+
 type SubmitHandler = (
   content: string,
   options?: KairoConversationSubmitOptions,
-) => Promise<void>;
+) => Promise<boolean | void>;
 
 export type KairoConversationSubmitOptions = {
   voiceCaptureMode?: 'manual' | 'hands_free' | 'barge_in';
+  dockAttachments?: ComposerClipboardImage[];
 };
 
 export type KairoConversationSubmitDispatchResult = 'submitted' | 'queued' | 'ignored';
