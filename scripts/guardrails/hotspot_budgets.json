@@ -401,7 +401,7 @@
       "note": "Gate 4 leased-task create_run binding; extract next"
     },
     "services/control-plane/app/persistence/task_store.py": {
-      "max_lines": 931,
+      "max_lines": 826,
       "soft_limit": 350,
       "hard_limit": 500,
       "target": "services/control-plane/app/persistence/*",
