@@ -28,6 +28,25 @@ function taskIsUnblocked(
   });
 }
 
+/** Matches control-plane cross-workspace handoff acceptance prefix. */
+export function taskLooksLikeCrossWorkspaceHandoff(task: WorkspaceTaskRecord): boolean {
+  const acceptance = String(task.acceptance_criteria || '')
+    .trim()
+    .toLowerCase();
+  return acceptance.includes('cross-workspace handoff');
+}
+
+/**
+ * Semi only offers Start now for Lead board tickets and cross-workspace handoffs
+ * (capacity / busy soft-fails). Manual keeps Start for any open role handoff.
+ */
+export function taskIsSemiStartFallback(task: WorkspaceTaskRecord): boolean {
+  if (roleKey(task.owner_role) === 'lead') {
+    return true;
+  }
+  return taskLooksLikeCrossWorkspaceHandoff(task);
+}
+
 const IN_FLIGHT_STATUSES = new Set([
   'executing',
   'working',
@@ -38,8 +57,10 @@ const IN_FLIGHT_STATUSES = new Set([
 ]);
 
 /**
- * Manual autonomy: handoffs wait for an explicit Start. Semi/Full hide Start Now
- * (Full auto-leases; Semi still uses Mission Control START / Lead Send).
+ * Manual: handoffs wait for an explicit Start.
+ * Semi: auto-start runs on the control plane; Start now is a fallback when a
+ * Lead / cross-workspace ticket is still open or leased+queued.
+ * Full: continuous leasing owns starts — hide Start now.
  *
  * Start now only when there is a real handoff wait and the teammate is not busy
  * (roster mid-shift or live IDE stream). Busy + no handoff both hide the button.
@@ -52,7 +73,8 @@ export function resolveEmployeeManualHandoff(input: {
   /** True when this teammate owns an active IDE stream (Team BUSY badge). */
   liveBusy?: boolean;
 }): EmployeeManualHandoff {
-  if (normalizeAutonomyMode(input.autonomyMode) !== 'manual') {
+  const mode = normalizeAutonomyMode(input.autonomyMode);
+  if (mode === 'full' || (mode !== 'manual' && mode !== 'semi')) {
     return { waiting: false, taskId: null, reason: null };
   }
   if (!input.employee.enabled) {
@@ -87,9 +109,15 @@ export function resolveEmployeeManualHandoff(input: {
           (activeRunTaskId && task.task_id === activeRunTaskId)),
     ) ?? null;
 
+  const allowsTask = (task: WorkspaceTaskRecord): boolean =>
+    mode === 'manual' || taskIsSemiStartFallback(task);
+
   // An assigned employee's bound run is authoritative. Never let an unrelated
   // newer open task steal this Start button.
   if (status === 'assigned' && (assignedTask || activeRunTaskId)) {
+    if (assignedTask && !allowsTask(assignedTask)) {
+      return { waiting: false, taskId: null, reason: null };
+    }
     return {
       waiting: true,
       taskId: assignedTask?.task_id ?? activeRunTaskId,
@@ -102,7 +130,8 @@ export function resolveEmployeeManualHandoff(input: {
       (task) =>
         roleKey(task.owner_role) === role &&
         task.status === 'open' &&
-        taskIsUnblocked(task, byId),
+        taskIsUnblocked(task, byId) &&
+        allowsTask(task),
     )
     .sort((left, right) => right.updated_at.localeCompare(left.updated_at))[0];
 
@@ -115,7 +144,8 @@ export function resolveEmployeeManualHandoff(input: {
       (task) =>
         roleKey(task.owner_role) === role &&
         task.status === 'leased' &&
-        Boolean(task.run_id?.trim()),
+        Boolean(task.run_id?.trim()) &&
+        allowsTask(task),
     )
     .sort((left, right) => right.updated_at.localeCompare(left.updated_at))[0];
 

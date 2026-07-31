@@ -287,7 +287,7 @@ def run_continuous_worker_tick(
         logger.exception("scheduled company work sources failed")
 
     # Semi / Manual pause continuous specialist leasing, but Lead-owned board
-    # tickets still need operator_start + kick so they do not sit Waiting.
+    # tickets and soft-failed handoff autostarts still need operator_start + kick.
     try:
         from app.workspace_agents.lead_board_pickup import pickup_open_lead_board_tasks
 
@@ -299,6 +299,20 @@ def run_continuous_worker_tick(
             )
     except Exception:  # noqa: BLE001 — never block scheduler on Lead pickup
         logger.exception("lead board pickup failed")
+
+    try:
+        from app.workspace_agents.handoff_autostart_retry import (
+            retry_pending_handoff_autostarts,
+        )
+
+        handoff_retried = retry_pending_handoff_autostarts(starts_bound=2)
+        if handoff_retried:
+            logger.info(
+                "continuous worker tick retried %s handoff autostart(s)",
+                len(handoff_retried),
+            )
+    except Exception:  # noqa: BLE001 — never block scheduler on handoff retry
+        logger.exception("handoff autostart retry failed")
 
     if not scheduler_enabled():
         return []

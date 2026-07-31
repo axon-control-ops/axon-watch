@@ -29,7 +29,7 @@ export interface TeamMemberQuickAction {
   surface?: TeamMemberSurfaceAction;
   control?: TeamMemberControlAction;
   composerMode?: IdeComposerRestoreMode;
-  /** Task id for Manual Start Now handoffs. */
+  /** Task id for Manual/Semi Start Now handoffs. */
   taskId?: string;
 }
 

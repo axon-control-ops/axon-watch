@@ -334,7 +334,7 @@ describe('company-roster-actions', () => {
     ]);
   });
 
-  it('offers Start now only for Manual handoffs that are not live-busy', () => {
+  it('offers Start now for Manual handoffs that are not live-busy', () => {
     const tasks = [
       {
         task_id: 'task_open',
@@ -372,5 +372,38 @@ describe('company-roster-actions', () => {
       liveBusy: true,
     });
     expect(busy.map((action) => action.id)).not.toContain('start_now');
+  });
+
+  it('offers Semi Start now for cross-workspace handoff tickets', () => {
+    const tasks = [
+      {
+        task_id: 'task_handoff',
+        workspace_id: 'workspace_dashpro',
+        goal: 'Fix child card avatar',
+        acceptance_criteria: 'Complete the cross-workspace handoff from Young Eagles.',
+        owner_role: 'frontend',
+        status: 'open' as const,
+        risk: 'normal' as const,
+        attempt_budget: 3,
+        attempts_used: 0,
+        dependencies: [],
+        allowed_paths: [],
+        exclusive_paths: [],
+        lease_holder: null,
+        lease_expires_at: null,
+        run_id: null,
+        plan_id: null,
+        plan_key: null,
+        terminal_outcome: null,
+        created_at: '2026-07-30T00:00:00Z',
+        updated_at: '2026-07-30T00:00:00Z',
+      },
+    ];
+    const actions = employeeQuickActions(employee(), {
+      autonomyMode: 'semi',
+      tasks,
+      liveBusy: false,
+    });
+    expect(actions[0]).toMatchObject({ id: 'start_now', taskId: 'task_handoff' });
   });
 });

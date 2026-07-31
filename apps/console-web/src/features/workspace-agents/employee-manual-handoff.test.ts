@@ -48,7 +48,7 @@ function task(overrides: Partial<WorkspaceTaskRecord> = {}): WorkspaceTaskRecord
 }
 
 describe('resolveEmployeeManualHandoff', () => {
-  it('shows waiting Start now only in Manual for open unblocked tasks', () => {
+  it('shows waiting Start now in Manual for any open unblocked role task', () => {
     const row = employee();
     const tasks = [task()];
     expect(
@@ -61,17 +61,46 @@ describe('resolveEmployeeManualHandoff', () => {
     expect(
       resolveEmployeeManualHandoff({
         employee: row,
-        autonomyMode: 'semi',
-        tasks,
-      }).waiting,
-    ).toBe(false);
-    expect(
-      resolveEmployeeManualHandoff({
-        employee: row,
         autonomyMode: 'full',
         tasks,
       }).waiting,
     ).toBe(false);
+  });
+
+  it('hides Semi Start now for ordinary open tasks without handoff provenance', () => {
+    expect(
+      resolveEmployeeManualHandoff({
+        employee: employee(),
+        autonomyMode: 'semi',
+        tasks: [task()],
+      }).waiting,
+    ).toBe(false);
+  });
+
+  it('shows Semi Start now for cross-workspace handoff tickets', () => {
+    expect(
+      resolveEmployeeManualHandoff({
+        employee: employee({ role: 'frontend', name: 'Priya' }),
+        autonomyMode: 'semi',
+        tasks: [
+          task({
+            owner_role: 'frontend',
+            acceptance_criteria:
+              'Complete the cross-workspace handoff from Young Eagles Day Care.',
+          }),
+        ],
+      }),
+    ).toEqual({ waiting: true, taskId: 'task_1', reason: 'open_task' });
+  });
+
+  it('shows Semi Start now for open Lead board tickets', () => {
+    expect(
+      resolveEmployeeManualHandoff({
+        employee: employee({ role: 'lead', name: 'Dana', status: 'idle' }),
+        autonomyMode: 'semi',
+        tasks: [task({ owner_role: 'lead', goal: 'Lead board ticket' })],
+      }),
+    ).toEqual({ waiting: true, taskId: 'task_1', reason: 'open_task' });
   });
 
   it('treats assigned specialists as handoff waiters in Manual', () => {

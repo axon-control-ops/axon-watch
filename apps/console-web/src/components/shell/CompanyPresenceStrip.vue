@@ -20,7 +20,7 @@ const props = defineProps<{
   selectedEmployeeId: string | null;
   /** Employee ids currently mid IDE/agent stream (client-side busy overlay). */
   liveBusyEmployeeIds?: readonly string[];
-  /** Manual-mode handoff waiters — amber glow until Start now. */
+  /** Manual/Semi handoff waiters — amber glow until Start now. */
   handoffWaitingEmployeeIds?: readonly string[];
 }>();
 
