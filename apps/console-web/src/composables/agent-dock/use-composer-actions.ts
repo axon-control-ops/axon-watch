@@ -25,6 +25,7 @@ import {
   rewriteNamedAssignPrompt,
 } from '../../lib/named-assign-route';
 import { resolveEmployeeSpecialtyRoute } from '../../lib/resolve-employee-specialty-route';
+import { shouldApplySpecialtyRouteNow } from '../../lib/specialty-route-busy-gate';
 import { DEBUG_REPRODUCE_PROCEED_MESSAGE } from '../../lib/debug-reproduce-view';
 import {
   findIdeComposerQueueEntry,
@@ -35,6 +36,7 @@ import { focusAgentDockComposerInput } from '../../lib/agent-dock-composer-focus
 import {
   type TeammateRouteNotice,
 } from '../../lib/teammate-route-notice';
+import { resolveLiveBusyEmployeeIds } from '../../features/workspace-agents/company-roster-busy';
 import { useShellStore } from '../../stores/shell';
 import type { ComposerMode } from './use-composer-menus';
 
@@ -97,6 +99,34 @@ export function useComposerActions(options: UseComposerActionsOptions) {
     withSkillTokensForSubmit,
     clearSkillAttachments,
   } = options;
+
+  function liveBusyEmployeeIds(): string[] {
+    return resolveLiveBusyEmployeeIds({
+      employees: shell.companyEmployeesForCurrentWorkspace,
+      streamingThreadIds: shell.streamingIdeThreadIds,
+      threads: shell.ideThreadsForCurrentWorkspace,
+      focusedStreamEmployeeId: shell.agentStreamActive
+        ? shell.activeIdeThread?.employee_id?.trim() ||
+          shell.activeIdeEmployeeRecord?.employee_id?.trim() ||
+          null
+        : null,
+    });
+  }
+
+  async function maybeApplySpecialtyRoute(
+    routeDecision: Awaited<ReturnType<typeof resolveEmployeeSpecialtyRoute>>,
+  ): Promise<boolean> {
+    if (
+      !shouldApplySpecialtyRouteNow({
+        decision: routeDecision,
+        busyEmployeeIds: liveBusyEmployeeIds(),
+      })
+    ) {
+      return false;
+    }
+    const applied = await applyEmployeeSpecialtyRoute(shell, routeDecision);
+    return applied.routed;
+  }
 
   function handleApproveRun(): void {
     void shell.approveIdeAgentRun();
@@ -195,11 +225,7 @@ export function useComposerActions(options: UseComposerActionsOptions) {
       roster,
       useModelTiebreak: false,
     });
-    let routed = false;
-    if (routeDecision.shouldRoute) {
-      const applied = await applyEmployeeSpecialtyRoute(shell, routeDecision);
-      routed = applied.routed;
-    }
+    const routed = await maybeApplySpecialtyRoute(routeDecision);
     const shouldRewriteNamedAssign =
       Boolean(namedAssign) &&
       (routed ||
@@ -295,11 +321,7 @@ export function useComposerActions(options: UseComposerActionsOptions) {
       roster,
       useModelTiebreak: false,
     });
-    let routed = false;
-    if (routeDecision.shouldRoute) {
-      const applied = await applyEmployeeSpecialtyRoute(shell, routeDecision);
-      routed = applied.routed;
-    }
+    const routed = await maybeApplySpecialtyRoute(routeDecision);
     const shouldRewriteNamedAssign =
       Boolean(namedAssign) &&
       (routed ||
