@@ -23,6 +23,7 @@ import {
   scheduleKairoVoiceFollowupWindowAfterSpeech,
 } from '../../lib/kairo-voice-followup-window';
 import type { KairoVoiceCaptureMode } from '../../lib/kairo-voice-gate';
+import type { ComposerClipboardImage } from '../../lib/composer-clipboard-paste';
 import { useShellStore } from '../../stores/shell';
 import { handleConversationModelSwitchIntent } from './conversation-model-switch-handler';
 import {
@@ -153,14 +154,20 @@ export function useKairoConversation() {
 
   async function submitTurn(
     rawContent?: string,
-    options?: { voiceCaptureMode?: KairoVoiceCaptureMode },
-  ): Promise<void> {
-    const pendingFiles = [...attachments.pendingAttachments.value];
+    options?: {
+      voiceCaptureMode?: KairoVoiceCaptureMode;
+      dockAttachments?: ComposerClipboardImage[];
+    },
+  ): Promise<boolean | void> {
+    const pendingFiles = [
+      ...attachments.pendingAttachments.value,
+      ...(options?.dockAttachments ?? []),
+    ];
     const raw = normalizeVoiceTranscript(
       vaxonConversePromptForAttachments(rawContent ?? draft.value, pendingFiles.length),
     );
     if (!raw || pending.value) {
-      return;
+      return false;
     }
     const content = expandReportHotword(raw) ?? raw;
     lastOperatorPrompt = content;

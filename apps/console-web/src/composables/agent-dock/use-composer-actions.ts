@@ -61,7 +61,10 @@ type UseComposerActionsOptions = {
   composerImages: Ref<ComposerClipboardImage[]>;
   composerHistory: Ref<string[]>;
   composerHistoryIndex: Ref<number>;
-  submitKairoTurn: (draft: string) => Promise<void>;
+  submitKairoTurn: (
+    draft: string,
+    options?: { dockAttachments?: ComposerClipboardImage[] },
+  ) => Promise<boolean | void>;
   recordComposerHistoryIfSent: (draft: string) => void;
   handleHistory: (direction: 'previous' | 'next') => void;
   speechCapture: { capturing: Ref<boolean> };
@@ -179,8 +182,13 @@ export function useComposerActions(options: UseComposerActionsOptions) {
       return;
     }
     if (composerMode.value === 'kairo') {
-      await submitKairoTurn(draft);
-      recordComposerHistoryIfSent(draft);
+      const dockAttachments = composerImages.value.length
+        ? [...composerImages.value]
+        : undefined;
+      const sent = await submitKairoTurn(draft, { dockAttachments });
+      if (sent !== false) {
+        recordComposerHistoryIfSent(draft);
+      }
       return;
     }
     let modeForSubmit: IdeComposerMode = composerMode.value;
