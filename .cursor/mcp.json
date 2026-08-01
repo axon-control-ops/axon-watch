@@ -1,14 +1,14 @@
 {
   "mcpServers": {
     "axon-research": {
-      "command": "/tmp/axon-attention-store-extract/.venv/bin/python3",
+      "command": "/tmp/axon-si-run_fa85dad0-nghamsjf/checkout/.venv/bin/python3",
       "args": [
         "-m",
         "app.research.mcp_server"
       ],
-      "cwd": "/tmp/axon-attention-store-extract/services/control-plane",
+      "cwd": "/tmp/axon-si-run_fa85dad0-nghamsjf/checkout/services/control-plane",
       "env": {
-        "PYTHONPATH": "/tmp/axon-attention-store-extract/services/control-plane"
+        "PYTHONPATH": "/tmp/axon-si-run_fa85dad0-nghamsjf/checkout/services/control-plane"
       }
     }
   }
