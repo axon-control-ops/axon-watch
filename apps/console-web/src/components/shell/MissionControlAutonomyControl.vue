@@ -286,6 +286,8 @@ onUnmounted(() => {
   </section>
 </template>
 
+<style scoped src="./mission-control-autonomy-control.css"></style>
+
 <style scoped>
 .orb-hud {
   --orb-hud-cyan: rgba(110, 235, 255, 0.95);
@@ -630,50 +632,4 @@ onUnmounted(() => {
   }
 }
 
-@keyframes orb-hud-armed {
-  0%,
-  100% {
-    box-shadow:
-      inset 0 0 0 1px rgba(140, 255, 210, 0.12),
-      0 0 0.85rem rgba(40, 255, 170, 0.2);
-  }
-  50% {
-    box-shadow:
-      inset 0 0 0 1px rgba(160, 255, 220, 0.22),
-      0 0 1.35rem rgba(50, 255, 180, 0.38);
-  }
-}
-
-@keyframes orb-hud-pulse {
-  0%,
-  100% {
-    transform: scale(0.9);
-    opacity: 0.7;
-  }
-  50% {
-    transform: scale(1.15);
-    opacity: 1;
-  }
-}
-
-@keyframes orb-hud-sheet-in {
-  from {
-    opacity: 0;
-    transform: translateY(0.35rem) scale(0.98);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .orb-hud__arc,
-  .orb-hud__arc::after,
-  .orb-hud__chip--prime[data-on='true'],
-  .orb-hud__telemetry-pulse[data-tone='running'],
-  .orb-hud__sheet {
-    animation: none;
-  }
-}
 </style>
