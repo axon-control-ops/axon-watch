@@ -40,6 +40,7 @@ import OperatorFleetHealthGrid from './OperatorFleetHealthGrid.vue';
 import OperatorIncidentFeedPanel from './OperatorIncidentFeedPanel.vue';
 import OperatorRunStripPanel from './OperatorRunStripPanel.vue';
 import OperatorStatusRadarPanelHeader from './OperatorStatusRadarPanelHeader.vue';
+import OperatorStatusRadarQuickGuide from './operator-status-radar/OperatorStatusRadarQuickGuide.vue';
 import OperatorTaskBoardPanel from './OperatorTaskBoardPanel.vue';
 import AttentionStackPanel from './AttentionStackPanel.vue';
 
@@ -410,38 +411,13 @@ function handleOperatorQuickGuideAction(actionId: OperatorQuickGuideActionId): v
 
       <OperatorRunStripPanel />
 
-      <section
+      <OperatorStatusRadarQuickGuide
         v-if="showStandaloneQuickGuide && quickGuide"
-        class="operator-status-radar-panel__guide operator-status-radar-panel__guide--standalone"
-        :class="{
-          'operator-status-radar-panel__guide--terminal-hidden': !props.terminalVisible,
-          'operator-status-radar-panel__guide--attention': quickGuide.tone === 'attention',
-        }"
-        aria-label="What to do next"
-      >
-        <div class="operator-status-radar-panel__guide-head">
-          <p class="operator-status-radar-panel__guide-title">{{ quickGuide.title }}</p>
-          <div
-            v-if="quickGuide.actions.length"
-            class="operator-status-radar-panel__guide-actions"
-            role="group"
-            aria-label="Quick actions"
-          >
-            <button
-              v-for="action in quickGuide.actions"
-              :key="action.id"
-              type="button"
-              class="operator-status-radar-panel__guide-action"
-              @click="handleOperatorQuickGuideAction(action.id)"
-            >
-              {{ action.label }}
-            </button>
-          </div>
-        </div>
-        <ol class="operator-status-radar-panel__guide-steps">
-          <li v-for="(step, index) in quickGuide.steps" :key="index">{{ step }}</li>
-        </ol>
-      </section>
+        :guide="quickGuide"
+        :terminal-visible="props.terminalVisible"
+        standalone
+        @action="handleOperatorQuickGuideAction"
+      />
 
       <section
         v-if="showMissionStage"
@@ -487,38 +463,12 @@ function handleOperatorQuickGuideAction(actionId: OperatorQuickGuideActionId): v
         <p class="operator-status-radar-panel__stage-notice">{{ executionStage.notice }}</p>
         <p class="operator-status-radar-panel__stage-decide">{{ executionStage.decide }}</p>
 
-        <section
+        <OperatorStatusRadarQuickGuide
           v-if="quickGuide"
-          class="operator-status-radar-panel__guide"
-          :class="{
-            'operator-status-radar-panel__guide--terminal-hidden': !props.terminalVisible,
-            'operator-status-radar-panel__guide--attention': quickGuide.tone === 'attention',
-          }"
-          aria-label="What to do next"
-        >
-          <div class="operator-status-radar-panel__guide-head">
-            <p class="operator-status-radar-panel__guide-title">{{ quickGuide.title }}</p>
-            <div
-              v-if="quickGuide.actions.length"
-              class="operator-status-radar-panel__guide-actions"
-              role="group"
-              aria-label="Quick actions"
-            >
-              <button
-                v-for="action in quickGuide.actions"
-                :key="action.id"
-                type="button"
-                class="operator-status-radar-panel__guide-action"
-                @click="handleOperatorQuickGuideAction(action.id)"
-              >
-                {{ action.label }}
-              </button>
-            </div>
-          </div>
-          <ol class="operator-status-radar-panel__guide-steps">
-            <li v-for="(step, index) in quickGuide.steps" :key="index">{{ step }}</li>
-          </ol>
-        </section>
+          :guide="quickGuide"
+          :terminal-visible="props.terminalVisible"
+          @action="handleOperatorQuickGuideAction"
+        />
 
         <p v-if="!executionStage.hasActiveRun" class="operator-status-radar-panel__stage-advise">
           {{ executionStage.advise }}
