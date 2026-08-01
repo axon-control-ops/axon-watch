@@ -44,27 +44,6 @@ async function refresh(): Promise<void> {
       const tick = await runMachineCeoTick(true);
       pulse.value = tick.pulse;
       status.value = tick.spoken || tick.pulse.spoken || '';
-      // #region agent log
-      fetch('http://127.0.0.1:7706/ingest/90bcaec2-2b39-4d4a-84b5-157c12735440', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': 'db8bb4' },
-        body: JSON.stringify({
-          sessionId: 'db8bb4',
-          runId: 'machine-ceo',
-          hypothesisId: 'M1',
-          location: 'MissionControlMachineCeoStrip.vue:refresh',
-          message: 'machine ceo tick',
-          data: {
-            autoOn: true,
-            mem: tick.pulse.health?.memory_percent ?? null,
-            top: tick.pulse.processes?.[0]?.name ?? null,
-            kills: tick.kills?.length ?? 0,
-            recommendations: tick.pulse.recommendations?.length ?? 0,
-          },
-          timestamp: Date.now(),
-        }),
-      }).catch(() => {});
-      // #endregion
     } else {
       pulse.value = await fetchMachinePulse();
       status.value = pulse.value.spoken || '';
@@ -145,10 +124,15 @@ onUnmounted(() => {
 .mc-machine-ceo {
   display: grid;
   gap: 0.35rem;
-  padding: 0.5rem 0.55rem;
-  border: 1px solid rgba(0, 242, 255, 0.22);
-  border-radius: 0.4rem;
-  background: rgba(0, 16, 24, 0.55);
+  flex: 0 0 auto;
+  margin: 0.15rem 0 0.25rem;
+  padding: 0.55rem 0.65rem;
+  border: 1px solid rgba(80, 255, 190, 0.35);
+  border-radius: 0.45rem;
+  background:
+    linear-gradient(120deg, rgba(0, 40, 32, 0.72), rgba(0, 16, 28, 0.78)),
+    rgba(0, 16, 24, 0.7);
+  box-shadow: inset 0 0 0 1px rgba(0, 242, 255, 0.08);
 }
 
 .mc-machine-ceo__head {
@@ -160,9 +144,9 @@ onUnmounted(() => {
 
 .mc-machine-ceo__eyebrow {
   margin: 0;
-  color: rgba(0, 242, 255, 0.85);
-  font: 0.58rem var(--font-mono, ui-monospace, monospace);
-  letter-spacing: 0.14em;
+  color: rgba(140, 255, 210, 0.98);
+  font: 0.68rem var(--font-mono, ui-monospace, monospace);
+  letter-spacing: 0.16em;
   text-transform: uppercase;
 }
 

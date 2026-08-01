@@ -39,39 +39,6 @@ def run_machine_ceo_tick(*, auto_kill: bool | None = None) -> dict[str, Any]:
     # Auto-kill only when Full autonomy AND caller asked for it (default: yes under AUTO).
     want_kill = autonomy_full if auto_kill is None else bool(auto_kill)
     do_kill = bool(want_kill and autonomy_full)
-    # #region agent log
-    try:
-        import json
-
-        with open(
-            "/home/edp/axon-nvme/repos/axon-watch/.cursor/debug-db8bb4.log",
-            "a",
-            encoding="utf-8",
-        ) as _dbg:
-            _dbg.write(
-                json.dumps(
-                    {
-                        "sessionId": "db8bb4",
-                        "runId": "machine-ceo",
-                        "hypothesisId": "M2",
-                        "location": "machine_ceo.py:run_machine_ceo_tick",
-                        "message": "ceo tick gate",
-                        "data": {
-                            "autonomy_full": autonomy_full,
-                            "want_kill": want_kill,
-                            "do_kill": do_kill,
-                            "mem": (pulse.get("health") or {}).get("memory_percent"),
-                            "top": (pulse.get("processes") or [{}])[0].get("name"),
-                            "recs": len(pulse.get("recommendations") or []),
-                        },
-                        "timestamp": int(__import__("time").time() * 1000),
-                    }
-                )
-                + "\n"
-            )
-    except Exception:
-        pass
-    # #endregion
     if not do_kill:
         return result
 

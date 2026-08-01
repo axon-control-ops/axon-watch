@@ -134,43 +134,6 @@ const doneVisibleCount = computed(
   () => visibleColumns.value.find((column) => column.id === 'done')?.count ?? 0,
 );
 
-// #region agent log
-watch(
-  () =>
-    [
-      boardView.value.counts.waiting,
-      boardView.value.counts.done,
-      doneVisibleCount.value,
-      planFilterId.value,
-      boardView.value.planGroups.length,
-    ] as const,
-  ([waiting, done, doneVisible, planFilter, planGroups]) => {
-    fetch('http://127.0.0.1:7706/ingest/90bcaec2-2b39-4d4a-84b5-157c12735440', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': 'db8bb4' },
-      body: JSON.stringify({
-        sessionId: 'db8bb4',
-        runId: 'mc-map',
-        hypothesisId: 'F',
-        location: 'OperatorTaskBoardPanel.vue:boardCounts',
-        message: 'task board map state',
-        data: {
-          waiting,
-          done,
-          doneVisible,
-          showCancelAllWaiting: waiting > 0,
-          showClearDupes: waiting > 1,
-          planFilter,
-          planGroups,
-          visiblePlanChips: Math.min(4, planGroups),
-        },
-        timestamp: Date.now(),
-      }),
-    }).catch(() => {});
-  },
-  { immediate: true },
-);
-// #endregion
 
 const holoTone = computed<HudHoloTone>(() => {
   const buckets = boardView.value.rows

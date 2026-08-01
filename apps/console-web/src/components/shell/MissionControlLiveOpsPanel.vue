@@ -106,33 +106,6 @@ const transmission = computed(() =>
 const spokenLine = computed(() => transmission.value.body);
 const transmissionHasDetail = computed(() => transmission.value.detailLines.length > 0);
 
-// #region agent log
-watch(
-  transmission,
-  (view) => {
-    fetch('http://127.0.0.1:7706/ingest/90bcaec2-2b39-4d4a-84b5-157c12735440', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': 'db8bb4' },
-      body: JSON.stringify({
-        sessionId: 'db8bb4',
-        runId: 'mc-vaxon',
-        hypothesisId: 'T1',
-        location: 'MissionControlLiveOpsPanel.vue:transmission',
-        message: 'transmission view',
-        data: {
-          bodyLen: view.body.length,
-          summaryLen: view.summary.length,
-          detailCount: view.detailLines.length,
-          empty: view.empty,
-          mode: view.mode,
-        },
-        timestamp: Date.now(),
-      }),
-    }).catch(() => {});
-  },
-  { immediate: true },
-);
-// #endregion
 
 const asksForReply = computed(
   () =>
@@ -250,6 +223,9 @@ onUnmounted(() => {
       </p>
     </header>
 
+    <!-- Above the orb so Machine CEO is never buried under Needs-you sheets. -->
+    <MissionControlMachineCeoStrip />
+
     <div
       class="mc-live-ops__orb-stage"
       :data-speaking="shell.kairoSpeechActive ? 'true' : 'false'"
@@ -266,8 +242,6 @@ onUnmounted(() => {
         <MissionControlAutonomyControl />
       </div>
     </div>
-
-    <MissionControlMachineCeoStrip />
 
     <div class="mc-live-ops__scroll">
       <article

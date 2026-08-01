@@ -107,8 +107,6 @@ export function useWorkerAutonomyControl(options?: {
   async function enableAutonomous(): Promise<boolean> {
     // AUTO ON = VAXON CEO mode: Full autonomy + workers unpaused (unless env-blocked).
     // If already Full, still resume — screenshot trap was AUTO ON with Workers paused.
-    const beforeMode = autonomyMode.value;
-    const beforeEffective = Boolean(status.value?.effective_enabled);
     if (autonomyMode.value !== 'full') {
       const modeOk = await setAutonomyMode('full');
       if (!modeOk) {
@@ -119,29 +117,6 @@ export function useWorkerAutonomyControl(options?: {
     if (!status.value?.effective_enabled) {
       resumed = await resume();
     }
-    // #region agent log
-    fetch('http://127.0.0.1:7706/ingest/90bcaec2-2b39-4d4a-84b5-157c12735440', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': 'db8bb4' },
-      body: JSON.stringify({
-        sessionId: 'db8bb4',
-        runId: 'machine-ceo',
-        hypothesisId: 'M3',
-        location: 'useWorkerAutonomyControl.ts:enableAutonomous',
-        message: 'AUTO ON resume path',
-        data: {
-          beforeMode,
-          beforeEffective,
-          afterMode: autonomyMode.value,
-          afterEffective: Boolean(status.value?.effective_enabled),
-          schedulerEnabled: Boolean(status.value?.scheduler_enabled),
-          blockedByEnv: Boolean(status.value?.blocked_by_env),
-          resumed,
-        },
-        timestamp: Date.now(),
-      }),
-    }).catch(() => {});
-    // #endregion
     return resumed;
   }
 

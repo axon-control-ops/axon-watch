@@ -153,27 +153,6 @@ export function buildOperatorIncidentFeed(input: {
   });
   const limited = sorted.slice(0, limit);
 
-  // #region agent log
-  fetch('http://127.0.0.1:7706/ingest/90bcaec2-2b39-4d4a-84b5-157c12735440', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': 'db8bb4' },
-    body: JSON.stringify({
-      sessionId: 'db8bb4',
-      runId: 'mc-map',
-      hypothesisId: 'B',
-      location: 'operator-incident-feed-view.ts:buildOperatorIncidentFeed',
-      message: 'incident feed built',
-      data: {
-        rawSignalCount: input.topSignals.length,
-        uniqueIdCount: seenIds.size,
-        uniqueTitleCount: seenTitles.size,
-        outCount: limited.length,
-        titles: limited.map((item) => item.title),
-      },
-      timestamp: Date.now(),
-    }),
-  }).catch(() => {});
-  // #endregion
 
   return {
     items: limited,

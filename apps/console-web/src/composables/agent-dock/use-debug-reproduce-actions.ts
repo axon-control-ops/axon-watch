@@ -69,26 +69,6 @@ export function useDebugReproduceActions(input: {
     }
     const attachmentFiles = composerImages.value.map((image) => image.file);
     onDebugReproduceProceed?.(messageId);
-    // #region agent log
-    fetch('http://127.0.0.1:7706/ingest/90bcaec2-2b39-4d4a-84b5-157c12735440', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': 'db8bb4' },
-      body: JSON.stringify({
-        sessionId: 'db8bb4',
-        runId: 'debug-resolved',
-        hypothesisId: 'H10',
-        location: 'use-debug-reproduce-actions.ts:submitDebugReproduceFollowUp',
-        message: 'debug reproduce follow-up submit',
-        data: {
-          messageId,
-          contentLen: content.length,
-          attachmentCount: attachmentFiles.length,
-          isResolved: content.includes('Confirmed resolved'),
-        },
-        timestamp: Date.now(),
-      }),
-    }).catch(() => {});
-    // #endregion
     const submitted = await shell.submitIdeComposer('debug', {
       contentOverride: content,
       attachmentFiles,

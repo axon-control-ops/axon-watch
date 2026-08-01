@@ -442,6 +442,17 @@ def resolve_decision(
         raise
 
 
+def soft_dedupe_key(dedupe_key: str) -> str:
+    """Collapse failed_shift:ws:role:run_id → failed_shift:ws:role for twin suppression."""
+    key = str(dedupe_key or "").strip().lower()
+    if not key:
+        return ""
+    parts = key.split(":")
+    if parts and parts[0] == "failed_shift" and len(parts) >= 3:
+        return f"failed_shift:{parts[1]}:{parts[2]}"
+    return key
+
+
 def has_recent_dedupe_key(
     dedupe_key: str,
     *,
@@ -450,17 +461,18 @@ def has_recent_dedupe_key(
     key = str(dedupe_key or "").strip()
     if not key:
         return False
+    soft = soft_dedupe_key(key)
     pending = list_pending_decisions(limit=500)
-    if any(str(row.get("dedupe_key") or "") == key for row in pending):
+    if any(soft_dedupe_key(str(row.get("dedupe_key") or "")) == soft for row in pending):
         return True
     resolving = list_receipts(limit=500, status="resolving")
-    if any(str(row.get("dedupe_key") or "") == key for row in resolving):
+    if any(soft_dedupe_key(str(row.get("dedupe_key") or "")) == soft for row in resolving):
         return True
     cutoff = datetime.now(timezone.utc) - timedelta(
         seconds=max(1, int(cooldown_seconds))
     )
     for row in list_receipts(limit=500):
-        if str(row.get("dedupe_key") or "") != key:
+        if soft_dedupe_key(str(row.get("dedupe_key") or "")) != soft:
             continue
         raw = str(row.get("resolved_at") or row.get("created_at") or "").replace(
             "Z", "+00:00"
@@ -484,6 +496,7 @@ __all__ = [
     "get_receipt",
     "get_meta",
     "has_recent_dedupe_key",
+    "soft_dedupe_key",
     "list_pending_decisions",
     "list_receipts",
     "release_decision_resolution",

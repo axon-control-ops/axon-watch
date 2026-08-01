@@ -326,29 +326,6 @@ export function projectLiveOperationsStream(input: {
   const deduped = collapseNearDuplicateStreamItems(items);
   const limited = deduped.slice(0, 8);
 
-  // #region agent log
-  fetch('http://127.0.0.1:7706/ingest/90bcaec2-2b39-4d4a-84b5-157c12735440', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': 'db8bb4' },
-    body: JSON.stringify({
-      sessionId: 'db8bb4',
-      runId: 'mc-map',
-      hypothesisId: 'A2',
-      location: 'live-operations-stream.ts:projectLiveOperationsStream',
-      message: 'live ops stream projected',
-      data: {
-        beforeDedupe: items.length,
-        afterDedupe: deduped.length,
-        outCount: limited.length,
-        texts: limited.map((item) => item.text),
-        dropped: items.length - deduped.length,
-        dashProHits: limited.filter((item) => /dashpro/i.test(item.text)).length,
-        leadPlanHits: limited.filter((item) => /lead-team plans/i.test(item.text)).length,
-      },
-      timestamp: Date.now(),
-    }),
-  }).catch(() => {});
-  // #endregion
 
   return limited;
 }
