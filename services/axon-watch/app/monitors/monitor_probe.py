@@ -134,7 +134,13 @@ def probe_monitor_slice(config: dict[str, object]) -> list[dict[str, object]]:
                 retries=retries,
             )
         elif check_type == "supabase_storage_quota":
-            status, detail = check_supabase_storage_quota(env=env)
+            timeout_seconds = max(1.0, float(entry.get("timeout_seconds") or 10))
+            retries = max(0, int(entry.get("retries") or 2))
+            status, detail = check_supabase_storage_quota(
+                env=env,
+                timeout_seconds=timeout_seconds,
+                retries=retries,
+            )
         elif check_type == "http_health":
             url = _resolve_url(str(entry.get("url") or ""), env)
             expect_status = int(entry.get("expect_status") or 200)

@@ -372,14 +372,18 @@ def _fetch_storage_bucket_totals(
     return totals, None
 
 
-def check_supabase_storage_quota(
+def _is_transport_fetch_error(detail: str) -> bool:
+    return " API query failed:" in detail
+
+
+def _evaluate_supabase_storage_quota(
     *,
     env: dict[str, str],
-    quota_bytes: int = 1_073_741_824,
-    warning_ratio: float = 0.80,
-    critical_ratio: float = 0.90,
-    rpc_name: str = "monitor_storage_bucket_usage",
-    timeout_seconds: float = 10,
+    quota_bytes: int,
+    warning_ratio: float,
+    critical_ratio: float,
+    rpc_name: str,
+    timeout_seconds: float,
 ) -> tuple[str, str]:
     headers = _supabase_rest_headers(env)
     if not headers:
@@ -405,7 +409,7 @@ def check_supabase_storage_quota(
         )
     if fetch_error and not totals:
         # Transient network blips warn; auth/schema/quota failures stay critical.
-        if " API query failed:" in fetch_error:
+        if _is_transport_fetch_error(fetch_error):
             return "warning", fetch_error
         return "critical", fetch_error
 
@@ -426,3 +430,36 @@ def check_supabase_storage_quota(
     if usage_ratio >= warning_ratio:
         return "warning", detail
     return "ok", detail
+
+
+def check_supabase_storage_quota(
+    *,
+    env: dict[str, str],
+    quota_bytes: int = 1_073_741_824,
+    warning_ratio: float = 0.80,
+    critical_ratio: float = 0.90,
+    rpc_name: str = "monitor_storage_bucket_usage",
+    timeout_seconds: float = 10,
+    retries: int = 2,
+) -> tuple[str, str]:
+    attempts = max(1, int(retries) + 1)
+    last_status = "warning"
+    last_detail = "Supabase Storage API query failed: unknown transport error"
+    for attempt in range(attempts):
+        status, detail = _evaluate_supabase_storage_quota(
+            env=env,
+            quota_bytes=quota_bytes,
+            warning_ratio=warning_ratio,
+            critical_ratio=critical_ratio,
+            rpc_name=rpc_name,
+            timeout_seconds=timeout_seconds,
+        )
+        if status != "warning" or not _is_transport_fetch_error(detail):
+            return status, detail
+        last_status = status
+        last_detail = detail
+        if attempt + 1 < attempts:
+            # Back off between attempts so transient DNS (EAI_AGAIN) can recover.
+            time.sleep(min(5.0, 1.5 * (attempt + 1)))
+            continue
+    return last_status, last_detail
