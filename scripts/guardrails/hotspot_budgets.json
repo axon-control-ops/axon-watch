@@ -213,7 +213,7 @@
       "target": "apps/console-web/src/styles/shell/mockup-shell-13a.css + mockup-shell-13b.css"
     },
     "apps/console-web/src/components/shell/OperatorStatusRadarPanel.vue": {
-      "max_lines": 734,
+      "max_lines": 725,
       "soft_limit": 350,
       "hard_limit": 500,
       "target": "apps/console-web/src/components/shell/operator-status-radar/*",
@@ -499,7 +499,7 @@
       "note": "VAXON orb HUD autonomy controls; pending-critical collapse extracted"
     },
     "apps/console-web/src/styles/shell/mockup-shell-11.css": {
-      "max_lines": 603,
+      "max_lines": 557,
       "soft_limit": 350,
       "hard_limit": 500,
       "target": "apps/console-web/src/styles/shell/*",
