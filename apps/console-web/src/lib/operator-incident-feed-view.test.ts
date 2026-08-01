@@ -39,6 +39,8 @@ describe('operator-incident-feed-view', () => {
     expect(view.items[0]?.title).toBe('Sentry spike');
     expect(view.items[0]?.plainWhat).toBeTruthy();
     expect(view.items[0]?.plainWhat.toLowerCase()).toContain('look');
+    expect(view.items[0]?.plainYouDo).toBeTruthy();
+    expect(view.items[0]?.plainAgentDo).toBeTruthy();
   });
 
   it('dedupes twin signals that share the same title', () => {
@@ -106,5 +108,7 @@ describe('operator-incident-feed-view', () => {
     });
 
     expect(view.items[0]?.plainWhat).toBe('Server plain English for Sentry.');
+    expect(view.items[0]?.plainYouDo).toBe('Open Attention.');
+    expect(view.items[0]?.plainAgentDo).toBe('Investigate Sentry.');
   });
 });

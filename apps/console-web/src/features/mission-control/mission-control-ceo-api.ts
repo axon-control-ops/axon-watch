@@ -1,9 +1,22 @@
-/** VAXON Mission Control CEO — ask Leads, rank critical work. */
+/** VAXON Mission Control CEO — ask Leads, rank critical work, board plate. */
+
+export type MissionControlPlate = {
+  waiting: number;
+  in_progress: number;
+  needs_attention: number;
+  pending_approvals: number;
+  cross_workspace: number;
+  total_open_plate: number;
+  load: 'idle' | 'busy' | 'critical' | string;
+  sample_titles?: string[];
+  focused_workspace_id?: string | null;
+};
 
 export type MissionControlCriticalWork = {
   ok: boolean;
   generated_at?: string;
   focused_workspace_id?: string | null;
+  autonomy_full?: boolean;
   leads_asked: number;
   awaiting_plan_count: number;
   leads: Array<{
@@ -22,12 +35,14 @@ export type MissionControlCriticalWork = {
     plan_id?: string | null;
     title?: string;
   } | null;
+  plate?: MissionControlPlate | null;
   advise: string;
   advise_ui_action?: {
     type: string;
     workspace_id?: string | null;
     focus_attention?: boolean;
     plan_id?: string | null;
+    column?: string | null;
   } | null;
 };
 

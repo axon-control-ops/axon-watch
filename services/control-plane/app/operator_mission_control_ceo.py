@@ -123,7 +123,12 @@ def build_mission_control_critical_work(
     ).strip().lower()
     auto_on = mode == "full"
 
+    from app.mission_control_plate import advise_from_plate, collect_mission_control_plate
+
+    plate = collect_mission_control_plate(focused_workspace_id=focused)
+
     advise = ""
+    advise_ui_action: dict[str, Any] | None = None
     if winner:
         lead = str(winner.get("lead_name") or "Lead")
         name = str(winner.get("display_name") or "that company")
@@ -142,6 +147,15 @@ def build_mission_control_critical_work(
             )
         else:
             advise = f"{lead} has a Lead-team plan waiting — engage “{title}”."
+        advise_ui_action = {
+            "type": "engage_lead_plans" if auto_on else "switch_workspace",
+            "workspace_id": winner.get("workspace_id"),
+            "focus_attention": True,
+            "plan_id": winner.get("plan_id"),
+        }
+    else:
+        # Lead plans clear ≠ Mission Control clear — surface Waiting / failures.
+        advise, advise_ui_action = advise_from_plate(plate, auto_on=auto_on)
 
     return {
         "ok": True,
@@ -152,17 +166,9 @@ def build_mission_control_critical_work(
         "awaiting_plan_count": len(plans),
         "leads": leads,
         "winner": winner,
+        "plate": plate,
         "advise": advise,
-        "advise_ui_action": (
-            {
-                "type": "engage_lead_plans" if auto_on else "switch_workspace",
-                "workspace_id": winner.get("workspace_id"),
-                "focus_attention": True,
-                "plan_id": winner.get("plan_id"),
-            }
-            if winner
-            else None
-        ),
+        "advise_ui_action": advise_ui_action,
     }
 
 

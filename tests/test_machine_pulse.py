@@ -43,6 +43,61 @@ class MachinePulseTests(unittest.TestCase):
         self.assertFalse(tick["autonomy_full"])
         self.assertEqual(tick["kills"], [])
 
+    def test_pressure_marks_fat_tsserver_auto_killable(self) -> None:
+        from app.host_context import machine_pulse as mp
+
+        self.assertTrue(
+            mp._is_auto_killable(
+                name="tsserver[5.9.2]",
+                cmdline="tsserver[5.9.2]: semantic",
+                rss=250.0,
+                protected=False,
+                junk=False,
+                mem_pct=85.0,
+            )
+        )
+        self.assertFalse(
+            mp._is_auto_killable(
+                name="tsserver[5.9.2]",
+                cmdline="tsserver[5.9.2]: semantic",
+                rss=1573.0,
+                protected=False,
+                junk=False,
+                mem_pct=70.0,
+            )
+        )
+
+    def test_orphan_si_worker_not_ide_protected(self) -> None:
+        from app.host_context import machine_pulse as mp
+
+        self.assertFalse(
+            mp._is_protected(
+                "MainThread",
+                "/home/edp/.local/bin/cursor-agent ... /tmp/axon-si-run_abc/checkout ...",
+                pid=424242,
+            )
+        )
+
+    def test_ci_runner_worker_is_reclaimable_under_pressure(self) -> None:
+        from app.host_context import machine_pulse as mp
+
+        cmdline = (
+            "/srv/axon-server/actions-runner-dashpro/_work/_tool/node/20/bin/node "
+            ".../jest-worker/build/workers/processChild.js"
+        )
+        self.assertFalse(mp._is_protected("node", cmdline, pid=424243))
+        self.assertTrue(
+            mp._is_auto_killable(
+                name="node",
+                cmdline=cmdline,
+                rss=90.0,
+                protected=False,
+                junk=False,
+                mem_pct=85.0,
+                swap_pct=80.0,
+            )
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

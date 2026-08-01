@@ -12,6 +12,10 @@ export type OperatorIncidentFeedItem = {
   summary: string;
   /** One-line layman "what happened" for the operator. */
   plainWhat: string;
+  /** Plain-English next step for the operator. */
+  plainYouDo: string;
+  /** Plain-English agent next step. */
+  plainAgentDo: string;
   severity: 'info' | 'high' | 'critical' | string;
   source: 'signal' | 'fleet';
   workspaceId: string | null;
@@ -63,7 +67,7 @@ export function buildOperatorIncidentFeed(input: {
   serverSignalId?: string | null;
   serverReason?: string | null;
 }): OperatorIncidentFeedView {
-  const limit = input.limit ?? 5;
+  const limit = input.limit ?? 8;
   const items: OperatorIncidentFeedItem[] = [];
   const seenIds = new Set<string>();
   const seenTitles = new Set<string>();
@@ -101,6 +105,8 @@ export function buildOperatorIncidentFeed(input: {
       title: signal.title,
       summary: signal.summary?.trim() || 'Open signal needs review.',
       plainWhat: explained.what,
+      plainYouDo: explained.youDo,
+      plainAgentDo: explained.agentDo,
       severity: signal.severity,
       source: 'signal',
       workspaceId: signal.workspace_id ?? null,
@@ -133,6 +139,8 @@ export function buildOperatorIncidentFeed(input: {
         title: row.top_signal_title,
         summary: `${row.open_signals_count} open signal(s) on ${row.display_name}.`,
         plainWhat: explained.what,
+        plainYouDo: explained.youDo,
+        plainAgentDo: explained.agentDo,
         severity: row.critical_signals_count > 0 ? 'critical' : 'high',
         source: 'fleet',
         workspaceId: row.workspace_id,

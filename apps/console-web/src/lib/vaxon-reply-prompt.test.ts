@@ -5,6 +5,7 @@ import {
   spokenLineAsksForRetry,
   vaxonAffirmReplyCta,
   vaxonLineAsksForReply,
+  vaxonLineNeedsIntervention,
 } from './vaxon-reply-prompt';
 
 describe('vaxonLineAsksForReply', () => {
@@ -29,6 +30,14 @@ describe('vaxonLineAsksForReply', () => {
 
   it('ignores plain narration', () => {
     expect(vaxonLineAsksForReply('Watch connected. Runtime looks nominal.')).toBe(false);
+  });
+
+  it('treats handoff / switch-there lines as needing operator intervention', () => {
+    const handoff =
+      "Handoff to Axon Watch is open, switch there and finish 'Control-plane fix for DashPro Lead blocker'.";
+    expect(vaxonLineNeedsIntervention(handoff)).toBe(true);
+    expect(vaxonLineAsksForReply(handoff)).toBe(true);
+    expect(vaxonAffirmReplyCta(handoff)).toBe('Yes — switch & attend');
   });
 });
 

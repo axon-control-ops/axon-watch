@@ -65,6 +65,45 @@ class MissionControlCeoTests(unittest.TestCase):
         self.assertEqual(facts[0]["lead_name"], "Dana")
         self.assertEqual(facts[0]["kind"], "awaiting_lead_plan")
 
+    def test_critical_work_surfaces_board_when_no_lead_plans(self) -> None:
+        plate = {
+            "waiting": 3,
+            "in_progress": 1,
+            "needs_attention": 12,
+            "pending_approvals": 0,
+            "cross_workspace": 2,
+            "total_open_plate": 18,
+            "load": "critical",
+            "sample_titles": ["VAXON attend: Reed failed"],
+            "focused_workspace_id": "workspace_axon_watch",
+        }
+        with (
+            patch(
+                "app.workspace_agents.lead_vaxon_handoff.list_awaiting_engagement_plans",
+                return_value=[],
+            ),
+            patch(
+                "app.workspace_agents.fleet_leads_context.collect_fleet_lead_rows",
+                return_value=[],
+            ),
+            patch(
+                "app.mission_control_plate.collect_mission_control_plate",
+                return_value=plate,
+            ),
+            patch(
+                "app.persistence.operator_presence_settings_store.load_settings",
+                return_value={"autonomy_mode": "full"},
+            ),
+        ):
+            pack = build_mission_control_critical_work(
+                focused_workspace_id="workspace_axon_watch",
+            )
+        self.assertTrue(pack["ok"])
+        self.assertEqual(pack["awaiting_plan_count"], 0)
+        self.assertIn("Waiting", pack["advise"])
+        self.assertNotEqual(pack["advise"], "")
+        self.assertEqual(pack["plate"]["waiting"], 3)
+
     def test_critical_work_pack_advise(self) -> None:
         plans = [
             {

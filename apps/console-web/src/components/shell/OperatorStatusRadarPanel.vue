@@ -1,15 +1,14 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { computed, onMounted } from 'vue';
 
+import { useMissionControlAttentionExpand } from '../../composables/useMissionControlAttentionExpand';
 import { openWatchConnectors } from '../../composables/useIdeEditorStatusBar';
 import { buildOperatorQuickGuide, type OperatorQuickGuideActionId } from '../../lib/operator-quick-guide';
 import {
   effectiveRequiredConnectorsUnavailable,
   isLegacyConnectorGlanceVisible,
 } from '../../lib/connector-glance-view';
-import {
-  type OperatorCenterView,
-} from '../../lib/operator-brain-graph-view';
+import { type OperatorCenterView } from '../../lib/operator-brain-graph-view';
 import {
   operatorAgentSummary,
   operatorExecutionStage,
@@ -22,10 +21,7 @@ import { leftSidebarAttentionBadgeCount } from '../../lib/left-sidebar-mode';
 import { kairoPresenceModuleParts } from '../../lib/mockup-shell-view';
 import PersonaTitle from '../PersonaTitle.vue';
 import { resolveKairoPresenceState } from '../../lib/kairo-presence';
-import {
-  formatRunDisplayName,
-  formatRunIdentityLabel,
-} from '../../lib/run-display';
+import { formatRunDisplayName, formatRunIdentityLabel } from '../../lib/run-display';
 import { runContinueActionLabel } from '../../lib/run-lifecycle-ui';
 import { useShellStore } from '../../stores/shell';
 import {
@@ -43,15 +39,10 @@ import OperatorStatusRadarPanelHeader from './OperatorStatusRadarPanelHeader.vue
 import OperatorTaskBoardPanel from './OperatorTaskBoardPanel.vue';
 import AttentionStackPanel from './AttentionStackPanel.vue';
 
-const props = defineProps<{
-  terminalVisible: boolean;
-}>();
-
-const emit = defineEmits<{
-  toggleTerminal: [];
-}>();
-
+const props = defineProps<{ terminalVisible: boolean }>();
+const emit = defineEmits<{ toggleTerminal: [] }>();
 const shell = useShellStore();
+useMissionControlAttentionExpand(shell);
 
 const continueActionLabel = computed(() =>
   runContinueActionLabel({
@@ -404,9 +395,9 @@ function handleOperatorQuickGuideAction(actionId: OperatorQuickGuideActionId): v
         <AttentionStackPanel variant="sidebar" sections="attention-only" />
       </section>
 
-      <OperatorTaskBoardPanel />
-
       <OperatorIncidentFeedPanel />
+
+      <OperatorTaskBoardPanel />
 
       <OperatorRunStripPanel />
 

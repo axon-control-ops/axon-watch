@@ -20,11 +20,15 @@ const autoOn = computed(
   () => String(shell.operatorPresenceSettings.autonomy_mode || '').toLowerCase() === 'full',
 );
 
+const plate = computed(() => pack.value?.plate ?? null);
+const plateLoad = computed(() => String(plate.value?.load || 'idle'));
+const plateOpen = computed(() => Number(plate.value?.total_open_plate || 0));
+
 const headline = computed(() => {
   if (error.value) {
     return error.value;
   }
-  if (lastSpoken.value) {
+  if (lastSpoken.value && (pack.value?.awaiting_plan_count ?? 0) > 0) {
     return lastSpoken.value;
   }
   if (!pack.value) {
@@ -33,20 +37,36 @@ const headline = computed(() => {
   if (pack.value.advise) {
     return pack.value.advise;
   }
-  return `Asked ${pack.value.leads_asked} Leads · no Lead-team plans waiting`;
+  if (plateOpen.value > 0) {
+    return 'Board still has work — scanning plate…';
+  }
+  return `Asked ${pack.value.leads_asked} Leads · plate clear`;
 });
 
 const meta = computed(() => {
   if (!pack.value) {
     return '';
   }
-  const waiting = pack.value.awaiting_plan_count;
-  if (waiting <= 0) {
-    return autoOn.value ? 'Plate clear · VAXON watching' : 'Plate clear';
+  const plans = pack.value.awaiting_plan_count ?? 0;
+  const waiting = plate.value?.waiting ?? 0;
+  const needs = plate.value?.needs_attention ?? 0;
+  const live = plate.value?.in_progress ?? 0;
+  const cross = plate.value?.cross_workspace ?? 0;
+  if (plans > 0) {
+    return autoOn.value
+      ? `${plans} Lead review${plans === 1 ? '' : 's'} · clearing`
+      : `${plans} Lead review${plans === 1 ? '' : 's'} waiting`;
   }
-  return autoOn.value
-    ? `${waiting} queued · VAXON clearing`
-    : `${waiting} plan${waiting === 1 ? '' : 's'} awaiting engagement`;
+  if (plateOpen.value > 0) {
+    const bits = [
+      waiting ? `${waiting} waiting` : '',
+      live ? `${live} live` : '',
+      needs ? `${needs} review` : '',
+      cross ? `${cross} cross-ws` : '',
+    ].filter(Boolean);
+    return bits.join(' · ') || `${plateOpen.value} on plate`;
+  }
+  return autoOn.value ? 'Plate clear · watching' : 'Plate clear';
 });
 
 async function refresh(): Promise<void> {
@@ -54,7 +74,6 @@ async function refresh(): Promise<void> {
   try {
     pack.value = await fetchMissionControlCriticalWork(focusedId.value);
     error.value = '';
-    // Under AUTO, VAXON owns Lead review close-out — do not leave Engage to the operator.
     if (autoOn.value && (pack.value.awaiting_plan_count ?? 0) > 0) {
       const engaged = await engageMissionControlLeads(5);
       lastSpoken.value = engaged.spoken || '';
@@ -64,20 +83,42 @@ async function refresh(): Promise<void> {
         headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': 'db8bb4' },
         body: JSON.stringify({
           sessionId: 'db8bb4',
-          runId: 'ceo-engage',
-          hypothesisId: 'C2',
+          runId: 'ceo-plate',
+          hypothesisId: 'P1',
           location: 'MissionControlCeoCriticalStrip.vue:refresh',
-          message: 'ui auto engage leads',
+          message: 'ui critical-work pack',
           data: {
-            engaged: engaged.engaged?.length ?? 0,
-            remaining: engaged.remaining ?? 0,
-            spoken: engaged.spoken ?? '',
+            plans: pack.value.awaiting_plan_count,
+            plate: pack.value.plate?.total_open_plate ?? 0,
+            load: pack.value.plate?.load,
+            advise: (pack.value.advise || '').slice(0, 120),
           },
           timestamp: Date.now(),
         }),
       }).catch(() => {});
       // #endregion
       pack.value = await fetchMissionControlCriticalWork(focusedId.value);
+    } else {
+      // #region agent log
+      fetch('http://127.0.0.1:7706/ingest/90bcaec2-2b39-4d4a-84b5-157c12735440', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': 'db8bb4' },
+        body: JSON.stringify({
+          sessionId: 'db8bb4',
+          runId: 'ceo-plate',
+          hypothesisId: 'P1',
+          location: 'MissionControlCeoCriticalStrip.vue:refresh',
+          message: 'ui critical-work pack',
+          data: {
+            plans: pack.value.awaiting_plan_count,
+            plate: pack.value.plate?.total_open_plate ?? 0,
+            load: pack.value.plate?.load,
+            advise: (pack.value.advise || '').slice(0, 120),
+          },
+          timestamp: Date.now(),
+        }),
+      }).catch(() => {});
+      // #endregion
     }
   } catch (err) {
     error.value = err instanceof Error ? err.message : 'Critical-work pack failed';
@@ -87,7 +128,7 @@ async function refresh(): Promise<void> {
 }
 
 async function onPrimaryAction(): Promise<void> {
-  if (autoOn.value) {
+  if (autoOn.value && (pack.value?.awaiting_plan_count ?? 0) > 0) {
     busy.value = true;
     try {
       const engaged = await engageMissionControlLeads(5);
@@ -103,10 +144,7 @@ async function onPrimaryAction(): Promise<void> {
   }
   const action = pack.value?.advise_ui_action;
   const workspaceId = action?.workspace_id?.trim();
-  if (!workspaceId) {
-    return;
-  }
-  if (shell.currentWorkspace?.workspace_id !== workspaceId) {
+  if (workspaceId && shell.currentWorkspace?.workspace_id !== workspaceId) {
     shell.setCurrentWorkspace(workspaceId);
   }
   shell.focusMissionControl();
@@ -130,23 +168,43 @@ onUnmounted(() => {
     timer = null;
   }
 });
+
+defineExpose({ plateLoad, pack });
 </script>
 
 <template>
-  <section class="mc-ceo-critical" aria-label="VAXON Mission Control critical work">
+  <section
+    class="mc-ceo-critical"
+    aria-label="VAXON Mission Control critical work"
+    :data-load="plateLoad"
+  >
     <header class="mc-ceo-critical__head">
       <p class="mc-ceo-critical__eyebrow">Mission Control · Ask Leads</p>
-      <span class="mc-ceo-critical__meta" :data-auto="autoOn ? 'true' : 'false'">{{ meta }}</span>
+      <span
+        class="mc-ceo-critical__meta"
+        :data-auto="autoOn ? 'true' : 'false'"
+        :data-load="plateLoad"
+      >
+        {{ meta }}
+      </span>
     </header>
     <p class="mc-ceo-critical__advise">{{ headline }}</p>
     <div class="mc-ceo-critical__actions">
       <button
         type="button"
         class="mc-ceo-critical__btn"
-        :disabled="busy || (!autoOn && !pack?.winner)"
+        :disabled="busy || (!autoOn && !pack?.advise && !pack?.winner)"
         @click="void onPrimaryAction()"
       >
-        {{ autoOn ? (busy ? 'Clearing…' : 'Clear reviews') : 'Open' }}
+        {{
+          autoOn && (pack?.awaiting_plan_count ?? 0) > 0
+            ? busy
+              ? 'Clearing…'
+              : 'Clear reviews'
+            : plateOpen > 0
+              ? 'Open board'
+              : 'Open'
+        }}
       </button>
       <button
         type="button"
@@ -172,6 +230,18 @@ onUnmounted(() => {
   background:
     linear-gradient(120deg, rgba(40, 28, 0, 0.55), rgba(0, 16, 28, 0.78)),
     rgba(0, 16, 24, 0.7);
+  transition:
+    border-color 220ms ease,
+    box-shadow 220ms ease;
+}
+
+.mc-ceo-critical[data-load='busy'] {
+  border-color: rgba(0, 220, 255, 0.4);
+}
+
+.mc-ceo-critical[data-load='critical'] {
+  border-color: rgba(255, 120, 90, 0.55);
+  box-shadow: 0 0 0 1px rgba(255, 90, 60, 0.18);
 }
 
 .mc-ceo-critical__head {
@@ -192,10 +262,15 @@ onUnmounted(() => {
 .mc-ceo-critical__meta {
   color: rgba(200, 220, 230, 0.75);
   font: 0.58rem var(--font-mono, ui-monospace, monospace);
+  text-align: right;
 }
 
 .mc-ceo-critical__meta[data-auto='true'] {
   color: rgba(160, 255, 210, 0.92);
+}
+
+.mc-ceo-critical__meta[data-load='critical'] {
+  color: rgba(255, 180, 140, 0.95);
 }
 
 .mc-ceo-critical__advise {
