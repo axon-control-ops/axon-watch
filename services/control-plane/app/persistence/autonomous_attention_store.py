@@ -3,191 +3,24 @@
 from __future__ import annotations
 
 from copy import deepcopy
-from contextlib import contextmanager
 import json
-import os
-import re
 import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
-from app.persistence import run_store_sqlite
-
-_SECRET_ASSIGNMENT_RE = re.compile(
-    r"(?i)\b([A-Z0-9_]*(?:TOKEN|SECRET|PASSWORD|API_KEY|APIKEY))"
-    r"\s*([:=])\s*([^\s,;]+)"
+from app.persistence.autonomous_attention_store_support import (
+    RECEIPT_COLUMNS,
+    ensure_autonomy_receipt_schema,
+    managed_connection,
+    redact_payload,
+    redact_text,
+    row_to_record,
+    utc_now_iso,
 )
-_BEARER_RE = re.compile(r"(?i)\bbearer\s+[A-Za-z0-9._~+/=-]+")
-_KNOWN_TOKEN_RE = re.compile(r"\b(?:gh[pousr]_[A-Za-z0-9]{20,}|sk-[A-Za-z0-9_-]{20,})\b")
-_SENSITIVE_KEY_RE = re.compile(
-    r"(?i)(token|secret|password|api[_-]?key|authorization|credential)"
-)
-
-
-def _redact_text(value: Any) -> str:
-    text = str(value or "")
-    text = _SECRET_ASSIGNMENT_RE.sub(r"\1\2[REDACTED]", text)
-    text = _BEARER_RE.sub("Bearer [REDACTED]", text)
-    return _KNOWN_TOKEN_RE.sub("[REDACTED]", text)
-
-
-def _redact_payload(value: Any) -> Any:
-    if isinstance(value, dict):
-        return {
-            str(key): (
-                "[REDACTED]"
-                if _SENSITIVE_KEY_RE.search(str(key))
-                else _redact_payload(item)
-            )
-            for key, item in value.items()
-        }
-    if isinstance(value, list):
-        return [_redact_payload(item) for item in value]
-    if isinstance(value, tuple):
-        return [_redact_payload(item) for item in value]
-    if isinstance(value, str):
-        return _redact_text(value)
-    return value
-
-_RECEIPT_COLUMNS = (
-    "receipt_id",
-    "workspace_id",
-    "kind",
-    "decision",
-    "tier",
-    "risk",
-    "title",
-    "detail",
-    "dedupe_key",
-    "task_id",
-    "ask_operator",
-    "status",
-    "resolution",
-    "resolved_at",
-    "payload_json",
-    "created_at",
-)
-
-
-def _configured_db_path() -> str | None:
-    return os.environ.get("AXON_WATCH_CONTROL_PLANE_DB")
-
-
-def _connection():
-    return run_store_sqlite.connect(_configured_db_path())
-
-
-@contextmanager
-def _managed_connection():
-    connection = _connection()
-    try:
-        yield connection
-    finally:
-        connection.close()
-
-
-def _utc_now_iso() -> str:
-    from datetime import datetime, timezone
-
-    return (
-        datetime.now(timezone.utc)
-        .replace(microsecond=0)
-        .isoformat()
-        .replace("+00:00", "Z")
-    )
-
-
-def ensure_autonomy_receipt_schema(connection: Any) -> None:
-    connection.execute(
-        """
-        CREATE TABLE IF NOT EXISTS autonomy_attention_receipts (
-            receipt_id TEXT PRIMARY KEY,
-            workspace_id TEXT NOT NULL DEFAULT '',
-            kind TEXT NOT NULL,
-            decision TEXT NOT NULL,
-            tier TEXT NOT NULL,
-            risk TEXT NOT NULL DEFAULT 'normal',
-            title TEXT NOT NULL DEFAULT '',
-            detail TEXT NOT NULL DEFAULT '',
-            dedupe_key TEXT NOT NULL DEFAULT '',
-            task_id TEXT,
-            ask_operator INTEGER NOT NULL DEFAULT 0,
-            status TEXT NOT NULL DEFAULT 'recorded',
-            resolution TEXT NOT NULL DEFAULT '',
-            resolved_at TEXT,
-            payload_json TEXT NOT NULL DEFAULT '{}',
-            created_at TEXT NOT NULL
-        )
-        """
-    )
-    columns = {
-        str(row["name"])
-        for row in connection.execute(
-            "PRAGMA table_info(autonomy_attention_receipts)"
-        ).fetchall()
-    }
-    optional = (
-        ("status", "TEXT NOT NULL DEFAULT 'recorded'"),
-        ("resolution", "TEXT NOT NULL DEFAULT ''"),
-        ("resolved_at", "TEXT"),
-    )
-    for name, ddl in optional:
-        if name not in columns:
-            connection.execute(
-                f"ALTER TABLE autonomy_attention_receipts ADD COLUMN {name} {ddl}"
-            )
-    connection.execute(
-        """
-        CREATE INDEX IF NOT EXISTS idx_autonomy_receipts_created
-            ON autonomy_attention_receipts(created_at DESC)
-        """
-    )
-    connection.execute(
-        """
-        CREATE INDEX IF NOT EXISTS idx_autonomy_receipts_dedupe
-            ON autonomy_attention_receipts(dedupe_key, created_at DESC)
-        """
-    )
-    connection.execute(
-        """
-        CREATE TABLE IF NOT EXISTS autonomy_attention_meta (
-            meta_key TEXT PRIMARY KEY,
-            meta_value TEXT NOT NULL,
-            updated_at TEXT NOT NULL
-        )
-        """
-    )
-
-
-def _row_to_record(row: Any) -> dict[str, Any]:
-    try:
-        payload = json.loads(row["payload_json"] or "{}")
-    except (TypeError, json.JSONDecodeError):
-        payload = {}
-    if not isinstance(payload, dict):
-        payload = {}
-    return {
-        "receipt_id": row["receipt_id"],
-        "workspace_id": row["workspace_id"] or "",
-        "kind": row["kind"],
-        "decision": row["decision"],
-        "tier": row["tier"],
-        "risk": row["risk"] or "normal",
-        "title": row["title"] or "",
-        "detail": row["detail"] or "",
-        "dedupe_key": row["dedupe_key"] or "",
-        "task_id": row["task_id"],
-        "ask_operator": bool(row["ask_operator"]),
-        "status": row["status"] or "recorded",
-        "resolution": row["resolution"] or "",
-        "resolved_at": row["resolved_at"],
-        "payload": payload,
-        "created_at": row["created_at"],
-    }
 
 
 def reset_store() -> None:
-    with _managed_connection() as connection:
+    with managed_connection() as connection:
         ensure_autonomy_receipt_schema(connection)
         connection.execute("DELETE FROM autonomy_attention_receipts")
         connection.execute("DELETE FROM autonomy_attention_meta")
@@ -198,9 +31,9 @@ def set_meta(key: str, value: Any) -> None:
     cleaned = str(key or "").strip()
     if not cleaned:
         return
-    stamp = _utc_now_iso()
+    stamp = utc_now_iso()
     serialized = json.dumps(value)
-    with _managed_connection() as connection:
+    with managed_connection() as connection:
         ensure_autonomy_receipt_schema(connection)
         connection.execute(
             """
@@ -219,7 +52,7 @@ def get_meta(key: str, default: Any = None) -> Any:
     cleaned = str(key or "").strip()
     if not cleaned:
         return default
-    with _managed_connection() as connection:
+    with managed_connection() as connection:
         ensure_autonomy_receipt_schema(connection)
         row = connection.execute(
             "SELECT meta_value FROM autonomy_attention_meta WHERE meta_key = ?",
@@ -247,7 +80,7 @@ def append_receipt(
     ask_operator: bool = False,
     payload: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
-    stamp = _utc_now_iso()
+    stamp = utc_now_iso()
     record = {
         "receipt_id": f"auton-{uuid.uuid4().hex[:16]}",
         "workspace_id": str(workspace_id or "").strip(),
@@ -255,32 +88,32 @@ def append_receipt(
         "decision": str(decision or "skip").strip() or "skip",
         "tier": str(tier or "unclassified").strip() or "unclassified",
         "risk": str(risk or "normal").strip() or "normal",
-        "title": _redact_text(title).strip()[:240],
-        "detail": _redact_text(detail).strip()[:500],
-        "dedupe_key": _redact_text(dedupe_key).strip()[:240],
+        "title": redact_text(title).strip()[:240],
+        "detail": redact_text(detail).strip()[:500],
+        "dedupe_key": redact_text(dedupe_key).strip()[:240],
         "task_id": (str(task_id).strip() if task_id else None),
         "ask_operator": 1 if ask_operator else 0,
         "status": "pending" if ask_operator else "recorded",
         "resolution": "",
         "resolved_at": None,
-        "payload_json": json.dumps(_redact_payload(payload or {})),
+        "payload_json": json.dumps(redact_payload(payload or {})),
         "created_at": stamp,
     }
-    with _managed_connection() as connection:
+    with managed_connection() as connection:
         ensure_autonomy_receipt_schema(connection)
-        placeholders = ", ".join("?" for _ in _RECEIPT_COLUMNS)
+        placeholders = ", ".join("?" for _ in RECEIPT_COLUMNS)
         connection.execute(
             f"""
-            INSERT INTO autonomy_attention_receipts ({", ".join(_RECEIPT_COLUMNS)})
+            INSERT INTO autonomy_attention_receipts ({", ".join(RECEIPT_COLUMNS)})
             VALUES ({placeholders})
             """,
-            tuple(record[column] for column in _RECEIPT_COLUMNS),
+            tuple(record[column] for column in RECEIPT_COLUMNS),
         )
         connection.commit()
     stored = {
-        **{key: record[key] for key in _RECEIPT_COLUMNS if key != "payload_json"},
+        **{key: record[key] for key in RECEIPT_COLUMNS if key != "payload_json"},
         "ask_operator": bool(record["ask_operator"]),
-        "payload": _redact_payload(payload or {}),
+        "payload": redact_payload(payload or {}),
     }
     return deepcopy(stored)
 
@@ -289,13 +122,13 @@ def get_receipt(receipt_id: str) -> dict[str, Any] | None:
     cleaned = str(receipt_id or "").strip()
     if not cleaned:
         return None
-    with _managed_connection() as connection:
+    with managed_connection() as connection:
         ensure_autonomy_receipt_schema(connection)
         row = connection.execute(
             "SELECT * FROM autonomy_attention_receipts WHERE receipt_id = ?",
             (cleaned,),
         ).fetchone()
-    return _row_to_record(row) if row is not None else None
+    return row_to_record(row) if row is not None else None
 
 
 def list_receipts(
@@ -319,7 +152,7 @@ def list_receipts(
         conditions.append("workspace_id = ?")
         params.append(workspace_filter)
     where = f"WHERE {' AND '.join(conditions)}" if conditions else ""
-    with _managed_connection() as connection:
+    with managed_connection() as connection:
         ensure_autonomy_receipt_schema(connection)
         rows = connection.execute(
             f"""
@@ -330,7 +163,7 @@ def list_receipts(
             """,
             (*params, bound),
         ).fetchall()
-    return [_row_to_record(row) for row in rows]
+    return [row_to_record(row) for row in rows]
 
 
 def list_pending_decisions(
@@ -354,7 +187,7 @@ def begin_decision_resolution(receipt_id: str) -> dict[str, Any]:
         raise ValueError(f"autonomy decision not found: {cleaned}")
     if current.get("status") != "pending":
         raise ValueError(f"autonomy decision already resolving or resolved: {cleaned}")
-    with _managed_connection() as connection:
+    with managed_connection() as connection:
         ensure_autonomy_receipt_schema(connection)
         cursor = connection.execute(
             """
@@ -383,8 +216,8 @@ def complete_decision_resolution(
     choice = str(resolution or "").strip().lower()
     if choice not in {"approved", "rejected"}:
         raise ValueError("resolution must be approved or rejected")
-    stamp = _utc_now_iso()
-    with _managed_connection() as connection:
+    stamp = utc_now_iso()
+    with managed_connection() as connection:
         ensure_autonomy_receipt_schema(connection)
         cursor = connection.execute(
             """
@@ -411,7 +244,7 @@ def release_decision_resolution(receipt_id: str) -> None:
     cleaned = str(receipt_id or "").strip()
     if not cleaned:
         return
-    with _managed_connection() as connection:
+    with managed_connection() as connection:
         ensure_autonomy_receipt_schema(connection)
         connection.execute(
             """
