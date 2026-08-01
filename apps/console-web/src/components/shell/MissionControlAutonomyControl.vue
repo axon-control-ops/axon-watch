@@ -10,6 +10,11 @@ import {
 import { useWorkerAutonomyControl } from '../../composables/useWorkerAutonomyControl';
 import { collapsePendingCriticalDecisions } from '../../features/mission-control/pending-critical-decisions';
 import { useShellStore } from '../../stores/shell';
+import {
+  buildAutonomyTelemetryLine,
+  resolveAutonomyWorkerStateLabel,
+  shouldShowAutonomyAlert,
+} from './mission-control-autonomy-control-helpers';
 
 const shell = useShellStore();
 const {
@@ -43,43 +48,29 @@ const pendingCritical = computed<AutonomyReceipt[]>(() =>
 );
 const pendingCriticalTotal = computed(() => pendingCritical.value.length);
 
-const workerStateLabel = computed(() => {
-  if (!status.value) {
-    return 'Unknown';
-  }
-  if (status.value.blocked_by_env) {
-    return 'Blocked';
-  }
-  if (autonomousOn.value && status.value.effective_enabled) {
-    return 'Running';
-  }
-  if (autonomousOn.value) {
-    return 'Armed';
-  }
-  return 'Paused';
-});
+const workerStateLabel = computed(() =>
+  resolveAutonomyWorkerStateLabel({
+    status: status.value,
+    autonomousOn: autonomousOn.value,
+  }),
+);
 
-const telemetryLine = computed(() => {
-  const parts = [workerStateLabel.value, autonomyMode.value];
-  const scan = feed.value?.last_scan;
-  if (scan) {
-    parts.push(`+${scan.created_count ?? 0}`);
-    if ((scan.escalated_count ?? 0) > 0) {
-      parts.push(`↑${scan.escalated_count}`);
-    }
-  }
-  if (readiness.value && readiness.value.grade !== 'ready') {
-    parts.push(`${readiness.value.score}/100`);
-  }
-  return parts.join(' · ');
-});
+const telemetryLine = computed(() =>
+  buildAutonomyTelemetryLine({
+    workerStateLabel: workerStateLabel.value,
+    autonomyMode: autonomyMode.value,
+    scan: feed.value?.last_scan ?? null,
+    readiness: readiness.value,
+  }),
+);
 
-const showAlert = computed(
-  () =>
-    Boolean(actionMessage.value) ||
-    Boolean(feedError.value) ||
-    Boolean(status.value?.blocked_by_env) ||
-    Boolean(readiness.value && readiness.value.grade !== 'ready'),
+const showAlert = computed(() =>
+  shouldShowAutonomyAlert({
+    actionMessage: actionMessage.value,
+    feedError: feedError.value,
+    blockedByEnv: Boolean(status.value?.blocked_by_env),
+    readiness: readiness.value,
+  }),
 );
 
 async function reloadFeed(): Promise<void> {
