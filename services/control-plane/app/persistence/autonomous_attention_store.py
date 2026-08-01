@@ -8,7 +8,7 @@ import json
 import os
 import re
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from typing import Any
 
 from app.persistence import run_store_sqlite
@@ -447,36 +447,11 @@ def has_recent_dedupe_key(
     *,
     cooldown_seconds: int = 900,
 ) -> bool:
-    from app.workspace_agents.autonomous_attention_dedupe import soft_dedupe_key
-
-    key = str(dedupe_key or "").strip()
-    if not key:
-        return False
-    soft = soft_dedupe_key(key)
-    pending = list_pending_decisions(limit=500)
-    if any(soft_dedupe_key(str(row.get("dedupe_key") or "")) == soft for row in pending):
-        return True
-    resolving = list_receipts(limit=500, status="resolving")
-    if any(soft_dedupe_key(str(row.get("dedupe_key") or "")) == soft for row in resolving):
-        return True
-    cutoff = datetime.now(timezone.utc) - timedelta(
-        seconds=max(1, int(cooldown_seconds))
+    from app.workspace_agents.autonomous_attention_dedupe import (
+        has_recent_dedupe_key as _has_recent,
     )
-    for row in list_receipts(limit=500):
-        if soft_dedupe_key(str(row.get("dedupe_key") or "")) != soft:
-            continue
-        raw = str(row.get("resolved_at") or row.get("created_at") or "").replace(
-            "Z", "+00:00"
-        )
-        try:
-            created = datetime.fromisoformat(raw)
-        except ValueError:
-            continue
-        if created.tzinfo is None:
-            created = created.replace(tzinfo=timezone.utc)
-        if created.astimezone(timezone.utc) >= cutoff:
-            return True
-    return False
+
+    return _has_recent(dedupe_key, cooldown_seconds=cooldown_seconds)
 
 
 __all__ = [

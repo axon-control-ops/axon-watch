@@ -14,6 +14,7 @@ from app.operator_fleet_advice import build_fleet_coach_line  # noqa: E402
 from app.operator_mission_control_ceo import (  # noqa: E402
     build_mission_control_critical_work,
     collect_awaiting_lead_plan_facts,
+    engage_awaiting_lead_plans,
 )
 
 
@@ -111,6 +112,64 @@ class MissionControlCeoTests(unittest.TestCase):
         )
         self.assertIn("Dana", line)
         self.assertIn("engage", line.lower())
+
+    def test_engage_requires_full_autonomy(self) -> None:
+        with patch(
+            "app.persistence.operator_presence_settings_store.load_settings",
+            return_value={"autonomy_mode": "assisted"},
+        ):
+            result = engage_awaiting_lead_plans(require_full_autonomy=True)
+        self.assertFalse(result["ok"])
+        self.assertEqual(result["reason"], "autonomy_not_full")
+        self.assertEqual(result["engaged"], [])
+
+    def test_engage_completes_one_plan_per_workspace(self) -> None:
+        plans = [
+            {
+                "plan_id": "p1",
+                "workspace_id": "workspace_dashpro",
+                "goal": "Ship parent fees",
+            },
+            {
+                "plan_id": "p2",
+                "workspace_id": "workspace_dashpro",
+                "goal": "Twin same company",
+            },
+            {
+                "plan_id": "p3",
+                "workspace_id": "workspace_axon_watch",
+                "goal": "Fast Gate",
+            },
+        ]
+        statuses: list[tuple[str, str]] = []
+
+        def _set_status(plan_id: str, status: str) -> dict[str, str]:
+            statuses.append((plan_id, status))
+            return {"plan_id": plan_id, "status": status}
+
+        with (
+            patch(
+                "app.persistence.operator_presence_settings_store.load_settings",
+                return_value={"autonomy_mode": "full"},
+            ),
+            patch(
+                "app.workspace_agents.lead_vaxon_handoff.list_awaiting_engagement_plans",
+                return_value=plans,
+            ),
+            patch(
+                "app.workspace_agents.lead_plan_store.set_plan_status",
+                side_effect=_set_status,
+            ),
+            patch(
+                "app.workspace_agents.lead_plan_store.append_receipt",
+                return_value={},
+            ),
+        ):
+            result = engage_awaiting_lead_plans(max_plans=5, require_full_autonomy=True)
+        self.assertTrue(result["ok"])
+        self.assertEqual(len(result["engaged"]), 2)
+        self.assertEqual({row[0] for row in statuses}, {"p1", "p3"})
+        self.assertTrue(all(row[1] == "completed" for row in statuses))
 
 
 if __name__ == "__main__":

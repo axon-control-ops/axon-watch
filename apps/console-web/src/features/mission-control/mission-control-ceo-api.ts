@@ -45,3 +45,25 @@ export async function fetchMissionControlCriticalWork(
   }
   return (await response.json()) as MissionControlCriticalWork;
 }
+
+export type MissionControlEngageLeadsResult = {
+  ok: boolean;
+  autonomy_full?: boolean;
+  engaged: Array<{ plan_id: string; workspace_id: string; goal: string }>;
+  remaining: number;
+  spoken?: string;
+  reason?: string;
+};
+
+export async function engageMissionControlLeads(
+  maxPlans = 5,
+): Promise<MissionControlEngageLeadsResult> {
+  const response = await fetch(
+    `/api/operator/mission-control/engage-leads?max_plans=${maxPlans}`,
+    { method: 'POST', headers: { Accept: 'application/json' } },
+  );
+  if (!response.ok) {
+    throw new Error(`engage-leads failed: ${response.status}`);
+  }
+  return (await response.json()) as MissionControlEngageLeadsResult;
+}

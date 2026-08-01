@@ -2,6 +2,7 @@
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 
 import {
+  engageMissionControlLeads,
   fetchMissionControlCriticalWork,
   type MissionControlCriticalWork,
 } from '../../features/mission-control/mission-control-ceo-api';
@@ -11,13 +12,20 @@ const shell = useShellStore();
 const pack = ref<MissionControlCriticalWork | null>(null);
 const error = ref('');
 const busy = ref(false);
+const lastSpoken = ref('');
 let timer: ReturnType<typeof setInterval> | null = null;
 
 const focusedId = computed(() => shell.currentWorkspace?.workspace_id ?? null);
+const autoOn = computed(
+  () => String(shell.operatorPresenceSettings.autonomy_mode || '').toLowerCase() === 'full',
+);
 
 const headline = computed(() => {
   if (error.value) {
     return error.value;
+  }
+  if (lastSpoken.value) {
+    return lastSpoken.value;
   }
   if (!pack.value) {
     return 'Asking Leads…';
@@ -33,9 +41,12 @@ const meta = computed(() => {
     return '';
   }
   const waiting = pack.value.awaiting_plan_count;
-  return waiting > 0
-    ? `${waiting} plan${waiting === 1 ? '' : 's'} awaiting engagement`
-    : 'Plate clear';
+  if (waiting <= 0) {
+    return autoOn.value ? 'Plate clear · VAXON watching' : 'Plate clear';
+  }
+  return autoOn.value
+    ? `${waiting} queued · VAXON clearing`
+    : `${waiting} plan${waiting === 1 ? '' : 's'} awaiting engagement`;
 });
 
 async function refresh(): Promise<void> {
@@ -43,6 +54,31 @@ async function refresh(): Promise<void> {
   try {
     pack.value = await fetchMissionControlCriticalWork(focusedId.value);
     error.value = '';
+    // Under AUTO, VAXON owns Lead review close-out — do not leave Engage to the operator.
+    if (autoOn.value && (pack.value.awaiting_plan_count ?? 0) > 0) {
+      const engaged = await engageMissionControlLeads(5);
+      lastSpoken.value = engaged.spoken || '';
+      // #region agent log
+      fetch('http://127.0.0.1:7706/ingest/90bcaec2-2b39-4d4a-84b5-157c12735440', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': 'db8bb4' },
+        body: JSON.stringify({
+          sessionId: 'db8bb4',
+          runId: 'ceo-engage',
+          hypothesisId: 'C2',
+          location: 'MissionControlCeoCriticalStrip.vue:refresh',
+          message: 'ui auto engage leads',
+          data: {
+            engaged: engaged.engaged?.length ?? 0,
+            remaining: engaged.remaining ?? 0,
+            spoken: engaged.spoken ?? '',
+          },
+          timestamp: Date.now(),
+        }),
+      }).catch(() => {});
+      // #endregion
+      pack.value = await fetchMissionControlCriticalWork(focusedId.value);
+    }
   } catch (err) {
     error.value = err instanceof Error ? err.message : 'Critical-work pack failed';
   } finally {
@@ -50,7 +86,21 @@ async function refresh(): Promise<void> {
   }
 }
 
-function attendWinner(): void {
+async function onPrimaryAction(): Promise<void> {
+  if (autoOn.value) {
+    busy.value = true;
+    try {
+      const engaged = await engageMissionControlLeads(5);
+      lastSpoken.value = engaged.spoken || '';
+      pack.value = await fetchMissionControlCriticalWork(focusedId.value);
+      error.value = '';
+    } catch (err) {
+      error.value = err instanceof Error ? err.message : 'Engage failed';
+    } finally {
+      busy.value = false;
+    }
+    return;
+  }
   const action = pack.value?.advise_ui_action;
   const workspaceId = action?.workspace_id?.trim();
   if (!workspaceId) {
@@ -59,7 +109,7 @@ function attendWinner(): void {
   if (shell.currentWorkspace?.workspace_id !== workspaceId) {
     shell.setCurrentWorkspace(workspaceId);
   }
-  shell.focusMissionControl?.();
+  shell.focusMissionControl();
   shell.focusAttentionSidebar();
 }
 
@@ -70,7 +120,7 @@ onMounted(() => {
   }, 30_000);
 });
 
-watch(focusedId, () => {
+watch([focusedId, autoOn], () => {
   void refresh();
 });
 
@@ -86,17 +136,17 @@ onUnmounted(() => {
   <section class="mc-ceo-critical" aria-label="VAXON Mission Control critical work">
     <header class="mc-ceo-critical__head">
       <p class="mc-ceo-critical__eyebrow">Mission Control · Ask Leads</p>
-      <span class="mc-ceo-critical__meta">{{ meta }}</span>
+      <span class="mc-ceo-critical__meta" :data-auto="autoOn ? 'true' : 'false'">{{ meta }}</span>
     </header>
     <p class="mc-ceo-critical__advise">{{ headline }}</p>
     <div class="mc-ceo-critical__actions">
       <button
         type="button"
         class="mc-ceo-critical__btn"
-        :disabled="busy || !pack?.winner"
-        @click="attendWinner()"
+        :disabled="busy || (!autoOn && !pack?.winner)"
+        @click="void onPrimaryAction()"
       >
-        Engage
+        {{ autoOn ? (busy ? 'Clearing…' : 'Clear reviews') : 'Open' }}
       </button>
       <button
         type="button"
@@ -104,7 +154,7 @@ onUnmounted(() => {
         :disabled="busy"
         @click="void refresh()"
       >
-        {{ busy ? 'Asking…' : 'Ask Leads' }}
+        {{ busy ? 'Working…' : autoOn ? 'Scan + act' : 'Ask Leads' }}
       </button>
     </div>
   </section>
@@ -142,6 +192,10 @@ onUnmounted(() => {
 .mc-ceo-critical__meta {
   color: rgba(200, 220, 230, 0.75);
   font: 0.58rem var(--font-mono, ui-monospace, monospace);
+}
+
+.mc-ceo-critical__meta[data-auto='true'] {
+  color: rgba(160, 255, 210, 0.92);
 }
 
 .mc-ceo-critical__advise {

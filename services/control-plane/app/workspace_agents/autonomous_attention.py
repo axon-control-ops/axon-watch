@@ -30,6 +30,7 @@ from app.workspace_agents.autonomous_attention_dedupe import (
     receipt_soft_key,
     reject_duplicate_pending,
 )
+from app.workspace_agents.ceo_pending_approve import ceo_dispatch_policy_if_full_auto
 from app.workspace_agents.lead_team_checkin import run_lead_team_checkin
 
 logger = logging.getLogger(__name__)
@@ -133,6 +134,16 @@ def _enqueue_attend_actions(
                 }
             )
             continue
+
+        ceo_policy = ceo_dispatch_policy_if_full_auto(
+            policy,
+            kind=finding.kind,
+            title=finding.title,
+            detail=finding.detail,
+            dedupe_key=finding.dedupe_key,
+        )
+        if ceo_policy is not None:
+            policy = ceo_policy
 
         if policy.decision != "dispatch" or policy.ask_operator:
             if escalation_budget <= 0:
@@ -323,14 +334,10 @@ def run_autonomous_attention_scan(
             logger.exception("lead check-in during attend scan failed")
             result["lead_checkin"] = {"error": "lead_checkin_failed"}
 
-    # Machine CEO — host pulse + safe allowlisted kills while Full autonomy is on.
-    try:
-        from app.host_context.machine_ceo import run_machine_ceo_tick
+    # Machine CEO + Lead-review engagement — VAXON owns these under Full AUTO.
+    from app.operator_mission_control_ceo import run_ceo_attend_hooks
 
-        result["machine_ceo"] = run_machine_ceo_tick(auto_kill=True)
-    except Exception:  # noqa: BLE001
-        logger.exception("machine ceo tick during attend scan failed")
-        result["machine_ceo"] = {"error": "machine_ceo_failed"}
+    result.update(run_ceo_attend_hooks())
 
     for workspace_id in targets:
         workspace = str(workspace_id or "").strip()
