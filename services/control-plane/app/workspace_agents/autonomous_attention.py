@@ -25,6 +25,11 @@ from app.workspace_agents.lead_checkin_assign import (
     SPECIALIST_ROLES,
     LeadCheckinFinding,
 )
+from app.workspace_agents.autonomous_attention_dedupe import (
+    collapse_pending_decisions,
+    receipt_soft_key,
+    reject_duplicate_pending,
+)
 from app.workspace_agents.lead_team_checkin import run_lead_team_checkin
 
 logger = logging.getLogger(__name__)
@@ -209,62 +214,6 @@ def _enqueue_attend_actions(
     return {"created_tasks": created, "escalated": escalated, "skipped": skipped}
 
 
-def _receipt_soft_key(receipt: dict[str, Any]) -> str:
-    soft = autonomous_attention_store.soft_dedupe_key(
-        str(receipt.get("dedupe_key") or "")
-    )
-    if soft:
-        return soft
-    title = str(receipt.get("title") or "").strip().lower()
-    workspace = str(receipt.get("workspace_id") or "").strip().lower()
-    kind = str(receipt.get("kind") or "").strip().lower()
-    if title:
-        return f"{kind}:{workspace}:{title}"
-    return str(receipt.get("receipt_id") or "").strip().lower()
-
-
-def _collapse_pending_decisions(pending: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    """Keep newest receipt per soft key so VAXON never stacks twin Needs-you cards."""
-    seen: set[str] = set()
-    collapsed: list[dict[str, Any]] = []
-    for row in pending:
-        soft = _receipt_soft_key(row)
-        if soft in seen:
-            continue
-        seen.add(soft)
-        collapsed.append(row)
-    return collapsed
-
-
-def _reject_duplicate_pending(*, primary_id: str, soft_key: str) -> int:
-    """Close stacked twins after the operator acts on one card."""
-    cleared = 0
-    if not soft_key:
-        return cleared
-    for row in autonomous_attention_store.list_pending_decisions(limit=500):
-        twin_id = str(row.get("receipt_id") or "").strip()
-        if not twin_id or twin_id == primary_id:
-            continue
-        if _receipt_soft_key(row) != soft_key:
-            continue
-        try:
-            autonomous_attention_store.begin_decision_resolution(twin_id)
-            autonomous_attention_store.complete_decision_resolution(
-                twin_id,
-                resolution="rejected",
-            )
-            cleared += 1
-        except Exception:
-            logger.warning(
-                "could not auto-clear duplicate autonomy decision %s", twin_id
-            )
-            try:
-                autonomous_attention_store.release_decision_resolution(twin_id)
-            except Exception:
-                pass
-    return cleared
-
-
 def resolve_autonomy_decision(
     receipt_id: str,
     *,
@@ -275,16 +224,14 @@ def resolve_autonomy_decision(
     if choice not in {"approved", "rejected"}:
         raise ValueError("resolution must be approved or rejected")
     receipt = autonomous_attention_store.begin_decision_resolution(receipt_id)
-    soft_key = _receipt_soft_key(receipt)
+    soft_key = receipt_soft_key(receipt)
     if choice == "rejected":
         try:
             resolved = autonomous_attention_store.complete_decision_resolution(
                 receipt_id,
                 resolution="rejected",
             )
-            cleared = _reject_duplicate_pending(
-                primary_id=receipt_id, soft_key=soft_key
-            )
+            reject_duplicate_pending(primary_id=receipt_id, soft_key=soft_key)
             return resolved
         except Exception:
             autonomous_attention_store.release_decision_resolution(receipt_id)
@@ -323,7 +270,7 @@ def resolve_autonomy_decision(
             resolution="approved",
             task_id=str(task.get("task_id") or "") or None,
         )
-        cleared = _reject_duplicate_pending(primary_id=receipt_id, soft_key=soft_key)
+        reject_duplicate_pending(primary_id=receipt_id, soft_key=soft_key)
         return resolved
     except Exception:
         if task is not None:
@@ -485,7 +432,7 @@ def build_autonomy_status_feed(*, workspace_id: str | None = None) -> dict[str, 
         limit=500,
         workspace_id=scoped_workspace or None,
     )
-    pending = _collapse_pending_decisions(pending_raw)
+    pending = collapse_pending_decisions(pending_raw)
     last_scan_key = f"last_scan:{scoped_workspace}" if scoped_workspace else "last_scan"
     last_scan = autonomous_attention_store.get_meta(last_scan_key) or {}
     return {

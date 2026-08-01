@@ -442,22 +442,13 @@ def resolve_decision(
         raise
 
 
-def soft_dedupe_key(dedupe_key: str) -> str:
-    """Collapse failed_shift:ws:role:run_id → failed_shift:ws:role for twin suppression."""
-    key = str(dedupe_key or "").strip().lower()
-    if not key:
-        return ""
-    parts = key.split(":")
-    if parts and parts[0] == "failed_shift" and len(parts) >= 3:
-        return f"failed_shift:{parts[1]}:{parts[2]}"
-    return key
-
-
 def has_recent_dedupe_key(
     dedupe_key: str,
     *,
     cooldown_seconds: int = 900,
 ) -> bool:
+    from app.workspace_agents.autonomous_attention_dedupe import soft_dedupe_key
+
     key = str(dedupe_key or "").strip()
     if not key:
         return False
@@ -496,7 +487,6 @@ __all__ = [
     "get_receipt",
     "get_meta",
     "has_recent_dedupe_key",
-    "soft_dedupe_key",
     "list_pending_decisions",
     "list_receipts",
     "release_decision_resolution",

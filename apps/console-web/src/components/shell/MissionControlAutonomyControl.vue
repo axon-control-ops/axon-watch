@@ -8,6 +8,7 @@ import {
   type AutonomyStatusFeed,
 } from '../../api/autonomy-api';
 import { useWorkerAutonomyControl } from '../../composables/useWorkerAutonomyControl';
+import { collapsePendingCriticalDecisions } from '../../features/mission-control/pending-critical-decisions';
 import { useShellStore } from '../../stores/shell';
 
 const shell = useShellStore();
@@ -34,34 +35,12 @@ const feedError = ref<string | null>(null);
 const resolvingId = ref<string | null>(null);
 let feedTimer: ReturnType<typeof setInterval> | null = null;
 
-function softDecisionKey(item: AutonomyReceipt): string {
-  const raw = String(item.dedupe_key || '').trim().toLowerCase();
-  const parts = raw.split(':');
-  if (parts[0] === 'failed_shift' && parts.length >= 3) {
-    return `failed_shift:${parts[1]}:${parts[2]}`;
-  }
-  const title = String(item.title || item.kind || '').trim().toLowerCase();
-  const workspace = String(item.workspace_id || '').trim().toLowerCase();
-  return title ? `${workspace}:${title}` : raw || item.receipt_id;
-}
-
-const pendingCritical = computed<AutonomyReceipt[]>(() => {
-  const workspaceId = shell.currentWorkspace?.workspace_id?.trim();
-  const scoped = (feed.value?.pending_critical_decisions ?? []).filter(
-    (item) => !workspaceId || !item.workspace_id || item.workspace_id === workspaceId,
-  );
-  const seen = new Set<string>();
-  const collapsed: AutonomyReceipt[] = [];
-  for (const item of scoped) {
-    const key = softDecisionKey(item);
-    if (seen.has(key)) {
-      continue;
-    }
-    seen.add(key);
-    collapsed.push(item);
-  }
-  return collapsed;
-});
+const pendingCritical = computed<AutonomyReceipt[]>(() =>
+  collapsePendingCriticalDecisions(
+    feed.value?.pending_critical_decisions ?? [],
+    shell.currentWorkspace?.workspace_id,
+  ),
+);
 const pendingCriticalTotal = computed(() => pendingCritical.value.length);
 
 const workerStateLabel = computed(() => {
