@@ -24,16 +24,11 @@ import { fetchMissionControlCriticalWork } from '../../features/mission-control/
 import MissionControlAutonomyControl from './MissionControlAutonomyControl.vue';
 import MissionControlCeoCriticalStrip from './MissionControlCeoCriticalStrip.vue';
 import MissionControlMachineCeoStrip from './MissionControlMachineCeoStrip.vue';
-import { resolveVaxonTransmissionView } from '../../lib/mc-vaxon-transmission-view';
+import { useStickyTransmissionAsk } from '../../composables/useStickyTransmissionAsk';
 import {
-  vaxonAffirmReplyCta,
-  vaxonLineAsksForReply,
-  vaxonLineNeedsIntervention,
-} from '../../lib/vaxon-reply-prompt';
-import {
-  isTransmissionAskAnswered,
-  markTransmissionAskAnswered,
-} from '../../lib/vaxon-transmission-reply-state';
+  resolveVaxonTransmissionView,
+  splitTransmissionBody,
+} from '../../lib/mc-vaxon-transmission-view';
 import { useShellStore } from '../../stores/shell';
 
 const shell = useShellStore();
@@ -107,27 +102,37 @@ const transmission = computed(() =>
 );
 
 const spokenLine = computed(() => transmission.value.body);
-const transmissionHasDetail = computed(() => transmission.value.detailLines.length > 0);
+const transmissionEmpty = computed(() => transmission.value.empty);
+const {
+  activeAskLine,
+  showReplyActions,
+  needsIntervention,
+  affirmCta,
+  clearStickyAsk,
+} = useStickyTransmissionAsk({
+  spokenLine,
+  transmissionEmpty,
+});
+
+const stickyDisplay = computed(() => {
+  const line = activeAskLine.value;
+  return line ? splitTransmissionBody(line) : null;
+});
+const displaySummary = computed(
+  () => stickyDisplay.value?.summary || transmission.value.summary,
+);
+const displayDetailLines = computed(
+  () => stickyDisplay.value?.detailLines ?? transmission.value.detailLines,
+);
+
 const showTransmissionCard = computed(
   () =>
+    Boolean(activeAskLine.value) ||
     !transmission.value.empty ||
     transmission.value.mode === 'transmitting' ||
     presencePhase.value === 'thinking' ||
     presencePhase.value === 'speaking',
 );
-
-const asksForReply = computed(
-  () =>
-    vaxonLineAsksForReply(spokenLine.value) &&
-    !transmission.value.empty &&
-    !isTransmissionAskAnswered(spokenLine.value),
-);
-const needsIntervention = computed(
-  () =>
-    asksForReply.value ||
-    (vaxonLineNeedsIntervention(spokenLine.value) && !transmission.value.empty),
-);
-const affirmCta = computed(() => vaxonAffirmReplyCta(spokenLine.value));
 
 const modeChip = computed(() => {
   if (presencePhase.value === 'speaking') return 'speaking';
@@ -143,15 +148,6 @@ const showModeStrip = computed(
     presencePhase.value === 'speaking' ||
     presencePhase.value === 'listening' ||
     presencePhase.value === 'thinking',
-);
-
-/** Reply CTAs stay only while speech is done and the ask is still unanswered. */
-const showReplyActions = computed(
-  () =>
-    asksForReply.value &&
-    !shell.kairoSpeechActive &&
-    presencePhase.value !== 'speaking' &&
-    presencePhase.value !== 'thinking',
 );
 
 const liveBadge = computed(
@@ -185,7 +181,7 @@ async function sendReply(content?: string): Promise<void> {
     return;
   }
   if (content === 'yes' || content === 'not now') {
-    markTransmissionAskAnswered(spokenLine.value);
+    clearStickyAsk(activeAskLine.value);
   }
   reply.value = '';
   await submitTurn(message);
@@ -223,31 +219,6 @@ async function refreshAutonomyReceipts(): Promise<void> {
     const load = String(pack.plate?.load || 'idle');
     plateLoad.value =
       load === 'critical' || load === 'busy' ? load : 'idle';
-    // #region agent log
-    const stage = document.querySelector<HTMLElement>('.mc-live-ops__orb-stage');
-    fetch('http://127.0.0.1:7706/ingest/90bcaec2-2b39-4d4a-84b5-157c12735440', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Debug-Session-Id': 'db8bb4',
-      },
-      body: JSON.stringify({
-        sessionId: 'db8bb4',
-        runId: 'inbox-orb-polish',
-        hypothesisId: 'D',
-        location: 'MissionControlLiveOpsPanel.vue:plate-load',
-        message: 'Orb stage load applied',
-        data: {
-          plateLoad: plateLoad.value,
-          waiting: pack.plate?.waiting ?? null,
-          needsAttention: pack.plate?.needs_attention ?? null,
-          stageHeight: stage?.offsetHeight ?? null,
-          stageDataLoad: stage?.dataset.load ?? null,
-        },
-        timestamp: Date.now(),
-      }),
-    }).catch(() => {});
-    // #endregion
   } catch {
     // Keep last plate load for orb scale.
   }
@@ -258,16 +229,17 @@ watch(
     [
       showTransmissionCard.value,
       transmission.value.mode,
-      asksForReply.value,
       showReplyActions.value,
+      activeAskLine.value,
       showModeStrip.value,
       presencePhase.value,
+      spokenLine.value,
+      transmissionEmpty.value,
     ] as const,
   async () => {
     await Promise.resolve();
     // #region agent log
     const card = document.querySelector<HTMLElement>('.mc-transmission');
-    const ops = document.querySelector<HTMLElement>('.mc-live-ops');
     fetch('http://127.0.0.1:7706/ingest/90bcaec2-2b39-4d4a-84b5-157c12735440', {
       method: 'POST',
       headers: {
@@ -276,25 +248,26 @@ watch(
       },
       body: JSON.stringify({
         sessionId: 'db8bb4',
-        runId: 'tx-hide-scroll',
-        hypothesisId: 'S1',
+        runId: 'post-fix',
+        hypothesisId: 'Y2',
         location: 'MissionControlLiveOpsPanel.vue:transmission-layout',
-        message: 'Transmission chrome + scroll state',
+        message: 'Sticky Needs-you chrome state',
         data: {
           visible: showTransmissionCard.value,
           mode: transmission.value.mode,
           presencePhase: presencePhase.value,
-          asksForReply: asksForReply.value,
+          speechActive: shell.kairoSpeechActive,
           showReplyActions: showReplyActions.value,
+          needsYouDom: card?.dataset.needsYou ?? null,
+          hasStickyAsk: Boolean(activeAskLine.value),
+          stickyPreview: (activeAskLine.value || '').slice(0, 72),
+          livePreview: spokenLine.value.slice(0, 72),
+          transmissionEmpty: transmissionEmpty.value,
           showModeStrip: showModeStrip.value,
           actionsInHeader: Boolean(
             card?.querySelector('.mc-transmission__header .mc-transmission__actions'),
           ),
           modesInDom: Boolean(document.querySelector('.mc-live-ops__modes')),
-          opsOverflowY: ops ? getComputedStyle(ops).overflowY : null,
-          opsScrollH: ops?.scrollHeight ?? null,
-          opsClientH: ops?.clientHeight ?? null,
-          canScrollOps: ops ? ops.scrollHeight > ops.clientHeight + 2 : null,
         },
         timestamp: Date.now(),
       }),
@@ -366,17 +339,19 @@ onUnmounted(() => {
       <article
         v-if="showTransmissionCard"
         class="mc-transmission"
-        :data-mode="transmission.mode"
-        :data-asking="asksForReply ? 'true' : 'false'"
+        :data-mode="showReplyActions ? 'locked' : transmission.mode"
+        :data-asking="showReplyActions ? 'true' : 'false'"
         :data-needs-you="needsIntervention ? 'true' : 'false'"
         :aria-live="transmission.mode === 'transmitting' ? 'polite' : 'off'"
         aria-label="VAXON transmission"
       >
         <header class="mc-transmission__header">
           <span class="mc-transmission__pulse" aria-hidden="true" />
-          <p class="mc-transmission__eyebrow">{{ transmission.eyebrow }}</p>
+          <p class="mc-transmission__eyebrow">
+            {{ showReplyActions ? 'Live transmission' : transmission.eyebrow }}
+          </p>
           <span
-            v-if="showReplyActions || (needsIntervention && showModeStrip)"
+            v-if="showReplyActions"
             class="mc-transmission__badge mc-transmission__badge--needs-you"
           >
             Needs you
@@ -393,17 +368,17 @@ onUnmounted(() => {
         </header>
         <div
           class="mc-transmission__float"
-          :data-live="transmission.mode === 'transmitting' ? 'true' : 'false'"
+          :data-live="transmission.mode === 'transmitting' && !showReplyActions ? 'true' : 'false'"
         >
           <p
-            :key="transmission.summary"
+            :key="displaySummary"
             class="mc-transmission__body"
-            :data-empty="transmission.empty ? 'true' : 'false'"
+            :data-empty="!showReplyActions && transmission.empty ? 'true' : 'false'"
           >
-            {{ transmission.summary }}
+            {{ displaySummary }}
           </p>
-          <ul v-if="transmissionHasDetail" class="mc-transmission__detail">
-            <li v-for="(line, index) in transmission.detailLines" :key="index">
+          <ul v-if="displayDetailLines.length" class="mc-transmission__detail">
+            <li v-for="(line, index) in displayDetailLines" :key="index">
               {{ line }}
             </li>
           </ul>

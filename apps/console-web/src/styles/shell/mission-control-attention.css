@@ -1,5 +1,9 @@
 /* Mission Control Attention strip — roomy cards + readable titles */
 
+.operator-status-radar-panel {
+  scrollbar-gutter: stable;
+}
+
 .operator-status-radar-panel__attention {
   display: flex;
   flex-direction: column;
@@ -11,6 +15,7 @@
   border-radius: 0.45rem;
   background: rgba(0, 12, 20, 0.42);
   overflow: auto;
+  scrollbar-gutter: stable;
 }
 
 .operator-status-radar-panel__attention-head {

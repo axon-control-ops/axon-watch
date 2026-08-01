@@ -355,6 +355,9 @@
   display: grid;
   gap: 0.35rem;
   flex: 0 0 auto;
+  position: sticky;
+  bottom: 0;
+  z-index: 3;
   margin-top: auto;
   padding: 0.45rem 0.5rem;
   border: 1px solid rgba(80, 220, 255, 0.38);

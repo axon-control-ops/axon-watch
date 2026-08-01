@@ -186,6 +186,10 @@ onUnmounted(() => {
   list-style: none;
   display: grid;
   gap: 0.25rem;
+  max-height: 7.5rem;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
 }
 
 .mc-machine-ceo__recs li {
