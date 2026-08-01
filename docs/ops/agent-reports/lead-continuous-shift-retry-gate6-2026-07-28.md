@@ -499,3 +499,62 @@ summary=Lead follow-ups completed; 14 stale watcher patrols closed/cancelled aft
 - Quinn: `task-a75a66c591c24ea2` (Gate 6 acceptance on failed investigate).
 - Sir King: Decide on DashPro Sentry critical.
 - VAXON: engage Gate-verify plan `lead-plan-279379f913bf4940` (still awaiting_engagement); briefing shows 7 awaiting engagement.
+
+---
+
+## Lead continuous shift continue (post-restart) — 2026-08-01 (~21:48 SAST)
+
+**Run:** `run_8f74a87fa531` (continue interrupted Lead shift after server restart)  
+**Prior failed Lead dispatches:** `run_68581e390f34`, `run_4f5b399f6217` (missing Confidence line)  
+**Constraint honored:** no restart/shutdown commands re-run; no commit / push / merge.
+
+### Health (first)
+
+| Check | Result | Evidence |
+| --- | --- | --- |
+| Control plane | Pass | `GET /health` → ok; boot_id `07ef0987c7da42b3ab1b169799bafe9d`; process pid 14405 since 18:11 SAST |
+| Runtime | Pass | `GET /api/runtime/summary` → `control_plane.ready=true`, watch connected, degraded inactive |
+| Console UI | Pass | `:5173` and `:4173` → HTTP 200 |
+| Fast Gate (branch) | Pass | success `30714291159` — “Fix OTA canary — mcp.json” on `worker/extract-mockup-shell-17-css` (also PR success `30714292554`) |
+| Gate 6 unit checks | Pass | `tests.test_gate6_path_scoped_checks` + `tests.test_gate6_verifier_contract` + `tests.test_lead_task_plan` → **22 OK** |
+| Hotspot guardrail | Pass | `check_hotspot_changes.py` → Critical hotspot change guardrails passed |
+
+### Next unfinished Lead steps completed
+
+1. **Synthesize Gate 6 Lead plan** — `POST /api/lead/plans/lead-plan-89ea855e841c406f/synthesize` → `status=completed`; receipt `lead-receipt-19e9e5773baf4451`; VAXON handoff `lead-receipt-e654754244e54c53`; Dana handoff `lead-receipt-cfae7d9cf2da48c8`. Specialist tasks remain cancelled by prior Lead decision (retry stays on Lead).
+2. **Re-check Gate-verify plan** — `lead-plan-279379f913bf4940` synthesize → still `completed` / Quinn completed; receipt `lead-receipt-5da2be81f4144948` (handoffs already posted).
+3. **Close open Lead advance task** — leased+completed `task-fae6868fd7ed4c2c` under `run_8f74a87fa531` after plan completion (duplicate advance `task-536303ad58a346ed` was superseded/cancelled).
+4. **Fleet triage** — Jules/Reed last outcomes completed; Rowan on leased failed_shift investigate; Quinn active on integrations retry after Gate 6 fail `run_f8c084be54e3`.
+
+### Specialist triage (not owned on this Lead thread)
+
+| Teammate | Receipt | Lead decision |
+| --- | --- | --- |
+| Quinn | `run_f8c084be54e3` — `acceptance=fail · failed_checks=test; policy=out_of_scope · paths=2` | Keep on Quinn’s integrations thread (`run_79084b6d789f` active). Gate 6 noise filter for `.cursor/` is already in tree + live process (started 18:11 after verifier re-land). |
+| Rowan | operator-stopped CLI / failed_shift attend leased | Keep on Rowan’s watcher thread — do not role-play. |
+| Dana / DashPro | Briefing critical Sentry still open | Existing handoff `handoff-dbfeb330c9d84c93` (2026-08-01T12:37Z) already routed to Dana — escalate Decide to Sir King if still uncleared. |
+
+### Lead decisions
+
+1. **Plan `lead-plan-89ea855e841c406f`:** Closed via synthesize after Lead-owned continue; do not re-decompose this Gate 6 shift retry onto Quinn/Rowan.
+2. **Fast Gate:** Latest green on current branch; Rowan remains post-push watcher.
+3. **Ship:** Not approved.
+4. **Upgrade proposals:** (a) stop rewriting tracked `.cursor/mcp.json` on every agent start so Gate 6 does not see metadata dirt; (b) require Confidence: N/10 on Lead finalize so dispatch does not fail the Critical Review gate; (c) Dana owns DashPro Sentry critical — keep Axon-X out of that product tree.
+
+### Code changed this continue
+
+- Receipts / board hygiene only — no product code edits this continue.
+
+### Acceptance evidence (Gate 6 — Lead scope)
+
+```
+acceptance=pass · intent=gate6_acceptance · actor=lead-retry-receipt
+summary=post-restart continue run_8f74a87fa531; health+console green; Fast Gate success 30714291159; plan lead-plan-89ea855e841c406f synthesized completed (lead-receipt-19e9e5773baf4451); Lead advance task-fae6868fd7ed4c2c completed; Gate6+Lead plan unit tests 22 OK; hotspot guardrails passed; Quinn/Rowan kept on their threads; DashPro Sentry already handed to Dana (handoff-dbfeb330c9d84c93); ship not approved
+```
+
+### Still open
+
+- Quinn: clear Gate 6 acceptance on integrations retry (`run_f8c084be54e3` root cause was out_of_scope + test fail).
+- Rowan: finish leased failed_shift attend; keep Confidence line on finalize.
+- Sir King: Decide if DashPro Sentry critical needs tighter priority with Dana.
+- No control-plane restart requested or performed this continue.
