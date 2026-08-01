@@ -3,7 +3,6 @@ import { computed, ref, watch, type ComputedRef, type Ref } from 'vue';
 import {
   isTransmissionAskAnswered,
   markTransmissionAskAnswered,
-  transmissionAskFingerprint,
 } from '../lib/vaxon-transmission-reply-state';
 import {
   vaxonAffirmReplyCta,
@@ -42,27 +41,6 @@ export function useStickyTransmissionAsk(input: {
         return;
       }
       stickyAskLine.value = text;
-      // #region agent log
-      fetch('http://127.0.0.1:7706/ingest/90bcaec2-2b39-4d4a-84b5-157c12735440', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Debug-Session-Id': 'db8bb4',
-        },
-        body: JSON.stringify({
-          sessionId: 'db8bb4',
-          runId: 'sticky-ask',
-          hypothesisId: 'Y1',
-          location: 'useStickyTransmissionAsk.ts:pin',
-          message: 'Pinned sticky Needs-you ask',
-          data: {
-            preview: text.slice(0, 72),
-            fingerprint: transmissionAskFingerprint(text).slice(0, 48),
-          },
-          timestamp: Date.now(),
-        }),
-      }).catch(() => {});
-      // #endregion
     },
   );
 

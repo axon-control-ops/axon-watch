@@ -49,29 +49,6 @@ export function useMissionControlAttentionExpand(shell: AttentionExpandShell): {
       }
       shell.toggleSignalDetails(primary.signal_id);
       attentionAutoExpanded.value = true;
-      // #region agent log
-      fetch('http://127.0.0.1:7706/ingest/90bcaec2-2b39-4d4a-84b5-157c12735440', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Debug-Session-Id': 'db8bb4',
-        },
-        body: JSON.stringify({
-          sessionId: 'db8bb4',
-          runId: 'tx-needs-you',
-          hypothesisId: 'A5',
-          location: 'useMissionControlAttentionExpand.ts:auto-expand',
-          message: 'Auto-expanded top Attention signal',
-          data: {
-            signalId: primary.signal_id,
-            severity: primary.severity,
-            attentionCount: signals.length,
-            priorHighlighted: shell.highlightedSignalId,
-          },
-          timestamp: Date.now(),
-        }),
-      }).catch(() => {});
-      // #endregion
     },
     { immediate: true },
   );

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
+import { computed, onMounted, onUnmounted, ref } from 'vue';
 
 import {
   fetchAutonomyStatus,
@@ -223,58 +223,6 @@ async function refreshAutonomyReceipts(): Promise<void> {
     // Keep last plate load for orb scale.
   }
 }
-
-watch(
-  () =>
-    [
-      showTransmissionCard.value,
-      transmission.value.mode,
-      showReplyActions.value,
-      activeAskLine.value,
-      showModeStrip.value,
-      presencePhase.value,
-      spokenLine.value,
-      transmissionEmpty.value,
-    ] as const,
-  async () => {
-    await Promise.resolve();
-    // #region agent log
-    const card = document.querySelector<HTMLElement>('.mc-transmission');
-    fetch('http://127.0.0.1:7706/ingest/90bcaec2-2b39-4d4a-84b5-157c12735440', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Debug-Session-Id': 'db8bb4',
-      },
-      body: JSON.stringify({
-        sessionId: 'db8bb4',
-        runId: 'post-fix',
-        hypothesisId: 'Y2',
-        location: 'MissionControlLiveOpsPanel.vue:transmission-layout',
-        message: 'Sticky Needs-you chrome state',
-        data: {
-          visible: showTransmissionCard.value,
-          mode: transmission.value.mode,
-          presencePhase: presencePhase.value,
-          speechActive: shell.kairoSpeechActive,
-          showReplyActions: showReplyActions.value,
-          needsYouDom: card?.dataset.needsYou ?? null,
-          hasStickyAsk: Boolean(activeAskLine.value),
-          stickyPreview: (activeAskLine.value || '').slice(0, 72),
-          livePreview: spokenLine.value.slice(0, 72),
-          transmissionEmpty: transmissionEmpty.value,
-          showModeStrip: showModeStrip.value,
-          actionsInHeader: Boolean(
-            card?.querySelector('.mc-transmission__header .mc-transmission__actions'),
-          ),
-          modesInDom: Boolean(document.querySelector('.mc-live-ops__modes')),
-        },
-        timestamp: Date.now(),
-      }),
-    }).catch(() => {});
-    // #endregion
-  },
-);
 
 onMounted(() => {
   void refreshAutonomyReceipts();

@@ -77,48 +77,7 @@ async function refresh(): Promise<void> {
     if (autoOn.value && (pack.value.awaiting_plan_count ?? 0) > 0) {
       const engaged = await engageMissionControlLeads(5);
       lastSpoken.value = engaged.spoken || '';
-      // #region agent log
-      fetch('http://127.0.0.1:7706/ingest/90bcaec2-2b39-4d4a-84b5-157c12735440', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': 'db8bb4' },
-        body: JSON.stringify({
-          sessionId: 'db8bb4',
-          runId: 'ceo-plate',
-          hypothesisId: 'P1',
-          location: 'MissionControlCeoCriticalStrip.vue:refresh',
-          message: 'ui critical-work pack',
-          data: {
-            plans: pack.value.awaiting_plan_count,
-            plate: pack.value.plate?.total_open_plate ?? 0,
-            load: pack.value.plate?.load,
-            advise: (pack.value.advise || '').slice(0, 120),
-          },
-          timestamp: Date.now(),
-        }),
-      }).catch(() => {});
-      // #endregion
       pack.value = await fetchMissionControlCriticalWork(focusedId.value);
-    } else {
-      // #region agent log
-      fetch('http://127.0.0.1:7706/ingest/90bcaec2-2b39-4d4a-84b5-157c12735440', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': 'db8bb4' },
-        body: JSON.stringify({
-          sessionId: 'db8bb4',
-          runId: 'ceo-plate',
-          hypothesisId: 'P1',
-          location: 'MissionControlCeoCriticalStrip.vue:refresh',
-          message: 'ui critical-work pack',
-          data: {
-            plans: pack.value.awaiting_plan_count,
-            plate: pack.value.plate?.total_open_plate ?? 0,
-            load: pack.value.plate?.load,
-            advise: (pack.value.advise || '').slice(0, 120),
-          },
-          timestamp: Date.now(),
-        }),
-      }).catch(() => {});
-      // #endregion
     }
   } catch (err) {
     error.value = err instanceof Error ? err.message : 'Critical-work pack failed';

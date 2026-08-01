@@ -33,31 +33,6 @@ watch(
     if (!expandedId.value || !feedView.value.items.some((item) => item.id === expandedId.value)) {
       expandedId.value = first.id;
     }
-    // #region agent log
-    fetch('http://127.0.0.1:7706/ingest/90bcaec2-2b39-4d4a-84b5-157c12735440', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Debug-Session-Id': 'db8bb4',
-      },
-      body: JSON.stringify({
-        sessionId: 'db8bb4',
-        runId: 'tx-float-typo',
-        hypothesisId: 'T3',
-        location: 'OperatorIncidentFeedPanel.vue:feed-expand',
-        message: 'Unified Inbox feed rendered',
-        data: {
-          itemCount: feedView.value.items.length,
-          expandedId: expandedId.value,
-          firstHasYouDo: Boolean(first.plainYouDo),
-          firstHasAgentDo: Boolean(first.plainAgentDo),
-          headline: feedView.value.headline,
-          titlePreview: first.title.slice(0, 64),
-        },
-        timestamp: Date.now(),
-      }),
-    }).catch(() => {});
-    // #endregion
   },
   { immediate: true },
 );
