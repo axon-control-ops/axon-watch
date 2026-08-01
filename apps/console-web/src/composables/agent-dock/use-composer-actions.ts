@@ -1,6 +1,7 @@
 import type { Ref } from 'vue';
 
 import {
+  shouldProceedDebugReproduceComposer,
   shouldSteerAgentDockComposer,
   shouldSubmitAgentDockComposer,
 } from '../../lib/agent-dock-composer-input';
@@ -26,7 +27,11 @@ import {
 } from '../../lib/named-assign-route';
 import { resolveEmployeeSpecialtyRoute } from '../../lib/resolve-employee-specialty-route';
 import { shouldApplySpecialtyRouteNow } from '../../lib/specialty-route-busy-gate';
-import { DEBUG_REPRODUCE_PROCEED_MESSAGE } from '../../lib/debug-reproduce-view';
+import {
+  buildDebugReproduceProceedContent,
+  extractDebugReproduceRequest,
+  shouldShowDebugReproduceBanner,
+} from '../../lib/debug-reproduce-view';
 import {
   findIdeComposerQueueEntry,
   type IdeComposerMode,
@@ -61,6 +66,7 @@ type UseComposerActionsOptions = {
   composerImages: Ref<ComposerClipboardImage[]>;
   composerHistory: Ref<string[]>;
   composerHistoryIndex: Ref<number>;
+  dismissedDebugReproduceMessageId: Ref<string | null>;
   submitKairoTurn: (
     draft: string,
     options?: { dockAttachments?: ComposerClipboardImage[] },
@@ -89,6 +95,7 @@ export function useComposerActions(options: UseComposerActionsOptions) {
     composerImages,
     composerHistory,
     composerHistoryIndex,
+    dismissedDebugReproduceMessageId,
     submitKairoTurn,
     recordComposerHistoryIfSent,
     handleHistory,
@@ -156,13 +163,53 @@ export function useComposerActions(options: UseComposerActionsOptions) {
     startVoiceCapture();
   }
 
+  function debugReproduceActive(): boolean {
+    const request = extractDebugReproduceRequest({
+      messages: shell.threadMessages.map((message) => ({
+        message_id: message.message_id,
+        role: message.role,
+        content: message.content,
+      })),
+      streaming: shell.agentStreamActive,
+    });
+    return shouldShowDebugReproduceBanner({
+      composerMode: composerMode.value,
+      linkedRunMode: shell.ideAgentLinkedRun?.mode,
+      request,
+      dismissedMessageId: dismissedDebugReproduceMessageId.value,
+    });
+  }
+
+  function activeDebugReproduceMessageId(): string | null {
+    return (
+      extractDebugReproduceRequest({
+        messages: shell.threadMessages.map((message) => ({
+          message_id: message.message_id,
+          role: message.role,
+          content: message.content,
+        })),
+        streaming: shell.agentStreamActive,
+      })?.messageId ?? null
+    );
+  }
+
   async function handleDebugReproduceProceed(messageId: string): Promise<void> {
     if (composerMode.value !== 'debug' && shell.ideAgentLinkedRun?.mode !== 'debug') {
       composerMode.value = 'debug';
     }
+    const operatorReply =
+      withSkillTokensForSubmit?.(shell.ideComposerDraft) ?? shell.ideComposerDraft;
+    const content = buildDebugReproduceProceedContent(operatorReply);
+    const attachmentFiles = composerImages.value.map((image) => image.file);
     onDebugReproduceProceed?.(messageId);
-    shell.ideComposerDraft = DEBUG_REPRODUCE_PROCEED_MESSAGE;
-    await shell.submitIdeComposer('debug');
+    const submitted = await shell.submitIdeComposer('debug', {
+      contentOverride: content,
+      attachmentFiles,
+    });
+    if (submitted !== false) {
+      recordComposerHistoryIfSent(operatorReply.trim() || content);
+      clearSkillAttachments?.();
+    }
   }
 
   async function handleSubmit(event?: Event): Promise<void> {
@@ -448,6 +495,15 @@ export function useComposerActions(options: UseComposerActionsOptions) {
         handleHistory('next');
         return;
       }
+    }
+
+    if (shouldProceedDebugReproduceComposer(event, debugReproduceActive())) {
+      event.preventDefault();
+      const messageId = activeDebugReproduceMessageId();
+      if (messageId) {
+        void handleDebugReproduceProceed(messageId);
+      }
+      return;
     }
 
     if (shouldSteerAgentDockComposer(event)) {

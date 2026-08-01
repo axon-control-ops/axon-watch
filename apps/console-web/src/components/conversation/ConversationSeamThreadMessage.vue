@@ -36,6 +36,7 @@ import AgentFileReadBlock from '../ide/AgentFileReadBlock.vue';
 import ConversationAgentStructuredBlock from '../ide/ConversationAgentStructuredBlock.vue';
 import AgentEditBlock from '../ide/AgentEditBlock.vue';
 import AgentImageBlock from '../ide/AgentImageBlock.vue';
+import AgentDebugReproduceBlock from '../ide/AgentDebugReproduceBlock.vue';
 import IdeActivityIcon from '../ide/IdeActivityIcon.vue';
 import ConversationSeamTerminalBlock from './ConversationSeamTerminalBlock.vue';
 import ConversationSeamMessageAttachments from './ConversationSeamMessageAttachments.vue';
@@ -369,8 +370,12 @@ async function copyTerminalOutput(output: string): Promise<void> {
         :open="segment.open"
       />
 
-      <!-- The composer renders this segment once as its actionable Proceed/Dismiss banner. -->
-      <template v-else-if="segment.kind === 'debug-reproduce'"></template>
+      <!-- Steps + live runtime logs stay in-thread; composer still hosts Proceed/Dismiss. -->
+      <AgentDebugReproduceBlock
+        v-else-if="segment.kind === 'debug-reproduce'"
+        :steps="segment.steps"
+        :workspace-id="shell.currentWorkspace?.workspace_id ?? null"
+      />
 
       <AgentImageBlock
         v-else-if="segment.kind === 'image'"

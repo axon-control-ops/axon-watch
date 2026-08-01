@@ -356,6 +356,17 @@
   color: rgba(196, 181, 253, 0.98);
 }
 
+.agent-dock-composer__debug-reproduce-copy kbd {
+  display: inline-block;
+  padding: 0.05rem 0.28rem;
+  border: 1px solid rgba(167, 139, 250, 0.45);
+  border-radius: 0.2rem;
+  background: rgba(24, 16, 48, 0.72);
+  font-family: var(--font-mono);
+  font-size: 0.58rem;
+  line-height: 1.2;
+}
+
 .agent-dock-composer__debug-reproduce-steps {
   margin: 0;
   padding-left: 1.05rem;
