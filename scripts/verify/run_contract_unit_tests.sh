@@ -31,8 +31,13 @@ _axon_contract_path_class() {
     docs/*) printf 'docs' ;;
     scripts/verify/run_contract_unit_tests.sh|\
     services/control-plane/app/workspace_agents/verifier_runner.py|\
+    services/control-plane/app/workspace_agents/verifier_checks.py|\
+    services/control-plane/app/workspace_agents/verifier_contract.py|\
+    services/control-plane/app/workspace_agents/diff_policy.py|\
     services/control-plane/app/workspace_delivery/publish.py|\
     tests/test_gate6_path_scoped_checks.py|\
+    tests/test_gate6_project_contract.py|\
+    tests/test_gate6_verifier_contract.py|\
     docs/ops/agent-reports/*) printf 'gate6' ;;
     apps/*|services/*|packages/*|scripts/*|tests/*|config/*|.github/*|\
     project.axon.yaml|package.json|package-lock.json) printf 'code' ;;
@@ -74,7 +79,10 @@ if [[ "${AXON_CONTRACT_SUITE_FORCE_FULL:-}" != "1" ]]; then
       "${repo_root}/scripts/dev/ensure-python-deps.sh"
       python_bin="$(resolve_python "${repo_root}")"
       echo "contract unit tests: Gate 6 path-scope harness only"
-      "${python_bin}" -m unittest -v tests.test_gate6_path_scoped_checks
+      "${python_bin}" -m unittest -v \
+        tests.test_gate6_path_scoped_checks \
+        tests.test_gate6_project_contract \
+        tests.test_gate6_verifier_contract
       exit $?
       ;;
   esac
