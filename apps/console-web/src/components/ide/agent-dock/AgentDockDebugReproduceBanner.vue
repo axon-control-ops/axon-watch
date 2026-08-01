@@ -1,7 +1,11 @@
 <script setup lang="ts">
-import type { DebugReproduceRequest } from '../../../lib/debug-reproduce-view';
+import { computed } from 'vue';
 
-const props = defineProps<{
+import type { DebugReproduceRequest } from '../../../lib/debug-reproduce-view';
+import { useShellStore } from '../../../stores/shell';
+import AgentDebugSessionLogPanel from '../AgentDebugSessionLogPanel.vue';
+
+defineProps<{
   request: DebugReproduceRequest;
   pending: boolean;
 }>();
@@ -10,16 +14,17 @@ const emit = defineEmits<{
   proceed: [];
   dismiss: [];
 }>();
+
+const shell = useShellStore();
+const workspaceId = computed(() => shell.currentWorkspace?.workspace_id ?? null);
 </script>
 
 <template>
   <div class="agent-dock-composer__debug-reproduce-banner" role="status">
-    <p class="agent-dock-composer__debug-reproduce-copy">
-      Reproduce the bug with these steps, then proceed so Debug can read runtime logs and continue.
-    </p>
     <ol class="agent-dock-composer__debug-reproduce-steps">
       <li v-for="(step, index) in request.steps" :key="index">{{ step }}</li>
     </ol>
+    <AgentDebugSessionLogPanel :workspace-id="workspaceId" compact />
     <div class="agent-dock-composer__debug-reproduce-actions">
       <button
         type="button"
@@ -27,7 +32,7 @@ const emit = defineEmits<{
         :disabled="pending"
         @click="emit('proceed')"
       >
-        {{ pending ? 'Sending…' : 'Proceed — bug reproduced' }}
+        {{ pending ? 'Sending…' : 'Proceed (Ctrl+Enter)' }}
       </button>
       <button
         type="button"
