@@ -1,10 +1,15 @@
-"""VAXON Mission Control CEO — ask Leads, rank critical fleet work."""
+"""VAXON Mission Control CEO — ask Leads, rank critical fleet work, engage reviews."""
 
 from __future__ import annotations
 
+import logging
 from typing import Any
 
 from app.operator_fleet_advice import workspace_advice_label
+
+logger = logging.getLogger(__name__)
+
+DEFAULT_ENGAGE_BATCH = 5
 
 
 def _plan_goal(plan: dict[str, Any]) -> str:
