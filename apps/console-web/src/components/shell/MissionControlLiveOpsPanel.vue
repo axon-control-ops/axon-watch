@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref } from 'vue';
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 
 import {
   fetchAutonomyStatus,
@@ -21,6 +21,7 @@ import { resolveGalaxyPresence } from '../../features/brain-galaxy/galaxy-presen
 import { projectLiveOperationsStream } from '../../features/brain-galaxy/live-operations-stream';
 import { companyBusyEmployeesCount } from '../../features/workspace-agents/company-roster-busy';
 import MissionControlAutonomyControl from './MissionControlAutonomyControl.vue';
+import MissionControlMachineCeoStrip from './MissionControlMachineCeoStrip.vue';
 import { resolveVaxonTransmissionView } from '../../lib/mc-vaxon-transmission-view';
 import {
   vaxonAffirmReplyCta,
@@ -36,6 +37,7 @@ const shell = useShellStore();
 const { spokenText } = useSpokenUtteranceText();
 const { pending, submitTurn, speechCapture } = useKairoConversation();
 const reply = ref('');
+const showTransmissionDetail = ref(false);
 const autonomyReceipts = ref<AutonomyReceipt[]>([]);
 const autonomyEffective = ref(false);
 let autonomyPoll: ReturnType<typeof setInterval> | null = null;
@@ -102,6 +104,36 @@ const transmission = computed(() =>
 );
 
 const spokenLine = computed(() => transmission.value.body);
+const transmissionHasDetail = computed(() => transmission.value.detailLines.length > 0);
+
+// #region agent log
+watch(
+  transmission,
+  (view) => {
+    fetch('http://127.0.0.1:7706/ingest/90bcaec2-2b39-4d4a-84b5-157c12735440', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': 'db8bb4' },
+      body: JSON.stringify({
+        sessionId: 'db8bb4',
+        runId: 'mc-vaxon',
+        hypothesisId: 'T1',
+        location: 'MissionControlLiveOpsPanel.vue:transmission',
+        message: 'transmission view',
+        data: {
+          bodyLen: view.body.length,
+          summaryLen: view.summary.length,
+          detailCount: view.detailLines.length,
+          empty: view.empty,
+          mode: view.mode,
+        },
+        timestamp: Date.now(),
+      }),
+    }).catch(() => {});
+  },
+  { immediate: true },
+);
+// #endregion
+
 const asksForReply = computed(
   () =>
     vaxonLineAsksForReply(spokenLine.value) &&
@@ -235,6 +267,8 @@ onUnmounted(() => {
       </div>
     </div>
 
+    <MissionControlMachineCeoStrip />
+
     <div class="mc-live-ops__scroll">
       <article
         class="mc-transmission"
@@ -251,8 +285,24 @@ onUnmounted(() => {
           class="mc-transmission__body"
           :data-empty="transmission.empty ? 'true' : 'false'"
         >
-          {{ transmission.body }}
+          {{ transmission.summary }}
         </p>
+        <ul
+          v-if="transmissionHasDetail && showTransmissionDetail"
+          class="mc-transmission__detail"
+        >
+          <li v-for="(line, index) in transmission.detailLines" :key="index">
+            {{ line }}
+          </li>
+        </ul>
+        <button
+          v-if="transmissionHasDetail"
+          type="button"
+          class="mc-transmission__detail-toggle"
+          @click="showTransmissionDetail = !showTransmissionDetail"
+        >
+          {{ showTransmissionDetail ? 'Hide detail' : `Show detail (${transmission.detailLines.length})` }}
+        </button>
         <div v-if="asksForReply" class="mc-transmission__actions">
           <button type="button" :disabled="pending" @click="void sendReply('yes')">
             {{ affirmCta }}

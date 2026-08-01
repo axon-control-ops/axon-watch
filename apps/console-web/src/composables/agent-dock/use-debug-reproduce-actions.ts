@@ -5,7 +5,10 @@ import {
   activeDebugReproduceMessageId as resolveActiveDebugReproduceMessageId,
   isDebugReproduceComposerActive,
 } from '../../lib/debug-reproduce-composer';
-import { buildDebugReproduceProceedContent } from '../../lib/debug-reproduce-view';
+import {
+  buildDebugReproduceProceedContent,
+  buildDebugReproduceResolvedContent,
+} from '../../lib/debug-reproduce-view';
 import { useShellStore } from '../../stores/shell';
 import type { ComposerMode } from './use-composer-menus';
 
@@ -57,28 +60,69 @@ export function useDebugReproduceActions(input: {
     });
   }
 
-  async function handleDebugReproduceProceed(messageId: string): Promise<void> {
+  async function submitDebugReproduceFollowUp(
+    messageId: string,
+    content: string,
+  ): Promise<void> {
     if (composerMode.value !== 'debug' && shell.ideAgentLinkedRun?.mode !== 'debug') {
       composerMode.value = 'debug';
     }
-    const operatorReply =
-      withSkillTokensForSubmit?.(shell.ideComposerDraft) ?? shell.ideComposerDraft;
-    const content = buildDebugReproduceProceedContent(operatorReply);
     const attachmentFiles = composerImages.value.map((image) => image.file);
     onDebugReproduceProceed?.(messageId);
+    // #region agent log
+    fetch('http://127.0.0.1:7706/ingest/90bcaec2-2b39-4d4a-84b5-157c12735440', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': 'db8bb4' },
+      body: JSON.stringify({
+        sessionId: 'db8bb4',
+        runId: 'debug-resolved',
+        hypothesisId: 'H10',
+        location: 'use-debug-reproduce-actions.ts:submitDebugReproduceFollowUp',
+        message: 'debug reproduce follow-up submit',
+        data: {
+          messageId,
+          contentLen: content.length,
+          attachmentCount: attachmentFiles.length,
+          isResolved: content.includes('Confirmed resolved'),
+        },
+        timestamp: Date.now(),
+      }),
+    }).catch(() => {});
+    // #endregion
     const submitted = await shell.submitIdeComposer('debug', {
       contentOverride: content,
       attachmentFiles,
     });
     if (submitted !== false) {
+      const operatorReply =
+        withSkillTokensForSubmit?.(shell.ideComposerDraft) ?? shell.ideComposerDraft;
       recordComposerHistoryIfSent(operatorReply.trim() || content);
       clearSkillAttachments?.();
     }
+  }
+
+  async function handleDebugReproduceProceed(messageId: string): Promise<void> {
+    const operatorReply =
+      withSkillTokensForSubmit?.(shell.ideComposerDraft) ?? shell.ideComposerDraft;
+    await submitDebugReproduceFollowUp(
+      messageId,
+      buildDebugReproduceProceedContent(operatorReply),
+    );
+  }
+
+  async function handleDebugReproduceResolved(messageId: string): Promise<void> {
+    const operatorReply =
+      withSkillTokensForSubmit?.(shell.ideComposerDraft) ?? shell.ideComposerDraft;
+    await submitDebugReproduceFollowUp(
+      messageId,
+      buildDebugReproduceResolvedContent(operatorReply),
+    );
   }
 
   return {
     debugReproduceActive,
     activeDebugReproduceMessageId,
     handleDebugReproduceProceed,
+    handleDebugReproduceResolved,
   };
 }

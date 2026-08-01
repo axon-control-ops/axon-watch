@@ -313,6 +313,15 @@ def run_autonomous_attention_scan(
             logger.exception("lead check-in during attend scan failed")
             result["lead_checkin"] = {"error": "lead_checkin_failed"}
 
+    # Machine CEO — host pulse + safe allowlisted kills while Full autonomy is on.
+    try:
+        from app.host_context.machine_ceo import run_machine_ceo_tick
+
+        result["machine_ceo"] = run_machine_ceo_tick(auto_kill=True)
+    except Exception:  # noqa: BLE001
+        logger.exception("machine ceo tick during attend scan failed")
+        result["machine_ceo"] = {"error": "machine_ceo_failed"}
+
     for workspace_id in targets:
         workspace = str(workspace_id or "").strip()
         if not workspace or workspace not in companies:

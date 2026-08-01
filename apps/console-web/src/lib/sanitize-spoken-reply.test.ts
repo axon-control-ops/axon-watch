@@ -85,9 +85,11 @@ describe('sanitizeSpokenReply', () => {
     expect(spoken.toLowerCase()).toContain('apps');
   });
 
-  it('leaves concise template replies unchanged', () => {
+  it('normalizes em-dashes in concise template replies for TTS pacing', () => {
     const line = '2 approvals on the board — Attention has the detail.';
-    expect(sanitizeSpokenReply(line)).toBe(line);
+    expect(sanitizeSpokenReply(line)).toBe(
+      '2 approvals on the board, Attention has the detail.',
+    );
   });
 
   it('splits long spoken replies into chunks', () => {

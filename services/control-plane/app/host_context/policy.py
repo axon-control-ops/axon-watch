@@ -22,6 +22,7 @@ _AUTO_ACTIONS = frozenset(
         "volume.adjust",
         "notification.local",
         "bridge.heartbeat",
+        "process.inventory",
     }
 )
 
@@ -36,6 +37,8 @@ _CONFIRM_ACTIONS = frozenset(
         "session.lock",
         "open.sensitive_path",
         "settings.change",
+        # Non-allowlisted kills stay confirm; allowlisted junk uses Machine CEO path.
+        "process.kill",
     }
 )
 

@@ -302,8 +302,10 @@ def build_fleet_coach_line(
         return f"Review the ready run in {name}."
 
     if kind == "open_handoff":
-        task = str(fact.get("title") or "the listed task").strip() or "the listed task"
-        title_l = task.lower()
+        raw_task = str(fact.get("title") or "the listed task").strip() or "the listed task"
+        # Mega task goals were being spoken verbatim in LIVE TRANSMISSION.
+        task = raw_task if len(raw_task) <= 96 else f"{raw_task[:95].rstrip()}…"
+        title_l = raw_task.lower()
         auth_hint = ""
         if "401" in title_l or "unauthorized" in title_l or "github api" in title_l:
             auth_hint = " Fix GitHub credentials there;"

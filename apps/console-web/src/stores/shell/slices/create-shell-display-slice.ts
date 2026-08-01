@@ -122,20 +122,41 @@ export function createShellDisplaySlice(input: CreateShellDisplaySliceInput) {
   );
 
   const attentionSignals = computed(() => {
-    if (
+    const workspaceId = input.currentWorkspace.value?.workspace_id ?? null;
+    const fromInbox =
       input.inboxLoadState.value === 'loaded' ||
       (input.inboxLoadState.value === 'loading' && input.inboxItems.value.length > 0)
-    ) {
-      return filterAttentionSignals(
-        input.inboxItems.value,
-        input.currentWorkspace.value?.workspace_id ?? null,
-      ).slice(0, 3);
-    }
-
-    return filterAttentionSignals(
+        ? filterAttentionSignals(input.inboxItems.value, workspaceId)
+        : [];
+    // Loaded-but-empty inbox was blanking Mission Control Attention while
+    // briefing still had actionable top signals (Sentry / CI / Android).
+    const fromBriefing = filterAttentionSignals(
       input.operatorBriefing.value?.top_signals ?? [],
-      input.currentWorkspace.value?.workspace_id ?? null,
-    ).slice(0, 3);
+      workspaceId,
+    );
+    const items = fromInbox.length > 0 ? fromInbox : fromBriefing;
+    // #region agent log
+    fetch('http://127.0.0.1:7706/ingest/90bcaec2-2b39-4d4a-84b5-157c12735440', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': 'db8bb4' },
+      body: JSON.stringify({
+        sessionId: 'db8bb4',
+        runId: 'mc-mgr',
+        hypothesisId: 'ATTN',
+        location: 'create-shell-display-slice.ts:attentionSignals',
+        message: 'attention signals resolved',
+        data: {
+          inboxState: input.inboxLoadState.value,
+          inboxRaw: input.inboxItems.value.length,
+          fromInbox: fromInbox.length,
+          fromBriefing: fromBriefing.length,
+          out: items.slice(0, 3).map((item) => item.title),
+        },
+        timestamp: Date.now(),
+      }),
+    }).catch(() => {});
+    // #endregion
+    return items.slice(0, 3);
   });
 
   const workspaceAttentionSignalCount = computed(() =>
