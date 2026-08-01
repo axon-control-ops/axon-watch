@@ -274,11 +274,8 @@ class OperatorFleetAdviceTests(unittest.TestCase):
         self.assertEqual("workspace_dashpro", action["workspace_id"])
         self.assertTrue(action["focus_attention"])
 
-    def test_open_handoff_advice_keeps_the_complete_task(self) -> None:
-        task = (
-            "DashPro PostHog warning, PostHog API query failed, "
-            "The read operation timed out while loading project insights"
-        )
+    def test_open_handoff_advice_keeps_short_task_titles(self) -> None:
+        task = "DashPro PostHog warning — API query timed out"
         pack = build_fleet_advice_pack(
             active_run_records=[],
             pending_approval_records=[],
@@ -310,6 +307,47 @@ class OperatorFleetAdviceTests(unittest.TestCase):
 
         self.assertIn(f"finish “{task}”", advise)
         self.assertNotIn("…", advise)
+
+    def test_open_handoff_advice_truncates_mega_task_titles(self) -> None:
+        task = (
+            "Control-plane fix for DashPro Lead blocker on plan lead-plan-8fe646a5634c44ef "
+            "lead-plan-4816b40edb8547c0, one Attend task task-809465afd26b4e23 remains "
+            "open+approved after Priya run failed with ActionRequiredError, Increase limits "
+            "for faster responses — You're out of usage Cursor usage quota"
+        )
+        pack = build_fleet_advice_pack(
+            active_run_records=[],
+            pending_approval_records=[],
+            fleet_signals=[],
+            degraded={"active": False, "reasons": []},
+            watch_connected=True,
+            display_names={"workspace_dashpro": "DashPro"},
+            focused_workspace_id="workspace_axon_watch",
+            scope_mode="workspace",
+            open_handoffs=[
+                {
+                    "handoff_id": "handoff-mega-task",
+                    "source_workspace_id": "workspace_axon_watch",
+                    "target_workspace_id": "workspace_dashpro",
+                    "task": task,
+                    "status": "routed",
+                    "target_task_id": "task-mega",
+                }
+            ],
+        )
+
+        advise = resolve_fleet_briefing_advise(
+            pack=pack,
+            display_names={
+                "workspace_dashpro": "DashPro",
+                "workspace_axon_watch": "Axon Watch",
+            },
+        )
+
+        self.assertIn("Handoff to DashPro is open", advise)
+        self.assertIn("…", advise)
+        self.assertNotIn("Cursor usage quota", advise)
+        self.assertIn("Pause more Axon Watch work until that closes.", advise)
 
 
 if __name__ == "__main__":

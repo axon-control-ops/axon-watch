@@ -1,0 +1,32 @@
+[fix-host-io] 1/5 journald caps (persistent journal was failing with EIO under IO storm)
+Vacuuming done, freed 0B of archived journals from /var/log/journal.
+Vacuuming done, freed 0B of archived journals from /run/log/journal.
+Vacuuming done, freed 0B of archived journals from /var/log/journal/e9e12ff8e0bc4921b18411992a783805.
+[fix-host-io] 2/5 drop pagecache pressure helpers — raise dirty writeback aggressiveness slightly
+vm.dirty_ratio = 10
+vm.dirty_background_ratio = 3
+vm.dirty_expire_centisecs = 1500
+vm.dirty_writeback_centisecs = 500
+[fix-host-io] 3/5 NVMe thermal check (Critical Comp. Temperature Time was elevated)
+Warning  Comp. Temp. Threshold:     83 Celsius
+Critical Comp. Temp. Threshold:     85 Celsius
+SMART overall-health self-assessment test result: PASSED
+Critical Warning:                   0x00
+Temperature:                        79 Celsius
+Available Spare:                    100%
+Available Spare Threshold:          50%
+Percentage Used:                    15%
+Unsafe Shutdowns:                   1,140
+Warning  Comp. Temperature Time:    1096
+Critical Comp. Temperature Time:    1072
+Temperature Sensor 1:               79 Celsius
+Temperature Sensor 2:               94 Celsius
+[fix-host-io] 4/5 mask heavy optional services if present
+[fix-host-io] 5/5 done
+Filesystem      Size  Used Avail Use% Mounted on
+/dev/nvme0n1p1  222G  157G   54G  75% /
+Archived and active journals take up 24.7M in the file system.
+[fix-host-io] NEXT: compact Cursor state.vscdb (26G) with Cursor fully quit, then reboot once for clean FS.
+EXIT:0
+Failed: Must run from runner root or install is corrupt
+Failed to stop actions-runner-dashpro.service: Unit actions-runner-dashpro.service not loaded.

@@ -10,6 +10,12 @@ _LANE_B_FALLBACK_NORMALIZE_RE = re.compile(
 )
 _DISPATCH_FAILURE_PREFIX = "continuous worker dispatch failed:"
 _FAILURE_NOISE_RE = re.compile(r"^(?:running as unit|invocation id|scope)[:\s]", re.IGNORECASE)
+# Cursor often packs "Invocation ID: <uuid> ActionRequiredError: ..." into one
+# whitespace-collapsed segment — strip the noise token, keep the real error.
+_FAILURE_NOISE_TOKEN_RE = re.compile(
+    r"^(?:running as unit|invocation id|scope)\s*:\s*\S+\s*",
+    re.IGNORECASE,
+)
 _RUNTIME_AUTH_MARKERS = (
     "not signed in",
     "cursor agent login",
@@ -29,19 +35,39 @@ _RUNTIME_AUTH_MARKERS = (
 )
 
 
+def _strip_leading_failure_noise(part: str) -> str:
+    text = " ".join(str(part or "").split()).strip()
+    while text:
+        match = _FAILURE_NOISE_TOKEN_RE.match(text)
+        if not match:
+            break
+        text = text[match.end() :].strip()
+    return text
+
+
 def _pick_primary_failure_cause(inner: str) -> str:
+    # Cursor unpaid-invoice dumps use newlines between systemd noise and
+    # ActionRequiredError; also split on ';' for older semicolon-joined wrappers.
     parts = [
-        " ".join(part.split()).strip()
-        for part in str(inner or "").split(";")
-        if " ".join(part.split()).strip()
+        cleaned
+        for cleaned in (
+            _strip_leading_failure_noise(part)
+            for part in re.split(r"[;\n]+", str(inner or ""))
+        )
+        if cleaned and not _FAILURE_NOISE_RE.search(cleaned)
     ]
-    parts = [part for part in parts if not _FAILURE_NOISE_RE.search(part)]
     if not parts:
         return " ".join(str(inner or "").split()).strip()
 
     def rank(part: str) -> int:
         lowered = part.lower()
-        if "actionrequirederror" in lowered or "out of usage" in lowered or "increase limits" in lowered:
+        if (
+            "unpaid invoice" in lowered
+            or "pay your invoice" in lowered
+            or "actionrequirederror" in lowered
+            or "out of usage" in lowered
+            or "increase limits" in lowered
+        ):
             return 0
         if any(marker in lowered for marker in _RUNTIME_AUTH_MARKERS):
             return 1
@@ -84,6 +110,20 @@ def is_usage_limit_failure(detail: str | None) -> bool:
         or "used 100% of your included" in hay
     )
     return matched
+
+
+def is_billing_block_failure(detail: str | None) -> bool:
+    """True when Cursor blocked the agent runtime for an unpaid invoice / Stripe hold.
+
+    Distinct from usage limits: the account may still show Auto headroom, but
+    agent requests fail immediately until the invoice is paid in the dashboard.
+    """
+    hay = f"{detail or ''} {normalize_operator_failure_detail(detail)}".lower()
+    return (
+        "unpaid invoice" in hay
+        or "pay your invoice" in hay
+        or ("invoice" in hay and "stripe" in hay and "resume requests" in hay)
+    )
 
 
 def is_runtime_auth_failure(detail: str | None) -> bool:

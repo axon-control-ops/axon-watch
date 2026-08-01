@@ -98,6 +98,11 @@ def _prepare_persona_name_for_speech(text: str) -> str:
 
 def _soften_symbols_for_speech(text: str) -> str:
     """Keep TTS from reading punctuation/symbol names aloud."""
+    # Expand acronyms before slash softening so TTS does not say "see" / "ayed".
+    text = re.sub(r"\bCI/CD\b", "C I C D", text)
+    text = re.sub(r"\bCI\b", "C I", text)
+    # IDE must be letter-spelled (I D E) — never the word "ayed".
+    text = re.sub(r"\bIDE\b", "I D E", text)
     # Emoji / pictographs (incl. many "smiley" ranges).
     text = re.sub(
         r"[\U0001F300-\U0001FAFF\U00002700-\U000027BF\U00002600-\U000026FF]",
@@ -114,6 +119,8 @@ def _soften_symbols_for_speech(text: str) -> str:
     text = re.sub(r"\b(\d{1,2}):(\d{2})\b", rf"\1{_clock_mark}\2", text)
     text = text.replace(":", ", ")
     text = text.replace(_clock_mark, ":")
+    # Em-dashes become long SSML breaks — prefer a light comma for manager pacing.
+    text = re.sub(r"\s*[—–]\s*", ", ", text)
     text = re.sub(r"[<>{}[\]()`~^]", " ", text)
     text = re.sub(r"\s+,", ",", text)
     text = re.sub(r",\s*,+", ",", text)
