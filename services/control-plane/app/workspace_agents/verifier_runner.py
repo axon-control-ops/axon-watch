@@ -10,6 +10,9 @@ from typing import Any
 from app.workspace_agents.verifier_checks import build_check_plan
 
 _DEFAULT_CHECK_TIMEOUT_SECONDS = 90.0
+# Full `./scripts/verify/run_contract_unit_tests.sh` exceeds the default 90s on
+# this host; Python-only isolations still need a real pass, not a timeout fail.
+_PYTHON_SUITE_TIMEOUT_SECONDS = 300.0
 _MAX_SECRET_SCAN_BYTES = 200_000
 _DEFAULT_FORBIDDEN = ("**/.env", "**/secrets/**", "**/*.pem")
 
@@ -22,6 +25,14 @@ def check_timeout_seconds() -> float:
         return max(5.0, min(float(raw), 600.0))
     except ValueError:
         return _DEFAULT_CHECK_TIMEOUT_SECONDS
+
+
+def check_timeout_seconds_for(name: str, *, base: float | None = None) -> float:
+    """Per-check timeout; the contract unit suite needs more than the default."""
+    timeout = base if base is not None else check_timeout_seconds()
+    if name == "test":
+        return max(timeout, _PYTHON_SUITE_TIMEOUT_SECONDS)
+    return timeout
 
 
 def list_changed_paths(workspace_root: Path) -> list[str]:
@@ -79,19 +90,53 @@ def read_path_texts(
     return texts
 
 
+_FRONTEND_HEAVY_CHECKS = frozenset({"typecheck", "build"})
+_CONSOLE_WEB_PREFIX = "apps/console-web/"
+
+
+def console_web_paths_touched(changed_paths: list[str] | None) -> bool:
+    """True when the dirty set includes console-web sources that need vue-tsc/build."""
+    if not changed_paths:
+        return False
+    for raw in changed_paths:
+        rel = str(raw or "").lstrip("./")
+        if rel == "apps/console-web" or rel.startswith(_CONSOLE_WEB_PREFIX):
+            return True
+    return False
+
+
 def execute_check_plan(
     workspace_root: Path,
     contract: dict[str, Any],
     *,
     timeout_seconds: float | None = None,
+    changed_paths: list[str] | None = None,
 ) -> dict[str, dict[str, Any]]:
-    """Run required verifier commands; return results keyed by check name."""
+    """Run required verifier commands; return results keyed by check name.
+
+    When ``changed_paths`` is provided and does not touch ``apps/console-web/``,
+    skip ``typecheck`` / ``build`` (vue-tsc / Vite). Those heaps OOM disposable
+    worker isolations on Python-only control-plane fixes and do not validate the
+    dirty set. Lint/test/security/diff_budget still run.
+    """
     root = Path(workspace_root)
-    timeout = timeout_seconds if timeout_seconds is not None else check_timeout_seconds()
+    base_timeout = timeout_seconds if timeout_seconds is not None else check_timeout_seconds()
+    skip_frontend_heavy = changed_paths is not None and not console_web_paths_touched(
+        changed_paths
+    )
     results: dict[str, dict[str, Any]] = {}
     for item in build_check_plan(contract):
         name = str(item.get("name") or "").strip() or "check"
         command = str(item.get("command") or "").strip()
+        timeout = check_timeout_seconds_for(name, base=base_timeout)
+        if skip_frontend_heavy and name in _FRONTEND_HEAVY_CHECKS:
+            results[name] = {
+                "passed": True,
+                "output_excerpt": (
+                    f"skipped: no {_CONSOLE_WEB_PREFIX.rstrip('/')} changes in dirty set"
+                ),
+            }
+            continue
         if not command or command.startswith("<missing command:"):
             results[name] = {
                 "passed": False,

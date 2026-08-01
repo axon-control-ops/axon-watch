@@ -48,6 +48,14 @@ class LeadAssignmentGuardrailTests(unittest.TestCase):
         self.assertEqual("frontend", role)
         self.assertTrue(escalate)
 
+    def test_unpaid_invoice_escalates_only(self) -> None:
+        role, escalate = assign_owner_role_for_failed_shift(
+            "integrations",
+            "ActionRequiredError: You have an unpaid invoice Visit cursor.com/dashboard",
+        )
+        self.assertEqual("integrations", role)
+        self.assertTrue(escalate)
+
     def test_crc_failure_reassigns_same_role(self) -> None:
         role, escalate = assign_owner_role_for_failed_shift(
             "watcher",
