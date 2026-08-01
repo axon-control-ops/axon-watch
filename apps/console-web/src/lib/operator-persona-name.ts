@@ -15,7 +15,7 @@ export const OPERATOR_PERSONA_BACKRONYM = 'Voice AI Assistant';
 
 /** LIVE OPERATIONS orb stage tagline (Mission Control). */
 export const OPERATOR_PERSONA_OPS_TAGLINE =
-  'VOICE • ANALYTICS • X • OPERATIONS • NETWORK';
+  'Second brain · manager · prioritizes · you decide';
 
 /** Dotted label rendered inside the galaxy orb core. */
 export const OPERATOR_PERSONA_ORB_LABEL = 'V.A.X.O.N';

@@ -176,6 +176,36 @@
   background: rgba(0, 70, 95, 0.75);
 }
 
+.mc-transmission__detail {
+  position: relative;
+  z-index: 1;
+  margin: 0;
+  padding: 0 0 0 0.9rem;
+  display: grid;
+  gap: 0.28rem;
+  color: rgba(190, 220, 232, 0.9);
+  font: 0.72rem/1.35 var(--font-ui, system-ui, sans-serif);
+  max-height: 6.5rem;
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+
+.mc-transmission__detail-toggle {
+  position: relative;
+  z-index: 1;
+  justify-self: start;
+  appearance: none;
+  border: 1px solid rgba(0, 220, 255, 0.28);
+  border-radius: 999px;
+  background: rgba(0, 24, 36, 0.7);
+  color: rgba(160, 230, 255, 0.92);
+  font: 0.58rem var(--font-mono, ui-monospace, monospace);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 0.22rem 0.55rem;
+  cursor: pointer;
+}
+
 .mc-transmission__body {
   position: relative;
   z-index: 1;

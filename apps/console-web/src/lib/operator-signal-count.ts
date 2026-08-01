@@ -121,7 +121,11 @@ export function resolveAttentionSignalCount(input: {
   briefingTopSignals?: OperatorSignalCountItem[] | null;
 }): number {
   if (shouldUseInboxSignalSnapshot(input.inboxLoadState, input.inboxItems)) {
-    return countAttentionSignals(input.inboxItems, input.workspaceId);
+    const fromInbox = countAttentionSignals(input.inboxItems, input.workspaceId);
+    if (fromInbox > 0) {
+      return fromInbox;
+    }
+    // Inbox loaded empty — still surface briefing tops so Attention is not blank.
   }
 
   const briefingSignals = input.briefingTopSignals ?? [];

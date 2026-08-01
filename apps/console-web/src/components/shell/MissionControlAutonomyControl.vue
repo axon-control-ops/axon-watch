@@ -8,6 +8,7 @@ import {
   type AutonomyStatusFeed,
 } from '../../api/autonomy-api';
 import { useWorkerAutonomyControl } from '../../composables/useWorkerAutonomyControl';
+import { collapsePendingCriticalDecisions } from '../../features/mission-control/pending-critical-decisions';
 import { useShellStore } from '../../stores/shell';
 
 const shell = useShellStore();
@@ -34,15 +35,13 @@ const feedError = ref<string | null>(null);
 const resolvingId = ref<string | null>(null);
 let feedTimer: ReturnType<typeof setInterval> | null = null;
 
-const pendingCritical = computed<AutonomyReceipt[]>(() => {
-  const workspaceId = shell.currentWorkspace?.workspace_id?.trim();
-  return (feed.value?.pending_critical_decisions ?? []).filter(
-    (item) => !workspaceId || !item.workspace_id || item.workspace_id === workspaceId,
-  );
-});
-const pendingCriticalTotal = computed(
-  () => feed.value?.pending_critical_count ?? pendingCritical.value.length,
+const pendingCritical = computed<AutonomyReceipt[]>(() =>
+  collapsePendingCriticalDecisions(
+    feed.value?.pending_critical_decisions ?? [],
+    shell.currentWorkspace?.workspace_id,
+  ),
 );
+const pendingCriticalTotal = computed(() => pendingCritical.value.length);
 
 const workerStateLabel = computed(() => {
   if (!status.value) {
@@ -257,7 +256,7 @@ onUnmounted(() => {
 
     <div v-if="pendingCritical.length" class="orb-hud__sheet orb-hud__sheet--critical">
       <ul aria-label="Needs your decision">
-        <li v-for="item in pendingCritical.slice(0, 2)" :key="item.receipt_id">
+        <li v-for="item in pendingCritical.slice(0, 1)" :key="item.receipt_id">
           <strong>Needs you</strong>
           <span>{{ item.title || item.kind }}</span>
           <div class="orb-hud__sheet-actions">
@@ -279,8 +278,8 @@ onUnmounted(() => {
           </div>
         </li>
       </ul>
-      <p v-if="pendingCriticalTotal > 2" class="orb-hud__whisper" data-tone="warn">
-        +{{ pendingCriticalTotal - 2 }} more
+      <p v-if="pendingCriticalTotal > 1" class="orb-hud__whisper" data-tone="warn">
+        +{{ pendingCriticalTotal - 1 }} more distinct
       </p>
     </div>
   </section>

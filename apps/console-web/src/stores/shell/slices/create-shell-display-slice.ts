@@ -122,20 +122,20 @@ export function createShellDisplaySlice(input: CreateShellDisplaySliceInput) {
   );
 
   const attentionSignals = computed(() => {
-    if (
+    const workspaceId = input.currentWorkspace.value?.workspace_id ?? null;
+    const fromInbox =
       input.inboxLoadState.value === 'loaded' ||
       (input.inboxLoadState.value === 'loading' && input.inboxItems.value.length > 0)
-    ) {
-      return filterAttentionSignals(
-        input.inboxItems.value,
-        input.currentWorkspace.value?.workspace_id ?? null,
-      ).slice(0, 3);
-    }
-
-    return filterAttentionSignals(
+        ? filterAttentionSignals(input.inboxItems.value, workspaceId)
+        : [];
+    // Loaded-but-empty inbox was blanking Mission Control Attention while
+    // briefing still had actionable top signals (Sentry / CI / Android).
+    const fromBriefing = filterAttentionSignals(
       input.operatorBriefing.value?.top_signals ?? [],
-      input.currentWorkspace.value?.workspace_id ?? null,
-    ).slice(0, 3);
+      workspaceId,
+    );
+    const items = fromInbox.length > 0 ? fromInbox : fromBriefing;
+    return items.slice(0, 3);
   });
 
   const workspaceAttentionSignalCount = computed(() =>

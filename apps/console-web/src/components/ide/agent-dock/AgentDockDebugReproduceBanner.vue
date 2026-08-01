@@ -12,7 +12,7 @@ defineProps<{
 
 const emit = defineEmits<{
   proceed: [];
-  dismiss: [];
+  resolve: [];
 }>();
 
 const shell = useShellStore();
@@ -36,11 +36,11 @@ const workspaceId = computed(() => shell.currentWorkspace?.workspace_id ?? null)
       </button>
       <button
         type="button"
-        class="agent-dock-composer__debug-reproduce-btn agent-dock-composer__debug-reproduce-btn--dismiss"
+        class="agent-dock-composer__debug-reproduce-btn agent-dock-composer__debug-reproduce-btn--resolve"
         :disabled="pending"
-        @click="emit('dismiss')"
+        @click="emit('resolve')"
       >
-        Dismiss
+        {{ pending ? 'Sending…' : 'Resolved' }}
       </button>
     </div>
   </div>
