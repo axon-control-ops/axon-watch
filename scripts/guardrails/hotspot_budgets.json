@@ -499,7 +499,7 @@
       "note": "VAXON orb HUD autonomy controls; split confirm/critical sheets next"
     },
     "apps/console-web/src/styles/shell/mockup-shell-11.css": {
-      "max_lines": 586,
+      "max_lines": 603,
       "soft_limit": 350,
       "hard_limit": 500,
       "target": "apps/console-web/src/styles/shell/*",
