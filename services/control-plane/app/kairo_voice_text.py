@@ -98,6 +98,11 @@ def _prepare_persona_name_for_speech(text: str) -> str:
 
 def _soften_symbols_for_speech(text: str) -> str:
     """Keep TTS from reading punctuation/symbol names aloud."""
+    # Expand acronyms before slash softening so TTS does not say "see" / "ayed".
+    text = re.sub(r"\bCI/CD\b", "C I C D", text)
+    text = re.sub(r"\bCI\b", "C I", text)
+    # IDE must be letter-spelled (I D E) — never the word "ayed".
+    text = re.sub(r"\bIDE\b", "I D E", text)
     # Emoji / pictographs (incl. many "smiley" ranges).
     text = re.sub(
         r"[\U0001F300-\U0001FAFF\U00002700-\U000027BF\U00002600-\U000026FF]",

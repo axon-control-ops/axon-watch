@@ -72,6 +72,13 @@ def sample(run_id: str, seq: int) -> dict:
         "ps -eo rss,comm --sort=-rss | awk 'NR>1 && NR<=6 {printf \"%s:%s \", $2, $1}'"
     )
     load1 = os.getloadavg()[0]
+    # NVMe composite temps when readable without root (hwmon); else blank.
+    nvme_temps = _sh(
+        "for t in /sys/class/hwmon/hwmon*/temp*_input; do "
+        "d=$(dirname \"$t\"); n=$(cat \"$d/name\" 2>/dev/null || true); "
+        "[[ \"$n\" == nvme* ]] || continue; "
+        "printf '%s:%s ' \"$n\" \"$(($(cat \"$t\")/1000))\"; done"
+    )
 
     return {
         "sessionId": SESSION_ID,
@@ -80,7 +87,7 @@ def sample(run_id: str, seq: int) -> dict:
         "timestamp": int(time.time() * 1000),
         "location": "scripts/ops/freeze-sentinel.py",
         "message": "host health sample",
-        "hypothesisId": "A,B,C,D,E",
+        "hypothesisId": "B,F,G",
         "data": {
             "seq": seq,
             "load1": load1,
@@ -94,6 +101,7 @@ def sample(run_id: str, seq: int) -> dict:
             "nouveau_data_errors_boot": gpu_err,
             "chrome_gpu_process": bool(chrome_gpu),
             "top_rss": top_rss,
+            "nvme_temps_c": nvme_temps,
             "pressure_memory": _pressure("memory"),
             "pressure_io": _pressure("io"),
             "pressure_cpu": _pressure("cpu"),

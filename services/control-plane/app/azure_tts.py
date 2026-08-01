@@ -59,6 +59,8 @@ def _clean_for_speech(text: str) -> str:
     cleaned = re.sub(r"\bThabo\b", "Ta-bo", cleaned, flags=re.IGNORECASE)
     # Zulu names Azure often misreads — speak Sipho as SEE-po.
     cleaned = re.sub(r"\bSipho\b", "See-po", cleaned, flags=re.IGNORECASE)
+    # IDE must be letter-spelled — never spoken as the word "ayed".
+    cleaned = re.sub(r"\bIDE\b", "I D E", cleaned)
     return cleaned[:3000]
 
 

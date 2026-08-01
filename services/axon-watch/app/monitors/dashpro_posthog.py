@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import time
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
@@ -19,9 +20,9 @@ def _posthog_api_base(env: dict[str, str]) -> str:
 def check_posthog_recent_events(
     *,
     env: dict[str, str],
-    limit: int = 5,
-    timeout_seconds: float = 20,
-    retries: int = 1,
+    limit: int = 1,
+    timeout_seconds: float = 35,
+    retries: int = 2,
 ) -> tuple[str, str]:
     api_key = str(
         env.get("POSTHOG_PERSONAL_API_KEY")
@@ -67,6 +68,9 @@ def check_posthog_recent_events(
         except (TimeoutError, URLError, OSError) as exc:
             last_exc = exc
             if attempt + 1 < attempts:
+                # Back off between attempts so a slow PostHog query is not retried
+                # immediately while the upstream read may still be in flight.
+                time.sleep(min(5.0, 1.5 * (attempt + 1)))
                 continue
             # Transient network blips stay warning (not critical) so inbox severity
             # can keep them below Attention thresholds via the shared marker.

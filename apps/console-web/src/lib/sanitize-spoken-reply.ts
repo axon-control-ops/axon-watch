@@ -79,9 +79,11 @@ function softenSymbolsForSpeech(text: string): string {
     // Speak readiness scores before slash stripping ("100/100" → "100 percent").
     .replace(/\b(\d{1,3})\s*\/\s*100\b/g, '$1 percent')
     .replace(/\b(\d{1,3})\s*\/\s*(\d{1,3})\b/g, '$1 out of $2')
-    // Expand acronyms before slash/hyphen softening so TTS does not say "see" / "fourlead".
+    // Expand acronyms before slash/hyphen softening so TTS does not say "see" / "fourlead" / "ayed".
     .replace(/\bCI\/CD\b/g, 'C I C D')
     .replace(/\bCI\b/g, 'C I')
+    // IDE must be letter-spelled (I D E) — never spoken as the word "ayed".
+    .replace(/\bIDE\b/g, 'I D E')
     // Keep Lead-team hyphenated — it forces a TTS break (Lead team → "forlead" after counts).
     // Emoji / pictographs (incl. many "smiley" ranges).
     .replace(/[\u{1F300}-\u{1FAFF}\u{2700}-\u{27BF}\u{2600}-\u{26FF}]/gu, ' ')

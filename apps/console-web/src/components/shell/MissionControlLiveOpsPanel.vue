@@ -181,7 +181,13 @@ async function sendReply(content?: string): Promise<void> {
     return;
   }
   if (content === 'yes' || content === 'not now') {
-    clearStickyAsk(activeAskLine.value);
+    const ask = activeAskLine.value;
+    clearStickyAsk(ask);
+    // Open Attention instantly — IDE handoff still follows the converse round-trip
+    // (+ ~1.3s filament) when dig-in was armed for this ask.
+    if (content === 'yes' && /\bopen attention\b/i.test(ask || '')) {
+      shell.focusAttentionSidebar();
+    }
   }
   reply.value = '';
   await submitTurn(message);

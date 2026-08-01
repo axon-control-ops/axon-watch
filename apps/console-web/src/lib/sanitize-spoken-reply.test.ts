@@ -174,4 +174,13 @@ describe('sanitizeSpokenReply', () => {
     expect(spoken).toMatch(/C I/);
     expect(spoken).not.toMatch(/\bCI\b/);
   });
+
+  it('spells IDE as I D E for TTS while display stays IDE', () => {
+    expect(formatConversationDisplayReply('Handing this off to the IDE.')).toBe(
+      'Handing this off to the IDE.',
+    );
+    const spoken = sanitizeSpokenReply('Handing this off to the IDE.');
+    expect(spoken).toMatch(/I D E/);
+    expect(spoken).not.toMatch(/\bIDE\b/);
+  });
 });
