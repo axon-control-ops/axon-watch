@@ -343,19 +343,6 @@
   background: rgba(46, 16, 101, 0.58);
 }
 
-.agent-dock-composer__debug-reproduce-copy {
-  margin: 0;
-  font-size: 0.62rem;
-  line-height: 1.4;
-  color: rgba(237, 233, 254, 0.95);
-}
-
-.agent-dock-composer__debug-reproduce-copy code {
-  font-family: var(--font-mono);
-  font-size: 0.58rem;
-  color: rgba(196, 181, 253, 0.98);
-}
-
 .agent-dock-composer__debug-reproduce-steps {
   margin: 0;
   padding-left: 1.05rem;
@@ -387,11 +374,11 @@
   color: rgba(237, 233, 254, 0.98);
 }
 
-.agent-dock-composer__debug-reproduce-btn--dismiss {
+.agent-dock-composer__debug-reproduce-btn--resolve {
   flex: 0 0 auto;
-  border-color: rgba(138, 154, 173, 0.28);
-  background: rgba(10, 14, 20, 0.55);
-  color: rgba(200, 214, 230, 0.9);
+  border-color: rgba(52, 211, 153, 0.45);
+  background: rgba(6, 78, 59, 0.45);
+  color: rgba(209, 250, 229, 0.96);
 }
 
 .agent-dock-composer__debug-reproduce-btn:disabled {

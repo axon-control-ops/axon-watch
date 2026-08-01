@@ -1,4 +1,4 @@
-"""Append NDJSON evidence lines for Debug-mode instrumentation."""
+"""Append and read NDJSON evidence lines for Debug-mode instrumentation."""
 
 from __future__ import annotations
 
@@ -19,6 +19,51 @@ def _candidate_roots() -> list[Path]:
     if sibling_local.is_dir():
         roots.append(sibling_local)
     return roots
+
+
+def resolve_debug_session_log_path(workspace_id: str = "") -> Path:
+    """Resolve `.axon/debug-session.ndjson` for a workspace (fallback: repo root)."""
+    from app.terminal.workspace_roots import WorkspaceRootError, resolve_workspace_root
+
+    workspace_root: Path | None = None
+    cleaned = (workspace_id or "").strip() or "workspace_axon_watch"
+    try:
+        workspace_root = resolve_workspace_root(cleaned)
+    except WorkspaceRootError:
+        workspace_root = None
+    if workspace_root is None:
+        workspace_root = Path(__file__).resolve().parents[3]
+    axon_dir = workspace_root / ".axon"
+    axon_dir.mkdir(parents=True, exist_ok=True)
+    return axon_dir / "debug-session.ndjson"
+
+
+def read_debug_session_log_lines(
+    *,
+    workspace_id: str = "",
+    limit: int = 80,
+) -> list[dict[str, Any]]:
+    """Return the newest NDJSON evidence lines for the Debug Mode thread panel."""
+    path = resolve_debug_session_log_path(workspace_id)
+    if not path.is_file():
+        return []
+    try:
+        raw_lines = path.read_text(encoding="utf-8").splitlines()
+    except OSError:
+        return []
+    capped = max(1, min(int(limit or 80), 200))
+    entries: list[dict[str, Any]] = []
+    for line in raw_lines[-capped:]:
+        text = line.strip()
+        if not text:
+            continue
+        try:
+            payload = json.loads(text)
+        except json.JSONDecodeError:
+            continue
+        if isinstance(payload, dict):
+            entries.append(payload)
+    return entries
 
 
 def append_debug_session_log(

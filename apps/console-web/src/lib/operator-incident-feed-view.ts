@@ -49,6 +49,11 @@ function incidentSignalRank(signal: InboxItem): number {
   return severityRank(signal.severity);
 }
 
+/** Collapse inbox twins that share the same operator-facing title. */
+function incidentTitleKey(title: string): string {
+  return title.trim().toLowerCase().replace(/\s+/g, ' ');
+}
+
 export function buildOperatorIncidentFeed(input: {
   topSignals: InboxItem[];
   workspaceId: string | null;
@@ -60,7 +65,8 @@ export function buildOperatorIncidentFeed(input: {
 }): OperatorIncidentFeedView {
   const limit = input.limit ?? 5;
   const items: OperatorIncidentFeedItem[] = [];
-  const seen = new Set<string>();
+  const seenIds = new Set<string>();
+  const seenTitles = new Set<string>();
 
   for (const signal of input.topSignals) {
     if (
@@ -70,10 +76,17 @@ export function buildOperatorIncidentFeed(input: {
     ) {
       continue;
     }
-    if (seen.has(signal.signal_id)) {
+    if (seenIds.has(signal.signal_id)) {
       continue;
     }
-    seen.add(signal.signal_id);
+    const titleKey = incidentTitleKey(signal.title || '');
+    if (titleKey && seenTitles.has(titleKey)) {
+      continue;
+    }
+    seenIds.add(signal.signal_id);
+    if (titleKey) {
+      seenTitles.add(titleKey);
+    }
     const explained = resolveOperatorAlertExplanation({
       signalId: signal.signal_id,
       title: signal.title,
@@ -100,11 +113,14 @@ export function buildOperatorIncidentFeed(input: {
     const row = input.fleetHealth.items.find(
       (entry) => entry.workspace_id === input.workspaceId,
     );
+    const fleetTitleKey = incidentTitleKey(row?.top_signal_title || '');
     if (
       row?.top_signal_title &&
       row.open_signals_count > 0 &&
-      !items.some((item) => item.title === row.top_signal_title)
+      fleetTitleKey &&
+      !seenTitles.has(fleetTitleKey)
     ) {
+      seenTitles.add(fleetTitleKey);
       const explained = resolveOperatorAlertExplanation({
         title: row.top_signal_title,
         summary: `${row.open_signals_count} open signal(s) on ${row.display_name}.`,
@@ -136,6 +152,28 @@ export function buildOperatorIncidentFeed(input: {
     return severityRank(left.severity) - severityRank(right.severity);
   });
   const limited = sorted.slice(0, limit);
+
+  // #region agent log
+  fetch('http://127.0.0.1:7706/ingest/90bcaec2-2b39-4d4a-84b5-157c12735440', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': 'db8bb4' },
+    body: JSON.stringify({
+      sessionId: 'db8bb4',
+      runId: 'mc-map',
+      hypothesisId: 'B',
+      location: 'operator-incident-feed-view.ts:buildOperatorIncidentFeed',
+      message: 'incident feed built',
+      data: {
+        rawSignalCount: input.topSignals.length,
+        uniqueIdCount: seenIds.size,
+        uniqueTitleCount: seenTitles.size,
+        outCount: limited.length,
+        titles: limited.map((item) => item.title),
+      },
+      timestamp: Date.now(),
+    }),
+  }).catch(() => {});
+  // #endregion
 
   return {
     items: limited,

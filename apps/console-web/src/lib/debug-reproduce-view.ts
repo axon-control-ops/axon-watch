@@ -5,8 +5,41 @@ import { parseAgentTranscriptBlocks } from './agent-transcript-blocks';
 export const DEBUG_REPRODUCE_PROCEED_MESSAGE =
   "I've reproduced the bug. Please read `.axon/debug-session.ndjson`, analyze the runtime evidence, and continue the debug loop.";
 
+export const DEBUG_REPRODUCE_RESOLVED_MESSAGE =
+  'Confirmed resolved. Please remove debug instrumentation, clear `.axon/debug-session.ndjson` if appropriate, and summarize the fix.';
+
 /** Cursor-like banner: keep reproduce actions short and human-facing. */
 export const DEBUG_REPRODUCE_STEP_CAP = 4;
+
+/**
+ * Build the proceed follow-up. When the operator typed a reply (or attached
+ * context), keep that text and append the standard continue cue so Debug can
+ * keep the evidence loop going — matching Cursor's "Proceed with reply".
+ */
+export function buildDebugReproduceProceedContent(operatorReply: string): string {
+  const reply = operatorReply.trim();
+  if (!reply) {
+    return DEBUG_REPRODUCE_PROCEED_MESSAGE;
+  }
+  if (reply.includes('.axon/debug-session.ndjson')) {
+    return reply;
+  }
+  return `${reply}\n\n${DEBUG_REPRODUCE_PROCEED_MESSAGE}`;
+}
+
+/**
+ * Build the Resolved follow-up — operator verified the fix; Debug should clean up.
+ */
+export function buildDebugReproduceResolvedContent(operatorReply: string): string {
+  const reply = operatorReply.trim();
+  if (!reply) {
+    return DEBUG_REPRODUCE_RESOLVED_MESSAGE;
+  }
+  if (/confirmed resolved|remove debug instrumentation/i.test(reply)) {
+    return reply;
+  }
+  return `${reply}\n\n${DEBUG_REPRODUCE_RESOLVED_MESSAGE}`;
+}
 
 export type DebugReproduceRequest = {
   messageId: string;

@@ -153,7 +153,7 @@ function sortNewest(left: WorkspaceTaskRecord, right: WorkspaceTaskRecord): numb
 }
 
 /** Shared plan-chip width so row labels match plan-group chips. */
-const PLAN_CHIP_LABEL_MAX = 28;
+const PLAN_CHIP_LABEL_MAX = 22;
 const TASK_CARD_GOAL_MAX = 96;
 
 /** Compact operator-facing label for plan chips and dependency tags. */

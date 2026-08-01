@@ -10,8 +10,8 @@ import type {
 
 import { columnTone } from './operator-task-board-helpers';
 
-/** Full-size cards in the Waiting column before "Show more". */
-const WAITING_PREVIEW = 6;
+/** Full-size cards in the Waiting column before "Show more". Keep Mission Control short. */
+const WAITING_PREVIEW = 4;
 
 const props = defineProps<{
   visibleColumns: OperatorTaskBoardView['columns'];
@@ -26,7 +26,7 @@ const emit = defineEmits<{
   startTask: [taskId: string];
   cancelTask: [taskId: string];
   dismissDone: [taskId: string];
-  cancelAllWaiting: [];
+  clearDuplicateWaiting: [];
   'update:showHistory': [value: boolean];
 }>();
 
@@ -90,12 +90,12 @@ function hiddenWaitingCount(column: OperatorTaskBoardView['columns'][number]): n
         <div class="operator-task-board__column-head-meta">
           <span>{{ column.count }}</span>
           <button
-            v-if="column.id === 'waiting' && column.count > 0"
+            v-if="column.id === 'waiting' && column.count > 1"
             type="button"
             class="operator-task-board__column-clear"
             :disabled="workspaceTasksMutating"
             title="Clear waiting duplicates of completed work (and open twins) — keeps distinct follow-ups"
-            @click="emit('cancelAllWaiting')"
+            @click="emit('clearDuplicateWaiting')"
           >
             Clear dupes
           </button>

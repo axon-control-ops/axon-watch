@@ -1,6 +1,7 @@
 import type { Ref } from 'vue';
 
 import {
+  shouldProceedDebugReproduceComposer,
   shouldSteerAgentDockComposer,
   shouldSubmitAgentDockComposer,
 } from '../../lib/agent-dock-composer-input';
@@ -26,7 +27,6 @@ import {
 } from '../../lib/named-assign-route';
 import { resolveEmployeeSpecialtyRoute } from '../../lib/resolve-employee-specialty-route';
 import { shouldApplySpecialtyRouteNow } from '../../lib/specialty-route-busy-gate';
-import { DEBUG_REPRODUCE_PROCEED_MESSAGE } from '../../lib/debug-reproduce-view';
 import {
   findIdeComposerQueueEntry,
   type IdeComposerMode,
@@ -38,6 +38,7 @@ import {
 } from '../../lib/teammate-route-notice';
 import { resolveLiveBusyEmployeeIds } from '../../features/workspace-agents/company-roster-busy';
 import { useShellStore } from '../../stores/shell';
+import { useDebugReproduceActions } from './use-debug-reproduce-actions';
 import type { ComposerMode } from './use-composer-menus';
 
 type ShellStore = ReturnType<typeof useShellStore>;
@@ -61,6 +62,7 @@ type UseComposerActionsOptions = {
   composerImages: Ref<ComposerClipboardImage[]>;
   composerHistory: Ref<string[]>;
   composerHistoryIndex: Ref<number>;
+  dismissedDebugReproduceMessageId: Ref<string | null>;
   submitKairoTurn: (
     draft: string,
     options?: { dockAttachments?: ComposerClipboardImage[] },
@@ -89,6 +91,7 @@ export function useComposerActions(options: UseComposerActionsOptions) {
     composerImages,
     composerHistory,
     composerHistoryIndex,
+    dismissedDebugReproduceMessageId,
     submitKairoTurn,
     recordComposerHistoryIfSent,
     handleHistory,
@@ -131,39 +134,33 @@ export function useComposerActions(options: UseComposerActionsOptions) {
     return applied.routed;
   }
 
-  function handleApproveRun(): void {
-    void shell.approveIdeAgentRun();
-  }
-
-  function handleRejectRun(): void {
-    void shell.rejectIdeAgentRun();
-  }
-
-  function handleStopRun(): void {
-    void shell.stopIdeAgentRun();
-  }
-
-  function handleResumeRun(): void {
-    void shell.resumeIdeAgentRun();
-  }
-
-  function toggleVoiceCapture(): void {
+  const handleApproveRun = (): void => { void shell.approveIdeAgentRun(); };
+  const handleRejectRun = (): void => { void shell.rejectIdeAgentRun(); };
+  const handleStopRun = (): void => { void shell.stopIdeAgentRun(); };
+  const handleResumeRun = (): void => { void shell.resumeIdeAgentRun(); };
+  const toggleVoiceCapture = (): void => {
     if (speechCapture.capturing.value) {
       stopVoiceCapture();
       return;
     }
     shell.interruptKairoVoice();
     startVoiceCapture();
-  }
-
-  async function handleDebugReproduceProceed(messageId: string): Promise<void> {
-    if (composerMode.value !== 'debug' && shell.ideAgentLinkedRun?.mode !== 'debug') {
-      composerMode.value = 'debug';
-    }
-    onDebugReproduceProceed?.(messageId);
-    shell.ideComposerDraft = DEBUG_REPRODUCE_PROCEED_MESSAGE;
-    await shell.submitIdeComposer('debug');
-  }
+  };
+  const {
+    debugReproduceActive,
+    activeDebugReproduceMessageId,
+    handleDebugReproduceProceed,
+    handleDebugReproduceResolved,
+  } = useDebugReproduceActions({
+    shell,
+    composerMode,
+    composerImages,
+    dismissedDebugReproduceMessageId,
+    recordComposerHistoryIfSent,
+    onDebugReproduceProceed,
+    withSkillTokensForSubmit,
+    clearSkillAttachments,
+  });
 
   async function handleSubmit(event?: Event): Promise<void> {
     event?.preventDefault();
@@ -450,6 +447,15 @@ export function useComposerActions(options: UseComposerActionsOptions) {
       }
     }
 
+    if (shouldProceedDebugReproduceComposer(event, debugReproduceActive())) {
+      event.preventDefault();
+      const messageId = activeDebugReproduceMessageId();
+      if (messageId) {
+        void handleDebugReproduceProceed(messageId);
+      }
+      return;
+    }
+
     if (shouldSteerAgentDockComposer(event)) {
       event.preventDefault();
       void handleSteer();
@@ -471,6 +477,7 @@ export function useComposerActions(options: UseComposerActionsOptions) {
     handleApproveRun,
     handleComposerKeydown,
     handleDebugReproduceProceed,
+    handleDebugReproduceResolved,
     handleRejectRun,
     handleResumeRun,
     handleSteer,

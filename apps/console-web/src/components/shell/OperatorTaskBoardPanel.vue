@@ -5,7 +5,6 @@ import {
   fetchWorkerSchedulerStatus,
   type WorkerSchedulerStatus,
 } from '../../api/worker-scheduler-api';
-import { listWorkspaceHandoffs } from '../../api/workspace-api';
 import HudHoloPanelShell from '../../features/hud-holo/HudHoloPanelShell.vue';
 import {
   taskBoardBucketToHoloTone,
@@ -19,15 +18,11 @@ import {
   dismissDoneTaskIds,
   loadDismissedDoneTaskIds,
 } from '../../lib/task-board-dismissed-done';
-import {
-  incomingHandoffHeadline,
-  mapWorkspaceHandoffRows,
-  type IncomingHandoffRow,
-} from '../../lib/workspace-handoff-board-view';
 import { useShellStore } from '../../stores/shell';
 
 import OperatorTaskBoardColumns from './operator-task-board/OperatorTaskBoardColumns.vue';
 import OperatorTaskBoardCreateForm from './operator-task-board/OperatorTaskBoardCreateForm.vue';
+import OperatorTaskBoardHandoffs from './operator-task-board/OperatorTaskBoardHandoffs.vue';
 import OperatorTaskBoardNextUp from './operator-task-board/OperatorTaskBoardNextUp.vue';
 import OperatorTaskBoardPlanFilter from './operator-task-board/OperatorTaskBoardPlanFilter.vue';
 import OperatorTaskBoardSelectedDrawer from './operator-task-board/OperatorTaskBoardSelectedDrawer.vue';
@@ -54,7 +49,6 @@ const selectedDrawerEl = ref<HTMLElement | null>(null);
 const planFilterId = ref<string | 'all'>('all');
 const scheduler = ref<WorkerSchedulerStatus | null>(null);
 const schedulerError = ref<string | null>(null);
-const handoffRows = ref<IncomingHandoffRow[]>([]);
 const dismissedDoneIds = ref<Set<string>>(loadDismissedDoneTaskIds());
 
 const boardView = computed(() => {
@@ -76,8 +70,6 @@ const boardView = computed(() => {
     runPhaseByTaskId,
   );
 });
-
-const openHandoffRows = computed(() => handoffRows.value.slice(0, 6));
 
 const roleOptions = computed(() => {
   const fromRoster = shell.companyEmployeesForCurrentWorkspace
@@ -142,6 +134,44 @@ const doneVisibleCount = computed(
   () => visibleColumns.value.find((column) => column.id === 'done')?.count ?? 0,
 );
 
+// #region agent log
+watch(
+  () =>
+    [
+      boardView.value.counts.waiting,
+      boardView.value.counts.done,
+      doneVisibleCount.value,
+      planFilterId.value,
+      boardView.value.planGroups.length,
+    ] as const,
+  ([waiting, done, doneVisible, planFilter, planGroups]) => {
+    fetch('http://127.0.0.1:7706/ingest/90bcaec2-2b39-4d4a-84b5-157c12735440', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': 'db8bb4' },
+      body: JSON.stringify({
+        sessionId: 'db8bb4',
+        runId: 'mc-map',
+        hypothesisId: 'F',
+        location: 'OperatorTaskBoardPanel.vue:boardCounts',
+        message: 'task board map state',
+        data: {
+          waiting,
+          done,
+          doneVisible,
+          showCancelAllWaiting: waiting > 0,
+          showClearDupes: waiting > 1,
+          planFilter,
+          planGroups,
+          visiblePlanChips: Math.min(4, planGroups),
+        },
+        timestamp: Date.now(),
+      }),
+    }).catch(() => {});
+  },
+  { immediate: true },
+);
+// #endregion
+
 const holoTone = computed<HudHoloTone>(() => {
   const buckets = boardView.value.rows
     .filter((row) => row.bucket !== 'cancelled')
@@ -191,43 +221,9 @@ async function refreshScheduler(): Promise<void> {
   }
 }
 
-async function refreshHandoffs(): Promise<void> {
-  const workspaceId = shell.currentWorkspace?.workspace_id;
-  if (!workspaceId) {
-    handoffRows.value = [];
-    return;
-  }
-  try {
-    const snapshot = await listWorkspaceHandoffs(workspaceId);
-    const taskStatusById: Record<string, string | undefined> = {};
-    for (const task of shell.workspaceTasksForCurrentWorkspace) {
-      taskStatusById[task.task_id] = task.status;
-    }
-    handoffRows.value = mapWorkspaceHandoffRows(snapshot.items, workspaceId, {
-      taskStatusById,
-    });
-  } catch {
-    handoffRows.value = [];
-  }
-}
-
-function focusHandoffTask(row: IncomingHandoffRow): void {
-  if (row.targetTaskId) {
-    selectedTaskId.value = row.targetTaskId;
-  }
-}
-
 onMounted(() => {
   void refreshScheduler();
-  void refreshHandoffs();
 });
-
-watch(
-  () => shell.currentWorkspace?.workspace_id ?? null,
-  () => {
-    void refreshHandoffs();
-  },
-);
 
 function selectTask(taskId: string): void {
   selectedTaskId.value = selectedTaskId.value === taskId ? null : taskId;
@@ -482,36 +478,7 @@ function activateNextUp(row: TaskBoardRow): void {
         @open-fleet="openFleetControls"
       />
 
-      <section
-        v-if="openHandoffRows.length"
-        class="operator-task-board__handoffs"
-        data-orb-field
-        aria-label="Cross-workspace handoffs"
-      >
-        <header class="operator-task-board__handoffs-head">
-          <h4>Cross-workspace tickets</h4>
-          <span>{{ openHandoffRows.length }}</span>
-        </header>
-        <ul class="operator-task-board__handoff-list">
-          <li
-            v-for="row in openHandoffRows"
-            :key="row.handoffId"
-            class="operator-task-board__handoff-item"
-            :class="`operator-task-board__handoff-item--${row.direction}`"
-          >
-            <button
-              type="button"
-              class="operator-task-board__handoff-button"
-              @click="focusHandoffTask(row)"
-            >
-              <span class="operator-task-board__handoff-meta">
-                {{ incomingHandoffHeadline(row) }} · {{ row.status }}
-              </span>
-              <span class="operator-task-board__handoff-task">{{ row.task }}</span>
-            </button>
-          </li>
-        </ul>
-      </section>
+      <OperatorTaskBoardHandoffs @select-task="selectedTaskId = $event" />
 
       <OperatorTaskBoardPlanFilter
         :plan-groups="boardView.planGroups"
@@ -557,7 +524,7 @@ function activateNextUp(row: TaskBoardRow): void {
         @start-task="void startTask($event)"
         @cancel-task="void cancelTask($event)"
         @dismiss-done="dismissDoneTask"
-        @cancel-all-waiting="void clearDuplicateWaiting()"
+        @clear-duplicate-waiting="void clearDuplicateWaiting()"
         @update:show-history="showHistory = $event"
       />
 

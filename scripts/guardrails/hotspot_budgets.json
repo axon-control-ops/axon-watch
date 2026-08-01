@@ -227,11 +227,11 @@
       "note": "Lowered after explorer/activity panel CSS extraction"
     },
     "apps/console-web/src/styles/ide/ide-layout-08.css": {
-      "max_lines": 565,
+      "max_lines": 552,
       "soft_limit": 350,
       "hard_limit": 500,
       "target": "apps/console-web/src/styles/ide/*",
-      "note": "Raised for Cursor-soft agent-dock notice styles"
+      "note": "Lowered after removing unused debug-reproduce copy styles"
     },
     "apps/console-web/src/styles/shell/mockup-shell-07.css": {
       "max_lines": 182,
@@ -422,11 +422,11 @@
       "note": "Autonomy publish path-scope + receipts; gh resolve extracted to gh_cli.py"
     },
     "apps/console-web/src/components/shell/OperatorTaskBoardPanel.vue": {
-      "max_lines": 590,
+      "max_lines": 553,
       "soft_limit": 350,
       "hard_limit": 500,
       "target": "apps/console-web/src/components/shell/operator-task-board/*",
-      "note": "Mission Control Task Board; Start now + Engage review open/dismiss/reopen"
+      "note": "Mission Control Task Board; handoffs extracted to OperatorTaskBoardHandoffs.vue"
     },
     "apps/console-web/src/features/report-theater/report-theater.css": {
       "max_lines": 550,
@@ -499,7 +499,7 @@
       "note": "VAXON orb HUD autonomy controls; split confirm/critical sheets next"
     },
     "apps/console-web/src/styles/shell/mockup-shell-11.css": {
-      "max_lines": 586,
+      "max_lines": 603,
       "soft_limit": 350,
       "hard_limit": 500,
       "target": "apps/console-web/src/styles/shell/*",

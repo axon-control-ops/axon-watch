@@ -2,6 +2,9 @@ import { describe, expect, it } from 'vitest';
 
 import {
   DEBUG_REPRODUCE_PROCEED_MESSAGE,
+  DEBUG_REPRODUCE_RESOLVED_MESSAGE,
+  buildDebugReproduceProceedContent,
+  buildDebugReproduceResolvedContent,
   contentHasDebugReproduceMarker,
   extractDebugReproduceRequest,
   parseDebugReproduceSteps,
@@ -161,5 +164,31 @@ describe('debug-reproduce-view', () => {
 
   it('exports a proceed follow-up that points at the debug log', () => {
     expect(DEBUG_REPRODUCE_PROCEED_MESSAGE).toContain('.axon/debug-session.ndjson');
+  });
+
+  it('keeps the operator reply when building a proceed follow-up', () => {
+    expect(buildDebugReproduceProceedContent('')).toBe(DEBUG_REPRODUCE_PROCEED_MESSAGE);
+    expect(buildDebugReproduceProceedContent('  H1 looks confirmed  ')).toContain(
+      'H1 looks confirmed',
+    );
+    expect(buildDebugReproduceProceedContent('H1 looks confirmed')).toContain(
+      '.axon/debug-session.ndjson',
+    );
+    expect(
+      buildDebugReproduceProceedContent(
+        "I've reproduced the bug. Please read `.axon/debug-session.ndjson`.",
+      ),
+    ).toContain('.axon/debug-session.ndjson');
+  });
+
+  it('builds a Resolved follow-up that asks Debug to clean up', () => {
+    expect(buildDebugReproduceResolvedContent('')).toBe(DEBUG_REPRODUCE_RESOLVED_MESSAGE);
+    expect(buildDebugReproduceResolvedContent('Looks good on web')).toContain('Looks good on web');
+    expect(buildDebugReproduceResolvedContent('Looks good on web')).toContain(
+      'Confirmed resolved',
+    );
+    expect(buildDebugReproduceResolvedContent(DEBUG_REPRODUCE_RESOLVED_MESSAGE)).toBe(
+      DEBUG_REPRODUCE_RESOLVED_MESSAGE,
+    );
   });
 });

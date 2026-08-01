@@ -17,6 +17,17 @@ export function shouldSteerAgentDockComposer(
   );
 }
 
+/**
+ * Cursor Debug Mode: Ctrl/Cmd+Enter continues the reproduce loop (with the
+ * operator's reply + attachments) instead of steering a busy agent run.
+ */
+export function shouldProceedDebugReproduceComposer(
+  event: AgentDockComposerKeyEvent,
+  debugReproduceActive: boolean,
+): boolean {
+  return debugReproduceActive && shouldSteerAgentDockComposer(event);
+}
+
 export function shouldSubmitAgentDockComposer(
   event: AgentDockComposerKeyEvent,
 ): boolean {
