@@ -492,11 +492,11 @@
       "note": "Thread message body/actions; extract attachment chrome next"
     },
     "apps/console-web/src/components/shell/MissionControlAutonomyControl.vue": {
-      "max_lines": 679,
+      "max_lines": 678,
       "soft_limit": 350,
       "hard_limit": 500,
       "target": "apps/console-web/src/components/shell/mission-control-*",
-      "note": "VAXON orb HUD autonomy controls; split confirm/critical sheets next"
+      "note": "VAXON orb HUD autonomy controls; pending-critical collapse extracted"
     },
     "apps/console-web/src/styles/shell/mockup-shell-11.css": {
       "max_lines": 603,
