@@ -28,11 +28,6 @@ import {
 import { resolveEmployeeSpecialtyRoute } from '../../lib/resolve-employee-specialty-route';
 import { shouldApplySpecialtyRouteNow } from '../../lib/specialty-route-busy-gate';
 import {
-  buildDebugReproduceProceedContent,
-  extractDebugReproduceRequest,
-  shouldShowDebugReproduceBanner,
-} from '../../lib/debug-reproduce-view';
-import {
   findIdeComposerQueueEntry,
   type IdeComposerMode,
 } from '../../lib/ide-composer-queue';
@@ -43,6 +38,7 @@ import {
 } from '../../lib/teammate-route-notice';
 import { resolveLiveBusyEmployeeIds } from '../../features/workspace-agents/company-roster-busy';
 import { useShellStore } from '../../stores/shell';
+import { useDebugReproduceActions } from './use-debug-reproduce-actions';
 import type { ComposerMode } from './use-composer-menus';
 
 type ShellStore = ReturnType<typeof useShellStore>;
@@ -138,79 +134,40 @@ export function useComposerActions(options: UseComposerActionsOptions) {
     return applied.routed;
   }
 
-  function handleApproveRun(): void {
+  const handleApproveRun = (): void => {
     void shell.approveIdeAgentRun();
-  }
-
-  function handleRejectRun(): void {
+  };
+  const handleRejectRun = (): void => {
     void shell.rejectIdeAgentRun();
-  }
-
-  function handleStopRun(): void {
+  };
+  const handleStopRun = (): void => {
     void shell.stopIdeAgentRun();
-  }
-
-  function handleResumeRun(): void {
+  };
+  const handleResumeRun = (): void => {
     void shell.resumeIdeAgentRun();
-  }
-
-  function toggleVoiceCapture(): void {
+  };
+  const toggleVoiceCapture = (): void => {
     if (speechCapture.capturing.value) {
       stopVoiceCapture();
       return;
     }
     shell.interruptKairoVoice();
     startVoiceCapture();
-  }
-
-  function debugReproduceActive(): boolean {
-    const request = extractDebugReproduceRequest({
-      messages: shell.threadMessages.map((message) => ({
-        message_id: message.message_id,
-        role: message.role,
-        content: message.content,
-      })),
-      streaming: shell.agentStreamActive,
-    });
-    return shouldShowDebugReproduceBanner({
-      composerMode: composerMode.value,
-      linkedRunMode: shell.ideAgentLinkedRun?.mode,
-      request,
-      dismissedMessageId: dismissedDebugReproduceMessageId.value,
-    });
-  }
-
-  function activeDebugReproduceMessageId(): string | null {
-    return (
-      extractDebugReproduceRequest({
-        messages: shell.threadMessages.map((message) => ({
-          message_id: message.message_id,
-          role: message.role,
-          content: message.content,
-        })),
-        streaming: shell.agentStreamActive,
-      })?.messageId ?? null
-    );
-  }
-
-  async function handleDebugReproduceProceed(messageId: string): Promise<void> {
-    if (composerMode.value !== 'debug' && shell.ideAgentLinkedRun?.mode !== 'debug') {
-      composerMode.value = 'debug';
-    }
-    const operatorReply =
-      withSkillTokensForSubmit?.(shell.ideComposerDraft) ?? shell.ideComposerDraft;
-    const content = buildDebugReproduceProceedContent(operatorReply);
-    const attachmentFiles = composerImages.value.map((image) => image.file);
-    onDebugReproduceProceed?.(messageId);
-    const submitted = await shell.submitIdeComposer('debug', {
-      contentOverride: content,
-      attachmentFiles,
-    });
-    if (submitted !== false) {
-      recordComposerHistoryIfSent(operatorReply.trim() || content);
-      clearSkillAttachments?.();
-    }
-  }
+  };
+  const {
+    debugReproduceActive,
+    activeDebugReproduceMessageId,
+    handleDebugReproduceProceed,
+  } = useDebugReproduceActions({
+    shell,
+    composerMode,
+    composerImages,
+    dismissedDebugReproduceMessageId,
+    recordComposerHistoryIfSent,
+    onDebugReproduceProceed,
+    withSkillTokensForSubmit,
+    clearSkillAttachments,
+  });
 
   async function handleSubmit(event?: Event): Promise<void> {
     event?.preventDefault();
