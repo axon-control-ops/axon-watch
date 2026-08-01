@@ -15,6 +15,17 @@ _DEFAULT_CHECK_TIMEOUT_SECONDS = 90.0
 _PYTHON_SUITE_TIMEOUT_SECONDS = 300.0
 _MAX_SECRET_SCAN_BYTES = 200_000
 _DEFAULT_FORBIDDEN = ("**/.env", "**/secrets/**", "**/*.pem")
+# Runtime rewrites (research MCP, isolation markers) must not fail Gate 6 scope.
+_RUNTIME_NOISE_PREFIXES = (".cursor/", ".axon-si/")
+_CODE_CHECK_PREFIXES = (
+    "apps/",
+    "services/",
+    "packages/",
+    "scripts/",
+    "tests/",
+    "config/",
+    ".github/",
+)
 
 
 def check_timeout_seconds() -> float:
@@ -33,6 +44,32 @@ def check_timeout_seconds_for(name: str, *, base: float | None = None) -> float:
     if name == "test":
         return max(timeout, _PYTHON_SUITE_TIMEOUT_SECONDS)
     return timeout
+
+
+def _normalize_rel_path(path: str) -> str:
+    """Strip a single leading ``./`` only (do not use str.lstrip — it eats ``.cursor``)."""
+    rel = str(path or "").strip()
+    while rel.startswith("./"):
+        rel = rel[2:]
+    return rel
+
+
+def is_runtime_noise_path(path: str) -> bool:
+    """True for Cursor/isolation metadata the runtime rewrites during dispatch."""
+    rel = _normalize_rel_path(path)
+    if not rel:
+        return False
+    return any(
+        rel == prefix.rstrip("/") or rel.startswith(prefix)
+        for prefix in _RUNTIME_NOISE_PREFIXES
+    )
+
+
+def filter_runtime_noise_paths(paths: list[str] | None) -> list[str]:
+    """Drop runtime metadata paths from a dirty set used for Gate 6 policy/checks."""
+    if not paths:
+        return []
+    return [str(p) for p in paths if not is_runtime_noise_path(str(p))]
 
 
 def list_changed_paths(workspace_root: Path) -> list[str]:
@@ -62,9 +99,26 @@ def list_changed_paths(workspace_root: Path) -> list[str]:
         if " -> " in rest:
             rest = rest.split(" -> ", 1)[1].strip()
         cleaned = rest.strip().strip('"')
-        if cleaned:
+        if cleaned and not is_runtime_noise_path(cleaned):
             paths.append(cleaned)
     return paths
+
+
+def code_paths_touched(changed_paths: list[str] | None) -> bool:
+    """True when the dirty set includes paths that need lint/test/security checks."""
+    if not changed_paths:
+        return False
+    for raw in changed_paths:
+        rel = _normalize_rel_path(str(raw or ""))
+        if not rel or is_runtime_noise_path(rel):
+            continue
+        for prefix in _CODE_CHECK_PREFIXES:
+            if rel == prefix.rstrip("/") or rel.startswith(prefix):
+                return True
+        # Repo-root contract files are code-adjacent for Gate 6.
+        if rel in {"project.axon.yaml", "package.json", "package-lock.json"}:
+            return True
+    return False
 
 
 def read_path_texts(
@@ -91,6 +145,7 @@ def read_path_texts(
 
 
 _FRONTEND_HEAVY_CHECKS = frozenset({"typecheck", "build"})
+_CODE_HEAVY_CHECKS = frozenset({"lint", "test", "security", "diff_budget"})
 _CONSOLE_WEB_PREFIX = "apps/console-web/"
 
 
@@ -99,7 +154,7 @@ def console_web_paths_touched(changed_paths: list[str] | None) -> bool:
     if not changed_paths:
         return False
     for raw in changed_paths:
-        rel = str(raw or "").lstrip("./")
+        rel = _normalize_rel_path(str(raw or ""))
         if rel == "apps/console-web" or rel.startswith(_CONSOLE_WEB_PREFIX):
             return True
     return False
@@ -117,12 +172,24 @@ def execute_check_plan(
     When ``changed_paths`` is provided and does not touch ``apps/console-web/``,
     skip ``typecheck`` / ``build`` (vue-tsc / Vite). Those heaps OOM disposable
     worker isolations on Python-only control-plane fixes and do not validate the
-    dirty set. Lint/test/security/diff_budget still run.
+    dirty set.
+
+    When ``changed_paths`` is provided and has no code prefixes (after filtering
+    runtime noise like ``.cursor/``), skip lint/test/security/diff_budget too —
+    investigate-only or metadata-only shifts must not burn the full unit suite.
     """
     root = Path(workspace_root)
     base_timeout = timeout_seconds if timeout_seconds is not None else check_timeout_seconds()
-    skip_frontend_heavy = changed_paths is not None and not console_web_paths_touched(
-        changed_paths
+    effective_paths = (
+        filter_runtime_noise_paths(list(changed_paths))
+        if changed_paths is not None
+        else None
+    )
+    skip_frontend_heavy = effective_paths is not None and not console_web_paths_touched(
+        effective_paths
+    )
+    skip_code_heavy = effective_paths is not None and not code_paths_touched(
+        effective_paths
     )
     results: dict[str, dict[str, Any]] = {}
     for item in build_check_plan(contract):
@@ -134,6 +201,15 @@ def execute_check_plan(
                 "passed": True,
                 "output_excerpt": (
                     f"skipped: no {_CONSOLE_WEB_PREFIX.rstrip('/')} changes in dirty set"
+                ),
+            }
+            continue
+        if skip_code_heavy and name in _CODE_HEAVY_CHECKS:
+            results[name] = {
+                "passed": True,
+                "output_excerpt": (
+                    "skipped: no code-path changes in dirty set "
+                    f"(prefixes={','.join(p.rstrip('/') for p in _CODE_CHECK_PREFIXES)})"
                 ),
             }
             continue
