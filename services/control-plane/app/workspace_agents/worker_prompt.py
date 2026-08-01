@@ -13,7 +13,12 @@ from app.workspace_agents.run_outcome import latest_role_run_outcome
 from app.workspace_agents.team_roster_context import build_team_roster_context
 
 OUT_OF_SCOPE_GUARD_MARKER = "OUT_OF_SCOPE_GUARD:"
-_OUT_OF_SCOPE_GUARD_RE = re.compile(r"OUT_OF_SCOPE_GUARD:\s*(.+)", re.IGNORECASE)
+# Line-start only: mid-line hits inside shell/Python samples (for example a
+# membership check against the abort token) must not fail the shift.
+_OUT_OF_SCOPE_GUARD_RE = re.compile(
+    r"(?m)^(?:\s|[*_`>#-])*OUT_OF_SCOPE_GUARD:\s*(.+)$",
+    re.IGNORECASE,
+)
 
 
 def _prior_failure_clause(*, workspace_id: str, role: str) -> str:

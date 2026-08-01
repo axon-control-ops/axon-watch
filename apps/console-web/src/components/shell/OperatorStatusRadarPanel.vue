@@ -23,6 +23,7 @@ import { kairoPresenceModuleParts } from '../../lib/mockup-shell-view';
 import PersonaTitle from '../PersonaTitle.vue';
 import { resolveKairoPresenceState } from '../../lib/kairo-presence';
 import {
+  formatRunDisplayName,
   formatRunIdentityLabel,
 } from '../../lib/run-display';
 import { runContinueActionLabel } from '../../lib/run-lifecycle-ui';
@@ -395,6 +396,9 @@ function handleOperatorQuickGuideAction(actionId: OperatorQuickGuideActionId): v
               shell.currentWorkspace?.workspace_id ||
               'Current workspace'
             }}
+            <template v-if="shell.workspaceAttentionSignalCount > 0">
+              · {{ shell.workspaceAttentionSignalCount }} open
+            </template>
           </p>
         </header>
         <AttentionStackPanel variant="sidebar" sections="attention-only" />
@@ -571,23 +575,51 @@ function handleOperatorQuickGuideAction(actionId: OperatorQuickGuideActionId): v
 
       <section v-if="showRunActions || shell.runMutationError" class="operator-status-radar-panel__controls">
         <div v-if="showRunActions" class="operator-status-radar-panel__run-actions run-actions">
+          <p
+            v-if="shell.primaryActiveRun"
+            class="operator-status-radar-panel__run-target"
+            :title="shell.primaryActiveRun.summary || shell.primaryActiveRun.run_id"
+          >
+            Active run · {{ formatRunIdentityLabel(shell.primaryActiveRun) }}
+            <span>· {{ shell.primaryActiveRun.phase }}</span>
+          </p>
           <button
             v-if="showStopAction"
             type="button"
             class="run-actions__button run-actions__button--primary"
             :disabled="!shell.canStopPrimaryRun && shell.primaryActiveRun?.phase !== 'executing'"
+            :title="
+              shell.primaryActiveRun
+                ? `Stop ${formatRunIdentityLabel(shell.primaryActiveRun)}`
+                : 'Stop active run'
+            "
             @click="shell.stopPrimaryRun()"
           >
-            {{ shell.runMutationState === 'stopping' ? 'STOPPING…' : 'STOP RUN' }}
+            {{
+              shell.runMutationState === 'stopping'
+                ? 'STOPPING…'
+                : shell.primaryActiveRun
+                  ? `STOP · ${formatRunDisplayName(shell.primaryActiveRun)}`
+                  : 'STOP RUN'
+            }}
           </button>
           <button
             v-if="shell.canResumePrimaryRun"
             type="button"
             class="run-actions__button run-actions__button--warning"
             :disabled="!shell.canResumePrimaryRun || shell.runMutationPending"
+            :title="
+              shell.primaryActiveRun
+                ? `${continueActionLabel} ${formatRunIdentityLabel(shell.primaryActiveRun)}`
+                : continueActionLabel
+            "
             @click="shell.resumePrimaryRun()"
           >
-            {{ continueActionLabel }}
+            {{
+              shell.primaryActiveRun
+                ? `${continueActionLabel.replace(/ RUN$/i, '')} · ${formatRunDisplayName(shell.primaryActiveRun)}`
+                : continueActionLabel
+            }}
           </button>
           <button
             v-if="shell.canCompletePrimaryRun"

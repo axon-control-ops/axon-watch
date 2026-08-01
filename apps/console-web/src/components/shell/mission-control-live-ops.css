@@ -54,9 +54,9 @@
   position: relative;
   display: flex;
   flex-direction: column;
-  flex: 0 1 48%;
-  min-height: 16rem;
-  max-height: min(56vh, 28rem);
+  flex: 0 1 38%;
+  min-height: 12rem;
+  max-height: min(42vh, 22rem);
   margin: 0.1rem 0 0;
   padding: 0;
   border-radius: 0.85rem;

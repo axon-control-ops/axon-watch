@@ -74,7 +74,7 @@ def list_isolation_changed_paths(isolation_root: Path) -> list[str]:
             continue
         for line in (result.stdout or "").splitlines():
             cleaned = line.strip()
-            if cleaned and cleaned not in paths and not cleaned.startswith(".axon-si/"):
+            if cleaned and cleaned not in paths and not cleaned.startswith(".axon-si/") and not cleaned.startswith(".cursor/"):
                 paths.append(cleaned)
     return paths
 

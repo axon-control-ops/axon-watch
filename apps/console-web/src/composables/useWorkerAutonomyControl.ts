@@ -105,7 +105,19 @@ export function useWorkerAutonomyControl(options?: {
   }
 
   async function enableAutonomous(): Promise<boolean> {
-    return setAutonomyMode('full');
+    // AUTO ON = VAXON CEO mode: Full autonomy + workers unpaused (unless env-blocked).
+    // If already Full, still resume — screenshot trap was AUTO ON with Workers paused.
+    if (autonomyMode.value !== 'full') {
+      const modeOk = await setAutonomyMode('full');
+      if (!modeOk) {
+        return false;
+      }
+    }
+    let resumed = true;
+    if (!status.value?.effective_enabled) {
+      resumed = await resume();
+    }
+    return resumed;
   }
 
   async function disableAutonomous(): Promise<boolean> {

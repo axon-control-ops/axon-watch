@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref } from 'vue';
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 
 import {
   fetchAutonomyStatus,
@@ -21,6 +21,8 @@ import { resolveGalaxyPresence } from '../../features/brain-galaxy/galaxy-presen
 import { projectLiveOperationsStream } from '../../features/brain-galaxy/live-operations-stream';
 import { companyBusyEmployeesCount } from '../../features/workspace-agents/company-roster-busy';
 import MissionControlAutonomyControl from './MissionControlAutonomyControl.vue';
+import MissionControlCeoCriticalStrip from './MissionControlCeoCriticalStrip.vue';
+import MissionControlMachineCeoStrip from './MissionControlMachineCeoStrip.vue';
 import { resolveVaxonTransmissionView } from '../../lib/mc-vaxon-transmission-view';
 import {
   vaxonAffirmReplyCta,
@@ -36,6 +38,7 @@ const shell = useShellStore();
 const { spokenText } = useSpokenUtteranceText();
 const { pending, submitTurn, speechCapture } = useKairoConversation();
 const reply = ref('');
+const showTransmissionDetail = ref(false);
 const autonomyReceipts = ref<AutonomyReceipt[]>([]);
 const autonomyEffective = ref(false);
 let autonomyPoll: ReturnType<typeof setInterval> | null = null;
@@ -102,6 +105,9 @@ const transmission = computed(() =>
 );
 
 const spokenLine = computed(() => transmission.value.body);
+const transmissionHasDetail = computed(() => transmission.value.detailLines.length > 0);
+
+
 const asksForReply = computed(
   () =>
     vaxonLineAsksForReply(spokenLine.value) &&
@@ -218,6 +224,10 @@ onUnmounted(() => {
       </p>
     </header>
 
+    <!-- Above the orb so CEO surfaces are never buried under Needs-you sheets. -->
+    <MissionControlMachineCeoStrip />
+    <MissionControlCeoCriticalStrip />
+
     <div
       class="mc-live-ops__orb-stage"
       :data-speaking="shell.kairoSpeechActive ? 'true' : 'false'"
@@ -251,8 +261,24 @@ onUnmounted(() => {
           class="mc-transmission__body"
           :data-empty="transmission.empty ? 'true' : 'false'"
         >
-          {{ transmission.body }}
+          {{ transmission.summary }}
         </p>
+        <ul
+          v-if="transmissionHasDetail && showTransmissionDetail"
+          class="mc-transmission__detail"
+        >
+          <li v-for="(line, index) in transmission.detailLines" :key="index">
+            {{ line }}
+          </li>
+        </ul>
+        <button
+          v-if="transmissionHasDetail"
+          type="button"
+          class="mc-transmission__detail-toggle"
+          @click="showTransmissionDetail = !showTransmissionDetail"
+        >
+          {{ showTransmissionDetail ? 'Hide detail' : `Show detail (${transmission.detailLines.length})` }}
+        </button>
         <div v-if="asksForReply" class="mc-transmission__actions">
           <button type="button" :disabled="pending" @click="void sendReply('yes')">
             {{ affirmCta }}
