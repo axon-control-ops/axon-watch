@@ -14,9 +14,10 @@ from app.chat.command_intent import is_auto_complete_run_summary
 # Ranking keys (highest first).
 _RANK_PENDING_APPROVAL = 1
 _RANK_CRITICAL_SIGNAL = 2
-_RANK_REVIEW_READY = 3
-_RANK_OPEN_HANDOFF = 4
-_RANK_DEGRADED = 5
+_RANK_AWAITING_LEAD_PLAN = 3
+_RANK_REVIEW_READY = 4
+_RANK_OPEN_HANDOFF = 5
+_RANK_DEGRADED = 6
 
 
 def workspace_advice_label(
@@ -110,6 +111,17 @@ def _collect_facts(
             }
         )
         break
+
+    try:
+        from app.operator_mission_control_ceo import collect_awaiting_lead_plan_facts
+
+        for fact in collect_awaiting_lead_plan_facts(
+            display_names=dict(display_names) if display_names else None
+        ):
+            fact["rank"] = _RANK_AWAITING_LEAD_PLAN
+            facts.append(fact)
+    except Exception:
+        pass
 
     for run in active_run_records:
         if run.get("phase") != "review_ready":
@@ -293,6 +305,21 @@ def build_fleet_coach_line(
         if scope_mode == "fleet":
             return f"Critical signal in {name} needs review: {title}."
         return f"Critical signal needs review: {title}."
+
+    if kind == "awaiting_lead_plan":
+        lead = str(fact.get("lead_name") or "Lead").strip() or "Lead"
+        title = str(fact.get("title") or "Lead-team plan").strip() or "Lead-team plan"
+        if cross and focus_label:
+            return (
+                f"{lead} ({name}) has a Lead-team plan waiting — engage “{title}” "
+                f"before more {focus_label} work."
+            )
+        if cross:
+            return (
+                f"{lead} ({name}) has a Lead-team plan waiting — "
+                f"engage “{title}” before continuing here."
+            )
+        return f"{lead} has a Lead-team plan waiting — engage “{title}”."
 
     if kind == "review_ready":
         if cross:

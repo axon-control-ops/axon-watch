@@ -425,6 +425,18 @@ def dev_debug_session_log(body: DebugSessionLogRequest) -> dict[str, object]:
     return {"ok": True, "path": str(log_path)}
 
 
+@router.get("/api/operator/mission-control/critical-work")
+def operator_mission_control_critical_work(
+    focused_workspace_id: str = "",
+) -> dict[str, object]:
+    """VAXON Mission Control CEO — ask Leads and rank critical fleet work."""
+    from app.operator_mission_control_ceo import build_mission_control_critical_work
+
+    return build_mission_control_critical_work(
+        focused_workspace_id=focused_workspace_id.strip() or None,
+    )
+
+
 @router.get("/api/operator/autonomy/status")
 def operator_autonomy_status(workspace_id: str = "") -> dict[str, object]:
     """Read-only Mission Control autonomy feed (mode, scheduler, receipts)."""

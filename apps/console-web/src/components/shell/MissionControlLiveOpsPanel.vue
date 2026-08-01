@@ -21,6 +21,7 @@ import { resolveGalaxyPresence } from '../../features/brain-galaxy/galaxy-presen
 import { projectLiveOperationsStream } from '../../features/brain-galaxy/live-operations-stream';
 import { companyBusyEmployeesCount } from '../../features/workspace-agents/company-roster-busy';
 import MissionControlAutonomyControl from './MissionControlAutonomyControl.vue';
+import MissionControlCeoCriticalStrip from './MissionControlCeoCriticalStrip.vue';
 import MissionControlMachineCeoStrip from './MissionControlMachineCeoStrip.vue';
 import { resolveVaxonTransmissionView } from '../../lib/mc-vaxon-transmission-view';
 import {
@@ -223,8 +224,9 @@ onUnmounted(() => {
       </p>
     </header>
 
-    <!-- Above the orb so Machine CEO is never buried under Needs-you sheets. -->
+    <!-- Above the orb so CEO surfaces are never buried under Needs-you sheets. -->
     <MissionControlMachineCeoStrip />
+    <MissionControlCeoCriticalStrip />
 
     <div
       class="mc-live-ops__orb-stage"
