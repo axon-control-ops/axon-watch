@@ -74,6 +74,13 @@
       "target": "services/control-plane/app/kairo/*",
       "note": "VAXON attachment path pass-through; extract early-intent next"
     },
+    "services/control-plane/app/kairo/voice_dispatch.py": {
+      "max_lines": 515,
+      "soft_limit": 350,
+      "hard_limit": 500,
+      "target": "services/control-plane/app/kairo/voice_*",
+      "note": "CI repair: 515-line hotspot over hard 500; extract dispatch helpers next"
+    },
     "apps/console-web/src/components/ConversationSeamPanel.vue": {
       "max_lines": 262,
       "soft_limit": 350,
