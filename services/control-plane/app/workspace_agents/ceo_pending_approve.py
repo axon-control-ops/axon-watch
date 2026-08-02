@@ -13,6 +13,7 @@ from app.workspace_agents.autonomous_attention_policy import (
     AutonomyPolicyDecision,
     text_looks_dangerous,
 )
+from app.workspace_agents.failure_detail import is_shift_continuation_failure
 
 logger = logging.getLogger(__name__)
 
@@ -52,6 +53,9 @@ def receipt_is_ceo_investigable(receipt: dict[str, Any]) -> bool:
     detail = str(receipt.get("detail") or "")
     dedupe = str(receipt.get("dedupe_key") or "")
     if text_looks_dangerous(title, detail, kind, dedupe):
+        return False
+    # Restart / operator stop / SIGTERM — escalate only; no repair attend under Full AUTO.
+    if is_shift_continuation_failure(detail):
         return False
     # operator_blocker only when it is a failed-shift / monitor-shaped card.
     if kind == "operator_blocker":

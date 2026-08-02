@@ -49,6 +49,21 @@ class CeoPendingApproveTests(unittest.TestCase):
             )
         )
 
+    def test_operator_stopped_shift_is_not_investigable(self) -> None:
+        self.assertFalse(
+            receipt_is_ceo_investigable(
+                {
+                    "kind": "operator_blocker",
+                    "title": "Rowan (watcher) last shift failed",
+                    "detail": (
+                        "Runtime execution stopped by operator before the CLI finished. "
+                        "[run=run_66a7b613f08a]"
+                    ),
+                    "dedupe_key": "failed_shift:workspace_axon_watch:watcher",
+                }
+            )
+        )
+
     def test_secrets_blocker_is_not_investigable(self) -> None:
         self.assertFalse(
             receipt_is_ceo_investigable(

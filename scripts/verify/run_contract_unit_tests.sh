@@ -59,12 +59,59 @@ _axon_contract_suite_mode() {
     esac
   done < <(_axon_contract_dirty_paths)
   if [[ "${seen_code}" -eq 1 ]]; then
-    printf 'full'
+    if _axon_contract_narrow_code_only; then
+      printf 'narrow'
+    else
+      printf 'full'
+    fi
   elif [[ "${seen_gate6}" -eq 1 ]]; then
     printf 'gate6'
   else
     printf 'skip'
   fi
+}
+
+_axon_contract_narrow_code_only() {
+  # Small control-plane + matching test edits must not invoke the full suite
+  # (~133 modules / >300s) during Gate 6 finalize on disposable workers.
+  local path class
+  local code_count=0
+  while IFS= read -r path; do
+    [[ -n "${path}" ]] || continue
+    class="$(_axon_contract_path_class "${path}")"
+    [[ "${class}" == "code" ]] || continue
+    code_count=$((code_count + 1))
+    case "${path}" in
+      services/control-plane/*|tests/test_*.py) ;;
+      *) return 1 ;;
+    esac
+  done < <(_axon_contract_dirty_paths)
+  [[ "${code_count}" -gt 0 && "${code_count}" -le 8 ]]
+}
+
+_axon_contract_narrow_modules() {
+  local path base mod
+  declare -A seen=()
+  while IFS= read -r path; do
+    [[ -n "${path}" ]] || continue
+    case "${path}" in
+      tests/test_*.py)
+        mod="${path#tests/}"
+        mod="${mod%.py}"
+        mod="tests.${mod//\//.}"
+        seen["${mod}"]=1
+        ;;
+      services/control-plane/app/*/*.py|services/control-plane/app/*/*/*.py)
+        base="$(basename "${path}" .py)"
+        if [[ -f "tests/test_${base}.py" ]]; then
+          seen["tests.test_${base}"]=1
+        fi
+        ;;
+    esac
+  done < <(_axon_contract_dirty_paths)
+  for mod in "${!seen[@]}"; do
+    printf '%s\n' "${mod}"
+  done | sort -u
 }
 
 if [[ "${AXON_CONTRACT_SUITE_FORCE_FULL:-}" != "1" ]]; then
@@ -84,6 +131,21 @@ if [[ "${AXON_CONTRACT_SUITE_FORCE_FULL:-}" != "1" ]]; then
         tests.test_gate6_project_contract \
         tests.test_gate6_verifier_contract
       exit $?
+      ;;
+    narrow)
+      source "${repo_root}/scripts/dev/lib/common.sh"
+      "${repo_root}/scripts/dev/ensure-python-deps.sh"
+      python_bin="$(resolve_python "${repo_root}")"
+      mapfile -t narrow_modules < <(_axon_contract_narrow_modules)
+      if [[ "${#narrow_modules[@]}" -gt 0 ]]; then
+        echo "contract unit tests: narrow path-scope (${#narrow_modules[@]} module(s))"
+        for test_module in "${narrow_modules[@]}"; do
+          echo "contract module: ${test_module}"
+          "${python_bin}" -m unittest -v "${test_module}" || exit $?
+        done
+        exit 0
+      fi
+      echo "contract unit tests: narrow mode had no derived modules; falling back to full suite" >&2
       ;;
   esac
 fi
