@@ -9,7 +9,9 @@ from typing import Any
 
 from app.workspace_agents.verifier_checks import build_check_plan
 
-_DEFAULT_CHECK_TIMEOUT_SECONDS = 90.0
+# Default must cover Gate 6's focused unit suite plus host load; full contract
+# coverage stays on Fast Gate via run_contract_unit_tests.sh (too large for 90s).
+_DEFAULT_CHECK_TIMEOUT_SECONDS = 180.0
 _MAX_SECRET_SCAN_BYTES = 200_000
 _DEFAULT_FORBIDDEN = ("**/.env", "**/secrets/**", "**/*.pem")
 

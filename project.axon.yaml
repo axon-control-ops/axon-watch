@@ -17,16 +17,19 @@ commands:
   lint:
     - npm run lint --if-present
   typecheck:
-    - npm run typecheck --workspace=apps/console-web
+    # Skip console compile when the worker diff has no frontend paths (Gate 6).
+    - ./scripts/verify/run_gate6_frontend_check.sh typecheck
   test:
-    - ./scripts/verify/run_contract_unit_tests.sh
+    # Full contract suite remains CI/Fast Gate; Gate 6 needs a timeout-safe subset.
+    - ./scripts/verify/run_gate6_unit_tests.sh
   build:
-    - npm run build --workspace=apps/console-web
+    - ./scripts/verify/run_gate6_frontend_check.sh build
   security:
     - ./scripts/dev/python.sh scripts/guardrails/check_hotspot_changes.py
   diff_budget:
     - ./scripts/dev/python.sh scripts/guardrails/check_file_sizes.py
 allowed_paths:
+  - project.axon.yaml
   - apps/
   - services/
   - packages/
