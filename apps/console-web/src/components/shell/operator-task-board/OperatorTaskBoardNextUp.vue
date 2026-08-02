@@ -50,13 +50,13 @@ const nextUpRow = computed(() => {
 <template>
   <section class="operator-task-board__next-up" data-orb-field aria-label="Queue next step">
     <div class="operator-task-board__next-up-copy">
-      <span class="operator-task-board__next-up-kicker">How this queue runs</span>
-      <p>{{ guidance }}</p>
+      <span class="operator-task-board__next-up-kicker">Your next step</span>
       <template v-if="nextUpRow">
         <strong>{{ nextUpRow.nextActionLabel }} · {{ nextUpRow.ownerRole }}</strong>
         <span>{{ nextUpRow.goal }}</span>
       </template>
       <span v-else>Nothing needs action in this workspace.</span>
+      <p class="operator-task-board__next-up-mode">{{ guidance }}</p>
     </div>
     <div class="operator-task-board__next-up-actions">
       <button

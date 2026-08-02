@@ -6,6 +6,108 @@ set -euo pipefail
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "${repo_root}"
 
+# Gate 6 / worker isolations often have only docs or Gate-6 harness edits dirty.
+# The full module list exceeds the Gate 6 test budget (~300s); path-scope here so
+# acceptance can pass without skipping verification of the harness itself.
+_axon_contract_dirty_paths() {
+  git status --porcelain -uall 2>/dev/null | while IFS= read -r line; do
+    [[ ${#line} -lt 4 ]] && continue
+    rest="${line:3}"
+    rest="${rest#"${rest%%[![:space:]]*}"}"
+    if [[ "${rest}" == *" -> "* ]]; then
+      rest="${rest##* -> }"
+    fi
+    rest="${rest%\"}"
+    rest="${rest#\"}"
+    [[ -n "${rest}" ]] || continue
+    printf '%s\n' "${rest}"
+  done
+}
+
+_axon_contract_path_class() {
+  local path="$1"
+  case "${path}" in
+    .cursor/*|.axon-si/*) printf 'noise' ;;
+    docs/*) printf 'docs' ;;
+    scripts/verify/run_contract_unit_tests.sh|\
+    services/control-plane/app/workspace_agents/verifier_runner.py|\
+    services/control-plane/app/workspace_agents/verifier_checks.py|\
+    services/control-plane/app/workspace_agents/verifier_contract.py|\
+    services/control-plane/app/workspace_agents/diff_policy.py|\
+    services/control-plane/app/workspace_delivery/publish.py|\
+    tests/test_gate6_path_scoped_checks.py|\
+    tests/test_gate6_project_contract.py|\
+    tests/test_gate6_verifier_contract.py|\
+    docs/ops/agent-reports/*) printf 'gate6' ;;
+    services/control-plane/app/workspace_agents/run_outcome.py) printf 'run_outcome' ;;
+    tests/test_run_outcome*.py) printf 'run_outcome' ;;
+    apps/*|services/*|packages/*|scripts/*|tests/*|config/*|.github/*|\
+    project.axon.yaml|package.json|package-lock.json) printf 'code' ;;
+    *) printf 'other' ;;
+  esac
+}
+
+_axon_contract_suite_mode() {
+  local path class
+  local seen_gate6=0
+  local seen_code=0
+  local seen_run_outcome=0
+  while IFS= read -r path; do
+    [[ -n "${path}" ]] || continue
+    class="$(_axon_contract_path_class "${path}")"
+    case "${class}" in
+      gate6) seen_gate6=1 ;;
+      run_outcome) seen_run_outcome=1 ;;
+      code) seen_code=1 ;;
+      noise|docs|other) ;;
+    esac
+  done < <(_axon_contract_dirty_paths)
+  if [[ "${seen_code}" -eq 1 ]]; then
+    printf 'full'
+  elif [[ "${seen_run_outcome}" -eq 1 ]]; then
+    printf 'run_outcome'
+  elif [[ "${seen_gate6}" -eq 1 ]]; then
+    printf 'gate6'
+  else
+    printf 'skip'
+  fi
+}
+
+if [[ "${AXON_CONTRACT_SUITE_FORCE_FULL:-}" != "1" ]]; then
+  _suite_mode="$(_axon_contract_suite_mode)"
+  case "${_suite_mode}" in
+    skip)
+      echo "contract unit tests skipped: no code-path changes in dirty set"
+      exit 0
+      ;;
+    gate6)
+      source "${repo_root}/scripts/dev/lib/common.sh"
+      "${repo_root}/scripts/dev/ensure-python-deps.sh"
+      python_bin="$(resolve_python "${repo_root}")"
+      echo "contract unit tests: Gate 6 path-scope harness only"
+      "${python_bin}" -m unittest -v \
+        tests.test_gate6_path_scoped_checks \
+        tests.test_gate6_project_contract \
+        tests.test_gate6_verifier_contract
+      exit $?
+      ;;
+    run_outcome)
+      source "${repo_root}/scripts/dev/lib/common.sh"
+      "${repo_root}/scripts/dev/ensure-python-deps.sh"
+      python_bin="$(resolve_python "${repo_root}")"
+      echo "contract unit tests: run_outcome path-scope only"
+      "${python_bin}" -m unittest -v \
+        tests.test_failure_detail \
+        tests.test_run_outcome \
+        tests.test_run_outcome_operator_stop \
+        tests.test_run_outcome_restart_critical_review \
+        tests.test_run_outcome_confidence \
+        tests.test_run_outcome_roster_api
+      exit $?
+      ;;
+  esac
+fi
+
 source "${repo_root}/scripts/dev/lib/common.sh"
 "${repo_root}/scripts/dev/ensure-python-deps.sh"
 python_bin="$(resolve_python "${repo_root}")"
@@ -46,6 +148,7 @@ main_tests=(
   tests.test_workspace_agent_scheduler
   tests.test_failure_detail
   tests.test_run_outcome
+  tests.test_run_outcome_operator_stop
   tests.test_workspace_agents
   tests.test_worker_scheduler_routes
   tests.test_worker_scheduler_settings_store

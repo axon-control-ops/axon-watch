@@ -9,6 +9,7 @@ CONTROL_ROOT = Path(__file__).resolve().parents[1] / "services" / "control-plane
 sys.path.insert(0, str(CONTROL_ROOT))
 
 from app.azure_tts import (  # noqa: E402
+    CONTINUATION_LEADING_AUDIO_GUARD_MS,
     LEADING_AUDIO_GUARD_MS,
     SOFT_ONSET_LEADING_AUDIO_GUARD_MS,
     TTS_READ_ATTEMPTS,
@@ -60,6 +61,19 @@ class AzureTtsTests(unittest.TestCase):
             soft_ssml,
         )
         self.assertIn("xmlns:mstts='https://www.w3.org/2001/mstts'", soft_ssml)
+
+    def test_continuation_chunks_skip_long_lead_in(self) -> None:
+        self.assertEqual(
+            leading_audio_guard_ms("Next sentence continues.", continuation=True),
+            CONTINUATION_LEADING_AUDIO_GUARD_MS,
+        )
+        ssml = build_azure_ssml("Next sentence continues.", continuation=True)
+        self.assertIn(
+            f"<mstts:silence type='Leading' value='{CONTINUATION_LEADING_AUDIO_GUARD_MS}ms'/>",
+            ssml,
+        )
+        self.assertNotIn("<break time='120ms'/>", ssml)
+        self.assertNotIn("<break time='200ms'/>", ssml)
 
     def test_relative_rate_and_pitch_attrs(self) -> None:
         self.assertEqual(azure_voice_rate_attr(0.85), "-15%")

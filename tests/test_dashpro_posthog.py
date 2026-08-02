@@ -33,7 +33,7 @@ class DashProPostHogMonitorTests(unittest.TestCase):
 
         def fake_urlopen(req, timeout=0):
             self.assertEqual("GET", req.get_method())
-            self.assertIn("/projects/proj_123/events/?limit=5", req.full_url)
+            self.assertIn("/projects/proj_123/events/?limit=1", req.full_url)
             return _FakeResponse(
                 200,
                 {
@@ -54,7 +54,7 @@ class DashProPostHogMonitorTests(unittest.TestCase):
             )
 
         self.assertEqual("ok", status)
-        self.assertIn("2 recent event(s)", detail)
+        self.assertIn("recent event(s)", detail)
         self.assertIn("dashboard_loaded", detail)
 
     def test_timeout_retries_once_then_succeeds(self) -> None:

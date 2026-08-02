@@ -2,7 +2,9 @@ import { describe, expect, it } from 'vitest';
 
 import {
   DEBUG_REPRODUCE_PROCEED_MESSAGE,
+  DEBUG_REPRODUCE_RESOLVED_MESSAGE,
   buildDebugReproduceProceedContent,
+  buildDebugReproduceResolvedContent,
   contentHasDebugReproduceMarker,
   extractDebugReproduceRequest,
   parseDebugReproduceSteps,
@@ -177,5 +179,16 @@ describe('debug-reproduce-view', () => {
         "I've reproduced the bug. Please read `.axon/debug-session.ndjson`.",
       ),
     ).toContain('.axon/debug-session.ndjson');
+  });
+
+  it('builds a Resolved follow-up that asks Debug to clean up', () => {
+    expect(buildDebugReproduceResolvedContent('')).toBe(DEBUG_REPRODUCE_RESOLVED_MESSAGE);
+    expect(buildDebugReproduceResolvedContent('Looks good on web')).toContain('Looks good on web');
+    expect(buildDebugReproduceResolvedContent('Looks good on web')).toContain(
+      'Confirmed resolved',
+    );
+    expect(buildDebugReproduceResolvedContent(DEBUG_REPRODUCE_RESOLVED_MESSAGE)).toBe(
+      DEBUG_REPRODUCE_RESOLVED_MESSAGE,
+    );
   });
 });

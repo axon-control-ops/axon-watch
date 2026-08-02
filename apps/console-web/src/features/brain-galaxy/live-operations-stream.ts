@@ -55,6 +55,56 @@ function pushItem(
   });
 }
 
+function normalizeStreamText(text: string): string {
+  return text
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, ' ')
+    .replace(/[.…]+$/g, '')
+    .replace(/^(inspect|review|check)\s+/i, '')
+    .replace(/\.$/, '');
+}
+
+function streamTextsNearDuplicate(left: string, right: string): boolean {
+  const a = normalizeStreamText(left);
+  const b = normalizeStreamText(right);
+  if (!a || !b) {
+    return false;
+  }
+  if (a === b) {
+    return true;
+  }
+  // Truncated spoken vs advise often share a long prefix but not full containment.
+  const prefixLen = 40;
+  if (a.length >= prefixLen && b.length >= prefixLen && a.slice(0, prefixLen) === b.slice(0, prefixLen)) {
+    return true;
+  }
+  const shorter = a.length <= b.length ? a : b;
+  const longer = a.length <= b.length ? b : a;
+  return shorter.length >= 24 && longer.includes(shorter);
+}
+
+/** Prefer the richer line when spoken/notice/advise/signal overlap. */
+export function collapseNearDuplicateStreamItems(
+  items: LiveOperationsStreamItem[],
+): LiveOperationsStreamItem[] {
+  const out: LiveOperationsStreamItem[] = [];
+  for (const item of items) {
+    const matchIndex = out.findIndex((existing) =>
+      streamTextsNearDuplicate(existing.text, item.text),
+    );
+    if (matchIndex < 0) {
+      out.push(item);
+      continue;
+    }
+    const existing = out[matchIndex]!;
+    if (item.text.trim().length > existing.text.trim().length) {
+      out[matchIndex] = item;
+    }
+  }
+  return out;
+}
+
 /** Compact mission ticker for the LIVE OPERATIONS orb card. */
 export function projectLiveOperationsStream(input: {
   briefing: OperatorBriefing | null;
@@ -146,7 +196,7 @@ export function projectLiveOperationsStream(input: {
   }
 
   const notice = input.briefing?.notice?.trim();
-  if (notice) {
+  if (notice && !(utterance && streamTextsNearDuplicate(utterance, notice))) {
     pushItem(items, {
       id: 'notice',
       text: truncate(notice),
@@ -157,7 +207,7 @@ export function projectLiveOperationsStream(input: {
     });
   }
   const advise = input.briefing?.advise?.trim();
-  if (advise) {
+  if (advise && !(utterance && streamTextsNearDuplicate(utterance, advise))) {
     pushItem(items, {
       id: 'advise',
       text: truncate(advise),
@@ -272,5 +322,10 @@ export function projectLiveOperationsStream(input: {
     });
   }
 
-  return items.slice(0, 8);
+  // Collapse exact + nested near-duplicates (spoken often wraps notice/advise).
+  const deduped = collapseNearDuplicateStreamItems(items);
+  const limited = deduped.slice(0, 8);
+
+
+  return limited;
 }

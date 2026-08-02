@@ -25,6 +25,12 @@ from app.workspace_agents.lead_checkin_assign import (
     SPECIALIST_ROLES,
     LeadCheckinFinding,
 )
+from app.workspace_agents.autonomous_attention_dedupe import (
+    collapse_pending_decisions,
+    receipt_soft_key,
+    reject_duplicate_pending,
+)
+from app.workspace_agents.ceo_pending_approve import ceo_dispatch_policy_if_full_auto
 from app.workspace_agents.lead_team_checkin import run_lead_team_checkin
 
 logger = logging.getLogger(__name__)
@@ -129,6 +135,16 @@ def _enqueue_attend_actions(
             )
             continue
 
+        ceo_policy = ceo_dispatch_policy_if_full_auto(
+            policy,
+            kind=finding.kind,
+            title=finding.title,
+            detail=finding.detail,
+            dedupe_key=finding.dedupe_key,
+        )
+        if ceo_policy is not None:
+            policy = ceo_policy
+
         if policy.decision != "dispatch" or policy.ask_operator:
             if escalation_budget <= 0:
                 skipped.append({"dedupe_key": finding.dedupe_key, "reason": "escalation_cap"})
@@ -219,12 +235,15 @@ def resolve_autonomy_decision(
     if choice not in {"approved", "rejected"}:
         raise ValueError("resolution must be approved or rejected")
     receipt = autonomous_attention_store.begin_decision_resolution(receipt_id)
+    soft_key = receipt_soft_key(receipt)
     if choice == "rejected":
         try:
-            return autonomous_attention_store.complete_decision_resolution(
+            resolved = autonomous_attention_store.complete_decision_resolution(
                 receipt_id,
                 resolution="rejected",
             )
+            reject_duplicate_pending(primary_id=receipt_id, soft_key=soft_key)
+            return resolved
         except Exception:
             autonomous_attention_store.release_decision_resolution(receipt_id)
             raise
@@ -257,11 +276,13 @@ def resolve_autonomy_decision(
             approval_receipt_id=receipt_id,
             attempt_budget=1,
         )
-        return autonomous_attention_store.complete_decision_resolution(
+        resolved = autonomous_attention_store.complete_decision_resolution(
             receipt_id,
             resolution="approved",
             task_id=str(task.get("task_id") or "") or None,
         )
+        reject_duplicate_pending(primary_id=receipt_id, soft_key=soft_key)
+        return resolved
     except Exception:
         if task is not None:
             try:
@@ -312,6 +333,11 @@ def run_autonomous_attention_scan(
         except Exception:  # noqa: BLE001
             logger.exception("lead check-in during attend scan failed")
             result["lead_checkin"] = {"error": "lead_checkin_failed"}
+
+    # Machine CEO + Lead-review engagement — VAXON owns these under Full AUTO.
+    from app.operator_mission_control_ceo import run_ceo_attend_hooks
+
+    result.update(run_ceo_attend_hooks())
 
     for workspace_id in targets:
         workspace = str(workspace_id or "").strip()
@@ -409,10 +435,11 @@ def build_autonomy_status_feed(*, workspace_id: str | None = None) -> dict[str, 
             receipt["payload"] = payload
         payload["task_status"] = str(task.get("status") or "")
         payload["terminal_outcome"] = str(task.get("terminal_outcome") or "")
-    pending = autonomous_attention_store.list_pending_decisions(
+    pending_raw = autonomous_attention_store.list_pending_decisions(
         limit=500,
         workspace_id=scoped_workspace or None,
     )
+    pending = collapse_pending_decisions(pending_raw)
     last_scan_key = f"last_scan:{scoped_workspace}" if scoped_workspace else "last_scan"
     last_scan = autonomous_attention_store.get_meta(last_scan_key) or {}
     return {
