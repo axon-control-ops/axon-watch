@@ -464,7 +464,7 @@
       "note": "Core roster outcome selection; confidence + roster API split to sibling modules"
     },
     "services/control-plane/app/workspace_agents/lead_vaxon_handoff.py": {
-      "max_lines": 454,
+      "max_lines": 227,
       "soft_limit": 350,
       "hard_limit": 500,
       "target": "services/control-plane/app/workspace_agents/lead_vaxon_*",
