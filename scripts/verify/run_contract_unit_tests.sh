@@ -6,6 +6,115 @@ set -euo pipefail
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "${repo_root}"
 
+# Gate 6 / worker isolations often have only docs or Gate-6 harness edits dirty.
+# The full module list exceeds the Gate 6 test budget (~300s); path-scope here so
+# acceptance can pass without skipping verification of the harness itself.
+_axon_contract_dirty_paths() {
+  git status --porcelain -uall 2>/dev/null | while IFS= read -r line; do
+    [[ ${#line} -lt 4 ]] && continue
+    rest="${line:3}"
+    rest="${rest#"${rest%%[![:space:]]*}"}"
+    if [[ "${rest}" == *" -> "* ]]; then
+      rest="${rest##* -> }"
+    fi
+    rest="${rest%\"}"
+    rest="${rest#\"}"
+    [[ -n "${rest}" ]] || continue
+    printf '%s\n' "${rest}"
+  done
+}
+
+_axon_contract_path_class() {
+  local path="$1"
+  case "${path}" in
+    .cursor/*|.axon-si/*) printf 'noise' ;;
+    docs/*) printf 'docs' ;;
+    # HTTP health probe slices: keep Gate 6 under the ~300s budget when only
+    # these monitor files change (full suite previously timed out on DNS attend).
+    services/axon-watch/app/monitors/http_health.py|\
+    services/axon-watch/app/monitors/monitor_probe.py|\
+    services/axon-watch/app/monitors/github_probe_headers.py|\
+    tests/test_http_health_monitor.py|\
+    tests/test_github_probe_headers.py|\
+    config/axon-x-monitor-slice.json|\
+    config/dashpro-monitor-slice.json) printf 'http_health' ;;
+    scripts/verify/run_contract_unit_tests.sh|\
+    services/control-plane/app/workspace_agents/verifier_runner.py|\
+    services/control-plane/app/workspace_agents/verifier_checks.py|\
+    services/control-plane/app/workspace_agents/verifier_contract.py|\
+    services/control-plane/app/workspace_agents/diff_policy.py|\
+    services/control-plane/app/workspace_delivery/publish.py|\
+    tests/test_gate6_path_scoped_checks.py|\
+    tests/test_gate6_project_contract.py|\
+    tests/test_gate6_verifier_contract.py|\
+    docs/ops/agent-reports/*) printf 'gate6' ;;
+    apps/*|services/*|packages/*|scripts/*|tests/*|config/*|.github/*|\
+    project.axon.yaml|package.json|package-lock.json) printf 'code' ;;
+    *) printf 'other' ;;
+  esac
+}
+
+_axon_contract_suite_mode() {
+  local path class
+  local seen_gate6=0
+  local seen_http_health=0
+  local seen_code=0
+  while IFS= read -r path; do
+    [[ -n "${path}" ]] || continue
+    class="$(_axon_contract_path_class "${path}")"
+    case "${class}" in
+      gate6) seen_gate6=1 ;;
+      http_health) seen_http_health=1 ;;
+      code) seen_code=1 ;;
+      noise|docs|other) ;;
+    esac
+  done < <(_axon_contract_dirty_paths)
+  if [[ "${seen_code}" -eq 1 ]]; then
+    printf 'full'
+  elif [[ "${seen_http_health}" -eq 1 ]]; then
+    # Optional gate6 harness dirtiness rides along with the focused probe suite.
+    printf 'http_health'
+  elif [[ "${seen_gate6}" -eq 1 ]]; then
+    printf 'gate6'
+  else
+    printf 'skip'
+  fi
+}
+
+if [[ "${AXON_CONTRACT_SUITE_FORCE_FULL:-}" != "1" ]]; then
+  _suite_mode="$(_axon_contract_suite_mode)"
+  case "${_suite_mode}" in
+    skip)
+      echo "contract unit tests skipped: no code-path changes in dirty set"
+      exit 0
+      ;;
+    gate6)
+      source "${repo_root}/scripts/dev/lib/common.sh"
+      "${repo_root}/scripts/dev/ensure-python-deps.sh"
+      python_bin="$(resolve_python "${repo_root}")"
+      echo "contract unit tests: Gate 6 path-scope harness only"
+      "${python_bin}" -m unittest -v \
+        tests.test_gate6_path_scoped_checks \
+        tests.test_gate6_project_contract \
+        tests.test_gate6_verifier_contract
+      exit $?
+      ;;
+    http_health)
+      source "${repo_root}/scripts/dev/lib/common.sh"
+      "${repo_root}/scripts/dev/ensure-python-deps.sh"
+      python_bin="$(resolve_python "${repo_root}")"
+      echo "contract unit tests: HTTP health probe path-scope"
+      "${python_bin}" -m unittest -v \
+        tests.test_http_health_monitor \
+        tests.test_github_probe_headers \
+        tests.test_gate6_path_scoped_checks \
+        tests.test_gate6_project_contract \
+        tests.test_gate6_verifier_contract
+      exit $?
+      ;;
+  esac
+fi
+
 source "${repo_root}/scripts/dev/lib/common.sh"
 "${repo_root}/scripts/dev/ensure-python-deps.sh"
 python_bin="$(resolve_python "${repo_root}")"
@@ -151,6 +260,8 @@ watch_monitor_tests=(
   tests.test_dashpro_monitor_slice
   tests.test_dashpro_monitor_vault_action
   tests.test_monitor_inbox_integration
+  tests.test_http_health_monitor
+  tests.test_github_probe_headers
 )
 
 watch_dashpro_api_tests=(

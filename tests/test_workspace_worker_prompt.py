@@ -212,6 +212,22 @@ class WorkspaceWorkerPromptTests(unittest.TestCase):
         )
         self.assertIsNone(parse_out_of_scope_guard("Everything stayed on task."))
 
+    def test_parse_out_of_scope_guard_ignores_mid_line_investigative_hits(self) -> None:
+        marker = "OUT_OF_" + "SCOPE_GUARD:"
+        # Source assignment and Python membership checks previously cascaded
+        # failed_shift attends (details '"' and "' in t)").
+        self.assertIsNone(
+            parse_out_of_scope_guard(f'OUT_OF_SCOPE_GUARD_MARKER = "{marker}"')
+        )
+        self.assertIsNone(
+            parse_out_of_scope_guard(f"print('has_abort_token', '{marker}' in t)")
+        )
+        self.assertIsNone(
+            parse_out_of_scope_guard(
+                f":::terminal python3 -c \"print('{marker}' in t)\"\nTrue\n:::"
+            )
+        )
+
     def test_prompt_surfaces_explicit_allowed_paths(self) -> None:
         with patch(
             "app.workspace_agents.worker_prompt.build_team_roster_context",

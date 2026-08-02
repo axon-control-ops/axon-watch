@@ -6,7 +6,10 @@
   height: 100%;
   max-height: 100%;
   padding: 0.7rem 0.75rem 0.8rem;
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
 }
 
 
@@ -54,9 +57,9 @@
   position: relative;
   display: flex;
   flex-direction: column;
-  flex: 0 1 48%;
-  min-height: 16rem;
-  max-height: min(56vh, 28rem);
+  flex: 0 1 38%;
+  min-height: 12rem;
+  max-height: min(42vh, 22rem);
   margin: 0.1rem 0 0;
   padding: 0;
   border-radius: 0.85rem;
@@ -70,6 +73,31 @@
   box-shadow:
     inset 0 -3.5rem 3rem rgba(0, 40, 70, 0.35),
     0 0 1.2rem rgba(0, 140, 200, 0.12);
+  transition:
+    flex-basis 280ms ease,
+    min-height 280ms ease,
+    max-height 280ms ease,
+    border-color 280ms ease,
+    box-shadow 280ms ease;
+}
+
+/* Plate load grows the stage itself — not only the inner orb glyph. */
+.mc-live-ops__orb-stage[data-load='idle'] {
+  flex: 0 1 32%;
+  min-height: 11rem;
+  max-height: min(36vh, 18rem);
+}
+
+.mc-live-ops__orb-stage[data-load='busy'] {
+  flex: 0 1 42%;
+  min-height: 13.5rem;
+  max-height: min(46vh, 24rem);
+}
+
+.mc-live-ops__orb-stage[data-load='critical'] {
+  flex: 0 1 52%;
+  min-height: 15.5rem;
+  max-height: min(54vh, 28rem);
 }
 
 .mc-live-ops__orb-visual {
@@ -121,6 +149,63 @@
   width: min(72vw, 16rem);
   height: min(72vw, 16rem);
   max-width: 100%;
+  transition:
+    width 280ms ease,
+    height 280ms ease,
+    transform 280ms ease;
+}
+
+/* Plate load scales the orb — idle compact, busy present, critical assertive. */
+.mc-live-ops__orb-stage[data-load='idle'] :deep(.kairo-galaxy-orb__trigger) {
+  width: min(64vw, 13.5rem);
+  height: min(64vw, 13.5rem);
+}
+
+.mc-live-ops__orb-stage[data-load='busy'] :deep(.kairo-galaxy-orb__trigger) {
+  width: min(72vw, 16rem);
+  height: min(72vw, 16rem);
+}
+
+.mc-live-ops__orb-stage[data-load='critical'] :deep(.kairo-galaxy-orb__trigger) {
+  width: min(78vw, 18rem);
+  height: min(78vw, 18rem);
+  transform: scale(1.02);
+}
+
+.mc-live-ops__orb-stage[data-load='critical'] {
+  border-color: rgba(255, 140, 90, 0.45);
+  box-shadow:
+    inset 0 -3.5rem 3rem rgba(60, 20, 0, 0.28),
+    0 0 1.5rem rgba(255, 120, 60, 0.18);
+}
+
+.mc-live-ops__orb-stage[data-load='busy']::before,
+.mc-live-ops__orb-stage[data-load='critical']::before {
+  animation: mc-orb-ring-pulse 2.4s ease-in-out infinite;
+}
+
+.mc-live-ops__orb-stage[data-load='critical']::before {
+  border-color: rgba(255, 160, 90, 0.28);
+  animation-duration: 1.6s;
+}
+
+@keyframes mc-orb-ring-pulse {
+  0%,
+  100% {
+    opacity: 0.55;
+    transform: scale(0.98);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.03);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mc-live-ops__orb-stage[data-load='busy']::before,
+  .mc-live-ops__orb-stage[data-load='critical']::before {
+    animation: none;
+  }
 }
 
 .mc-live-ops__orb-labels {
@@ -180,7 +265,7 @@
   gap: 0.5rem;
   flex: 1 1 auto;
   min-height: 0;
-  overflow: hidden;
+  overflow: visible;
 }
 
 .mc-live-ops__modes {
@@ -270,6 +355,9 @@
   display: grid;
   gap: 0.35rem;
   flex: 0 0 auto;
+  position: sticky;
+  bottom: 0;
+  z-index: 3;
   margin-top: auto;
   padding: 0.45rem 0.5rem;
   border: 1px solid rgba(80, 220, 255, 0.38);

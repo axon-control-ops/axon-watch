@@ -17,7 +17,12 @@ from app.project_contract.loader import (  # noqa: E402
     load_project_contract,
     resolve_default_contract,
 )
-from app.workspace_agents.diff_policy import evaluate_changed_paths, evaluate_diff_texts  # noqa: E402
+from app.workspace_agents.diff_policy import (  # noqa: E402
+    evaluate_changed_paths,
+    evaluate_diff_texts,
+    normalize_rel_path,
+    path_allowed,
+)
 from app.workspace_agents.verifier_checks import (  # noqa: E402
     evaluate_acceptance,
 )
@@ -97,6 +102,22 @@ class Gate6DiffPolicyTests(unittest.TestCase):
         )
         self.assertTrue(any(f.code == "secret" for f in secret_findings))
 
+    def test_normalize_preserves_dot_directories(self) -> None:
+        self.assertEqual(normalize_rel_path("./.cursor/mcp.json"), ".cursor/mcp.json")
+        self.assertEqual(
+            normalize_rel_path("./.github/workflows/fast-gate.yml"),
+            ".github/workflows/fast-gate.yml",
+        )
+        # Regression: str.lstrip('./') wrongly yields cursor/... and github/...
+        self.assertNotEqual(normalize_rel_path(".cursor/mcp.json"), "cursor/mcp.json")
+        self.assertTrue(path_allowed(".github/workflows/fast-gate.yml", [".github/"]))
+        findings = evaluate_changed_paths(
+            [".github/workflows/fast-gate.yml", "./docs/ops/note.md"],
+            allowed_paths=[".github/", "docs/"],
+            forbidden_path_globs=[],
+        )
+        self.assertEqual(findings, [])
+
 
 class Gate6VerifierCheckEvalTests(unittest.TestCase):
     def test_failed_check_or_secret_blocks_acceptance(self) -> None:
@@ -148,6 +169,21 @@ class Gate6VerifierCheckEvalTests(unittest.TestCase):
             path_to_text={"apps/console-web/src/App.vue": "export const ok = true"},
         )
         self.assertTrue(passed.passed)
+
+        # Runtime MCP rewrite must not fail policy even if still in the dirty list.
+        cursor_only = evaluate_acceptance(
+            contract={
+                **contract,
+                "allowed_paths": ["apps/", "services/", "docs/", ".github/"],
+            },
+            check_results={
+                "lint": {"passed": True, "output_excerpt": "ok"},
+                "test": {"passed": True, "output_excerpt": "ok"},
+            },
+            changed_paths=[".cursor/mcp.json", "docs/ops/agent-reports/note.md"],
+            path_to_text={".cursor/mcp.json": '{"mcpServers":{}}'},
+        )
+        self.assertTrue(cursor_only.passed, cursor_only.summary)
 
     def test_implementer_cannot_act_as_verifier(self) -> None:
         contract = load_project_contract(resolve_default_contract(REPO_ROOT))

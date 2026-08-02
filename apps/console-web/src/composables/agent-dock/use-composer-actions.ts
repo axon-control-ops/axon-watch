@@ -134,18 +134,10 @@ export function useComposerActions(options: UseComposerActionsOptions) {
     return applied.routed;
   }
 
-  const handleApproveRun = (): void => {
-    void shell.approveIdeAgentRun();
-  };
-  const handleRejectRun = (): void => {
-    void shell.rejectIdeAgentRun();
-  };
-  const handleStopRun = (): void => {
-    void shell.stopIdeAgentRun();
-  };
-  const handleResumeRun = (): void => {
-    void shell.resumeIdeAgentRun();
-  };
+  const handleApproveRun = (): void => { void shell.approveIdeAgentRun(); };
+  const handleRejectRun = (): void => { void shell.rejectIdeAgentRun(); };
+  const handleStopRun = (): void => { void shell.stopIdeAgentRun(); };
+  const handleResumeRun = (): void => { void shell.resumeIdeAgentRun(); };
   const toggleVoiceCapture = (): void => {
     if (speechCapture.capturing.value) {
       stopVoiceCapture();
@@ -158,6 +150,7 @@ export function useComposerActions(options: UseComposerActionsOptions) {
     debugReproduceActive,
     activeDebugReproduceMessageId,
     handleDebugReproduceProceed,
+    handleDebugReproduceResolved,
   } = useDebugReproduceActions({
     shell,
     composerMode,
@@ -484,6 +477,7 @@ export function useComposerActions(options: UseComposerActionsOptions) {
     handleApproveRun,
     handleComposerKeydown,
     handleDebugReproduceProceed,
+    handleDebugReproduceResolved,
     handleRejectRun,
     handleResumeRun,
     handleSteer,

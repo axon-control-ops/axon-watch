@@ -112,6 +112,37 @@ class CliRuntimeAuthHealTests(unittest.TestCase):
                 runtime_auth_blocks_auto_start("workspace_axon_watch", "backend")
             )
 
+    def test_billing_block_gate_skips_unpaid_invoice_roles(self) -> None:
+        from app.workspace_agents.scheduler_auto_start_gates import (
+            billing_block_blocks_auto_start,
+        )
+
+        with patch(
+            "app.workspace_agents.scheduler_auto_start_gates.latest_role_run_outcome",
+            return_value={
+                "outcome": "failed",
+                "detail": (
+                    "Lane B agent fallback reply generated "
+                    "(ActionRequiredError: You have an unpaid invoice Visit "
+                    "cursor.com/dashboard and pay your invoice in Stripe to resume requests.)"
+                ),
+            },
+        ):
+            self.assertTrue(
+                billing_block_blocks_auto_start("workspace_axon_watch", "integrations")
+            )
+
+        with patch(
+            "app.workspace_agents.scheduler_auto_start_gates.latest_role_run_outcome",
+            return_value={
+                "outcome": "failed",
+                "detail": "verify:contracts — assertion failed",
+            },
+        ):
+            self.assertFalse(
+                billing_block_blocks_auto_start("workspace_axon_watch", "integrations")
+            )
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import time
 from typing import Any
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
@@ -31,6 +32,23 @@ def _github_forbidden_detail(*, status_code: int, target: str, body: str = "", h
     )
 
 
+def _exception_text(exc: BaseException) -> str:
+    parts = [str(exc)]
+    if isinstance(exc, URLError) and getattr(exc, "reason", None) is not None:
+        parts.append(str(exc.reason))
+    return " ".join(parts).lower()
+
+
+def _is_transient_dns_failure(exc: BaseException) -> bool:
+    """True for resolver blips (EAI_AGAIN / Errno -3), not permanent NXDOMAIN."""
+    text = _exception_text(exc)
+    return (
+        "temporary failure in name resolution" in text
+        or "errno -3" in text
+        or "eai_again" in text
+    )
+
+
 def check_http_health(
     *,
     url: str,
@@ -38,6 +56,7 @@ def check_http_health(
     expect_status: int = 200,
     expect_json_status: str | None = None,
     headers: dict[str, str] | None = None,
+    retries: int = 2,
 ) -> tuple[str, str]:
     """Probe one URL and return (status, detail).
 
@@ -55,30 +74,60 @@ def check_http_health(
     if headers:
         request_headers.update({str(k): str(v) for k, v in headers.items() if str(k).strip()})
 
+    attempts = max(1, int(retries) + 1)
     response_headers = None
-    try:
-        request = Request(target, headers=request_headers, method="GET")
-        with urlopen(request, timeout=max(0.5, float(timeout_seconds))) as response:
-            status_code = int(response.status)
-            response_headers = response.headers
-            body = response.read(8192).decode("utf-8", errors="replace")
-    except HTTPError as exc:
-        status_code = int(exc.code)
-        response_headers = exc.headers
-        body = exc.read(8192).decode("utf-8", errors="replace") if exc.fp else ""
-        github_detail = _github_forbidden_detail(
-            status_code=status_code,
-            target=target,
-            body=body,
-            headers=response_headers,
-        )
-        if github_detail:
-            return "warning", github_detail
-        if status_code >= 500:
-            return "critical", f"HTTP {status_code} from {target}"
-        return "warning", f"HTTP {status_code} from {target}"
-    except (TimeoutError, URLError, OSError, ValueError) as exc:
-        return "critical", f"HTTP health probe failed: {exc}"
+    body = ""
+    status_code = 0
+    last_dns_exc: BaseException | None = None
+
+    for attempt in range(attempts):
+        try:
+            request = Request(target, headers=request_headers, method="GET")
+            with urlopen(request, timeout=max(0.5, float(timeout_seconds))) as response:
+                status_code = int(response.status)
+                response_headers = response.headers
+                body = response.read(8192).decode("utf-8", errors="replace")
+            break
+        except HTTPError as exc:
+            status_code = int(exc.code)
+            response_headers = exc.headers
+            body = exc.read(8192).decode("utf-8", errors="replace") if exc.fp else ""
+            github_detail = _github_forbidden_detail(
+                status_code=status_code,
+                target=target,
+                body=body,
+                headers=response_headers,
+            )
+            if github_detail:
+                return "warning", github_detail
+            if status_code >= 500:
+                return "critical", f"HTTP {status_code} from {target}"
+            return "warning", f"HTTP {status_code} from {target}"
+        except (TimeoutError, URLError, OSError, ValueError) as exc:
+            if _is_transient_dns_failure(exc):
+                last_dns_exc = exc
+                if attempt + 1 < attempts:
+                    time.sleep(min(5.0, 1.5 * (attempt + 1)))
+                    continue
+                return (
+                    "warning",
+                    (
+                        f"HTTP health probe DNS temporarily failed for {target}: {exc} — "
+                        "local name resolution blip, not a confirmed upstream outage"
+                    ),
+                )
+            return "critical", f"HTTP health probe failed: {exc}"
+    else:
+        # Exhausted DNS retries without break (defensive; loop returns above).
+        if last_dns_exc is not None:
+            return (
+                "warning",
+                (
+                    f"HTTP health probe DNS temporarily failed for {target}: {last_dns_exc} — "
+                    "local name resolution blip, not a confirmed upstream outage"
+                ),
+            )
+        return "critical", f"HTTP health probe failed for {target}"
 
     expected = int(expect_status)
     if status_code != expected:

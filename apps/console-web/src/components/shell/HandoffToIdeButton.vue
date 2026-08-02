@@ -57,6 +57,6 @@ async function handleHandoff(): Promise<void> {
     :disabled="pending || shell.handoffMutationState === 'submitting'"
     @click.stop="handleHandoff"
   >
-    {{ pending || shell.handoffMutationState === 'submitting' ? 'Handing off…' : 'Continue in IDE' }}
+    {{ pending || shell.handoffMutationState === 'submitting' ? 'Handing off…' : 'Investigate in IDE' }}
   </button>
 </template>

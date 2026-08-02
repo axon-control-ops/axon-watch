@@ -30,8 +30,10 @@ class KairoConversationSmalltalkTests(unittest.TestCase):
     def test_converse_self_intro_returns_vaxon_identity(self, *_mocks: object) -> None:
         payload = converse_turn(content="tell me about yourself", session_id="intro-session")
         self.assertEqual("open_question", payload["turn_kind"])
-        self.assertIn("VAXON", str(payload["reply"]))
-        self.assertRegex(str(payload["reply"]).lower(), r"runtime|control plane|workspace")
+        reply = str(payload["reply"])
+        # Spoken delivery may render VAXON as "Vekson".
+        self.assertRegex(reply, r"VAXON|Vekson")
+        self.assertRegex(reply.lower(), r"chief of staff|executive intelligence|control plane|workspace|runtime")
 
 
 if __name__ == "__main__":

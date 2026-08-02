@@ -46,12 +46,18 @@ def _format_employee_line(row: dict[str, Any], *, detail: bool) -> str:
             bits.append(f"; id: {employee_id}")
         if last_outcome == "failed" and last_detail:
             from app.workspace_agents.failure_detail import (
+                is_billing_block_failure,
                 is_usage_limit_failure,
                 normalize_operator_failure_detail,
             )
 
             cleaned_detail = normalize_operator_failure_detail(last_detail)
-            if is_usage_limit_failure(cleaned_detail):
+            if is_billing_block_failure(cleaned_detail):
+                bits.append(
+                    "; last job failed: Cursor unpaid invoice "
+                    "(pay invoice at cursor.com/dashboard — not a code-repair task)"
+                )
+            elif is_usage_limit_failure(cleaned_detail):
                 bits.append(
                     "; last job failed: Cursor usage signal "
                     "(do not claim teammates are account-wide exhausted — "

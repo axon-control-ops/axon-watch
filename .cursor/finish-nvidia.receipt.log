@@ -1,0 +1,185 @@
+rebo
+Setting up libglx-nvidia0:amd64 (550.163.01-5.1)…
+Setting up nvidia-kernel-support (550.163.01-5.1)…
+Setting up xserver-xorg-video-nvidia (550.163.01-5.1)…
+Configuring xserver-xorg-video-nvidia
+-------------------------------------
+
+Conflicting nouveau kernel module loaded
+
+The free nouveau kernel module is currently loaded and conflicts with the 
+non-free nvidia kernel module.
+
+The easiest way to fix this is to reboot the machine once the installation 
+has finished.
+
+Setting up nvidia-vdpau-driver:amd64 (550.163.01-5.1)…
+Setting up libgl1-nvidia-glvnd-glx:amd64 (550.163.01-5.1)…
+Setting up libegl-nvidia0:amd64 (550.163.01-5.1)…
+Setting up nvidia-driver-bin (550.163.01-5.1)…
+Setting up nvidia-egl-icd:amd64 (550.163.01-5.1)…
+Setting up nvidia-driver-libs:amd64 (550.163.01-5.1)…
+Processing triggers for nvidia-alternative (550.163.01-5.1)…
+update-alternatives: updating alternative /usr/lib/nvidia/current because link group nvidia has changed slave links
+Setting up nvidia-kernel-dkms (550.163.01-5.1)…
+Loading new nvidia-current/550.163.01 DKMS files...
+Building for 6.18.12+kali-amd64, 6.19.11+kali-amd64 and 6.19.14+kali-amd64
+
+Building initial module nvidia-current/550.163.01 for 6.18.12+kali-amd64
+Sign command: /lib/modules/6.18.12+kali-amd64/build/scripts/sign-file
+Signing key: /var/lib/dkms/mok.key
+Public certificate (MOK): /var/lib/dkms/mok.pub
+
+Building module(s)......................... done.
+Signing module /var/lib/dkms/nvidia-current/550.163.01/build/nvidia.ko
+Signing module /var/lib/dkms/nvidia-current/550.163.01/build/nvidia-modeset.ko
+Signing module /var/lib/dkms/nvidia-current/550.163.01/build/nvidia-drm.ko
+Signing module /var/lib/dkms/nvidia-current/550.163.01/build/nvidia-uvm.ko
+Signing module /var/lib/dkms/nvidia-current/550.163.01/build/nvidia-peermem.ko
+Installing /lib/modules/6.18.12+kali-amd64/updates/dkms/nvidia-current.ko.xz
+Installing /lib/modules/6.18.12+kali-amd64/updates/dkms/nvidia-current-modeset.ko.xz
+Installing /lib/modules/6.18.12+kali-amd64/updates/dkms/nvidia-current-drm.ko.xz
+Installing /lib/modules/6.18.12+kali-amd64/updates/dkms/nvidia-current-uvm.ko.xz
+Installing /lib/modules/6.18.12+kali-amd64/updates/dkms/nvidia-current-peermem.ko.xz
+Running depmod..... done.
+
+Building initial module nvidia-current/550.163.01 for 6.19.11+kali-amd64
+Sign command: /lib/modules/6.19.11+kali-amd64/build/scripts/sign-file
+Signing key: /var/lib/dkms/mok.key
+Public certificate (MOK): /var/lib/dkms/mok.pub
+
+Building module(s)............................... done.
+Signing module /var/lib/dkms/nvidia-current/550.163.01/build/nvidia.ko
+Signing module /var/lib/dkms/nvidia-current/550.163.01/build/nvidia-modeset.ko
+Signing module /var/lib/dkms/nvidia-current/550.163.01/build/nvidia-drm.ko
+Signing module /var/lib/dkms/nvidia-current/550.163.01/build/nvidia-uvm.ko
+Signing module /var/lib/dkms/nvidia-current/550.163.01/build/nvidia-peermem.ko
+Installing /lib/modules/6.19.11+kali-amd64/updates/dkms/nvidia-current.ko.xz
+Installing /lib/modules/6.19.11+kali-amd64/updates/dkms/nvidia-current-modeset.ko.xz
+Installing /lib/modules/6.19.11+kali-amd64/updates/dkms/nvidia-current-drm.ko.xz
+Installing /lib/modules/6.19.11+kali-amd64/updates/dkms/nvidia-current-uvm.ko.xz
+Installing /lib/modules/6.19.11+kali-amd64/updates/dkms/nvidia-current-peermem.ko.xz
+Running depmod............... done.
+
+Building initial module nvidia-current/550.163.01 for 6.19.14+kali-amd64
+Sign command: /lib/modules/6.19.14+kali-amd64/build/scripts/sign-file
+Signing key: /var/lib/dkms/mok.key
+Public certificate (MOK): /var/lib/dkms/mok.pub
+
+Building module(s)....................................... done.
+Signing module /var/lib/dkms/nvidia-current/550.163.01/build/nvidia.ko
+Signing module /var/lib/dkms/nvidia-current/550.163.01/build/nvidia-modeset.ko
+Signing module /var/lib/dkms/nvidia-current/550.163.01/build/nvidia-drm.ko
+Signing module /var/lib/dkms/nvidia-current/550.163.01/build/nvidia-uvm.ko
+Signing module /var/lib/dkms/nvidia-current/550.163.01/build/nvidia-peermem.ko
+Installing /lib/modules/6.19.14+kali-amd64/updates/dkms/nvidia-current.ko.xz
+Installing /lib/modules/6.19.14+kali-amd64/updates/dkms/nvidia-current-modeset.ko.xz
+Installing /lib/modules/6.19.14+kali-amd64/updates/dkms/nvidia-current-drm.ko.xz
+Installing /lib/modules/6.19.14+kali-amd64/updates/dkms/nvidia-current-uvm.ko.xz
+Installing /lib/modules/6.19.14+kali-amd64/updates/dkms/nvidia-current-peermem.ko.xz
+Running depmod................ done.
+Setting up nvidia-driver (550.163.01-5.1)…
+Processing triggers for initramfs-tools (0.150)…
+update-initramfs: Generating /boot/initrd.img-6.19.14+kali-amd64
+Processing triggers for libc-bin (2.42-13)…
+Processing triggers for update-glx (1.2.2)…
+Processing triggers for glx-alternative-nvidia (1.2.2)…
+update-alternatives: using /usr/lib/nvidia to provide /usr/lib/glx (glx) in auto mode
+Processing triggers for glx-alternative-mesa (1.2.2)…
+Processing triggers for libc-bin (2.42-13)…
+Processing triggers for initramfs-tools (0.150)…
+update-initramfs: Generating /boot/initrd.img-6.19.14+kali-amd64
+[finish-nvidia] ensure packages present
+Reading package lists...
+Building dependency tree...
+Reading state information...
+nvidia-driver is already the newest version (550.163.01-5.1).
+nvidia-driver-libs is already the newest version (550.163.01-5.1).
+nvidia-kernel-dkms is already the newest version (550.163.01-5.1).
+nvidia-kernel-dkms set to manually installed.
+nvidia-driver-bin is already the newest version (550.163.01-5.1).
+nvidia-driver-bin set to manually installed.
+Solving dependencies...
+0 upgraded, 0 newly installed, 0 to remove and 1424 not upgraded.
+[finish-nvidia] initramfs
+update-initramfs: Generating /boot/initrd.img-6.19.14+kali-amd64
+[finish-nvidia] results
+ii  libnvidia-ml1:amd64 550.163.01-5.1 amd64        NVIDIA Management Library (NVML) runtime library
+ii  nvidia-driver       550.163.01-5.1 amd64        NVIDIA metapackage
+ii  nvidia-driver-bin   550.163.01-5.1 amd64        NVIDIA driver support binaries
+ii  nvidia-kernel-dkms  550.163.01-5.1 amd64        NVIDIA binary kernel module DKMS source
+nvidia-current/550.163.01, 6.18.12+kali-amd64, x86_64: installed
+nvidia-current/550.163.01, 6.19.11+kali-amd64, x86_64: installed
+nvidia-current/550.163.01, 6.19.14+kali-amd64, x86_64: installed
+ls: cannot access '/usr/bin/nvidia-smi': No such file or directory
+[finish-nvidia] nvidia module not built yet
+[finish-nvidia] DONE 2026-08-01T15:21:11+02:00 — reboot required
+EXIT:0
+Reading package lists...
+Building dependency tree...
+Reading state information...
+Solving dependencies...
+The following NEW packages will be installed:
+  nvidia-smi
+0 upgraded, 1 newly installed, 0 to remove and 1424 not upgraded.
+Need to get 475 kB of archives.
+After this operation, 1,260 kB of additional disk space will be used.
+Get:1 http://kali.download/kali kali-rolling/non-free amd64 nvidia-smi amd64 550.163.01-5.1 [475 kB]
+debconf: unable to initialize frontend: Dialog
+debconf: (Dialog frontend will not work on a dumb terminal, an emacs shell buffer, or without a controlling terminal.)
+debconf: falling back to frontend: Readline
+debconf: unable to initialize frontend: Readline
+debconf: (This frontend requires a controlling tty.)
+debconf: falling back to frontend: Teletype
+debconf: unable to initialize frontend: Teletype
+debconf: (This frontend requires a controlling tty.)
+debconf: falling back to frontend: Noninteractive
+Fetched 475 kB in 1s (455 kB/s)
+Selecting previously unselected package nvidia-smi.
+(Reading database… 
+(Reading database… 5%
+(Reading database… 10%
+(Reading database… 15%
+(Reading database… 20%
+(Reading database… 25%
+(Reading database… 30%
+(Reading database… 35%
+(Reading database… 40%
+(Reading database… 45%
+(Reading database… 50%
+(Reading database… 55%
+(Reading database… 60%
+(Reading database… 65%
+(Reading database… 70%
+(Reading database… 75%
+(Reading database… 80%
+(Reading database… 85%
+(Reading database… 90%
+(Reading database… 95%
+(Reading database… 100%
+(Reading database… 675697 files and directories currently installed.)
+Preparing to unpack …/nvidia-smi_550.163.01-5.1_amd64.deb…
+Unpacking nvidia-smi (550.163.01-5.1)…
+Setting up nvidia-smi (550.163.01-5.1)…
+Processing triggers for nvidia-alternative (550.163.01-5.1)…
+update-alternatives: updating alternative /usr/lib/nvidia/current because link group nvidia has changed slave links
+Processing triggers for glx-alternative-nvidia (1.2.2)…
+Processing triggers for glx-alternative-mesa (1.2.2)…
+Processing triggers for update-glx (1.2.2)…
+Processing triggers for libc-bin (2.42-13)…
+Processing triggers for glx-alternative-nvidia (1.2.2)…
+Processing triggers for libc-bin (2.42-13)…
+Processing triggers for initramfs-tools (0.150)…
+update-initramfs: Generating /boot/initrd.img-6.19.14+kali-amd64
+
+Running kernel seems to be up-to-date.
+
+The processor microcode seems to be up-to-date.
+
+No services need to be restarted.
+
+No containers need to be restarted.
+
+No user sessions are running outdated binaries.
+
+No VM guests are running outdated hypervisor (qemu) binaries on this host.
