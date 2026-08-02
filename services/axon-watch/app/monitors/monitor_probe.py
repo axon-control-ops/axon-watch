@@ -146,6 +146,7 @@ def probe_monitor_slice(config: dict[str, object]) -> list[dict[str, object]]:
             expect_status = int(entry.get("expect_status") or 200)
             expect_json_status = str(entry.get("expect_json_status") or "").strip() or None
             timeout_seconds = float(entry.get("timeout_seconds") or 5.0)
+            retries = max(0, int(entry.get("retries") or 2))
             request_headers = _http_health_headers(entry, env, url=url)
             status, detail = check_http_health(
                 url=url,
@@ -153,6 +154,7 @@ def probe_monitor_slice(config: dict[str, object]) -> list[dict[str, object]]:
                 expect_status=expect_status,
                 expect_json_status=expect_json_status,
                 headers=request_headers or None,
+                retries=retries,
             )
         else:
             continue

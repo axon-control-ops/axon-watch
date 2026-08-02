@@ -29,6 +29,15 @@ _axon_contract_path_class() {
   case "${path}" in
     .cursor/*|.axon-si/*) printf 'noise' ;;
     docs/*) printf 'docs' ;;
+    # HTTP health probe slices: keep Gate 6 under the ~300s budget when only
+    # these monitor files change (full suite previously timed out on DNS attend).
+    services/axon-watch/app/monitors/http_health.py|\
+    services/axon-watch/app/monitors/monitor_probe.py|\
+    services/axon-watch/app/monitors/github_probe_headers.py|\
+    tests/test_http_health_monitor.py|\
+    tests/test_github_probe_headers.py|\
+    config/axon-x-monitor-slice.json|\
+    config/dashpro-monitor-slice.json) printf 'http_health' ;;
     scripts/verify/run_contract_unit_tests.sh|\
     services/control-plane/app/workspace_agents/verifier_runner.py|\
     services/control-plane/app/workspace_agents/verifier_checks.py|\
@@ -48,18 +57,23 @@ _axon_contract_path_class() {
 _axon_contract_suite_mode() {
   local path class
   local seen_gate6=0
+  local seen_http_health=0
   local seen_code=0
   while IFS= read -r path; do
     [[ -n "${path}" ]] || continue
     class="$(_axon_contract_path_class "${path}")"
     case "${class}" in
       gate6) seen_gate6=1 ;;
+      http_health) seen_http_health=1 ;;
       code) seen_code=1 ;;
       noise|docs|other) ;;
     esac
   done < <(_axon_contract_dirty_paths)
   if [[ "${seen_code}" -eq 1 ]]; then
     printf 'full'
+  elif [[ "${seen_http_health}" -eq 1 ]]; then
+    # Optional gate6 harness dirtiness rides along with the focused probe suite.
+    printf 'http_health'
   elif [[ "${seen_gate6}" -eq 1 ]]; then
     printf 'gate6'
   else
@@ -80,6 +94,19 @@ if [[ "${AXON_CONTRACT_SUITE_FORCE_FULL:-}" != "1" ]]; then
       python_bin="$(resolve_python "${repo_root}")"
       echo "contract unit tests: Gate 6 path-scope harness only"
       "${python_bin}" -m unittest -v \
+        tests.test_gate6_path_scoped_checks \
+        tests.test_gate6_project_contract \
+        tests.test_gate6_verifier_contract
+      exit $?
+      ;;
+    http_health)
+      source "${repo_root}/scripts/dev/lib/common.sh"
+      "${repo_root}/scripts/dev/ensure-python-deps.sh"
+      python_bin="$(resolve_python "${repo_root}")"
+      echo "contract unit tests: HTTP health probe path-scope"
+      "${python_bin}" -m unittest -v \
+        tests.test_http_health_monitor \
+        tests.test_github_probe_headers \
         tests.test_gate6_path_scoped_checks \
         tests.test_gate6_project_contract \
         tests.test_gate6_verifier_contract
@@ -233,6 +260,8 @@ watch_monitor_tests=(
   tests.test_dashpro_monitor_slice
   tests.test_dashpro_monitor_vault_action
   tests.test_monitor_inbox_integration
+  tests.test_http_health_monitor
+  tests.test_github_probe_headers
 )
 
 watch_dashpro_api_tests=(

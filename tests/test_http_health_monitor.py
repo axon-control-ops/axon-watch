@@ -121,6 +121,60 @@ class HttpHealthMonitorTests(unittest.TestCase):
         self.assertIn("placeholder probe token", detail.lower())
         self.assertIn("not a github outage", detail.lower())
 
+    def test_transient_dns_retries_then_ok(self) -> None:
+        from urllib.error import URLError
+
+        response = MagicMock()
+        response.status = 200
+        response.read.return_value = b"Keep it logically awesome."
+        response.headers = {}
+        response.__enter__.return_value = response
+        response.__exit__.return_value = False
+        calls = {"n": 0}
+
+        def fake_urlopen(*_args, **_kwargs):
+            calls["n"] += 1
+            if calls["n"] == 1:
+                raise URLError("[Errno -3] Temporary failure in name resolution")
+            return response
+
+        with patch.object(self.http_health, "urlopen", side_effect=fake_urlopen):
+            with patch.object(self.http_health.time, "sleep", return_value=None):
+                status, detail = self.http_health.check_http_health(
+                    url="https://api.github.com/zen",
+                    retries=1,
+                )
+        self.assertEqual(2, calls["n"])
+        self.assertEqual("ok", status)
+        self.assertIn("reachable", detail)
+
+    def test_transient_dns_exhausted_is_warning_not_critical(self) -> None:
+        from urllib.error import URLError
+
+        raised = URLError("[Errno -3] Temporary failure in name resolution")
+        with patch.object(self.http_health, "urlopen", side_effect=raised):
+            with patch.object(self.http_health.time, "sleep", return_value=None):
+                status, detail = self.http_health.check_http_health(
+                    url="https://api.github.com/zen",
+                    retries=1,
+                )
+        self.assertEqual("warning", status)
+        self.assertIn("dns temporarily failed", detail.lower())
+        self.assertIn("local name resolution", detail.lower())
+        self.assertNotIn("HTTP health probe failed:", detail)
+
+    def test_non_dns_urlerror_remains_critical(self) -> None:
+        from urllib.error import URLError
+
+        raised = URLError("Connection refused")
+        with patch.object(self.http_health, "urlopen", side_effect=raised):
+            status, detail = self.http_health.check_http_health(
+                url="https://api.github.com/zen",
+                retries=1,
+            )
+        self.assertEqual("critical", status)
+        self.assertIn("HTTP health probe failed:", detail)
+
     def test_probe_slice_injects_github_auth_header(self) -> None:
         captured: dict[str, object] = {}
 
