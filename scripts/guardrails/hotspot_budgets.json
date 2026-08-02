@@ -491,6 +491,13 @@
       "target": "services/control-plane/app/workspace_agents/scheduler_*",
       "note": "Agent scheduler; extract dispatch slices next"
     },
+    "services/control-plane/app/workspace_agents/autonomous_attention.py": {
+      "max_lines": 505,
+      "soft_limit": 350,
+      "hard_limit": 500,
+      "target": "services/control-plane/app/workspace_agents/autonomous_attention_*",
+      "note": "Autonomous attention scan; worker scheduler switch gate added"
+    },
     "apps/console-web/src/components/conversation/ConversationSeamThreadMessage.vue": {
       "max_lines": 537,
       "soft_limit": 350,
