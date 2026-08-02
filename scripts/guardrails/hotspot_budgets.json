@@ -464,11 +464,11 @@
       "note": "Core roster outcome selection; confidence + roster API split to sibling modules"
     },
     "services/control-plane/app/workspace_agents/lead_vaxon_handoff.py": {
-      "max_lines": 454,
+      "max_lines": 195,
       "soft_limit": 350,
       "hard_limit": 500,
       "target": "services/control-plane/app/workspace_agents/lead_vaxon_*",
-      "note": "Lead\u2192VAXON handoffs; message builders in lead_vaxon_messages.py"
+      "note": "Lead\u2192VAXON plan handoffs; ad-hoc flashes in lead_vaxon_adhoc.py; message builders in lead_vaxon_messages.py"
     },
     "services/control-plane/app/workspace_agents/lead_team_checkin.py": {
       "max_lines": 510,
