@@ -110,20 +110,39 @@ def evaluate_acceptance(
     plan = build_check_plan(contract)
     checks = evaluate_check_outputs(plan, results_by_name=check_results, actor=actor)
     findings: list[DiffPolicyFinding] = []
-    if changed_paths is not None:
+    # Runtime rewrites (.cursor/, .axon-si/) must not fail Gate 6 path policy.
+    from app.workspace_agents.verifier_runner import (
+        filter_runtime_noise_paths,
+        is_runtime_noise_path,
+    )
+
+    policy_paths = (
+        filter_runtime_noise_paths(list(changed_paths))
+        if changed_paths is not None
+        else None
+    )
+    if policy_paths is not None:
         effective_allowed = resolve_effective_allowed_paths(
             contract_allowed_paths=contract.get("allowed_paths") or [],
             task_allowed_paths=task_allowed_paths or [],
         )
         findings.extend(
             evaluate_changed_paths(
-                changed_paths,
+                policy_paths,
                 allowed_paths=effective_allowed,
                 forbidden_path_globs=contract.get("forbidden_path_globs") or [],
             )
         )
     if path_to_text:
-        findings.extend(evaluate_diff_texts(path_to_text))
+        findings.extend(
+            evaluate_diff_texts(
+                {
+                    key: value
+                    for key, value in path_to_text.items()
+                    if not is_runtime_noise_path(str(key))
+                }
+            )
+        )
 
     failed_checks = [c.name for c in checks if not c.passed]
     passed = not failed_checks and not findings

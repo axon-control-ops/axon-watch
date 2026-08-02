@@ -289,7 +289,10 @@ function approvalExplanation(): OperatorAlertExplanation {
     </HudSeamCard>
 
     <HudSeamCard
-      v-if="sections === 'all' || sections === 'attention-only'"
+      v-if="
+        (sections === 'all' || sections === 'attention-only') &&
+        (sections !== 'attention-only' || shell.pendingApprovalsCount > 0)
+      "
       seam-id="dock-seam-approvals"
       :title="shell.dockSeamState('approvals')?.title ?? 'Approvals'"
       seam-class="dock-seam dock-seam--approvals"

@@ -23,6 +23,7 @@ from app.persistence import (  # noqa: E402
 )
 from app.workspace_agents.autonomous_attention import (  # noqa: E402
     ATTEND_GOAL_PREFIX,
+    build_autonomy_status_feed,
     collect_handoff_findings,
     enqueue_attend_actions,
     resolve_autonomy_decision,
@@ -433,6 +434,39 @@ class AutonomousAttentionLoopTests(unittest.TestCase):
         tasks = task_store.list_tasks(workspace_id="workspace_axon_watch")
         self.assertEqual(len(tasks), 1)
         self.assertEqual(tasks[0]["risk"], "approved")
+
+    def test_failed_shift_twins_collapse_and_clear_together(self) -> None:
+        first = autonomous_attention_store.append_receipt(
+            kind="failed_shift",
+            decision="escalate",
+            tier="operator_gated",
+            risk="critical",
+            title="Marco (backend) last shift failed",
+            detail="run A",
+            workspace_id="workspace_dashpro",
+            dedupe_key="failed_shift:workspace_dashpro:backend:run_a",
+            ask_operator=True,
+            payload={"owner_role": "backend"},
+        )
+        autonomous_attention_store.append_receipt(
+            kind="failed_shift",
+            decision="escalate",
+            tier="operator_gated",
+            risk="critical",
+            title="Marco (backend) last shift failed",
+            detail="run B",
+            workspace_id="workspace_dashpro",
+            dedupe_key="failed_shift:workspace_dashpro:backend:run_b",
+            ask_operator=True,
+            payload={"owner_role": "backend"},
+        )
+        feed = build_autonomy_status_feed(workspace_id="workspace_dashpro")
+        self.assertEqual(feed["pending_critical_count"], 1)
+        self.assertEqual(len(feed["pending_critical_decisions"]), 1)
+        resolve_autonomy_decision(first["receipt_id"], resolution="rejected")
+        after = build_autonomy_status_feed(workspace_id="workspace_dashpro")
+        self.assertEqual(after["pending_critical_decisions"], [])
+        self.assertEqual(after["pending_critical_count"], 0)
 
 
 if __name__ == "__main__":

@@ -7,6 +7,7 @@ import {
   employeeDockReceiptRunId,
   employeeFailureLine,
   employeeFailureRetryActionLabel,
+  isMissingConfidenceFailure,
   isRuntimeAuthFailure,
   isRuntimeAuthProbeFailure,
   isShiftContinuationFailure,
@@ -84,14 +85,24 @@ export function employeeRetryDraft(employee: CompanyEmployeeRecord): string {
     return (
       `Runtime auth blocked my last shift on ${owns}. After \`cursor agent login\` ` +
       `on the host or /vault unlock, I will retry my bounded continuous shift. ${voiceLock} ` +
-      `Summarize what I changed and include receipts.`
+      `Summarize what I changed and include receipts. End with Confidence: N/10.`
+    );
+  }
+  // Missing Confidence is a close-out formatting gate — retry must not re-do the whole
+  // shift without explicitly requiring the closing line that failed the last run.
+  if (isMissingConfidenceFailure(employee.last_outcome_detail)) {
+    return (
+      `My last shift on ${owns} almost finished, but the closing Critical Review line ` +
+      `was missing so the run was marked failed. Do not restart unrelated work. ` +
+      `Briefly confirm what already landed with receipts, then end the final reply with ` +
+      `exactly one line: Confidence: N/10 (integer 1-10). ${voiceLock}`
     );
   }
   const errorHint = detail ? ` Last error: ${detail}` : '';
   return (
     `My last continuous shift on ${owns} failed.${errorHint} ` +
     `Retry that bounded shift now as me. ${voiceLock} ` +
-    `Summarize what I changed and include receipts.`
+    `Summarize what I changed and include receipts. End with Confidence: N/10.`
   );
 }
 

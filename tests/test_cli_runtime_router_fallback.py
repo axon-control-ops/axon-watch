@@ -116,6 +116,24 @@ class FallbackReplyTests(unittest.TestCase):
         self.assertNotIn("/vault", reply.lower())
         self.assertIn("Check Cursor Usage", reply)
 
+    def test_unpaid_invoice_run_error_points_to_dashboard(self) -> None:
+        reply = _fallback_reply(
+            composer_mode="agent",
+            user_prompt="continue",
+            context_block="ctx",
+            reason=(
+                "ActionRequiredError: You have an unpaid invoice Visit "
+                "cursor.com/dashboard and pay your invoice in Stripe to resume requests."
+            ),
+            failure_phase="run_error",
+            runtime_label="Cursor CLI (local)",
+        )
+        self.assertIn("could not start", reply.lower())
+        self.assertIn("unpaid invoice", reply.lower())
+        self.assertIn("cursor.com/dashboard", reply.lower())
+        self.assertNotIn("/vault", reply.lower())
+        self.assertNotIn("Check Cursor Usage", reply)
+
 
 class DispatchRecursionRecoveryTests(unittest.TestCase):
     def test_recursion_retries_once_without_research_mcp(self) -> None:

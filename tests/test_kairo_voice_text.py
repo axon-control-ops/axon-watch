@@ -55,6 +55,11 @@ class KairoVoiceTextTests(unittest.TestCase):
         self.assertIn("Ta-bo", spoken)
         self.assertNotIn("Thabo", spoken)
 
+    def test_speaks_ide_letter_by_letter(self) -> None:
+        spoken = normalize_spoken_line("Handing this off to the IDE.")
+        self.assertIn("I D E", spoken)
+        self.assertNotRegex(spoken, r"\bIDE\b")
+
 
 if __name__ == "__main__":
     unittest.main()

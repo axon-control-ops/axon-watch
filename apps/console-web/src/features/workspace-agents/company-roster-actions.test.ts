@@ -143,8 +143,20 @@ describe('company-roster-actions', () => {
     expect(employeeRetryDraft(failed)).toMatch(/My last continuous shift on .+ failed/);
     expect(employeeRetryDraft(failed)).not.toMatch(/^I am /);
     expect(employeeRetryDraft(failed)).toContain('vitest: assertion failed');
+    expect(employeeRetryDraft(failed)).toContain('Confidence: N/10');
     expect(employeeRetryDraft(failed).toLowerCase()).toContain('first person');
     expect(employeeChatDraft(failed, 'retry')).toBe(employeeRetryDraft(failed));
+
+    const missingConfidence = employee({
+      status: 'idle',
+      last_outcome: 'failed',
+      last_outcome_detail:
+        'Critical Review Clause missing: final reply must end with Confidence: N/10',
+    });
+    const confidenceRetry = employeeRetryDraft(missingConfidence);
+    expect(confidenceRetry).toContain('closing Critical Review line');
+    expect(confidenceRetry).toContain('Confidence: N/10');
+    expect(confidenceRetry).not.toMatch(/My last continuous shift on .+ failed/);
 
     expect(employeeReceiptsDraft(failed)).toContain('run_failed_abc123');
     expect(employeeReceiptsDraft(failed)).toContain('vitest: assertion failed');

@@ -6,6 +6,7 @@ import re
 from typing import Any
 
 from app.chat.lane_b_agent import LaneBContext, build_lane_b_context_block
+from app.kairo_chief_of_staff import build_chief_of_staff_context_block
 from app.kairo_conversation_reply import build_conversation_facts
 from app.kairo_participant_memory import get_active_participant
 from app.operator_persona_name import OPERATOR_PERSONA_BACKRONYM, OPERATOR_PERSONA_NAME
@@ -67,10 +68,13 @@ def build_runtime_context_block(
         if str(turn.get("content") or "").strip()
     ]
     extras = [
-        "Voice assistant contract (JARVIS-style — proactive):",
-        f"- You are {OPERATOR_PERSONA_NAME} ({OPERATOR_PERSONA_BACKRONYM}) — calm, precise, one step ahead; dry wit, never theatrical.",
+        # Compact reminder only — full charter is in Ask system prompt (avoid double ~7k payload).
+        build_chief_of_staff_context_block(include_full_charter=False),
+        "Voice assistant contract (Chief of Staff — proactive):",
+        f"- You are {OPERATOR_PERSONA_NAME} ({OPERATOR_PERSONA_BACKRONYM}) — Executive Intelligence / Chief of Staff; calm, precise, one step ahead; dry wit, never theatrical.",
+        "- Obey the VAXON Chief of Staff charter (system prompt + standing block). Delegate specialist implementation; do not role-play as a coding assistant.",
         "- Be proactive: when live state shows risk, degradation, approvals, or a clear next move, lead with it — do not wait to be interrogated.",
-        "- When the operator says REPORT (or status / update / stand-up), deliver a categorized second-brain rollup in plain English: Attention, Work in flight, Fleet, then one Next move. Conversational colleague voice with dry wit — never semicolon dumps, never robotic chrome.",
+        "- Hotword REPORT / theater stand-up is a separate deterministic lane (Attention, Work in flight, Lead rollups, Fleet, Next move) — it does not use this Ask runtime. For freeform brief/status questions that reach this lane, brief only from live facts below; omit unknown charter fields rather than inventing them.",
         "- Never put a count beside Lead (say 'Lead-team plans — four of them', never 'four Lead' / '4 Lead') so speech engines do not glue 'forlead'.",
         "- Speak like a trusted mission partner: acknowledge intent, report live state, recommend the single best next move when facts support it.",
         "- If nothing urgent is true, say so briefly and offer one useful optional check — never invent work.",

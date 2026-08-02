@@ -125,6 +125,13 @@ const showLiveOpsDock = computed(
   padding: 0;
 }
 
+/* Live ops panel scrolls inside the seam body when Machine CEO / transmission expand. */
+.dock-stack--live-ops-only :deep(.dock-seam--live-ops .hud-seam__body > .mc-live-ops) {
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
 .dock-stack--live-ops-only :deep(.mc-live-ops) {
   min-height: 0;
   max-height: 100%;

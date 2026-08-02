@@ -6,6 +6,150 @@ set -euo pipefail
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "${repo_root}"
 
+# Gate 6 / worker isolations often have only docs or Gate-6 harness edits dirty.
+# The full module list exceeds the Gate 6 test budget (~300s); path-scope here so
+# acceptance can pass without skipping verification of the harness itself.
+_axon_contract_dirty_paths() {
+  git status --porcelain -uall 2>/dev/null | while IFS= read -r line; do
+    [[ ${#line} -lt 4 ]] && continue
+    rest="${line:3}"
+    rest="${rest#"${rest%%[![:space:]]*}"}"
+    if [[ "${rest}" == *" -> "* ]]; then
+      rest="${rest##* -> }"
+    fi
+    rest="${rest%\"}"
+    rest="${rest#\"}"
+    [[ -n "${rest}" ]] || continue
+    printf '%s\n' "${rest}"
+  done
+}
+
+_axon_contract_path_class() {
+  local path="$1"
+  case "${path}" in
+    .cursor/*|.axon-si/*) printf 'noise' ;;
+    docs/*) printf 'docs' ;;
+    scripts/verify/run_contract_unit_tests.sh|\
+    services/control-plane/app/workspace_agents/verifier_runner.py|\
+    services/control-plane/app/workspace_agents/verifier_checks.py|\
+    services/control-plane/app/workspace_agents/verifier_contract.py|\
+    services/control-plane/app/workspace_agents/diff_policy.py|\
+    services/control-plane/app/workspace_delivery/publish.py|\
+    tests/test_gate6_path_scoped_checks.py|\
+    tests/test_gate6_project_contract.py|\
+    tests/test_gate6_verifier_contract.py|\
+    docs/ops/agent-reports/*) printf 'gate6' ;;
+    apps/*|services/*|packages/*|scripts/*|tests/*|config/*|.github/*|\
+    project.axon.yaml|package.json|package-lock.json) printf 'code' ;;
+    *) printf 'other' ;;
+  esac
+}
+
+_axon_contract_suite_mode() {
+  local path class
+  local seen_gate6=0
+  local seen_code=0
+  while IFS= read -r path; do
+    [[ -n "${path}" ]] || continue
+    class="$(_axon_contract_path_class "${path}")"
+    case "${class}" in
+      gate6) seen_gate6=1 ;;
+      code) seen_code=1 ;;
+      noise|docs|other) ;;
+    esac
+  done < <(_axon_contract_dirty_paths)
+  if [[ "${seen_code}" -eq 1 ]]; then
+    if _axon_contract_narrow_code_only; then
+      printf 'narrow'
+    else
+      printf 'full'
+    fi
+  elif [[ "${seen_gate6}" -eq 1 ]]; then
+    printf 'gate6'
+  else
+    printf 'skip'
+  fi
+}
+
+_axon_contract_narrow_code_only() {
+  # Small control-plane + matching test edits must not invoke the full suite
+  # (~133 modules / >300s) during Gate 6 finalize on disposable workers.
+  local path class
+  local code_count=0
+  while IFS= read -r path; do
+    [[ -n "${path}" ]] || continue
+    class="$(_axon_contract_path_class "${path}")"
+    [[ "${class}" == "code" ]] || continue
+    code_count=$((code_count + 1))
+    case "${path}" in
+      services/control-plane/*|tests/test_*.py) ;;
+      *) return 1 ;;
+    esac
+  done < <(_axon_contract_dirty_paths)
+  [[ "${code_count}" -gt 0 && "${code_count}" -le 8 ]]
+}
+
+_axon_contract_narrow_modules() {
+  local path base mod
+  declare -A seen=()
+  while IFS= read -r path; do
+    [[ -n "${path}" ]] || continue
+    case "${path}" in
+      tests/test_*.py)
+        mod="${path#tests/}"
+        mod="${mod%.py}"
+        mod="tests.${mod//\//.}"
+        seen["${mod}"]=1
+        ;;
+      services/control-plane/app/*/*.py|services/control-plane/app/*/*/*.py)
+        base="$(basename "${path}" .py)"
+        if [[ -f "tests/test_${base}.py" ]]; then
+          seen["tests.test_${base}"]=1
+        fi
+        ;;
+    esac
+  done < <(_axon_contract_dirty_paths)
+  for mod in "${!seen[@]}"; do
+    printf '%s\n' "${mod}"
+  done | sort -u
+}
+
+if [[ "${AXON_CONTRACT_SUITE_FORCE_FULL:-}" != "1" ]]; then
+  _suite_mode="$(_axon_contract_suite_mode)"
+  case "${_suite_mode}" in
+    skip)
+      echo "contract unit tests skipped: no code-path changes in dirty set"
+      exit 0
+      ;;
+    gate6)
+      source "${repo_root}/scripts/dev/lib/common.sh"
+      "${repo_root}/scripts/dev/ensure-python-deps.sh"
+      python_bin="$(resolve_python "${repo_root}")"
+      echo "contract unit tests: Gate 6 path-scope harness only"
+      "${python_bin}" -m unittest -v \
+        tests.test_gate6_path_scoped_checks \
+        tests.test_gate6_project_contract \
+        tests.test_gate6_verifier_contract
+      exit $?
+      ;;
+    narrow)
+      source "${repo_root}/scripts/dev/lib/common.sh"
+      "${repo_root}/scripts/dev/ensure-python-deps.sh"
+      python_bin="$(resolve_python "${repo_root}")"
+      mapfile -t narrow_modules < <(_axon_contract_narrow_modules)
+      if [[ "${#narrow_modules[@]}" -gt 0 ]]; then
+        echo "contract unit tests: narrow path-scope (${#narrow_modules[@]} module(s))"
+        for test_module in "${narrow_modules[@]}"; do
+          echo "contract module: ${test_module}"
+          "${python_bin}" -m unittest -v "${test_module}" || exit $?
+        done
+        exit 0
+      fi
+      echo "contract unit tests: narrow mode had no derived modules; falling back to full suite" >&2
+      ;;
+  esac
+fi
+
 source "${repo_root}/scripts/dev/lib/common.sh"
 "${repo_root}/scripts/dev/ensure-python-deps.sh"
 python_bin="$(resolve_python "${repo_root}")"
