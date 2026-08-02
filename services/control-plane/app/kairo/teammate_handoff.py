@@ -5,6 +5,7 @@ from __future__ import annotations
 import re
 from typing import Any
 
+from app.kairo.mission_spec import build_mission_spec
 from app.workspace_agents.lead_fan_out import LeadFanOutError, materialize_lead_fan_out
 from app.workspace_agents.lead_task_plan import detect_fan_out_intent
 from app.workspace_agents.teammate_route import (
@@ -40,9 +41,52 @@ _LEAD_DECOMPOSE_HINT_RE = re.compile(
     re.IGNORECASE,
 )
 
+_MISSION_HEADER_RE = re.compile(
+    r"(?im)^\s*(?:#{1,4}\s*)?mission(?:\s+(?:specification|id|title))?\s*(?::|$)",
+)
+_MISSION_FIELD_RE = re.compile(
+    r"(?im)^\s*(?:[-*]\s*)?(?:"
+    r"objective|business context|success criteria|deliverables|constraints|"
+    r"dependencies|recommended specialists|estimated complexity|"
+    r"evidence required|definition of done"
+    r")\s*:",
+)
+_IDENTITY_CHARTER_MARKERS = (
+    re.compile(r"\byou are vaxon\b", re.IGNORECASE),
+    re.compile(r"\bexecutive operating system\b", re.IGNORECASE),
+    re.compile(r"\bchief of staff\b", re.IGNORECASE),
+    re.compile(r"\bcore principles\b", re.IGNORECASE),
+    re.compile(r"\bnon-negotiable rules\b", re.IGNORECASE),
+    re.compile(r"\bautonomy levels\b", re.IGNORECASE),
+    re.compile(r"\bfirst directive\b", re.IGNORECASE),
+)
+
+
+def is_identity_charter_text(task: str) -> bool:
+    """Keep long identity/policy documents out of specialist task routing."""
+    cleaned = str(task or "").strip()
+    if len(cleaned) < 500:
+        return False
+    marker_count = sum(bool(pattern.search(cleaned)) for pattern in _IDENTITY_CHARTER_MARKERS)
+    return marker_count >= 3
+
+
+def is_mission_spec_text(task: str) -> bool:
+    """Recognize explicit Mission Specs without introducing a mission object."""
+    cleaned = str(task or "").strip()
+    if not cleaned:
+        return False
+    if _MISSION_HEADER_RE.search(cleaned):
+        return True
+    return len(_MISSION_FIELD_RE.findall(cleaned)) >= 3
+
 
 def _should_lead_decompose(task: str) -> bool:
-    return detect_fan_out_intent(task) or bool(_LEAD_DECOMPOSE_HINT_RE.search(task))
+    return (
+        is_mission_spec_text(task)
+        or detect_fan_out_intent(task)
+        or bool(_LEAD_DECOMPOSE_HINT_RE.search(task))
+    )
 
 
 def _materialize_lead_action(
@@ -59,10 +103,11 @@ def _materialize_lead_action(
         )
     except (LeadFanOutError, Exception):
         return None
-    return {
+    action: dict[str, object] = {
         "type": "lead_fan_out",
         "target_workspace_id": target_workspace_id,
         "task": task,
+        "plan_id": materialize.get("plan_id"),
         "mode": materialize.get("mode"),
         "tasks": materialize.get("tasks") or [],
         "runs": materialize.get("runs") or [],
@@ -70,6 +115,12 @@ def _materialize_lead_action(
         "receipt": materialize.get("receipt"),
         "plan": materialize.get("plan"),
     }
+    action["mission_spec"] = build_mission_spec(
+        task=task,
+        workspace_id=target_workspace_id,
+        action=action,
+    )
+    return action
 
 
 def build_specialty_task_action(
@@ -81,6 +132,8 @@ def build_specialty_task_action(
     task = str(content or "").strip()
     target_workspace_id = str(workspace_id or "").strip()
     if not task or not target_workspace_id:
+        return None
+    if is_identity_charter_text(task):
         return None
     # Public tunnel repair is a Connectors / Watch control — never a coding handoff.
     from app.kairo_tunnel_intents import detect_public_tunnel_repair_intent
@@ -107,7 +160,7 @@ def build_specialty_task_action(
         return None
     if not decision.should_route or not decision.employee:
         return None
-    return {
+    action: dict[str, object] = {
         "type": "route_employee",
         "target_workspace_id": target_workspace_id,
         "task": task,
@@ -117,6 +170,12 @@ def build_specialty_task_action(
         "routing_receipt": decision.routing_receipt,
         "model_receipt": decision.model_receipt,
     }
+    action["mission_spec"] = build_mission_spec(
+        task=task,
+        workspace_id=target_workspace_id,
+        action=action,
+    )
+    return action
 
 
 def enrich_handoff_with_teammate(
@@ -152,4 +211,9 @@ def enrich_handoff_with_teammate(
     }
 
 
-__all__ = ["build_specialty_task_action", "enrich_handoff_with_teammate"]
+__all__ = [
+    "build_specialty_task_action",
+    "enrich_handoff_with_teammate",
+    "is_identity_charter_text",
+    "is_mission_spec_text",
+]

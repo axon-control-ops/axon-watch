@@ -182,6 +182,11 @@ class TeammateRouteTests(unittest.TestCase):
         assert action is not None
         self.assertEqual("route_employee", action["type"])
         self.assertEqual(priya.employee_id, action["employee_id"])
+        self.assertEqual(
+            "frontend",
+            action["mission_spec"]["recommended_specialists"],
+        )
+        self.assertIn("definition_of_done", action["mission_spec"])
 
     def test_status_text_does_not_build_direct_task_action(self) -> None:
         action = build_specialty_task_action(
@@ -235,6 +240,8 @@ class TeammateRouteEndpointTests(unittest.TestCase):
         self.assertEqual(200, response.status_code)
         action = response.json()["action"]
         self.assertEqual("route_employee", action["type"])
+        self.assertIn("Planned, Mission Specification", response.json()["reply"])
+        self.assertIn("mission_spec", action)
         self.assertEqual(
             "employee-workspace_dashpro-frontend-2",
             action["employee_id"],

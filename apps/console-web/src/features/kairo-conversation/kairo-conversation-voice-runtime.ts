@@ -19,7 +19,6 @@ import {
 import { recordVaxonBriefingInteraction } from '../../lib/vaxon-briefing-interaction';
 import { kairoConversationReply } from './kairo-conversation-state';
 import {
-  RUNTIME_ASSISTANT_CUE_COPY,
   RUNTIME_ASSISTANT_CUE_LINE,
   shouldPrimeRuntimeAssistantCue,
 } from './runtime-assistant-heuristics';
@@ -47,14 +46,16 @@ export function createKairoRuntimeAssistantCue(input: {
     if (!shouldPrimeRuntimeAssistantCue(content)) {
       return;
     }
-    kairoConversationReply.value = RUNTIME_ASSISTANT_CUE_COPY;
+    // Speak a short wait cue only — never overwrite Live Transmission with filler.
+    // Transmission must stay empty/previous until the verified reply lands.
     runtimeCueTimer = globalThis.setTimeout(() => {
       runtimeCueTimer = null;
       if (!input.pending.value) {
         return;
       }
-      kairoConversationReply.value = RUNTIME_ASSISTANT_CUE_COPY;
-      void input.shell.speakKairoConversationLine(RUNTIME_ASSISTANT_CUE_LINE, { operatorPrompt: content });
+      void input.shell.speakKairoConversationLine(RUNTIME_ASSISTANT_CUE_LINE, {
+        operatorPrompt: content,
+      });
     }, RUNTIME_ASSISTANT_CUE_DELAY_MS);
   }
 

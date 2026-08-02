@@ -19,6 +19,10 @@ describe('kairo entity labels', () => {
 
   it('normalizes display copy', () => {
     expect(normalizeKairoCopy("Dash Pro's sitting idle")).toBe("DashPro's sitting idle");
+    expect(normalizeKairoCopy('DashPro C I C D Pipeline failed.')).toBe(
+      'DashPro CI/CD Pipeline failed.',
+    );
+    expect(normalizeKairoCopy('DashPro C I failed.')).toBe('DashPro CI failed.');
   });
 
   it('returns canonical workspace labels', () => {

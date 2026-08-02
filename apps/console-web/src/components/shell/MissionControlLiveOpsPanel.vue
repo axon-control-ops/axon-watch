@@ -31,11 +31,11 @@ import {
   markTransmissionAskAnswered,
 } from '../../lib/vaxon-transmission-reply-state';
 import { useShellStore } from '../../stores/shell';
+import VaxonExecutiveComposer from './VaxonExecutiveComposer.vue';
 
 const shell = useShellStore();
 const { spokenText } = useSpokenUtteranceText();
 const { pending, submitTurn, speechCapture } = useKairoConversation();
-const reply = ref('');
 const autonomyReceipts = ref<AutonomyReceipt[]>([]);
 const autonomyEffective = ref(false);
 let autonomyPoll: ReturnType<typeof setInterval> | null = null;
@@ -142,15 +142,14 @@ const focusedWorkspaceLabel = computed(() => {
   return ws.display_name?.trim() || ws.workspace_id;
 });
 
-async function sendReply(content?: string): Promise<void> {
-  const message = (content ?? reply.value).trim();
+async function sendReply(content: string): Promise<void> {
+  const message = content.trim();
   if (!message || pending.value) {
     return;
   }
   if (content === 'yes' || content === 'not now') {
     markTransmissionAskAnswered(spokenLine.value);
   }
-  reply.value = '';
   await submitTurn(message);
 }
 
@@ -305,34 +304,14 @@ onUnmounted(() => {
       </ul>
     </div>
 
-    <div class="mc-live-ops__reply">
-      <form class="mc-live-ops__reply-form" @submit.prevent="void sendReply()">
-        <button
-          type="button"
-          class="mc-live-ops__mic"
-          :data-live="micLive ? 'true' : 'false'"
-          :disabled="!speechCapture.supported || pending"
-          :title="micLive ? 'Stop listening' : 'Talk to VAXON'"
-          :aria-pressed="micLive"
-          @click="toggleMic"
-        >
-          Mic
-        </button>
-        <input
-          v-model="reply"
-          type="text"
-          autocomplete="off"
-          :placeholder="`Talk to ${OPERATOR_PERSONA_NAME}… or REPORT`"
-          :disabled="pending"
-        >
-        <span class="mc-live-ops__wave" aria-hidden="true">
-          <i /><i /><i /><i /><i />
-        </span>
-        <button type="submit" class="mc-live-ops__send" :disabled="pending || !reply.trim()">
-          {{ pending ? '…' : 'Send' }}
-        </button>
-      </form>
-    </div>
+    <VaxonExecutiveComposer
+      :pending="pending"
+      :mic-live="micLive"
+      :mic-supported="speechCapture.supported"
+      :focused-workspace-label="focusedWorkspaceLabel"
+      @submit="void sendReply($event)"
+      @toggle-mic="toggleMic"
+    />
   </section>
 </template>
 

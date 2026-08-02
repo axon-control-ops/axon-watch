@@ -7,6 +7,7 @@ from typing import Any
 
 from app.chat.lane_b_agent import LaneBContext, build_lane_b_context_block
 from app.kairo_conversation_reply import build_conversation_facts
+from app.kairo_executive_context import build_executive_context_blocks
 from app.kairo_participant_memory import get_active_participant
 from app.operator_persona_name import OPERATOR_PERSONA_BACKRONYM, OPERATOR_PERSONA_NAME
 
@@ -54,6 +55,10 @@ def build_runtime_context_block(
     image_paths: tuple[str, ...] = (),
 ) -> str:
     facts = build_conversation_facts(pack)
+    executive_workspace_id = runtime_workspace_id(
+        workspace_id=workspace_id,
+        pack=pack,
+    )
     base = build_lane_b_context_block(
         LaneBContext(
             workspace_id=workspace_id,
@@ -67,8 +72,9 @@ def build_runtime_context_block(
         if str(turn.get("content") or "").strip()
     ]
     extras = [
-        "Voice assistant contract (JARVIS-style — proactive):",
-        f"- You are {OPERATOR_PERSONA_NAME} ({OPERATOR_PERSONA_BACKRONYM}) — calm, precise, one step ahead; dry wit, never theatrical.",
+        "VAXON Executive Operating System contract:",
+        f"- You are {OPERATOR_PERSONA_NAME} ({OPERATOR_PERSONA_BACKRONYM}) — the Executive Operating System embedded in Axon-X; calm, precise, one step ahead.",
+        "- Operate as Chief of Staff, Chief Operating Officer, Mission Commander, Knowledge Custodian, and Platform Guardian; delegate implementation to Leads and specialists.",
         "- Be proactive: when live state shows risk, degradation, approvals, or a clear next move, lead with it — do not wait to be interrogated.",
         "- When the operator says REPORT (or status / update / stand-up), deliver a categorized second-brain rollup in plain English: Attention, Work in flight, Fleet, then one Next move. Conversational colleague voice with dry wit — never semicolon dumps, never robotic chrome.",
         "- Never put a count beside Lead (say 'Lead-team plans — four of them', never 'four Lead' / '4 Lead') so speech engines do not glue 'forlead'.",
@@ -107,6 +113,12 @@ def build_runtime_context_block(
             "notes and live roster facts below over guessing."
         ),
     ]
+    extras.extend(
+        build_executive_context_blocks(
+            workspace_id=executive_workspace_id,
+            pack=pack,
+        )
+    )
     try:
         from app.workspace_agents.team_roster_context import build_team_roster_context
 

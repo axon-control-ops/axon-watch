@@ -302,20 +302,37 @@ def build_fleet_coach_line(
         return f"Review the ready run in {name}."
 
     if kind == "open_handoff":
-        task = str(fact.get("title") or "the listed task").strip() or "the listed task"
+        raw_task = str(fact.get("title") or "the listed task").strip() or "the listed task"
+        task = " ".join(raw_task.split())
+        if len(task) > 140:
+            task = f"{task[:139].rstrip()}…"
         title_l = task.lower()
         auth_hint = ""
         if "401" in title_l or "unauthorized" in title_l or "github api" in title_l:
-            auth_hint = " Fix GitHub credentials there;"
+            auth_hint = " Restore GitHub credentials in Vault first."
+        # Cross-workspace handoffs are VAXON orchestration work, not "operator go switch tabs".
+        if (
+            "control-plane" in title_l
+            or "axon watch" in name.lower()
+            or "axon-watch" in name.lower()
+        ):
+            return (
+                f"VAXON owns an open {name} handoff: “{task}”."
+                f"{auth_hint} Dispatch or close it with evidence — "
+                "do not recycle stale pause advice."
+            ).strip()
         if cross and focus_label:
             return (
-                f"Handoff to {name} is open — switch there and finish “{task}”."
-                f"{auth_hint} Pause more {focus_label} work until that closes."
-            )
+                f"VAXON owns an open handoff in {name}: “{task}”."
+                f"{auth_hint} Route or close it; keep {focus_label} moving "
+                "on fresh verified work."
+            ).strip()
         if cross:
-            base = f"Handoff to {name} is open — switch there and finish “{task}”."
-            return f"{base}{auth_hint}".rstrip(";") if auth_hint else base
-        return f"Finish the open handoff ticket in {name}: “{task}”."
+            return (
+                f"VAXON owns an open handoff in {name}: “{task}”."
+                f"{auth_hint} Route or close it with evidence."
+            ).strip()
+        return f"VAXON owns the open handoff in {name}: “{task}”."
 
     if kind == "degraded_runtime":
         if fact.get("watch_connected") is False:

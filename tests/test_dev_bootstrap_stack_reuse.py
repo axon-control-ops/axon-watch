@@ -9,12 +9,25 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[1]
 COMMON_SH = REPO_ROOT / "scripts" / "dev" / "lib" / "common.sh"
 UP_SH = REPO_ROOT / "scripts" / "dev" / "up.sh"
+RESTART_SH = REPO_ROOT / "scripts" / "dev" / "restart.sh"
 SOFT_CUTOVER_SH = REPO_ROOT / "scripts" / "ops" / "soft-public-cutover.sh"
 PROXY_SCRIPT = REPO_ROOT / "scripts" / "ops" / "public-origin-proxy.py"
 PROXY_UNIT = REPO_ROOT / "infra" / "systemd" / "user" / "axon-public-origin-proxy.service"
 
 
 class DevBootstrapStackReuseContractTests(unittest.TestCase):
+    def test_restart_suspends_legacy_cutover_ports(self) -> None:
+        restart_script = RESTART_SH.read_text(encoding="utf-8")
+
+        self.assertIn("for port in 7734 7735", restart_script)
+        self.assertIn("axon-public-origin-proxy.service", restart_script)
+        self.assertIn(
+            '"${repo_root}/scripts/dev/up.sh" --force --no-soft-cutover "$@"',
+            restart_script,
+        )
+        self.assertIn("for attempt in 1 2 3", restart_script)
+        self.assertIn("check_health_after_restart", restart_script)
+
     def test_up_sh_checks_health_before_pid_conflicts(self) -> None:
         up_script = UP_SH.read_text(encoding="utf-8")
 

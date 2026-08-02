@@ -268,7 +268,12 @@ def list_recent_handoffs(*, limit: int = 50) -> list[dict[str, Any]]:
 
 
 def list_open_follow_through_handoffs(*, limit: int = 50) -> list[dict[str, Any]]:
-    """Handoffs whose target ticket is missing or still open/leased."""
+    """Handoffs whose target ticket is missing or still actionable (open/leased).
+
+    Terminal target tickets close the handoff for advisory follow-through.
+    Open tickets with exhausted attempt budgets are stuck, not actionable —
+    they must not keep recycling stale Advise / Live Transmission text.
+    """
     from app.persistence import task_store
 
     open_items: list[dict[str, Any]] = []
@@ -282,7 +287,29 @@ def list_open_follow_through_handoffs(*, limit: int = 50) -> list[dict[str, Any]
             continue
         task = task_store.get_task(task_id)
         task_status = str((task or {}).get("status") or "").strip().lower()
-        if task is None or task_status in {"open", "leased"}:
+        if task is None:
+            open_items.append(record)
+            continue
+        if task_status in {"completed", "failed", "cancelled"}:
+            # Keep Advise honest: do not surface finished handoff bodies forever.
+            if status in {"recorded", "routed"}:
+                update_handoff(
+                    str(record.get("handoff_id") or ""),
+                    status="completed" if task_status == "completed" else "closed",
+                )
+            continue
+        if task_status == "leased":
+            open_items.append(record)
+            continue
+        if task_status == "open":
+            try:
+                attempts_used = int(task.get("attempts_used") or 0)
+                attempt_budget = int(task.get("attempt_budget") or 0)
+            except (TypeError, ValueError):
+                attempts_used = 0
+                attempt_budget = 0
+            if attempt_budget > 0 and attempts_used >= attempt_budget:
+                continue
             open_items.append(record)
     return open_items
 
