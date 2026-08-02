@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import time
 from typing import Any
 from urllib.error import HTTPError, URLError
 from urllib.parse import quote
@@ -51,6 +52,7 @@ def check_sentry_recent_issues(
     warning_threshold: int = 10,
     critical_threshold: int = 20,
     timeout_seconds: float = 10,
+    retries: int = 2,
     environment: str | None = None,
     workspace_id: str = "workspace_dashpro",
 ) -> tuple[str, str, list[dict[str, object]]]:
@@ -73,17 +75,35 @@ def check_sentry_recent_issues(
             "User-Agent": "Axon-Watch-DashPro-Monitor/1.0",
         },
     )
-    try:
-        with urlopen(request, timeout=timeout_seconds) as response:
-            status = int(response.status)
-            body = response.read().decode("utf-8", errors="replace")
-    except HTTPError as exc:
-        status = int(exc.code)
-        body = exc.read().decode("utf-8", errors="replace")
-    except (TimeoutError, URLError, OSError) as exc:
-        # Transient network blips stay warning (not critical) so inbox severity
-        # can keep them below Attention thresholds via the shared marker.
-        return "warning", f"Sentry API query failed: {exc}", empty
+    attempts = max(1, int(retries) + 1)
+    timeout = max(1.0, float(timeout_seconds))
+    status = 0
+    body = ""
+    last_exc: Exception | None = None
+    for attempt in range(attempts):
+        try:
+            with urlopen(request, timeout=timeout) as response:
+                status = int(response.status)
+                body = response.read().decode("utf-8", errors="replace")
+            last_exc = None
+            break
+        except HTTPError as exc:
+            status = int(exc.code)
+            body = exc.read().decode("utf-8", errors="replace")
+            last_exc = None
+            break
+        except (TimeoutError, URLError, OSError) as exc:
+            last_exc = exc
+            if attempt + 1 < attempts:
+                # Back off between attempts so transient DNS (EAI_AGAIN) can recover.
+                time.sleep(min(5.0, 1.5 * (attempt + 1)))
+                continue
+            # Transient network blips stay warning (not critical) so inbox severity
+            # can keep them below Attention thresholds via the shared marker.
+            return "warning", f"Sentry API query failed: {exc}", empty
+
+    if last_exc is not None:
+        return "warning", f"Sentry API query failed: {last_exc}", empty
 
     if status == 401:
         return "critical", "Sentry API rejected the auth token", empty

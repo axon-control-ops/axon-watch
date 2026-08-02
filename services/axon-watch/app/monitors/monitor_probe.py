@@ -115,10 +115,12 @@ def probe_monitor_slice(config: dict[str, object]) -> list[dict[str, object]]:
         request_headers: dict[str, str] = {}
         if check_type == "sentry_recent_issues":
             environment = str(entry.get("environment") or "").strip() or None
+            retries = max(0, int(entry.get("retries") or 2))
             status, detail, issues = check_sentry_recent_issues(
                 env=env,
                 environment=environment,
                 workspace_id=workspace_id,
+                retries=retries,
             )
         elif check_type == "posthog_recent_events":
             limit = max(1, int(entry.get("limit") or 1))

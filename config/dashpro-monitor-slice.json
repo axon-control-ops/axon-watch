@@ -9,7 +9,8 @@
       "id": "dashpro_sentry_recent_issues",
       "type": "sentry_recent_issues",
       "service": "Sentry",
-      "environment": "production"
+      "environment": "production",
+      "retries": 2
     },
     {
       "id": "dashpro_posthog_recent_events",
