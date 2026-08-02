@@ -19,7 +19,7 @@ from app.chat.command_intent import (
 )
 from app.cli_runtime.catalog import runtime_status_snapshot
 from app.cli_runtime.recovery import ordered_runtime_candidates
-from app.kairo.mission_spec import format_mission_spec
+from app.kairo.specialty_action_reply import build_specialty_action_reply
 from app.kairo.teammate_handoff import build_specialty_task_action
 from app.kairo.voice_autonomy import resolve_voice_action_tier
 from app.kairo_conversation_reply import (
@@ -328,36 +328,7 @@ def route_voice_turn(
             workspace_id=workspace_id,
         )
         if specialty_action is not None:
-            action_type = str(specialty_action.get("type") or "")
-            mission_spec = specialty_action.get("mission_spec")
-            if action_type == "lead_fan_out":
-                mode = str(specialty_action.get("mode") or "decompose").strip() or "decompose"
-                task_count = len(specialty_action.get("tasks") or [])
-                dispatch_line = (
-                    f"Lead materialized {mode}"
-                    + (f" across {task_count} task(s)" if task_count else "")
-                    + "; the Task Board is opening."
-                )
-                reply = (
-                    f"{format_mission_spec(mission_spec, evidence_state='Dispatched')}\n\n"
-                    f"**Dispatch evidence:** {dispatch_line}"
-                    if isinstance(mission_spec, dict)
-                    else f"Dispatched: {dispatch_line}"
-                )
-                spoken_reply = f"Dispatched: {dispatch_line}"
-            else:
-                employee_name = str(specialty_action.get("employee_name") or "the specialist")
-                employee_role = str(specialty_action.get("employee_role") or "specialist")
-                planned_line = (
-                    f"Routing is prepared for {employee_name}, the {employee_role} specialist."
-                )
-                reply = (
-                    f"{format_mission_spec(mission_spec, evidence_state='Planned')}\n\n"
-                    f"**Next state:** {planned_line}"
-                    if isinstance(mission_spec, dict)
-                    else f"Planned: {planned_line}"
-                )
-                spoken_reply = f"Planned: {planned_line}"
+            reply, spoken_reply = build_specialty_action_reply(specialty_action)
             return VoiceDispatchDecision(
                 lane="ide_handoff",
                 turn_kind="action",

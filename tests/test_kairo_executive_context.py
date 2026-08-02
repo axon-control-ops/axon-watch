@@ -9,6 +9,7 @@ CONTROL_PLANE_ROOT = Path(__file__).resolve().parents[1] / "services" / "control
 sys.path.insert(0, str(CONTROL_PLANE_ROOT))
 
 from app.kairo_executive_context import build_executive_context_blocks  # noqa: E402
+from app.kairo_conversation_runtime_context import build_runtime_context_block  # noqa: E402
 
 
 class KairoExecutiveContextTests(unittest.TestCase):
@@ -96,6 +97,50 @@ class KairoExecutiveContextTests(unittest.TestCase):
         self.assertIn("Current Milestone: unknown — no verified source", block)
         self.assertIn("Recent Missions: unknown — no verified source", block)
         self.assertIn("Repeated Failures: none evidenced", block)
+
+    def test_runtime_context_includes_executive_projection(self) -> None:
+        pack = {
+            "briefing": {
+                "scope": {"workspace_id": "workspace_axon_watch"},
+                "pending_approvals": {"count": 0},
+                "top_signals": [],
+                "active_runs": [],
+                "degraded": {"active": False, "reasons": []},
+                "connectivity": {"watch_connected": True},
+                "next_safe_actions": [],
+                "cli_runtime": {"dispatch_ready": True, "blockers": []},
+            },
+            "workspace": {"workspace_id": "workspace_axon_watch"},
+            "fleet": {},
+        }
+        with (
+            patch(
+                "app.kairo_conversation_runtime_context.build_lane_b_context_block",
+                return_value="Base context",
+            ),
+            patch(
+                "app.kairo_conversation_runtime_context.build_executive_context_blocks",
+                return_value=["ExecutiveIntent:", "- Vision: verified"],
+            ) as executive,
+            patch(
+                "app.kairo_conversation_runtime_context.get_active_participant",
+                return_value=None,
+            ),
+        ):
+            context = build_runtime_context_block(
+                content="Explain the current mission",
+                workspace_id="workspace_axon_watch",
+                pack=pack,
+                session_id="session-eos",
+                recent_turns=[],
+            )
+
+        self.assertIn("VAXON Executive Operating System contract:", context)
+        self.assertIn("ExecutiveIntent:\n- Vision: verified", context)
+        executive.assert_called_once_with(
+            workspace_id="workspace_axon_watch",
+            pack=pack,
+        )
 
 
 if __name__ == "__main__":

@@ -12,6 +12,8 @@ from app.kairo.teammate_handoff import (  # noqa: E402
     _LEAD_DECOMPOSE_HINT_RE,
     _TASK_REQUEST_RE,
     build_specialty_task_action,
+    is_identity_charter_text,
+    is_mission_spec_text,
 )
 from app.kairo_conversation_reply import detect_question_focus  # noqa: E402
 
@@ -70,6 +72,73 @@ class TeammateHandoffWorkAskTests(unittest.TestCase):
         self.assertEqual(action["target_workspace_id"], "workspace_dashpro")
         self.assertEqual(action["mode"], "decompose")
         self.assertEqual(len(action["tasks"]), 2)
+
+    def test_identity_charter_with_incidental_task_verbs_never_routes(self) -> None:
+        charter = (
+            "# VAXON\n"
+            "You are VAXON, the Executive Operating System.\n"
+            "Chief of Staff\n"
+            "Core Principles\n"
+            "Evidence before assumption. Architecture before implementation.\n"
+            "Never perform specialist implementation yourself. Investigate uncertainty.\n"
+            "Non-Negotiable Rules\n"
+            "Never fabricate evidence. Continue improving architecture.\n"
+            "Autonomy Levels\n"
+            "Observe, research, document, plan, delegate, approve reversible work.\n"
+            "First Directive\n"
+            "Study the architecture before changing it.\n"
+        ) * 3
+
+        self.assertTrue(is_identity_charter_text(charter))
+        with patch(
+            "app.kairo.teammate_handoff.route_teammate_decision"
+        ) as route:
+            action = build_specialty_task_action(
+                charter,
+                workspace_id="workspace_axon_watch",
+            )
+
+        self.assertIsNone(action)
+        route.assert_not_called()
+
+    def test_mission_spec_prefers_lead_fan_out_and_attaches_spec(self) -> None:
+        mission = (
+            "Mission Title: Authentication launch\n"
+            "Objective: Build the login UI and session API\n"
+            "Deliverables: Frontend and backend implementation\n"
+            "Evidence Required: Tests and CI receipts"
+        )
+        fake = {
+            "plan_id": "lead-plan-auth",
+            "mode": "decompose",
+            "tasks": [{"task_id": "frontend"}, {"task_id": "backend"}],
+            "runs": [],
+            "deferred": [],
+            "receipt": {"ok": True},
+            "plan": {
+                "items": [
+                    {"goal": "Build login UI", "owner_role": "frontend"},
+                    {"goal": "Build session API", "owner_role": "backend"},
+                ]
+            },
+        }
+
+        self.assertTrue(is_mission_spec_text(mission))
+        with patch(
+            "app.kairo.teammate_handoff.materialize_lead_fan_out",
+            return_value=fake,
+        ) as materialize:
+            action = build_specialty_task_action(
+                mission,
+                workspace_id="workspace_axon_watch",
+            )
+
+        self.assertIsNotNone(action)
+        assert action is not None
+        self.assertEqual("lead_fan_out", action["type"])
+        self.assertEqual("lead-plan-auth", action["mission_spec"]["mission_id"])
+        self.assertIn("frontend", action["mission_spec"]["recommended_specialists"])
+        materialize.assert_called_once()
 
 
 if __name__ == "__main__":
