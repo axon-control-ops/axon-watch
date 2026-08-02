@@ -45,6 +45,52 @@ function clockStamp(date = new Date()): string {
   return `${hh}:${mm}:${ss}`;
 }
 
+const LIVE_RECEIPT_MAX_AGE_MS = 90_000;
+const LIVE_BRIEFING_MAX_AGE_MS = 90_000;
+const CLOSED_RECEIPT_STATUSES = new Set([
+  'completed',
+  'cancelled',
+  'resolved',
+  'rejected',
+  'expired',
+]);
+const LIVE_SIGNAL_STATUSES = new Set(['open', 'watching', 'failed_delivery']);
+const LIVE_EMPLOYEE_FAILURE_STATUSES = new Set(['blocked', 'waiting_approval']);
+
+function isLiveAutonomyReceipt(receipt: LiveOperationsAutonomyReceipt, now: Date): boolean {
+  const status = String(receipt.status || '').trim().toLowerCase();
+  const resolution = String(receipt.resolution || '').trim().toLowerCase();
+  const taskStatus = String(receipt.payload?.task_status || '').trim().toLowerCase();
+  if (
+    CLOSED_RECEIPT_STATUSES.has(status) ||
+    CLOSED_RECEIPT_STATUSES.has(resolution) ||
+    CLOSED_RECEIPT_STATUSES.has(taskStatus)
+  ) {
+    return false;
+  }
+  const createdAt = new Date(String(receipt.created_at || ''));
+  const age = now.getTime() - createdAt.getTime();
+  return !Number.isNaN(createdAt.getTime()) && age >= 0 && age <= LIVE_RECEIPT_MAX_AGE_MS;
+}
+
+function isCurrentBriefing(briefing: OperatorBriefing | null, now: Date): boolean {
+  const generatedAt = new Date(String(briefing?.generated_at || ''));
+  const age = now.getTime() - generatedAt.getTime();
+  return !Number.isNaN(generatedAt.getTime()) && age >= 0 && age <= LIVE_BRIEFING_MAX_AGE_MS;
+}
+
+function isLiveRun(run: RunRecord): boolean {
+  return !new Set(['completed', 'failed', 'cancelled', 'review_ready']).has(
+    String(run.phase || '').trim().toLowerCase(),
+  );
+}
+
+function isLegacyLeadEngagementCopy(text: string): boolean {
+  return /lead(?:-team| team)? plans? (?:are )?ready for vaxon engagement|awaiting engagement/i.test(
+    text,
+  );
+}
+
 function pushItem(
   items: LiveOperationsStreamItem[],
   item: Omit<LiveOperationsStreamItem, 'at'> & { at?: string },
@@ -67,7 +113,9 @@ export function projectLiveOperationsStream(input: {
   autonomyMode?: string | null;
   now?: Date;
 }): LiveOperationsStreamItem[] {
-  const stamp = clockStamp(input.now ?? new Date());
+  const now = input.now ?? new Date();
+  const stamp = clockStamp(now);
+  const briefingIsCurrent = isCurrentBriefing(input.briefing, now);
   const items: LiveOperationsStreamItem[] = [];
   const utterance = getKairoVoiceUtteranceState().text?.trim();
   if (utterance) {
@@ -93,7 +141,10 @@ export function projectLiveOperationsStream(input: {
     });
   }
 
-  for (const receipt of (input.autonomyReceipts ?? []).slice(0, 4)) {
+  for (const receipt of input.autonomyReceipts ?? []) {
+    if (!isLiveAutonomyReceipt(receipt, now)) {
+      continue;
+    }
     const title = String(receipt.title || receipt.detail || receipt.kind || '').trim();
     if (!title) {
       continue;
@@ -109,16 +160,8 @@ export function projectLiveOperationsStream(input: {
     pushItem(items, {
       id: `auton-${receipt.receipt_id || title}`,
       text: truncate(
-        ask
+      ask
           ? `Needs you · ${title}`
-          : resolution === 'approved'
-            ? `Approved · ${title}`
-            : resolution === 'rejected'
-              ? `Rejected · ${title}`
-          : taskStatus === 'completed'
-            ? `Completed · ${title}`
-            : taskStatus === 'failed' || taskStatus === 'cancelled'
-              ? `${taskStatus === 'failed' ? 'Failed' : 'Cancelled'} · ${title}`
           : decision === 'dispatch'
             ? `Dispatched · ${title}`
             : decision === 'escalate'
@@ -128,14 +171,6 @@ export function projectLiveOperationsStream(input: {
       tone:
         ask || String(receipt.risk || '').toLowerCase() === 'critical'
           ? 'critical'
-          : resolution === 'approved'
-            ? 'info'
-            : resolution === 'rejected'
-              ? 'nominal'
-          : taskStatus === 'completed'
-            ? 'nominal'
-            : taskStatus === 'failed' || taskStatus === 'cancelled'
-              ? 'attention'
           : decision === 'dispatch'
             ? 'info'
             : 'attention',
@@ -143,10 +178,13 @@ export function projectLiveOperationsStream(input: {
       agent: 'VAXON',
       at: receiptStamp,
     });
+    if (items.filter((item) => item.kind === 'autonomy').length >= 5) {
+      break;
+    }
   }
 
   const notice = input.briefing?.notice?.trim();
-  if (notice) {
+  if (briefingIsCurrent && notice && !isLegacyLeadEngagementCopy(notice)) {
     pushItem(items, {
       id: 'notice',
       text: truncate(notice),
@@ -157,7 +195,7 @@ export function projectLiveOperationsStream(input: {
     });
   }
   const advise = input.briefing?.advise?.trim();
-  if (advise) {
+  if (briefingIsCurrent && advise && !isLegacyLeadEngagementCopy(advise)) {
     pushItem(items, {
       id: 'advise',
       text: truncate(advise),
@@ -168,9 +206,9 @@ export function projectLiveOperationsStream(input: {
     });
   }
 
-  for (const signal of input.briefing?.top_signals?.slice(0, 2) ?? []) {
+  for (const signal of briefingIsCurrent ? input.briefing?.top_signals?.slice(0, 2) ?? [] : []) {
     const title = String(signal.title || '').trim();
-    if (!title) {
+    if (!title || !LIVE_SIGNAL_STATUSES.has(String(signal.status || '').trim().toLowerCase())) {
       continue;
     }
     const severity = String(signal.severity || '').toLowerCase();
@@ -185,7 +223,7 @@ export function projectLiveOperationsStream(input: {
   }
 
   const run = input.primaryActiveRun;
-  if (run) {
+  if (briefingIsCurrent && run && isLiveRun(run)) {
     const summary = String(run.summary || run.phase || 'active run').trim();
     pushItem(items, {
       id: `run-${run.run_id}`,
@@ -204,7 +242,7 @@ export function projectLiveOperationsStream(input: {
     }
     const agent = name.split(/\s+/)[0]?.toUpperCase() || 'TEAM';
     const failureLine = employeeFailureLine(employee);
-    if (failureLine) {
+    if (failureLine && LIVE_EMPLOYEE_FAILURE_STATUSES.has(employee.status)) {
       pushItem(items, {
         id: `emp-fail-${employee.employee_id}`,
         text: truncate(failureLine),
@@ -244,18 +282,6 @@ export function projectLiveOperationsStream(input: {
         at: stamp,
       });
     }
-  }
-
-  const receipt = input.routingReceipt?.trim();
-  if (receipt) {
-    pushItem(items, {
-      id: 'routing',
-      text: truncate(receipt),
-      tone: 'info',
-      kind: 'routing',
-      agent: 'OPS',
-      at: stamp,
-    });
   }
 
   if (items.length === 0) {

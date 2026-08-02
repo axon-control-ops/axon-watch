@@ -12,6 +12,21 @@ export type KairoConverseTurnKind =
 export type KairoConverseSource = 'template' | 'model' | 'fallback';
 export type KairoConverseAnswerTier = 'fast' | 'deep';
 
+export interface KairoMissionSpec {
+  mission_id: string;
+  mission_title: string;
+  objective: string;
+  business_context: string;
+  success_criteria: string;
+  deliverables: string;
+  constraints: string;
+  dependencies: string;
+  recommended_specialists: string;
+  estimated_complexity: string;
+  evidence_required: string;
+  definition_of_done: string;
+}
+
 export type KairoConverseAction =
   | {
       type: 'handoff_signal';
@@ -31,6 +46,7 @@ export type KairoConverseAction =
       employee_id: string;
       employee_role: string;
       employee_name: string;
+      mission_spec?: KairoMissionSpec;
       routing_receipt?: string | null;
       model_receipt?: Record<string, unknown> | null;
     }
@@ -38,6 +54,8 @@ export type KairoConverseAction =
       type: 'lead_fan_out';
       target_workspace_id: string;
       task: string;
+      plan_id?: string | null;
+      mission_spec?: KairoMissionSpec;
       mode?: string | null;
       tasks?: unknown[];
       runs?: unknown[];

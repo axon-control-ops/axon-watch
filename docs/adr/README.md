@@ -49,6 +49,7 @@ Every numbered ADR must include:
 - [ADR-006: Operator command hero and footer attention](ADR-006-operator-command-hero-and-footer-attention.md)
 - [ADR-007: Operator workbench demotion](ADR-007-operator-workbench-demotion.md) — implementation spec: [`OPERATOR_MISSION_CONTROL_V1.md`](../OPERATOR_MISSION_CONTROL_V1.md)
 - [ADR-008: IDE shell content lock](ADR-008-ide-shell-content-lock.md)
+- [ADR-009: VAXON as the Executive Operating System](ADR-009-vaxon-executive-operating-system.md)
 
 **Planning-only (not yet copied here):**
 

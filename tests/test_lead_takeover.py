@@ -76,7 +76,7 @@ class LeadTakeoverTests(unittest.TestCase):
         self.assertTrue(thread_id)
         messages = chat_store.list_thread_messages(str(thread_id))
         agent_msgs = [m for m in messages if m.get("role") == "agent"]
-        self.assertTrue(any("Lead takeover" in str(m.get("content") or "") for m in agent_msgs))
+        self.assertTrue(any("Lead update" in str(m.get("content") or "") for m in agent_msgs))
         self.assertTrue(
             any("Priya" in str(m.get("content") or "") for m in agent_msgs)
         )
@@ -105,9 +105,8 @@ class LeadTakeoverTests(unittest.TestCase):
         op_msgs = chat_store.list_thread_messages(str(operator["thread_id"]))
         self.assertTrue(
             any(
-                str(m.get("content") or "").startswith("VAXON:")
-                and "run_priya_grad_1" in str(m.get("content") or "")
-                and "Lead summary:" in str(m.get("content") or "")
+                str(m.get("content") or "").startswith("VAXON update")
+                and "Outcome:" in str(m.get("content") or "")
                 for m in op_msgs
                 if m.get("role") == "agent"
             )
@@ -208,8 +207,9 @@ class LeadTakeoverTests(unittest.TestCase):
         messages = chat_store.list_thread_messages(str(takeover.get("thread_id")))
         agent = next(m for m in messages if m.get("role") == "agent")
         content = str(agent.get("content") or "")
-        self.assertIn("Parent ask (sole truth): Push OTA to canary", content)
-        self.assertIn("will not restart it as the mission", content)
+        self.assertIn("Goal: Push OTA to canary", content)
+        self.assertIn("Next action:", content)
+        self.assertNotIn("Ask me what to do next", content)
 
     def test_controlling_plan_ignores_completed_plan_id(self) -> None:
         from app.workspace_agents import lead_plan_store
@@ -298,10 +298,10 @@ class LeadTakeoverTests(unittest.TestCase):
         op_msgs = chat_store.list_thread_messages(str(operator["thread_id"]))
         self.assertTrue(
             any(
-                str(m.get("content") or "").startswith("VAXON:")
+                str(m.get("content") or "").startswith("VAXON update")
                 and "Dana" in str(m.get("content") or "")
                 and "lead" in str(m.get("content") or "").lower()
-                and "run_dana_lead_1" in str(m.get("content") or "")
+                and "Next action:" in str(m.get("content") or "")
                 for m in op_msgs
                 if m.get("role") == "agent"
             )

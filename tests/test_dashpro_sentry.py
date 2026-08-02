@@ -82,6 +82,41 @@ class DashProSentryMonitorTests(unittest.TestCase):
         self.assertIn("Sentry API query failed", detail)
         self.assertEqual([], sample)
 
+
+    def test_transport_failure_retries_before_warning(self) -> None:
+        calls = {"count": 0}
+
+        class _FakeResponse:
+            def __init__(self, status: int, payload):
+                self.status = status
+                self._payload = payload
+
+            def read(self):
+                return json.dumps(self._payload).encode("utf-8")
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, exc_type, exc, tb):
+                return False
+
+        def fake_urlopen(req, timeout=0):
+            calls["count"] += 1
+            if calls["count"] == 1:
+                raise TimeoutError("The read operation timed out")
+            return _FakeResponse(200, [])
+
+        with patch.object(dashpro_sentry, "urlopen", side_effect=fake_urlopen):
+            status, detail, sample = dashpro_sentry.check_sentry_recent_issues(
+                env={"SENTRY_AUTH_TOKEN": "token"},
+                retries=1,
+            )
+
+        self.assertEqual(2, calls["count"])
+        self.assertEqual("ok", status)
+        self.assertIn("zero unresolved production issues", detail)
+        self.assertEqual([], sample)
+
     def test_transport_failure_maps_to_warning_inbox_severity(self) -> None:
         from app.signals.monitor_signal import monitor_inbox_item  # noqa: WPS433
 

@@ -34,6 +34,45 @@ Axon-X (`workspace_axon_watch`) coaches other Leads; child companies own their
 product trees. EduDash Pro marketing site (`edudashpro.org.za`) is **DashPro**
 (Dana / Cass / Priya / Soren) — not EDP Excellence.
 
+ADR-009 defines VAXON as the **Executive Operating System** embedded in this
+existing hierarchy. Chief of Staff, Chief Operating Officer, Mission Commander,
+Knowledge Custodian, and Platform Guardian are VAXON responsibilities, not new
+agents. See
+[`ADR-009-vaxon-executive-operating-system.md`](../adr/ADR-009-vaxon-executive-operating-system.md).
+
+Vision-language maps onto the roster without adding roles:
+
+| Mission language | Existing role |
+| --- | --- |
+| Planner | Lead |
+| Researcher | Watcher |
+| React developer | Frontend |
+| Supabase developer | Backend, with Integrations for connectors |
+| Verifier / GitHub | Watcher and Integrations |
+
+## Mission Specification handoff
+
+A mission is exchanged between the operator and VAXON as a **conversation
+artifact**, not a new database object or file-backed engine. Every Mission
+Specification uses:
+
+1. Mission ID
+2. Mission Title
+3. Objective
+4. Business Context
+5. Success Criteria
+6. Deliverables
+7. Constraints
+8. Dependencies
+9. Recommended Specialists
+10. Estimated Complexity
+11. Evidence Required
+12. Definition of Done
+
+VAXON then reuses Lead fan-out or direct specialist routing. Execution reports
+must state their evidence level: `Planned`, `Dispatched`, `Observed`, `Verified`,
+`Completed`, or `Operator Approved`. Dispatch is never described as completion.
+
 ---
 
 ## Lead team check-in (clocked guardrails)
