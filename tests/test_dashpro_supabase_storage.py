@@ -7,7 +7,7 @@ import sys
 import unittest
 from pathlib import Path
 from unittest.mock import patch
-from urllib.error import HTTPError
+from urllib.error import HTTPError, URLError
 
 WATCH_SERVICE_ROOT = Path(__file__).resolve().parents[1] / "services" / "axon-watch"
 _WATCH_PATH = str(WATCH_SERVICE_ROOT)
@@ -152,6 +152,48 @@ class DashProSupabaseStorageMonitorTests(unittest.TestCase):
 
         self.assertEqual("critical", status)
         self.assertIn("402", detail)
+
+    def test_dns_failure_retries_once_then_succeeds(self) -> None:
+        class _FakeResponse:
+            def __init__(self, status: int, payload):
+                self.status = status
+                self._payload = payload
+
+            def read(self):
+                return json.dumps(self._payload).encode("utf-8")
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, exc_type, exc, tb):
+                return False
+
+        rows = [{"bucket_id": "tts-audio", "object_count": 1, "total_bytes": 100_000_000}]
+        calls = {"n": 0}
+
+        def fake_urlopen(req, timeout=0):
+            calls["n"] += 1
+            if "/storage/v1/bucket" in req.full_url:
+                if calls["n"] == 1:
+                    raise URLError("[Errno -3] Temporary failure in name resolution")
+                return _FakeResponse(200, [])
+            if "/rpc/monitor_storage_bucket_usage" in req.full_url:
+                return _FakeResponse(200, rows)
+            raise AssertionError(req.full_url)
+
+        with patch.object(self.dashpro_supabase_storage, "urlopen", side_effect=fake_urlopen):
+            with patch.object(self.dashpro_supabase_storage.time, "sleep", return_value=None):
+                status, detail = self.dashpro_supabase_storage.check_supabase_storage_quota(
+                    env={
+                        "EXPO_PUBLIC_SUPABASE_URL": "https://example.supabase.co",
+                        "SUPABASE_SERVICE_ROLE_KEY": "service-role-key",
+                    },
+                    retries=1,
+                )
+
+        self.assertGreaterEqual(calls["n"], 2)
+        self.assertEqual("ok", status)
+        self.assertIn("tts-audio", detail)
 
     def test_transport_failure_downgrades_to_warning(self) -> None:
         with patch.object(

@@ -72,6 +72,7 @@ export class BrainGalaxyScene {
   private nodeMeshes: NodeMesh[] = [];
   private liveEdges: Line[] = [];
   private animationId = 0;
+  private renderingEnabled = true;
   private layout: BrainGraphLayout3D = { nodes: [], edges: [] };
   private clock = 0;
   private disposed = false;
@@ -185,6 +186,24 @@ export class BrainGalaxyScene {
     if (this.selectedNodeId) {
       this.applySelectionHighlight(this.selectedNodeId);
     }
+  }
+
+  /** Stop or resume the rAF loop (tab hidden / panel off-screen power save). */
+  setRenderingEnabled(enabled: boolean): void {
+    if (this.disposed || this.renderingEnabled === enabled) {
+      return;
+    }
+    this.renderingEnabled = enabled;
+    if (this.controls) {
+      this.controls.autoRotate = enabled;
+    }
+    if (enabled) {
+      cancelAnimationFrame(this.animationId);
+      this.animate();
+      return;
+    }
+    cancelAnimationFrame(this.animationId);
+    this.animationId = 0;
   }
 
   resetView(): void {
@@ -423,13 +442,11 @@ export class BrainGalaxyScene {
   }
 
   private animate = (): void => {
-    if (this.disposed) {
+    if (this.disposed || !this.renderingEnabled) {
+      this.animationId = 0;
       return;
     }
     this.animationId = requestAnimationFrame(this.animate);
-    if (typeof document !== 'undefined' && document.visibilityState === 'hidden') {
-      return;
-    }
     this.clock += 0.016;
 
     if (this.controls) {

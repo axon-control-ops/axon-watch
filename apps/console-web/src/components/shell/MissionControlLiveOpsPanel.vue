@@ -20,16 +20,15 @@ import KairoGalaxyOrb from '../../features/brain-galaxy/KairoGalaxyOrb.vue';
 import { resolveGalaxyPresence } from '../../features/brain-galaxy/galaxy-presence-state';
 import { projectLiveOperationsStream } from '../../features/brain-galaxy/live-operations-stream';
 import { companyBusyEmployeesCount } from '../../features/workspace-agents/company-roster-busy';
+import { fetchMissionControlCriticalWork } from '../../features/mission-control/mission-control-ceo-api';
 import MissionControlAutonomyControl from './MissionControlAutonomyControl.vue';
-import { resolveVaxonTransmissionView } from '../../lib/mc-vaxon-transmission-view';
+import MissionControlCeoCriticalStrip from './MissionControlCeoCriticalStrip.vue';
+import MissionControlMachineCeoStrip from './MissionControlMachineCeoStrip.vue';
+import { useStickyTransmissionAsk } from '../../composables/useStickyTransmissionAsk';
 import {
-  vaxonAffirmReplyCta,
-  vaxonLineAsksForReply,
-} from '../../lib/vaxon-reply-prompt';
-import {
-  isTransmissionAskAnswered,
-  markTransmissionAskAnswered,
-} from '../../lib/vaxon-transmission-reply-state';
+  resolveVaxonTransmissionView,
+  splitTransmissionBody,
+} from '../../lib/mc-vaxon-transmission-view';
 import { useShellStore } from '../../stores/shell';
 
 const shell = useShellStore();
@@ -38,6 +37,7 @@ const { pending, submitTurn, speechCapture } = useKairoConversation();
 const reply = ref('');
 const autonomyReceipts = ref<AutonomyReceipt[]>([]);
 const autonomyEffective = ref(false);
+const plateLoad = ref<'idle' | 'busy' | 'critical'>('idle');
 let autonomyPoll: ReturnType<typeof setInterval> | null = null;
 
 const companyBusyCount = computed(() =>
@@ -102,20 +102,53 @@ const transmission = computed(() =>
 );
 
 const spokenLine = computed(() => transmission.value.body);
-const asksForReply = computed(
-  () =>
-    vaxonLineAsksForReply(spokenLine.value) &&
-    !transmission.value.empty &&
-    !isTransmissionAskAnswered(spokenLine.value),
+const transmissionEmpty = computed(() => transmission.value.empty);
+const {
+  activeAskLine,
+  showReplyActions,
+  needsIntervention,
+  affirmCta,
+  clearStickyAsk,
+} = useStickyTransmissionAsk({
+  spokenLine,
+  transmissionEmpty,
+});
+
+const stickyDisplay = computed(() => {
+  const line = activeAskLine.value;
+  return line ? splitTransmissionBody(line) : null;
+});
+const displaySummary = computed(
+  () => stickyDisplay.value?.summary || transmission.value.summary,
 );
-const affirmCta = computed(() => vaxonAffirmReplyCta(spokenLine.value));
+const displayDetailLines = computed(
+  () => stickyDisplay.value?.detailLines ?? transmission.value.detailLines,
+);
+
+const showTransmissionCard = computed(
+  () =>
+    Boolean(activeAskLine.value) ||
+    !transmission.value.empty ||
+    transmission.value.mode === 'transmitting' ||
+    presencePhase.value === 'thinking' ||
+    presencePhase.value === 'speaking',
+);
 
 const modeChip = computed(() => {
   if (presencePhase.value === 'speaking') return 'speaking';
   if (presencePhase.value === 'listening') return 'listening';
+  if (presencePhase.value === 'thinking') return 'listening';
   if (presencePhase.value === 'autonomous' || fullAutonomyActive.value) return 'autonomous';
   return 'standby';
 });
+
+/** Mode pills only while voice is live — hide after speaking ends (even if AUTO stays on). */
+const showModeStrip = computed(
+  () =>
+    presencePhase.value === 'speaking' ||
+    presencePhase.value === 'listening' ||
+    presencePhase.value === 'thinking',
+);
 
 const liveBadge = computed(
   () =>
@@ -148,7 +181,13 @@ async function sendReply(content?: string): Promise<void> {
     return;
   }
   if (content === 'yes' || content === 'not now') {
-    markTransmissionAskAnswered(spokenLine.value);
+    const ask = activeAskLine.value;
+    clearStickyAsk(ask);
+    // Open Attention instantly — IDE handoff still follows the converse round-trip
+    // (+ ~1.3s filament) when dig-in was armed for this ask.
+    if (content === 'yes' && /\bopen attention\b/i.test(ask || '')) {
+      shell.focusAttentionSidebar();
+    }
   }
   reply.value = '';
   await submitTurn(message);
@@ -178,6 +217,16 @@ async function refreshAutonomyReceipts(): Promise<void> {
       feed.autonomy_mode === shell.operatorPresenceSettings.autonomy_mode;
   } catch {
     // Keep last good receipts; stream falls back to briefing items.
+  }
+  try {
+    const pack = await fetchMissionControlCriticalWork(
+      shell.currentWorkspace?.workspace_id ?? null,
+    );
+    const load = String(pack.plate?.load || 'idle');
+    plateLoad.value =
+      load === 'critical' || load === 'busy' ? load : 'idle';
+  } catch {
+    // Keep last plate load for orb scale.
   }
 }
 
@@ -218,11 +267,16 @@ onUnmounted(() => {
       </p>
     </header>
 
+    <!-- Above the orb so CEO surfaces are never buried under Needs-you sheets. -->
+    <MissionControlMachineCeoStrip />
+    <MissionControlCeoCriticalStrip />
+
     <div
       class="mc-live-ops__orb-stage"
       :data-speaking="shell.kairoSpeechActive ? 'true' : 'false'"
       :data-mode="modeChip"
       :data-autonomy="fullAutonomyActive ? 'armed' : autonomyMode"
+      :data-load="plateLoad"
     >
       <div class="mc-live-ops__orb-visual">
         <KairoGalaxyOrb placement-mode="embedded" />
@@ -237,33 +291,60 @@ onUnmounted(() => {
 
     <div class="mc-live-ops__scroll">
       <article
+        v-if="showTransmissionCard"
         class="mc-transmission"
-        :data-mode="transmission.mode"
+        :data-mode="showReplyActions ? 'locked' : transmission.mode"
+        :data-asking="showReplyActions ? 'true' : 'false'"
+        :data-needs-you="needsIntervention ? 'true' : 'false'"
         :aria-live="transmission.mode === 'transmitting' ? 'polite' : 'off'"
         aria-label="VAXON transmission"
       >
         <header class="mc-transmission__header">
           <span class="mc-transmission__pulse" aria-hidden="true" />
-          <p class="mc-transmission__eyebrow">{{ transmission.eyebrow }}</p>
-          <span class="mc-transmission__badge">{{ transmission.mode }}</span>
+          <p class="mc-transmission__eyebrow">
+            {{ showReplyActions ? 'Live transmission' : transmission.eyebrow }}
+          </p>
+          <span
+            v-if="showReplyActions"
+            class="mc-transmission__badge mc-transmission__badge--needs-you"
+          >
+            Needs you
+          </span>
+          <span v-else class="mc-transmission__badge">{{ transmission.mode }}</span>
+          <div v-if="showReplyActions" class="mc-transmission__actions">
+            <button type="button" :disabled="pending" @click="void sendReply('yes')">
+              {{ affirmCta }}
+            </button>
+            <button type="button" :disabled="pending" @click="void sendReply('not now')">
+              Not now
+            </button>
+          </div>
         </header>
-        <p
-          class="mc-transmission__body"
-          :data-empty="transmission.empty ? 'true' : 'false'"
+        <div
+          class="mc-transmission__float"
+          :data-live="transmission.mode === 'transmitting' && !showReplyActions ? 'true' : 'false'"
         >
-          {{ transmission.body }}
-        </p>
-        <div v-if="asksForReply" class="mc-transmission__actions">
-          <button type="button" :disabled="pending" @click="void sendReply('yes')">
-            {{ affirmCta }}
-          </button>
-          <button type="button" :disabled="pending" @click="void sendReply('not now')">
-            Not now
-          </button>
+          <p
+            :key="displaySummary"
+            class="mc-transmission__body"
+            :data-empty="!showReplyActions && transmission.empty ? 'true' : 'false'"
+          >
+            {{ displaySummary }}
+          </p>
+          <ul v-if="displayDetailLines.length" class="mc-transmission__detail">
+            <li v-for="(line, index) in displayDetailLines" :key="index">
+              {{ line }}
+            </li>
+          </ul>
         </div>
       </article>
 
-      <div class="mc-live-ops__modes" role="status" aria-label="Voice mode">
+      <div
+        v-if="showModeStrip"
+        class="mc-live-ops__modes"
+        role="status"
+        aria-label="Voice mode"
+      >
         <span
           class="mc-live-ops__mode"
           :data-active="modeChip === 'speaking' ? 'true' : 'false'"

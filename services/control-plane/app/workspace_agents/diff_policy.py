@@ -23,8 +23,22 @@ class DiffPolicyFinding:
     detail: str
 
 
+def normalize_rel_path(path: str) -> str:
+    """Strip a leading ``./`` only — never ``str.lstrip('./')``.
+
+    ``lstrip('./')`` eats every leading ``.`` / ``/``, so ``.cursor/mcp.json``
+    becomes ``cursor/mcp.json`` and ``.github/workflows/x.yml`` becomes
+    ``github/workflows/x.yml``. That falsely marks hidden contract paths as
+    out_of_scope during Gate 6 / publish scans.
+    """
+    rel = str(path or "").strip()
+    while rel.startswith("./"):
+        rel = rel[2:]
+    return rel
+
+
 def path_allowed(path: str, allowed_paths: Iterable[str]) -> bool:
-    normalized = path.lstrip("./")
+    normalized = normalize_rel_path(path)
     allowed = list(allowed_paths)
     if not allowed:
         return True
@@ -39,7 +53,7 @@ def normalize_path_prefixes(paths: Iterable[str]) -> list[str]:
     cleaned: list[str] = []
     seen: set[str] = set()
     for raw in paths:
-        prefix = str(raw or "").strip().lstrip("./")
+        prefix = normalize_rel_path(str(raw or "").strip())
         if not prefix:
             continue
         key = prefix.lower()
@@ -88,7 +102,7 @@ def resolve_effective_allowed_paths(
 
 
 def path_forbidden(path: str, forbidden_globs: Iterable[str]) -> bool:
-    normalized = path.lstrip("./")
+    normalized = normalize_rel_path(path)
     for pattern in forbidden_globs:
         if fnmatch(normalized, pattern):
             return True
@@ -119,7 +133,11 @@ def evaluate_changed_paths(
     max_paths: int = 80,
 ) -> list[DiffPolicyFinding]:
     findings: list[DiffPolicyFinding] = []
-    paths = [str(p).lstrip("./") for p in changed_paths if str(p).strip()]
+    paths = [
+        normalize_rel_path(str(p))
+        for p in changed_paths
+        if normalize_rel_path(str(p))
+    ]
     if len(paths) > max_paths:
         findings.append(
             DiffPolicyFinding(

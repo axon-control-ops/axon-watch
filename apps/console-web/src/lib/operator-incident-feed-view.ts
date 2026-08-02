@@ -12,6 +12,10 @@ export type OperatorIncidentFeedItem = {
   summary: string;
   /** One-line layman "what happened" for the operator. */
   plainWhat: string;
+  /** Plain-English next step for the operator. */
+  plainYouDo: string;
+  /** Plain-English agent next step. */
+  plainAgentDo: string;
   severity: 'info' | 'high' | 'critical' | string;
   source: 'signal' | 'fleet';
   workspaceId: string | null;
@@ -49,6 +53,11 @@ function incidentSignalRank(signal: InboxItem): number {
   return severityRank(signal.severity);
 }
 
+/** Collapse inbox twins that share the same operator-facing title. */
+function incidentTitleKey(title: string): string {
+  return title.trim().toLowerCase().replace(/\s+/g, ' ');
+}
+
 export function buildOperatorIncidentFeed(input: {
   topSignals: InboxItem[];
   workspaceId: string | null;
@@ -58,9 +67,10 @@ export function buildOperatorIncidentFeed(input: {
   serverSignalId?: string | null;
   serverReason?: string | null;
 }): OperatorIncidentFeedView {
-  const limit = input.limit ?? 5;
+  const limit = input.limit ?? 8;
   const items: OperatorIncidentFeedItem[] = [];
-  const seen = new Set<string>();
+  const seenIds = new Set<string>();
+  const seenTitles = new Set<string>();
 
   for (const signal of input.topSignals) {
     if (
@@ -70,10 +80,17 @@ export function buildOperatorIncidentFeed(input: {
     ) {
       continue;
     }
-    if (seen.has(signal.signal_id)) {
+    if (seenIds.has(signal.signal_id)) {
       continue;
     }
-    seen.add(signal.signal_id);
+    const titleKey = incidentTitleKey(signal.title || '');
+    if (titleKey && seenTitles.has(titleKey)) {
+      continue;
+    }
+    seenIds.add(signal.signal_id);
+    if (titleKey) {
+      seenTitles.add(titleKey);
+    }
     const explained = resolveOperatorAlertExplanation({
       signalId: signal.signal_id,
       title: signal.title,
@@ -88,6 +105,8 @@ export function buildOperatorIncidentFeed(input: {
       title: signal.title,
       summary: signal.summary?.trim() || 'Open signal needs review.',
       plainWhat: explained.what,
+      plainYouDo: explained.youDo,
+      plainAgentDo: explained.agentDo,
       severity: signal.severity,
       source: 'signal',
       workspaceId: signal.workspace_id ?? null,
@@ -100,11 +119,14 @@ export function buildOperatorIncidentFeed(input: {
     const row = input.fleetHealth.items.find(
       (entry) => entry.workspace_id === input.workspaceId,
     );
+    const fleetTitleKey = incidentTitleKey(row?.top_signal_title || '');
     if (
       row?.top_signal_title &&
       row.open_signals_count > 0 &&
-      !items.some((item) => item.title === row.top_signal_title)
+      fleetTitleKey &&
+      !seenTitles.has(fleetTitleKey)
     ) {
+      seenTitles.add(fleetTitleKey);
       const explained = resolveOperatorAlertExplanation({
         title: row.top_signal_title,
         summary: `${row.open_signals_count} open signal(s) on ${row.display_name}.`,
@@ -117,6 +139,8 @@ export function buildOperatorIncidentFeed(input: {
         title: row.top_signal_title,
         summary: `${row.open_signals_count} open signal(s) on ${row.display_name}.`,
         plainWhat: explained.what,
+        plainYouDo: explained.youDo,
+        plainAgentDo: explained.agentDo,
         severity: row.critical_signals_count > 0 ? 'critical' : 'high',
         source: 'fleet',
         workspaceId: row.workspace_id,
@@ -136,6 +160,7 @@ export function buildOperatorIncidentFeed(input: {
     return severityRank(left.severity) - severityRank(right.severity);
   });
   const limited = sorted.slice(0, limit);
+
 
   return {
     items: limited,

@@ -178,6 +178,13 @@
   text-transform: uppercase;
 }
 
+.operator-task-board__next-up-mode {
+  margin: 0.1rem 0 0;
+  color: rgba(150, 190, 205, 0.72);
+  font-size: 0.6rem;
+  line-height: 1.3;
+}
+
 .operator-task-board__next-up-actions {
   display: flex;
   flex: 0 0 auto;
@@ -225,7 +232,7 @@
 .operator-task-board__plan-chip {
   flex: 0 0 auto;
   gap: 0.25rem;
-  max-width: 13.5rem;
+  max-width: 10.5rem;
   border-radius: 999px;
   font-size: 0.64rem;
   line-height: 1.2;
@@ -299,12 +306,16 @@
 }
 
 .operator-task-board__list--queued {
-  max-height: none;
-  overflow: visible;
+  /* Collapsed Waiting: ~4 cards, never taller than the rest of Mission Control. */
+  max-height: min(26vh, 15.5rem);
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
 }
 
 .operator-task-board__list--queued-expanded {
-  max-height: min(46vh, 30rem);
+  max-height: min(32vh, 19rem);
   overflow-x: hidden;
   overflow-y: auto;
   overscroll-behavior: contain;

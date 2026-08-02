@@ -16,6 +16,7 @@ from app.routes import (
     inbox_watch,
     lead_planner,
     operator,
+    operator_autonomy,
     plans,
     runs,
     runtime,
@@ -36,6 +37,7 @@ def register_routes(app: FastAPI) -> None:
     app.include_router(inbox_watch.router)
     app.include_router(host.router)
     app.include_router(operator.router)
+    app.include_router(operator_autonomy.router)
     app.include_router(email_settings.router)
     app.include_router(email_reply.router)
     app.include_router(chat.router)

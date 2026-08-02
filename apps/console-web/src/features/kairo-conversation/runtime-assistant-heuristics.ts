@@ -7,10 +7,19 @@ const STATUS_STYLE_RE =
 const COMMAND_STYLE_RE =
   /\b(git status|check health|run\s+\S+|open attention|focus attention|switch to|dispatch|handoff|hand it off|resume)\b/i;
 
+/** Long / charter-shaped prompts need Ask runtime so Chief of Staff policy applies. */
+const CHIEF_OF_STAFF_RUNTIME_RE =
+  /\b(chief of staff|executive intelligence|mission lifecycle|autonomy levels|you are vaxon)\b/i;
+
+const COS_RUNTIME_MIN_CHARS = 480;
+
 export function shouldPrimeRuntimeAssistantCue(content: string): boolean {
   const trimmed = content.trim();
   if (!trimmed) {
     return false;
+  }
+  if (CHIEF_OF_STAFF_RUNTIME_RE.test(trimmed) || trimmed.length >= COS_RUNTIME_MIN_CHARS) {
+    return true;
   }
   if (COMMAND_STYLE_RE.test(trimmed) || STATUS_STYLE_RE.test(trimmed)) {
     return false;

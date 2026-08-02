@@ -260,3 +260,16 @@ Template:
 - acceptance evidence (this retry scope): `acceptance=pass · intent=gate6_acceptance · actor=integrations-retry-receipt · summary=run_01bb18cb3b92 triaged (billing-not-code + paths=0 Gate 6 miss); verify:console-web+contract unit tests green locally; Fast Gate 30648759025; watch 6/6 connectors; reverted stray IdeActivityBar whitespace; ship not approved`
 - residual risks: DashPro org billing still blocks dashpro main CI until Sir King fixes payment/spend limit; Rowan Gate 6 still open on watcher thread; decision-only tasks may need Reed policy so Gate 6 does not require full build when paths=0
 - next gate unlocked: Lead close `task-1f499843c3424aa9` after publish; Sir King billing on axon-control-ops; Jules owns any further IdeActivityBar product polish
+
+### Integrations usage-limit + Gate 6 attend — 2026-08-01
+- owner: integrations (`run_79084b6d789f`; prior Gate 6 fail `run_f8c084be54e3` / `task-a97ad0f33ea04a08`; original usage fail `run_a74935205818`; approval `auton-2613ddbd627e482e`)
+- commit: not requested this shift (harness fixes landed via concurrent OTA canary commits on the worker branch; receipt doc remains local)
+- commands run: `GET /api/runs/run_a74935205818` + history; `GET /api/runs/run_f8c084be54e3` + history; usage probe; `cursor agent --print CURSOR_OK_USAGE`; `GET /api/runtime/summary`; `gh run view 30714291159`; Gate 6 harness unittest (20 OK); local acceptance eval on dirty set → pass; file-size guardrails pass
+- pass/fail: pass for bounded retry — usage hold cleared; Gate 6 out_of_scope/`lstrip` bug + harness path-scope timeout fixed; connectors/watch/Fast Gate receipts green
+- exit criteria met: yes for investigate + fix Gate 6 delivery blocker on integrations thread (not ship)
+- root cause: original ActionRequiredError was Cursor usage; prior attend failed Gate 6 on `test` timeout + `out_of_scope` from `str.lstrip("./")` mangling `.cursor`/`.github` paths and full contract suite on harness edits
+- fleet: control-plane ok · watch connected · connectors 6/6 ok · Fast Gate success https://github.com/axon-control-ops/axon-watch/actions/runs/30714291159
+- code change: `diff_policy.normalize_rel_path`; noise filter in `evaluate_acceptance`; Gate 6 fast-path classifier + three harness modules in `run_contract_unit_tests.sh`
+- acceptance evidence (this retry scope): `acceptance=pass · intent=gate6_acceptance · actor=integrations-retry-receipt · summary=usage Auto~12% allows_retry; agent CURSOR_OK_USAGE; Gate6 harness 20 OK; docs-only dirty acceptance=pass; Fast Gate 30714291159; connectors 6/6; ship not approved`
+- residual risks: live control-plane process needs restart to load Gate 6 fixes for task-bound finalize; optional stop rewriting tracked `.cursor/mcp.json`
+- next gate unlocked: Lead close failed_shift attend after publish; schedule CP restart when no workers should be cancelled

@@ -62,6 +62,44 @@ describe('projectLiveOperationsStream', () => {
     expect(items.some((item) => item.id === 'emp-fail-employee-priya')).toBe(false);
   });
 
+  it('collapses near-identical notice/advise lines', () => {
+    const line = 'Lead-team plans are waiting for you in Mission Control — Seven of them.';
+    const items = projectLiveOperationsStream({
+      briefing: {
+        notice: line,
+        advise: line,
+        top_signals: [],
+      } as never,
+      primaryActiveRun: null,
+      employees: [],
+      presencePhase: 'speaking',
+    });
+    const matches = items.filter((item) => item.text.includes('Lead-team plans'));
+    expect(matches).toHaveLength(1);
+  });
+
+  it('collapses nested Lead-plan + DashPro advise/signal twins', () => {
+    const short = 'Lead-team plans are waiting for you in Mission Control — Seven of them.';
+    const items = projectLiveOperationsStream({
+      briefing: {
+        notice: short,
+        advise: 'Inspect DashPro Sentry critical.',
+        top_signals: [
+          {
+            signal_id: 'signal_sentry',
+            title: 'DashPro Sentry critical',
+            severity: 'critical',
+          },
+        ],
+      } as never,
+      primaryActiveRun: null,
+      employees: [],
+      presencePhase: 'speaking',
+    });
+    expect(items.filter((item) => /Lead-team plans/i.test(item.text))).toHaveLength(1);
+    expect(items.filter((item) => /DashPro Sentry critical/i.test(item.text))).toHaveLength(1);
+  });
+
   it('falls back to standby when there is nothing live', () => {
     const items = projectLiveOperationsStream({
       briefing: null,

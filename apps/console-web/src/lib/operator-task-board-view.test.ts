@@ -133,8 +133,8 @@ describe('buildOperatorTaskBoardView', () => {
     );
     const group = view.planGroups.find((item) => item.planId === 'lead-plan-long');
     expect(group?.planGoal).toBe(longGoal);
-    expect(group?.planLabel.length).toBeLessThanOrEqual(28);
-    expect(group?.planLabel).toMatch(/^Check with all sub-agents/i);
+    expect(group?.planLabel.length).toBeLessThanOrEqual(22);
+    expect(group?.planLabel).toMatch(/^Check with all sub-ag/i);
     expect(group?.planLabel).not.toContain('Marco (backend)');
     expect(view.rows[0]?.planLabel).toBe(group?.planLabel);
   });
