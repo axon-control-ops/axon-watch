@@ -8,6 +8,7 @@ from app.domain.run_state import is_terminal_phase
 from app.persistence import run_store
 from app.runs.service import list_runs
 from app.workspace_agents.failure_detail import (
+    is_operator_stopped_failure,
     is_restart_interrupted_failure,
     normalize_operator_failure_detail,
 )
@@ -109,6 +110,31 @@ def _successful_critical_review_detail(run: dict[str, Any]) -> str | None:
 def _is_restart_interrupt_without_success(run: dict[str, Any]) -> bool:
     """Skip restart cancels unless the shift already delivered a successful Critical Review."""
     if not _is_restart_interrupt_run(run):
+        return False
+    return _successful_critical_review_detail(run) is None
+
+
+def _is_operator_stopped_run(run: dict[str, Any]) -> bool:
+    """Return True when a run ended only because the operator stopped the CLI."""
+    step = str(run.get("current_step") or "").strip()
+    if step and is_operator_stopped_failure(step):
+        return True
+    history_ref = str(run.get("history_ref") or "").strip()
+    if not history_ref:
+        return False
+    for item in reversed(run_store.list_history(history_ref)):
+        receipt = item.get("receipt") if isinstance(item, dict) else None
+        if not isinstance(receipt, dict):
+            continue
+        summary = str(receipt.get("summary") or "").strip()
+        if summary and is_operator_stopped_failure(summary):
+            return True
+    return False
+
+
+def _is_operator_stopped_without_success(run: dict[str, Any]) -> bool:
+    """Skip operator stops unless the shift already delivered a successful Critical Review."""
+    if not _is_operator_stopped_run(run):
         return False
     return _successful_critical_review_detail(run) is None
 
@@ -218,6 +244,7 @@ def latest_role_run_outcome(workspace_id: str, role: str) -> dict[str, str] | No
     ]
     candidates = terminal if terminal else tagged
     candidates = [run for run in candidates if not _is_restart_interrupt_without_success(run)]
+    candidates = [run for run in candidates if not _is_operator_stopped_without_success(run)]
     if not candidates:
         return None
     run = _select_role_outcome_run(candidates)

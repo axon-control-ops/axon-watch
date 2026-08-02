@@ -39,6 +39,8 @@ _axon_contract_path_class() {
     tests/test_gate6_project_contract.py|\
     tests/test_gate6_verifier_contract.py|\
     docs/ops/agent-reports/*) printf 'gate6' ;;
+    services/control-plane/app/workspace_agents/run_outcome.py) printf 'run_outcome' ;;
+    tests/test_run_outcome*.py) printf 'run_outcome' ;;
     apps/*|services/*|packages/*|scripts/*|tests/*|config/*|.github/*|\
     project.axon.yaml|package.json|package-lock.json) printf 'code' ;;
     *) printf 'other' ;;
@@ -49,17 +51,21 @@ _axon_contract_suite_mode() {
   local path class
   local seen_gate6=0
   local seen_code=0
+  local seen_run_outcome=0
   while IFS= read -r path; do
     [[ -n "${path}" ]] || continue
     class="$(_axon_contract_path_class "${path}")"
     case "${class}" in
       gate6) seen_gate6=1 ;;
+      run_outcome) seen_run_outcome=1 ;;
       code) seen_code=1 ;;
       noise|docs|other) ;;
     esac
   done < <(_axon_contract_dirty_paths)
   if [[ "${seen_code}" -eq 1 ]]; then
     printf 'full'
+  elif [[ "${seen_run_outcome}" -eq 1 ]]; then
+    printf 'run_outcome'
   elif [[ "${seen_gate6}" -eq 1 ]]; then
     printf 'gate6'
   else
@@ -83,6 +89,20 @@ if [[ "${AXON_CONTRACT_SUITE_FORCE_FULL:-}" != "1" ]]; then
         tests.test_gate6_path_scoped_checks \
         tests.test_gate6_project_contract \
         tests.test_gate6_verifier_contract
+      exit $?
+      ;;
+    run_outcome)
+      source "${repo_root}/scripts/dev/lib/common.sh"
+      "${repo_root}/scripts/dev/ensure-python-deps.sh"
+      python_bin="$(resolve_python "${repo_root}")"
+      echo "contract unit tests: run_outcome path-scope only"
+      "${python_bin}" -m unittest -v \
+        tests.test_failure_detail \
+        tests.test_run_outcome \
+        tests.test_run_outcome_operator_stop \
+        tests.test_run_outcome_restart_critical_review \
+        tests.test_run_outcome_confidence \
+        tests.test_run_outcome_roster_api
       exit $?
       ;;
   esac
@@ -128,6 +148,7 @@ main_tests=(
   tests.test_workspace_agent_scheduler
   tests.test_failure_detail
   tests.test_run_outcome
+  tests.test_run_outcome_operator_stop
   tests.test_workspace_agents
   tests.test_worker_scheduler_routes
   tests.test_worker_scheduler_settings_store
