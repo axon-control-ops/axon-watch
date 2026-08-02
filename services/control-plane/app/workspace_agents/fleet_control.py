@@ -41,6 +41,7 @@ def build_scheduler_status() -> dict[str, Any]:
         "executing_count": executing_count,
         "active_run_count": len(active_runs),
         "employee_enabled": dict(settings.get("employee_enabled") or {}),
+        "workspace_enabled": dict(settings.get("workspace_enabled") or {}),
         "updated_at": settings.get("updated_at"),
         # Idle ticks only reconcile housekeeping; Cursor CLI usage starts on dispatch.
         "cursor_usage_on_idle_tick": False,
@@ -121,4 +122,53 @@ def set_employee_enabled(
         "role": role.strip().lower(),
         "enabled": bool(enabled),
         "key": key,
+    }
+
+
+def stop_active_runs_for_workspace(workspace_id: str) -> dict[str, Any]:
+    """Stop active employee runs for one workspace only."""
+    target = str(workspace_id or "").strip()
+    stopped: list[str] = []
+    errors: list[dict[str, str]] = []
+    if not target:
+        status = build_scheduler_status()
+        status["stopped_run_ids"] = stopped
+        status["stop_errors"] = errors
+        return status
+    for run in list_active_employee_runs():
+        if str(run.get("workspace_id") or "").strip() != target:
+            continue
+        run_id = str(run.get("run_id") or "").strip()
+        if not run_id:
+            continue
+        try:
+            stop_run(run_id)
+            stopped.append(run_id)
+        except (RunLifecycleError, RunNotFoundError) as exc:
+            errors.append({"run_id": run_id, "error": str(exc)})
+    status = build_scheduler_status()
+    status["stopped_run_ids"] = stopped
+    status["stop_errors"] = errors
+    return status
+
+
+def set_workspace_enabled(*, workspace_id: str, enabled: bool) -> dict[str, Any]:
+    """Arm or pause continuous workers for one workspace from the Workspaces panel."""
+    cleaned = str(workspace_id or "").strip()
+    if not cleaned:
+        raise ValueError("workspace_id is required")
+    worker_scheduler_settings_store.patch_settings(
+        {"workspace_enabled": {cleaned: bool(enabled)}}
+    )
+    stopped: dict[str, Any] = {"stopped_run_ids": [], "stop_errors": []}
+    if not enabled:
+        stopped = stop_active_runs_for_workspace(cleaned)
+    status = build_scheduler_status()
+    return {
+        "workspace_id": cleaned,
+        "enabled": bool(enabled),
+        "workspace_enabled": dict(status.get("workspace_enabled") or {}),
+        "stopped_run_ids": list(stopped.get("stopped_run_ids") or []),
+        "stop_errors": list(stopped.get("stop_errors") or []),
+        "scheduler": status,
     }

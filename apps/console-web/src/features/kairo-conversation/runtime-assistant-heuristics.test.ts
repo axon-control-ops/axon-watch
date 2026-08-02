@@ -13,4 +13,12 @@ describe('runtime assistant heuristics', () => {
     expect(shouldPrimeRuntimeAssistantCue('git status')).toBe(false);
     expect(shouldPrimeRuntimeAssistantCue('open attention')).toBe(false);
   });
+
+  it('primes the cue for Chief of Staff / long executive prompts', () => {
+    expect(shouldPrimeRuntimeAssistantCue('You are VAXON. Chief of Staff charter follows.')).toBe(
+      true,
+    );
+    expect(shouldPrimeRuntimeAssistantCue(`${'plan the mission. '.repeat(40)}`)).toBe(true);
+  });
 });
+

@@ -9,20 +9,23 @@
       "id": "dashpro_sentry_recent_issues",
       "type": "sentry_recent_issues",
       "service": "Sentry",
-      "environment": "production"
+      "environment": "production",
+      "retries": 2
     },
     {
       "id": "dashpro_posthog_recent_events",
       "type": "posthog_recent_events",
       "service": "PostHog",
-      "limit": 5,
-      "timeout_seconds": 20,
-      "retries": 1
+      "limit": 1,
+      "timeout_seconds": 35,
+      "retries": 2
     },
     {
       "id": "dashpro_supabase_storage_quota",
       "type": "supabase_storage_quota",
-      "service": "Supabase Storage"
+      "service": "Supabase Storage",
+      "timeout_seconds": 10,
+      "retries": 2
     },
     {
       "id": "dashpro_marketing_site_health",

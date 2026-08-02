@@ -75,7 +75,8 @@ class DashProSentryMonitorTests(unittest.TestCase):
             side_effect=TimeoutError("The read operation timed out"),
         ):
             status, detail, sample = dashpro_sentry.check_sentry_recent_issues(
-                env={"SENTRY_AUTH_TOKEN": "token"}
+                env={"SENTRY_AUTH_TOKEN": "token"},
+                retries=0,
             )
 
         self.assertEqual("warning", status)
@@ -91,7 +92,8 @@ class DashProSentryMonitorTests(unittest.TestCase):
             side_effect=TimeoutError("The read operation timed out"),
         ):
             status, detail, _sample = dashpro_sentry.check_sentry_recent_issues(
-                env={"SENTRY_AUTH_TOKEN": "token"}
+                env={"SENTRY_AUTH_TOKEN": "token"},
+                retries=0,
             )
 
         item = monitor_inbox_item(
@@ -107,6 +109,62 @@ class DashProSentryMonitorTests(unittest.TestCase):
         )
         assert item is not None
         self.assertEqual("warning", item["severity"])
+
+
+    def test_dns_failure_retries_once_then_succeeds(self) -> None:
+        from urllib.error import URLError
+
+        class _FakeResponse:
+            def __init__(self, status: int, payload):
+                self.status = status
+                self._payload = payload
+
+            def read(self):
+                return json.dumps(self._payload).encode("utf-8")
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, exc_type, exc, tb):
+                return False
+
+        calls = {"n": 0}
+        issues = [
+            {
+                "id": "1",
+                "shortId": "RN-1",
+                "title": "TypeError: boom",
+                "level": "error",
+                "count": "4",
+                "permalink": "https://sentry.io/issues/1/",
+                "culprit": "app",
+            }
+        ]
+
+        def fake_urlopen(req, timeout=0):
+            calls["n"] += 1
+            if calls["n"] == 1:
+                raise URLError("[Errno -3] Temporary failure in name resolution")
+            return _FakeResponse(200, issues)
+
+        with patch.object(dashpro_sentry, "urlopen", side_effect=fake_urlopen), patch.object(
+            dashpro_sentry.time, "sleep", return_value=None
+        ):
+            status, detail, sample = dashpro_sentry.check_sentry_recent_issues(
+                env={
+                    "SENTRY_AUTH_TOKEN": "token",
+                    "SENTRY_ORG_SLUG": "edudashpro",
+                    "SENTRY_PROJECT_SLUG": "react-native",
+                },
+                retries=1,
+                warning_threshold=10,
+                critical_threshold=20,
+            )
+
+        self.assertEqual(2, calls["n"])
+        self.assertEqual("ok", status)
+        self.assertIn("1 unresolved production issue(s)", detail)
+        self.assertEqual(1, len(sample))
 
     def test_attended_production_issue_is_suppressed(self) -> None:
         import tempfile

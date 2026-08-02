@@ -115,18 +115,20 @@ def probe_monitor_slice(config: dict[str, object]) -> list[dict[str, object]]:
         request_headers: dict[str, str] = {}
         if check_type == "sentry_recent_issues":
             environment = str(entry.get("environment") or "").strip() or None
+            retries = max(0, int(entry.get("retries") or 2))
             status, detail, issues = check_sentry_recent_issues(
                 env=env,
                 environment=environment,
                 workspace_id=workspace_id,
+                retries=retries,
             )
         elif check_type == "posthog_recent_events":
-            limit = max(1, int(entry.get("limit") or 5))
+            limit = max(1, int(entry.get("limit") or 1))
             if entry.get("timeout_ms") is not None:
-                timeout_seconds = max(1.0, float(entry.get("timeout_ms") or 20000) / 1000.0)
+                timeout_seconds = max(1.0, float(entry.get("timeout_ms") or 35000) / 1000.0)
             else:
-                timeout_seconds = max(1.0, float(entry.get("timeout_seconds") or 20))
-            retries = max(0, int(entry.get("retries") or 1))
+                timeout_seconds = max(1.0, float(entry.get("timeout_seconds") or 35))
+            retries = max(0, int(entry.get("retries") or 2))
             status, detail = check_posthog_recent_events(
                 env=env,
                 limit=limit,
@@ -134,7 +136,13 @@ def probe_monitor_slice(config: dict[str, object]) -> list[dict[str, object]]:
                 retries=retries,
             )
         elif check_type == "supabase_storage_quota":
-            status, detail = check_supabase_storage_quota(env=env)
+            timeout_seconds = max(1.0, float(entry.get("timeout_seconds") or 10))
+            retries = max(0, int(entry.get("retries") or 2))
+            status, detail = check_supabase_storage_quota(
+                env=env,
+                timeout_seconds=timeout_seconds,
+                retries=retries,
+            )
         elif check_type == "http_health":
             url = _resolve_url(str(entry.get("url") or ""), env)
             expect_status = int(entry.get("expect_status") or 200)

@@ -41,6 +41,12 @@ ConversationSource = Literal["template", "model", "fallback"]
 ConversationTurnKind = Literal["status_question", "open_question", "command", "chat", "action"]
 
 _MAX_RUNTIME_VOICE_REPLY_CHARS = 1200
+_COS_FORCE_RUNTIME_RE = re.compile(
+    r"\b(chief of staff|executive intelligence|mission lifecycle|autonomy levels|"
+    r"you are vaxon)\b",
+    re.IGNORECASE,
+)
+_COS_FORCE_RUNTIME_MIN_CHARS = 480
 
 # Dedicated VAXON pool — independent from IDE Composer UI selection.
 _DEFAULT_VAXON_MODEL_POOL = (
@@ -196,6 +202,16 @@ def select_vaxon_runtime(
     return None, None, resolved_model, attempts
 
 
+def _force_chief_of_staff_runtime(content: str) -> bool:
+    """Long or charter-shaped freeform prompts must hit Ask runtime (not templates)."""
+    trimmed = str(content or "").strip()
+    if not trimmed:
+        return False
+    if len(trimmed) >= _COS_FORCE_RUNTIME_MIN_CHARS:
+        return True
+    return bool(_COS_FORCE_RUNTIME_RE.search(trimmed))
+
+
 def should_use_vaxon_runtime(
     *,
     turn_kind: ConversationTurnKind,
@@ -207,6 +223,9 @@ def should_use_vaxon_runtime(
     mode = normalize_voice_routing_mode(voice_routing_mode)
     if turn_kind not in {"open_question", "status_question"}:
         return False
+    # Charter / long executive prompts always need Ask runtime (CoS policy lives there).
+    if turn_kind == "open_question" and _force_chief_of_staff_runtime(content):
+        return True
     if mode == "runtime_aggressive":
         if turn_kind == "open_question":
             return True

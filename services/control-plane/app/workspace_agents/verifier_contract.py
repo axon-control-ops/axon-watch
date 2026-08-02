@@ -206,7 +206,11 @@ def ensure_acceptance_before_publish(
     else:
         try:
             contract = load_repo_contract(str(root))
-            check_results = execute_check_plan(root, contract)
+            check_results = execute_check_plan(
+                root,
+                contract,
+                changed_paths=paths,
+            )
             path_to_text = read_path_texts(root, paths)
             mode = "contract"
         except ProjectContractError as exc:

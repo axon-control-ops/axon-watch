@@ -302,6 +302,30 @@ class WorkerSchedulerRouteTests(unittest.TestCase):
                     scheduler.json()["employee_enabled"],
                 )
 
+    def test_workspace_worker_enabled_patch_pauses_workspace(self) -> None:
+        response = self.client.patch(
+            "/api/workspaces/workspace_bkk_invoice_system/worker-enabled",
+            json={"enabled": False},
+        )
+        self.assertEqual(200, response.status_code)
+        payload = response.json()
+        self.assertEqual("workspace_bkk_invoice_system", payload["workspace_id"])
+        self.assertFalse(payload["enabled"])
+        self.assertFalse(payload["workspace_enabled"]["workspace_bkk_invoice_system"])
+
+        status = self.client.get("/api/worker-scheduler")
+        self.assertEqual(200, status.status_code)
+        self.assertFalse(
+            status.json()["workspace_enabled"]["workspace_bkk_invoice_system"]
+        )
+
+        resume = self.client.patch(
+            "/api/workspaces/workspace_bkk_invoice_system/worker-enabled",
+            json={"enabled": True},
+        )
+        self.assertEqual(200, resume.status_code)
+        self.assertTrue(resume.json()["enabled"])
+
 
 if __name__ == "__main__":
     unittest.main()

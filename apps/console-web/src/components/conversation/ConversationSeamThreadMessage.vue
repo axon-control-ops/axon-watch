@@ -369,7 +369,7 @@ async function copyTerminalOutput(output: string): Promise<void> {
         :open="segment.open"
       />
 
-      <!-- The composer renders this segment once as its actionable Proceed/Dismiss banner. -->
+      <!-- Reproduce UI lives once in the sticky composer banner (avoid duplicate cards). -->
       <template v-else-if="segment.kind === 'debug-reproduce'"></template>
 
       <AgentImageBlock

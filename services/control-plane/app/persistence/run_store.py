@@ -6,6 +6,7 @@ from copy import deepcopy
 from contextlib import contextmanager
 import json
 import os
+import sqlite3
 from typing import Any
 
 from app.persistence import run_store_sqlite
@@ -175,21 +176,51 @@ def delete_run(run_id: str) -> bool:
 
 
 def append_transition(history_ref: str, transition: dict[str, Any]) -> None:
+    """Append one history transition with a unique (history_ref, sequence).
+
+    Concurrent workers (heartbeat + progress + failure) previously raced on
+    SELECT MAX(sequence)+1 then INSERT under deferred transactions, raising
+    ``UNIQUE constraint failed: run_history.history_ref, run_history.sequence``.
+    BEGIN IMMEDIATE serializes writers; IntegrityError retries cover residual
+    races if another connection commits between our select and insert.
+    """
     payload = deepcopy(transition)
     encoded = json.dumps(payload, separators=(",", ":"), sort_keys=True)
-    with _managed_connection() as connection:
-        sequence = connection.execute(
-            "SELECT COALESCE(MAX(sequence), 0) + 1 FROM run_history WHERE history_ref = ?",
-            (history_ref,),
-        ).fetchone()[0]
-        connection.execute(
-            """
-            INSERT INTO run_history (history_ref, sequence, transition_json)
-            VALUES (?, ?, ?)
-            """,
-            (history_ref, sequence, encoded),
-        )
-        connection.commit()
+    cleaned_ref = str(history_ref or "").strip()
+    if not cleaned_ref:
+        raise ValueError("history_ref is required")
+
+    last_error: Exception | None = None
+    for _attempt in range(8):
+        with _managed_connection() as connection:
+            try:
+                connection.execute("BEGIN IMMEDIATE")
+                sequence = connection.execute(
+                    "SELECT COALESCE(MAX(sequence), 0) + 1 FROM run_history WHERE history_ref = ?",
+                    (cleaned_ref,),
+                ).fetchone()[0]
+                connection.execute(
+                    """
+                    INSERT INTO run_history (history_ref, sequence, transition_json)
+                    VALUES (?, ?, ?)
+                    """,
+                    (cleaned_ref, sequence, encoded),
+                )
+                connection.commit()
+                return
+            except sqlite3.IntegrityError as exc:
+                last_error = exc
+                try:
+                    connection.rollback()
+                except sqlite3.Error:
+                    pass
+                message = str(exc)
+                if "run_history.history_ref" not in message and "UNIQUE" not in message:
+                    raise
+    raise sqlite3.IntegrityError(
+        f"UNIQUE constraint failed: run_history.history_ref, run_history.sequence "
+        f"after retries for history_ref={cleaned_ref!r}: {last_error}"
+    )
 
 
 def list_history(history_ref: str) -> list[dict[str, Any]]:

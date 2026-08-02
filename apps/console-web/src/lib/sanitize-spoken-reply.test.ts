@@ -85,9 +85,11 @@ describe('sanitizeSpokenReply', () => {
     expect(spoken.toLowerCase()).toContain('apps');
   });
 
-  it('leaves concise template replies unchanged', () => {
+  it('normalizes em-dashes in concise template replies for TTS pacing', () => {
     const line = '2 approvals on the board — Attention has the detail.';
-    expect(sanitizeSpokenReply(line)).toBe(line);
+    expect(sanitizeSpokenReply(line)).toBe(
+      '2 approvals on the board, Attention has the detail.',
+    );
   });
 
   it('splits long spoken replies into chunks', () => {
@@ -171,5 +173,14 @@ describe('sanitizeSpokenReply', () => {
     expect(spoken).toMatch(/four, Lead-team/i);
     expect(spoken).toMatch(/C I/);
     expect(spoken).not.toMatch(/\bCI\b/);
+  });
+
+  it('spells IDE as I D E for TTS while display stays IDE', () => {
+    expect(formatConversationDisplayReply('Handing this off to the IDE.')).toBe(
+      'Handing this off to the IDE.',
+    );
+    const spoken = sanitizeSpokenReply('Handing this off to the IDE.');
+    expect(spoken).toMatch(/I D E/);
+    expect(spoken).not.toMatch(/\bIDE\b/);
   });
 });

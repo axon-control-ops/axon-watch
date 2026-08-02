@@ -29,6 +29,8 @@ LEADING_AUDIO_GUARD_MS = 1100
 # Soft action-word openings still lost the first syllable at 1450 ms
 # ("Walking" -> "king"). Keep the extra latency on vulnerable openings only.
 SOFT_ONSET_LEADING_AUDIO_GUARD_MS = 2200
+# Continuation chunks already have a live audio graph — do not re-pad 1s+.
+CONTINUATION_LEADING_AUDIO_GUARD_MS = 60
 TTS_READ_ATTEMPTS = 2
 TTS_REQUEST_TIMEOUT_SECONDS = 6
 TTS_RETRY_BACKOFF_SECONDS = 0.15
@@ -57,11 +59,15 @@ def _clean_for_speech(text: str) -> str:
     cleaned = re.sub(r"\bThabo\b", "Ta-bo", cleaned, flags=re.IGNORECASE)
     # Zulu names Azure often misreads — speak Sipho as SEE-po.
     cleaned = re.sub(r"\bSipho\b", "See-po", cleaned, flags=re.IGNORECASE)
+    # IDE must be letter-spelled — never spoken as the word "ayed".
+    cleaned = re.sub(r"\bIDE\b", "I D E", cleaned)
     return cleaned[:3000]
 
 
-def leading_audio_guard_ms(text: str) -> int:
+def leading_audio_guard_ms(text: str, *, continuation: bool = False) -> int:
     """Return encoded lead-in required for the opening phoneme."""
+    if continuation:
+        return CONTINUATION_LEADING_AUDIO_GUARD_MS
     cleaned = _clean_for_speech(text)
     if _SOFT_ONSET_OPENING_RE.match(cleaned):
         return SOFT_ONSET_LEADING_AUDIO_GUARD_MS
@@ -73,20 +79,21 @@ def _inject_ssml_breaks(text: str) -> str:
     value = str(text or "")
     if not value:
         return value
-    value = re.sub(r"([.!?])\s+", r"\1<break time='120ms'/> ", value)
-    value = re.sub(r":\s+", r":<break time='90ms'/> ", value)
-    value = re.sub(r";\s+", r";<break time='80ms'/> ", value)
-    value = re.sub(r"\s*[—–]\s*", r"<break time='80ms'/> ", value)
+    # Keep breaks crisp — 120ms+ stacked with em-dashes / commas felt laggy.
+    value = re.sub(r"([.!?])\s+", r"\1<break time='70ms'/> ", value)
+    value = re.sub(r":\s+", r":<break time='45ms'/> ", value)
+    value = re.sub(r";\s+", r";<break time='45ms'/> ", value)
+    value = re.sub(r"\s*[—–]\s*", r"<break time='45ms'/> ", value)
     value = re.sub(
         r",\s+(?=(?:and|but|or|so|yet|because|since|while|although)\b)",
-        r",<break time='70ms'/> ",
+        r",<break time='40ms'/> ",
         value,
     )
     return value
 
 
 def _escape_ssml_text_preserving_breaks(text: str) -> str:
-    break_tag = re.compile(r"(<break time='(?:70|80|90|120)ms'/>)")
+    break_tag = re.compile(r"(<break time='(?:40|45|70|80|90|120)ms'/>)")
     parts = break_tag.split(str(text or ""))
     escaped_parts: list[str] = []
     for part in parts:
@@ -161,6 +168,7 @@ def build_azure_ssml(
     voice: str = DEFAULT_AZURE_VOICE,
     rate: float | int | str | None = None,
     pitch: float | int | str | None = None,
+    continuation: bool = False,
 ) -> str:
     """Build SSML matching axon-local Azure talkback.
 
@@ -173,16 +181,16 @@ def build_azure_ssml(
     safe_text = _escape_ssml_text_preserving_breaks(_inject_ssml_breaks(cleaned))
     rate_attr = azure_voice_rate_attr(rate if rate is not None else DEFAULT_VOICE_RATE)
     pitch_attr = azure_voice_pitch_attr(pitch if pitch is not None else DEFAULT_VOICE_PITCH)
-    leading_guard_ms = leading_audio_guard_ms(cleaned)
-    # mstts Leading + a short break outside prosody — Chromium still ate soft
-    # openings when only an in-prosody <break> was used. Do not double the full
-    # guard (that made every line feel delayed).
+    leading_guard_ms = leading_audio_guard_ms(cleaned, continuation=continuation)
+    # First chunk: mstts Leading + short outside-prosody break for sink wake-up.
+    # Continuations: tiny lead only — stacked 1.1s+200ms made mid-speech laggy.
+    onset_break = "" if continuation else "<break time='120ms'/>"
     return (
         "<speak version='1.0' xmlns='http://www.w3.org/2001/10/synthesis' "
         "xmlns:mstts='https://www.w3.org/2001/mstts' xml:lang='en-GB'>"
         f"<voice name='{safe_voice}'>"
         f"<mstts:silence type='Leading' value='{leading_guard_ms}ms'/>"
-        "<break time='200ms'/>"
+        f"{onset_break}"
         f"<prosody rate='{rate_attr}' pitch='{pitch_attr}'>"
         f"{safe_text}</prosody></voice>"
         "</speak>"
@@ -197,6 +205,7 @@ def synthesize_azure_speech(
     key: str | None = None,
     rate: float | None = None,
     pitch: float | None = None,
+    continuation: bool = False,
 ) -> tuple[bytes, str] | None:
     resolved_key, resolved_region = resolve_azure_speech_credentials()
     speech_key = extract_azure_speech_key(key) or resolved_key
@@ -209,7 +218,13 @@ def synthesize_azure_speech(
 
     speech_region = resolve_azure_speech_region(region or resolved_region)
     url = f"https://{speech_region}.tts.speech.microsoft.com/cognitiveservices/v1"
-    body = build_azure_ssml(trimmed, voice=voice, rate=rate, pitch=pitch).encode("utf-8")
+    body = build_azure_ssml(
+        trimmed,
+        voice=voice,
+        rate=rate,
+        pitch=pitch,
+        continuation=continuation,
+    ).encode("utf-8")
     headers = {
         "Ocp-Apim-Subscription-Key": speech_key,
         "Content-Type": "application/ssml+xml",
