@@ -13,6 +13,10 @@ import {
   type GalaxyPresencePhase,
   type GalaxyPresenceResolved,
 } from './galaxy-presence-state';
+import {
+  galaxyIntersectionIsVisible,
+  shouldRenderGalaxy,
+} from './galaxy-render-power';
 import { probeWebGlAvailability } from './webgl-availability';
 
 export type UseBrainGalaxyOptions = {
@@ -47,6 +51,20 @@ export function useBrainGalaxy(options: UseBrainGalaxyOptions): {
   const sceneRef = shallowRef<BrainGalaxyScene | null>(null);
   let voiceEnergyDecayTimer: number | null = null;
   let unsubscribeVoiceChunk: (() => void) | null = null;
+  let intersectionObserver: IntersectionObserver | null = null;
+  let containerVisible = true;
+
+  function syncRenderPower(): void {
+    const documentHidden =
+      typeof document !== 'undefined' && document.visibilityState === 'hidden';
+    sceneRef.value?.setRenderingEnabled(
+      shouldRenderGalaxy({ documentHidden, containerVisible }),
+    );
+  }
+
+  function onDocumentVisibility(): void {
+    syncRenderPower();
+  }
 
   const presence = computed(() =>
     resolveGalaxyPresence({
@@ -173,6 +191,7 @@ export function useBrainGalaxy(options: UseBrainGalaxyOptions): {
     sceneRef.value = scene;
     scene.setSnapshot(options.snapshot.value);
     syncPresenceToScene();
+    syncRenderPower();
     if (selectedNode.value) {
       scene.setSelectedNode(selectedNode.value.node_id);
     }
@@ -182,7 +201,22 @@ export function useBrainGalaxy(options: UseBrainGalaxyOptions): {
   onMounted(() => {
     void nextTick(() => {
       mountScene();
+      const container = options.container.value;
+      if (container && typeof IntersectionObserver !== 'undefined') {
+        intersectionObserver = new IntersectionObserver(
+          (entries) => {
+            const entry = entries[0];
+            containerVisible = galaxyIntersectionIsVisible(entry?.intersectionRatio ?? 0);
+            syncRenderPower();
+          },
+          { threshold: [0, 0.02, 0.1, 0.25] },
+        );
+        intersectionObserver.observe(container);
+      }
     });
+    if (typeof document !== 'undefined') {
+      document.addEventListener('visibilitychange', onDocumentVisibility);
+    }
     unsubscribeVoiceChunk = subscribeKairoVoiceChunk(() => {
       pulseVoiceEnergy();
     });
@@ -224,6 +258,11 @@ export function useBrainGalaxy(options: UseBrainGalaxyOptions): {
   onBeforeUnmount(() => {
     unsubscribeVoiceChunk?.();
     unsubscribeVoiceChunk = null;
+    if (typeof document !== 'undefined') {
+      document.removeEventListener('visibilitychange', onDocumentVisibility);
+    }
+    intersectionObserver?.disconnect();
+    intersectionObserver = null;
     if (voiceEnergyDecayTimer !== null) {
       window.clearTimeout(voiceEnergyDecayTimer);
       voiceEnergyDecayTimer = null;
