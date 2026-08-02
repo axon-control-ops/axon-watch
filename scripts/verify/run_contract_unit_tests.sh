@@ -39,6 +39,10 @@ _axon_contract_path_class() {
     tests/test_gate6_project_contract.py|\
     tests/test_gate6_verifier_contract.py|\
     docs/ops/agent-reports/*) printf 'gate6' ;;
+    # Operator-stop / shift-continuation CEO auto-approve attend (Quinn integrations).
+    # Keep Gate 6 under the ~300s budget instead of the full 100+ module suite.
+    services/control-plane/app/workspace_agents/ceo_pending_approve.py|\
+    tests/test_ceo_pending_approve.py) printf 'ceo_approve' ;;
     apps/*|services/*|packages/*|scripts/*|tests/*|config/*|.github/*|\
     project.axon.yaml|package.json|package-lock.json) printf 'code' ;;
     *) printf 'other' ;;
@@ -48,18 +52,22 @@ _axon_contract_path_class() {
 _axon_contract_suite_mode() {
   local path class
   local seen_gate6=0
+  local seen_ceo_approve=0
   local seen_code=0
   while IFS= read -r path; do
     [[ -n "${path}" ]] || continue
     class="$(_axon_contract_path_class "${path}")"
     case "${class}" in
       gate6) seen_gate6=1 ;;
+      ceo_approve) seen_ceo_approve=1 ;;
       code) seen_code=1 ;;
       noise|docs|other) ;;
     esac
   done < <(_axon_contract_dirty_paths)
   if [[ "${seen_code}" -eq 1 ]]; then
     printf 'full'
+  elif [[ "${seen_ceo_approve}" -eq 1 ]]; then
+    printf 'ceo_approve'
   elif [[ "${seen_gate6}" -eq 1 ]]; then
     printf 'gate6'
   else
@@ -73,6 +81,20 @@ if [[ "${AXON_CONTRACT_SUITE_FORCE_FULL:-}" != "1" ]]; then
     skip)
       echo "contract unit tests skipped: no code-path changes in dirty set"
       exit 0
+      ;;
+    ceo_approve)
+      source "${repo_root}/scripts/dev/lib/common.sh"
+      "${repo_root}/scripts/dev/ensure-python-deps.sh"
+      python_bin="$(resolve_python "${repo_root}")"
+      echo "contract unit tests: CEO auto-approve / shift-continuation path-scope"
+      # Include Gate 6 harness when this script itself is also dirty (path-scope edits).
+      "${python_bin}" -m unittest -v \
+        tests.test_ceo_pending_approve \
+        tests.test_failure_detail \
+        tests.test_gate6_path_scoped_checks \
+        tests.test_gate6_project_contract \
+        tests.test_gate6_verifier_contract
+      exit $?
       ;;
     gate6)
       source "${repo_root}/scripts/dev/lib/common.sh"
@@ -127,6 +149,7 @@ main_tests=(
   tests.test_command_executor
   tests.test_workspace_agent_scheduler
   tests.test_failure_detail
+  tests.test_ceo_pending_approve
   tests.test_run_outcome
   tests.test_workspace_agents
   tests.test_worker_scheduler_routes

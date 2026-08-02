@@ -61,6 +61,22 @@ class CeoPendingApproveTests(unittest.TestCase):
             )
         )
 
+    def test_operator_stopped_shift_is_not_investigable(self) -> None:
+        detail = (
+            "Runtime execution stopped by operator before the CLI finished. "
+            "[run=run_8f6d892d278b]"
+        )
+        self.assertFalse(
+            receipt_is_ceo_investigable(
+                {
+                    "kind": "operator_blocker",
+                    "title": "Quinn (integrations) last shift failed",
+                    "detail": detail,
+                    "dedupe_key": "failed_shift:workspace_axon_watch:integrations",
+                }
+            )
+        )
+
     def test_auto_approve_clears_github_api_pending(self) -> None:
         pending = autonomous_attention_store.append_receipt(
             kind="critical_signal",
