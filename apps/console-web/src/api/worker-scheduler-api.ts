@@ -14,6 +14,7 @@ export interface WorkerSchedulerStatus {
   executing_count: number;
   active_run_count: number;
   employee_enabled: Record<string, boolean>;
+  workspace_enabled?: Record<string, boolean>;
   updated_at?: string | null;
   stopped_run_ids?: string[];
   stop_errors?: Array<{ run_id: string; error: string }>;
@@ -98,5 +99,30 @@ export function patchWorkspaceEmployeeEnabled(
       body: JSON.stringify({ enabled }),
     },
     'employee enabled patch failed',
+  );
+}
+
+export type WorkspaceWorkerEnabledPatchResponse = {
+  workspace_id: string;
+  enabled: boolean;
+  workspace_enabled: Record<string, boolean>;
+  stopped_run_ids?: string[];
+  stop_errors?: Array<{ run_id: string; error: string }>;
+  scheduler?: WorkerSchedulerStatus;
+};
+
+export function patchWorkspaceWorkerEnabled(
+  workspaceId: string,
+  enabled: boolean,
+): Promise<WorkspaceWorkerEnabledPatchResponse> {
+  const encodedWorkspace = encodeURIComponent(workspaceId);
+  return fetchJson<WorkspaceWorkerEnabledPatchResponse>(
+    `/api/workspaces/${encodedWorkspace}/worker-enabled`,
+    {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ enabled }),
+    },
+    'workspace worker-enabled patch failed',
   );
 }

@@ -344,6 +344,8 @@ def run_continuous_worker_tick(
     if len(started) >= starts_bound:
         return started
     for workspace_id, company in companies.items():
+        if not worker_scheduler_settings_store.is_workspace_enabled(workspace_id):
+            continue
         for employee in company.employees:
             if len(started) >= starts_bound:
                 return started

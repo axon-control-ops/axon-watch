@@ -339,9 +339,19 @@ def run_autonomous_attention_scan(
 
     result.update(run_ceo_attend_hooks())
 
+    from app.persistence import worker_scheduler_settings_store
+
     for workspace_id in targets:
         workspace = str(workspace_id or "").strip()
         if not workspace or workspace not in companies:
+            continue
+        if not worker_scheduler_settings_store.is_workspace_enabled(workspace):
+            result["skipped"].append(
+                {
+                    "workspace_id": workspace,
+                    "reason": "workspace_paused",
+                }
+            )
             continue
         findings = collect_attend_findings(
             workspace,

@@ -93,6 +93,8 @@ def dispatch_queued_lead_fan_out_runs(
                     except Exception:  # noqa: BLE001
                         pass
                 continue
+        if not worker_scheduler_settings_store.is_workspace_enabled(workspace_id):
+            continue
         employee = employee_for_role(companies, workspace_id, role)
         if employee is None:
             continue
