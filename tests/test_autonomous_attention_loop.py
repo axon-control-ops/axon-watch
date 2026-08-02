@@ -23,6 +23,7 @@ from app.persistence import (  # noqa: E402
 )
 from app.workspace_agents.autonomous_attention import (  # noqa: E402
     ATTEND_GOAL_PREFIX,
+    build_autonomy_status_feed,
     collect_handoff_findings,
     enqueue_attend_actions,
     resolve_autonomy_decision,
@@ -378,6 +379,58 @@ class AutonomousAttentionLoopTests(unittest.TestCase):
                 params={"workspace_id": "workspace_axon_watch"},
             ).json()
             self.assertEqual(after["pending_critical_decisions"], [])
+
+    def test_status_hides_pending_signal_decision_after_source_signal_is_closed(self) -> None:
+        stale = autonomous_attention_store.append_receipt(
+            kind="critical_signal",
+            decision="escalate",
+            tier="operator_gated",
+            risk="critical",
+            title="Old critical monitor alert",
+            workspace_id="workspace_axon_watch",
+            dedupe_key="signal:workspace_axon_watch:signal_old:critical",
+            ask_operator=True,
+        )
+        current = autonomous_attention_store.append_receipt(
+            kind="critical_signal",
+            decision="escalate",
+            tier="operator_gated",
+            risk="critical",
+            title="Current critical monitor alert",
+            workspace_id="workspace_axon_watch",
+            dedupe_key="signal:workspace_axon_watch:signal_current:critical",
+            ask_operator=True,
+        )
+        manual = autonomous_attention_store.append_receipt(
+            kind="production_deploy",
+            decision="escalate",
+            tier="operator_gated",
+            risk="critical",
+            title="Deploy release",
+            workspace_id="workspace_axon_watch",
+            dedupe_key="deploy:release:42",
+            ask_operator=True,
+        )
+        with patch(
+            "app.adapters.watch_client.fetch_watch_inbox",
+            return_value={
+                "items": [
+                    {
+                        "workspace_id": "workspace_axon_watch",
+                        "signal_id": "signal_current",
+                        "severity": "critical",
+                        "status": "open",
+                    }
+                ]
+            },
+        ):
+            feed = build_autonomy_status_feed(workspace_id="workspace_axon_watch")
+
+        ids = {item["receipt_id"] for item in feed["pending_critical_decisions"]}
+        self.assertNotIn(stale["receipt_id"], ids)
+        self.assertIn(current["receipt_id"], ids)
+        self.assertIn(manual["receipt_id"], ids)
+        self.assertEqual(2, feed["pending_critical_count"])
 
     def test_concurrent_scans_create_one_task(self) -> None:
         finding = LeadCheckinFinding(

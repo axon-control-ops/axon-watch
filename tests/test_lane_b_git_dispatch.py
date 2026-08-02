@@ -362,6 +362,7 @@ class LaneBGitDispatchTests(unittest.TestCase):
             self.assertTrue(payload["dispatched"])
             self.assertIn("Ship notes", str(payload["content"]))
             self.assertIn(":::terminal", str(payload["content"]))
+            self.assertTrue(str(payload["content"]).endswith("Confidence: 8/10"))
             self.assertIsNone(payload.get("continue_prompt"))
 
     def test_requires_explicit_message_when_generic_fallback_would_be_used(self) -> None:

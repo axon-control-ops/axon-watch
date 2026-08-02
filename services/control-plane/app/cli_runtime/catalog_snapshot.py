@@ -150,7 +150,6 @@ def runtime_status_snapshot(
     # Stale-while-revalidate: never block operator UI on `cursor agent status`.
     # Return last good (or empty) snapshot and rebuild in a background thread.
     if allow_stale and not force_refresh:
-        schedule_runtime_status_refresh()
         if cached is not None:
             return copy.deepcopy(cached)
         return {
@@ -164,7 +163,6 @@ def runtime_status_snapshot(
     # Expired cache without allow_stale: still prefer SWR for boot/summary callers
     # that forgot the flag — only force_refresh blocks for a live probe.
     if not force_refresh and cached is not None:
-        schedule_runtime_status_refresh()
         return copy.deepcopy(cached)
 
     # Coalesce concurrent bootstrap callers (summary + status + fleet) so CLI
@@ -221,8 +219,4 @@ def runtime_status_snapshot(
         }
         _SNAPSHOT_CACHE["fetched_at"] = time.monotonic()
         _SNAPSHOT_CACHE["payload"] = copy.deepcopy(payload)
-        if snapshot_has_auth_probe_timeout(payload):
-            # Short TTL already applied; heal on cooldown so we auto-recover
-            # without spinning forever when the host CLI is truly broken.
-            heal_cursor_auth_probe_timeout(force=False)
         return copy.deepcopy(payload)

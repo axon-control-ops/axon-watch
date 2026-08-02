@@ -47,6 +47,64 @@ def _open_attend_tasks(workspace_id: str) -> list[dict[str, Any]]:
     ]
 
 
+def _active_critical_signal_keys(workspace_id: str) -> set[str] | None:
+    """Return live critical-signal receipt keys, or ``None`` when unknown.
+
+    Attention receipts are durable by design, while monitor signals can be
+    resolved independently.  The operator decision surface must not keep
+    showing a receipt after its source alert is gone.  A missing snapshot is
+    treated as unknown rather than hiding a possibly real decision.
+    """
+    try:
+        from app.adapters.watch_client import fetch_watch_inbox
+
+        inbox = fetch_watch_inbox(
+            timeout_seconds=0.8,
+            allow_stale=True,
+            cached_only=False,
+        )
+    except Exception:  # noqa: BLE001 - decision status must remain available
+        return None
+    rows = inbox.get("items") if isinstance(inbox, dict) else None
+    if not isinstance(rows, list):
+        return None
+
+    keys: set[str] = set()
+    workspace = workspace_id.strip()
+    for signal in rows:
+        if not isinstance(signal, dict):
+            continue
+        signal_workspace = str(signal.get("workspace_id") or "").strip()
+        if workspace and signal_workspace and signal_workspace != workspace:
+            continue
+        if str(signal.get("status") or "open").strip().lower() not in {"", "open"}:
+            continue
+        if str(signal.get("severity") or "").strip().lower() != "critical":
+            continue
+        signal_id = str(signal.get("signal_id") or "").strip()
+        if signal_id:
+            keys.add(f"signal:{workspace}:{signal_id}:critical")
+    return keys
+
+
+def _pending_decision_is_current(
+    receipt: dict[str, Any],
+    *,
+    active_critical_keys: set[str] | None,
+) -> bool:
+    """Hide a critical receipt when its originating signal is no longer open."""
+    if str(receipt.get("kind") or "").strip().lower() != "critical_signal":
+        return True
+    if active_critical_keys is None:
+        return True
+    dedupe_key = str(receipt.get("dedupe_key") or "").strip()
+    # Older/non-signal critical receipts may represent a real guarded action.
+    # Only filter the receipt shape that was created from a monitor signal.
+    if not dedupe_key.startswith("signal:"):
+        return True
+    return dedupe_key in active_critical_keys
+
+
 def _already_tracked(dedupe_key: str, existing: list[dict[str, Any]]) -> bool:
     needle = dedupe_key.lower()
     if not needle:
@@ -413,6 +471,15 @@ def build_autonomy_status_feed(*, workspace_id: str | None = None) -> dict[str, 
         limit=500,
         workspace_id=scoped_workspace or None,
     )
+    active_critical_keys = _active_critical_signal_keys(scoped_workspace)
+    pending = [
+        receipt
+        for receipt in pending
+        if _pending_decision_is_current(
+            receipt,
+            active_critical_keys=active_critical_keys,
+        )
+    ]
     last_scan_key = f"last_scan:{scoped_workspace}" if scoped_workspace else "last_scan"
     last_scan = autonomous_attention_store.get_meta(last_scan_key) or {}
     return {

@@ -76,6 +76,21 @@ class KairoTurnMemoryTests(unittest.TestCase):
         self.assertEqual("turn-1", turns[0]["content"])
         self.assertEqual("turn-8", turns[-1]["content"])
 
+    def test_transient_application_stopped_line_never_enters_session_memory(self) -> None:
+        session = "application-stopped-session"
+        remember_turn(session, "assistant", "Application stopped after the local restart.")
+        remember_turn(session, "assistant", "DashPro CI is still running.")
+
+        self.assertEqual(
+            [{"role": "assistant", "content": "DashPro CI is still running."}],
+            recent_turns(session),
+        )
+        clear_memory_cache_for_tests()
+        self.assertEqual(
+            [{"role": "assistant", "content": "DashPro CI is still running."}],
+            recent_turns(session),
+        )
+
     def test_not_now_clears_pending_dig_in(self) -> None:
         session = "decline-dig-in-session"
         remember_entities(

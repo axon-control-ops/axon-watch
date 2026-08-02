@@ -91,7 +91,7 @@ describe('useAgentTerminalMirror', () => {
     syncNow();
 
     expect(writeMirrorSnapshot).toHaveBeenCalledWith(
-      '$ RELEASE_GUARD_ALLOW_DIRTY=1 npm run ota\n# Publish OTA\nrunning…\n',
+      '$ RELEASE_GUARD_ALLOW_DIRTY=1 npm run ota\n# Publish OTA\n',
     );
   });
 

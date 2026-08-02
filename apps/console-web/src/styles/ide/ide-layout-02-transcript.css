@@ -111,6 +111,13 @@
   max-height: min(62vh, 32rem);
 }
 
+/* Long spoken reports grow only for the live utterance, then collapse back to
+   the compact 14-line transcript when speech ends. */
+.kairo-sidebar-speech--auto-expanded {
+  flex-grow: 0;
+  max-height: min(56vh, 28rem);
+}
+
 .kairo-sidebar-panel-host--team .kairo-sidebar-speech {
   max-height: min(38vh, 16rem);
   margin-inline: 0;
@@ -118,6 +125,10 @@
 
 .kairo-sidebar-panel-host--team .kairo-sidebar-speech--expanded {
   max-height: min(58vh, 28rem);
+}
+
+.kairo-sidebar-panel-host--team .kairo-sidebar-speech--auto-expanded {
+  max-height: min(54vh, 24rem);
 }
 
 .kairo-sidebar-speech[data-speaking='true'] {
@@ -254,6 +265,12 @@
   -webkit-line-clamp: 14;
 }
 
+.kairo-sidebar-speech--auto-expanded .kairo-sidebar-speech__text {
+  display: block;
+  overflow: auto;
+  -webkit-line-clamp: unset;
+}
+
 .kairo-sidebar-speech--awaiting-reply {
   max-height: min(58vh, 28rem);
 }
@@ -365,6 +382,10 @@
 
   .kairo-sidebar-speech--expanded {
     max-height: min(64vh, 24rem);
+  }
+
+  .kairo-sidebar-speech--auto-expanded {
+    max-height: min(60vh, 22rem);
   }
 }
 

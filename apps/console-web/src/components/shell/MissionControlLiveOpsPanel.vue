@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref } from 'vue';
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 
 import {
   fetchAutonomyStatus,
@@ -29,6 +29,8 @@ import {
 import {
   isTransmissionAskAnswered,
   markTransmissionAskAnswered,
+  pendingTransmissionAsk,
+  retainTransmissionAsk,
 } from '../../lib/vaxon-transmission-reply-state';
 import { useShellStore } from '../../stores/shell';
 import VaxonExecutiveComposer from './VaxonExecutiveComposer.vue';
@@ -96,6 +98,7 @@ const transmission = computed(() =>
   resolveVaxonTransmissionView({
     spokenText: spokenText.value,
     conversationReply: kairoConversationReply.value,
+    pendingDecision: pendingTransmissionAsk.value,
     speaking: shell.kairoSpeechActive || presencePhase.value === 'speaking',
     pending: pending.value || presencePhase.value === 'thinking',
   }),
@@ -104,11 +107,22 @@ const transmission = computed(() =>
 const spokenLine = computed(() => transmission.value.body);
 const asksForReply = computed(
   () =>
+    Boolean(pendingTransmissionAsk.value) &&
     vaxonLineAsksForReply(spokenLine.value) &&
     !transmission.value.empty &&
     !isTransmissionAskAnswered(spokenLine.value),
 );
 const affirmCta = computed(() => vaxonAffirmReplyCta(spokenLine.value));
+
+watch(
+  () => spokenText.value || kairoConversationReply.value,
+  (line) => {
+    if (vaxonLineAsksForReply(line)) {
+      retainTransmissionAsk(line);
+    }
+  },
+  { immediate: true },
+);
 
 const modeChip = computed(() => {
   if (presencePhase.value === 'speaking') return 'speaking';
@@ -147,10 +161,11 @@ async function sendReply(content: string): Promise<void> {
   if (!message || pending.value) {
     return;
   }
-  if (content === 'yes' || content === 'not now') {
-    markTransmissionAskAnswered(spokenLine.value);
-  }
+  const decisionLine = pendingTransmissionAsk.value || spokenLine.value;
   await submitTurn(message);
+  if (content === 'yes' || content === 'not now') {
+    markTransmissionAskAnswered(decisionLine);
+  }
 }
 
 function toggleMic(): void {
@@ -235,6 +250,7 @@ onUnmounted(() => {
     </div>
 
     <div class="mc-live-ops__scroll">
+      <div id="mission-control-approval-tray" class="mc-live-ops__approval-tray" />
       <article
         class="mc-transmission"
         :data-mode="transmission.mode"

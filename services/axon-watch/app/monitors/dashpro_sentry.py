@@ -8,9 +8,10 @@ import re
 from typing import Any
 from urllib.error import HTTPError, URLError
 from urllib.parse import quote
-from urllib.request import Request, urlopen
+from urllib.request import Request
 
 from app.monitors.sentry_issue_sample import extract_sentry_issue_sample
+from app.monitors.transport_retry import urlopen_with_retries
 from app.signals.sentry_issue_attendance_store import (
     attendance_map,
     should_suppress_issue,
@@ -51,7 +52,7 @@ def check_sentry_recent_issues(
     warning_threshold: int = 10,
     critical_threshold: int = 20,
     timeout_seconds: float = 20,
-    retries: int = 1,
+    retries: int = 2,
     environment: str | None = None,
     workspace_id: str = "workspace_dashpro",
 ) -> tuple[str, str, list[dict[str, object]]]:
@@ -74,33 +75,22 @@ def check_sentry_recent_issues(
             "User-Agent": "Axon-Watch-DashPro-Monitor/1.0",
         },
     )
-    attempts = max(1, int(retries) + 1)
     timeout = max(1.0, float(timeout_seconds))
-    status = 0
-    body = ""
-    last_exc: Exception | None = None
-    for attempt in range(attempts):
-        try:
-            with urlopen(request, timeout=timeout) as response:
-                status = int(response.status)
-                body = response.read().decode("utf-8", errors="replace")
-            last_exc = None
-            break
-        except HTTPError as exc:
-            status = int(exc.code)
-            body = exc.read().decode("utf-8", errors="replace")
-            last_exc = None
-            break
-        except (TimeoutError, URLError, OSError) as exc:
-            last_exc = exc
-            if attempt + 1 < attempts:
-                continue
-            # Transient network blips stay warning (not critical) so inbox severity
-            # can keep them below Attention thresholds via the shared marker.
-            return "warning", f"Sentry API query failed: {exc}", empty
-
-    if last_exc is not None:
-        return "warning", f"Sentry API query failed: {last_exc}", empty
+    try:
+        status, body = urlopen_with_retries(
+            request,
+            timeout=timeout,
+            retries=max(0, int(retries)),
+            backoff_seconds=0.5,
+        )
+    except (TimeoutError, URLError, OSError) as exc:
+        attempts = max(1, int(retries) + 1)
+        detail = f"Sentry API query failed: {exc}"
+        if attempts > 1:
+            detail = f"Sentry API query failed: {exc} (after {attempts} attempts)"
+        # Transient network blips stay warning (not critical) so inbox severity
+        # can keep them below Attention thresholds via the shared marker.
+        return "warning", detail, empty
 
     if status == 401:
         return "critical", "Sentry API rejected the auth token", empty

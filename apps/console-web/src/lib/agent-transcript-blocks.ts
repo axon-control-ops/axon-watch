@@ -1,6 +1,7 @@
 /** Parse block-annotated agent transcripts (:::thinking / :::edit / :::tool / :::terminal). */
 
 import { sanitizeAgentThinkingForOperator, THINKING_SPEECH_FALLBACK } from './agent-live-line-view';
+import { tryParseClarifyingMarkdown } from './agent-question-view';
 import { tryParseLegacyLeadFanOutText } from './lead-fan-out-card';
 import { looksLikeLeadStandupReport } from './lead-standup-card';
 
@@ -31,6 +32,15 @@ export function agentContentHasTranscriptBlocks(content: string): boolean {
       content,
     )
   ) {
+    return true;
+  }
+  // A runtime can return an ordinary numbered clarification instead of the
+  // preferred :::ask fence. The parser already upgrades that form, but the
+  // conversation surface used to gate the parser behind this function and
+  // therefore rendered it as inert markdown. Keep the render gate aligned
+  // with the parser so an operator never hears "choose on the ask card" with
+  // no card available to choose from.
+  if (tryParseClarifyingMarkdown(content) != null) {
     return true;
   }
   // Legacy Lead essays (pre-fence) still get the cinematic fan-out / stand-up cards.

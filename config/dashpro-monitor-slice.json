@@ -11,7 +11,7 @@
       "service": "Sentry",
       "environment": "production",
       "timeout_seconds": 20,
-      "retries": 1
+      "retries": 2
     },
     {
       "id": "dashpro_posthog_recent_events",
@@ -19,7 +19,7 @@
       "service": "PostHog",
       "limit": 5,
       "timeout_seconds": 20,
-      "retries": 1
+      "retries": 2
     },
     {
       "id": "dashpro_supabase_storage_quota",

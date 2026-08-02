@@ -56,21 +56,15 @@ class CliRuntimeAuthHealTests(unittest.TestCase):
             )
         )
 
-    def test_cursor_auth_retries_after_timeout(self) -> None:
+    def test_cursor_auth_times_out_without_a_second_cli_process(self) -> None:
         import subprocess
 
         from app.cli_runtime.auth_probes import cursor_auth_status
 
-        timed_out = subprocess.TimeoutExpired(cmd=["cursor", "agent", "status"], timeout=20)
-        ok = subprocess.CompletedProcess(
-            args=["cursor", "agent", "status"],
-            returncode=0,
-            stdout="✓ Logged in as axon@example.com\n",
-            stderr="",
-        )
+        timed_out = subprocess.TimeoutExpired(cmd=["cursor", "agent", "status"], timeout=10)
         with patch(
             "app.cli_runtime.auth_probes._run_command",
-            side_effect=[timed_out, ok],
+            side_effect=timed_out,
         ) as run:
             result = cursor_auth_status(
                 "/usr/bin/cursor",
@@ -78,8 +72,9 @@ class CliRuntimeAuthHealTests(unittest.TestCase):
                 env_keys={},
                 probe_env={"NO_COLOR": "1"},
             )
-        self.assertTrue(result["logged_in"])
-        self.assertEqual(2, run.call_count)
+        self.assertFalse(result["logged_in"])
+        self.assertIn("timed out", result["message"].lower())
+        self.assertEqual(1, run.call_count)
 
     def test_runtime_auth_gate_soft_opens_after_heal(self) -> None:
         from app.workspace_agents.scheduler_auto_start_gates import runtime_auth_blocks_auto_start

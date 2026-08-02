@@ -21,8 +21,8 @@ class WorkerSchedulerSettingsStoreTests(unittest.TestCase):
     def test_load_settings_defaults_off(self) -> None:
         settings = worker_scheduler_settings_store.load_settings()
         self.assertFalse(settings["scheduler_enabled"])
-        self.assertEqual(4, settings["max_active"])
-        self.assertEqual(2, settings["max_starts_per_tick"])
+        self.assertEqual(1, settings["max_active"])
+        self.assertEqual(1, settings["max_starts_per_tick"])
         self.assertEqual({}, settings["employee_enabled"])
 
     def test_patch_settings_persists_scheduler_toggle(self) -> None:

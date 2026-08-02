@@ -204,8 +204,6 @@ class OperatorPresenceSettingsApiTests(unittest.TestCase):
         ), patch(
             "app.runtime_summary_assembler.runtime_status_snapshot",
             return_value={"families": {}, "records": []},
-        ), patch(
-            "app.runtime_summary_assembler.schedule_runtime_status_refresh",
         ):
             enabled_briefing = self.client.get("/api/briefing").json()
         self.assertTrue(
@@ -231,8 +229,6 @@ class OperatorPresenceSettingsApiTests(unittest.TestCase):
         ), patch(
             "app.runtime_summary_assembler.runtime_status_snapshot",
             return_value={"families": {}, "records": []},
-        ), patch(
-            "app.runtime_summary_assembler.schedule_runtime_status_refresh",
         ):
             disabled_briefing = self.client.get("/api/briefing").json()
 
