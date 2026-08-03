@@ -1,0 +1,9 @@
+[Unit]
+Description=Watch local dev ref for Axon-X Console rebuilds
+
+[Path]
+PathChanged=%h/axon-nvme/repos/axon-watch/.git/refs/heads/dev
+Unit=console-web-rebuild.service
+
+[Install]
+WantedBy=default.target
