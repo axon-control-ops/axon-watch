@@ -7,7 +7,7 @@ import sys
 import unittest
 from pathlib import Path
 from unittest.mock import patch
-from urllib.error import HTTPError
+from urllib.error import URLError
 
 WATCH_SERVICE_ROOT = Path(__file__).resolve().parents[1] / "services" / "axon-watch"
 _WATCH_PATH = str(WATCH_SERVICE_ROOT)
@@ -40,31 +40,28 @@ class DashProSupabaseStorageMonitorTests(unittest.TestCase):
             sys.path.remove(_WATCH_PATH)
         sys.modules.update(self._saved_modules)
 
+    def _patch_request(self, handler):
+        def fake_request(request, *, timeout, retries):
+            return handler(request)
+
+        return patch.object(
+            self.dashpro_supabase_storage,
+            "_request_with_retries",
+            side_effect=fake_request,
+        )
+
     def test_storage_quota_critical_when_over_ninety_percent(self) -> None:
-        class _FakeResponse:
-            def __init__(self, status: int, payload):
-                self.status = status
-                self._payload = payload
-
-            def read(self):
-                return json.dumps(self._payload).encode("utf-8")
-
-            def __enter__(self):
-                return self
-
-            def __exit__(self, exc_type, exc, tb):
-                return False
-
         rows = [{"bucket_id": "tts-audio", "object_count": 10, "total_bytes": 980_000_000}]
 
-        def fake_urlopen(req, timeout=0):
-            if "/storage/v1/bucket" in req.full_url:
-                return _FakeResponse(200, [])
-            if "/rpc/monitor_storage_bucket_usage" in req.full_url:
-                return _FakeResponse(200, rows)
-            raise AssertionError(req.full_url)
+        def handler(request):
+            url = request.full_url
+            if "/storage/v1/bucket" in url:
+                return 200, json.dumps([])
+            if "/rpc/monitor_storage_bucket_usage" in url:
+                return 200, json.dumps(rows)
+            raise AssertionError(url)
 
-        with patch.object(self.dashpro_supabase_storage, "urlopen", side_effect=fake_urlopen):
+        with self._patch_request(handler):
             status, detail = self.dashpro_supabase_storage.check_supabase_storage_quota(
                 env={
                     "EXPO_PUBLIC_SUPABASE_URL": "https://example.supabase.co",
@@ -76,21 +73,6 @@ class DashProSupabaseStorageMonitorTests(unittest.TestCase):
         self.assertIn("tts-audio", detail)
 
     def test_storage_quota_warning_when_over_eighty_percent(self) -> None:
-        class _FakeResponse:
-            def __init__(self, status: int, payload):
-                self.status = status
-                self._payload = payload
-
-            def read(self):
-                return json.dumps(self._payload).encode("utf-8")
-
-            def __enter__(self):
-                return self
-
-            def __exit__(self, exc_type, exc, tb):
-                return False
-
-        # 85% of the default 1 GiB quota (850M was only ~79% and returned ok).
         rows = [
             {
                 "bucket_id": "tts-audio",
@@ -99,14 +81,15 @@ class DashProSupabaseStorageMonitorTests(unittest.TestCase):
             }
         ]
 
-        def fake_urlopen(req, timeout=0):
-            if "/storage/v1/bucket" in req.full_url:
-                return _FakeResponse(200, [])
-            if "/rpc/monitor_storage_bucket_usage" in req.full_url:
-                return _FakeResponse(200, rows)
-            raise AssertionError(req.full_url)
+        def handler(request):
+            url = request.full_url
+            if "/storage/v1/bucket" in url:
+                return 200, json.dumps([])
+            if "/rpc/monitor_storage_bucket_usage" in url:
+                return 200, json.dumps(rows)
+            raise AssertionError(url)
 
-        with patch.object(self.dashpro_supabase_storage, "urlopen", side_effect=fake_urlopen):
+        with self._patch_request(handler):
             status, detail = self.dashpro_supabase_storage.check_supabase_storage_quota(
                 env={
                     "EXPO_PUBLIC_SUPABASE_URL": "https://example.supabase.co",
@@ -124,25 +107,12 @@ class DashProSupabaseStorageMonitorTests(unittest.TestCase):
         self.assertIn("service-role", detail)
 
     def test_storage_quota_flags_402_restriction(self) -> None:
-        def fake_urlopen(req, timeout=0):
-            if "/storage/v1/bucket" in req.full_url:
-                raise HTTPError(
-                    req.full_url,
-                    402,
-                    "Payment Required",
-                    hdrs=None,
-                    fp=type(
-                        "Body",
-                        (),
-                        {
-                            "read": lambda self: b'{"error":"exceed_storage_size_quota"}',
-                            "close": lambda self: None,
-                        },
-                    )(),
-                )
-            raise AssertionError(req.full_url)
+        def handler(request):
+            if "/storage/v1/bucket" in request.full_url:
+                return 402, '{"error":"exceed_storage_size_quota"}'
+            raise AssertionError(request.full_url)
 
-        with patch.object(self.dashpro_supabase_storage, "urlopen", side_effect=fake_urlopen):
+        with self._patch_request(handler):
             status, detail = self.dashpro_supabase_storage.check_supabase_storage_quota(
                 env={
                     "EXPO_PUBLIC_SUPABASE_URL": "https://example.supabase.co",
@@ -154,16 +124,16 @@ class DashProSupabaseStorageMonitorTests(unittest.TestCase):
         self.assertIn("402", detail)
 
     def test_transport_failure_downgrades_to_warning(self) -> None:
-        with patch.object(
-            self.dashpro_supabase_storage,
-            "urlopen",
-            side_effect=TimeoutError("The read operation timed out"),
-        ):
+        def handler(request):
+            raise TimeoutError("The read operation timed out")
+
+        with self._patch_request(handler):
             status, detail = self.dashpro_supabase_storage.check_supabase_storage_quota(
                 env={
                     "EXPO_PUBLIC_SUPABASE_URL": "https://example.supabase.co",
                     "SUPABASE_SERVICE_ROLE_KEY": "service-role-key",
-                }
+                },
+                retries=0,
             )
 
         self.assertEqual("warning", status)
@@ -172,16 +142,16 @@ class DashProSupabaseStorageMonitorTests(unittest.TestCase):
     def test_transport_failure_maps_to_warning_inbox_severity(self) -> None:
         from app.signals.monitor_signal import monitor_inbox_item  # noqa: WPS433
 
-        with patch.object(
-            self.dashpro_supabase_storage,
-            "urlopen",
-            side_effect=TimeoutError("The read operation timed out"),
-        ):
+        def handler(request):
+            raise TimeoutError("The read operation timed out")
+
+        with self._patch_request(handler):
             status, detail = self.dashpro_supabase_storage.check_supabase_storage_quota(
                 env={
                     "EXPO_PUBLIC_SUPABASE_URL": "https://example.supabase.co",
                     "SUPABASE_SERVICE_ROLE_KEY": "service-role-key",
-                }
+                },
+                retries=0,
             )
 
         item = monitor_inbox_item(
@@ -203,59 +173,21 @@ class DashProSupabaseStorageMonitorTests(unittest.TestCase):
         )
 
     def test_storage_quota_falls_back_to_storage_api_when_storage_schema_is_blocked(self) -> None:
-        class _FakeResponse:
-            def __init__(self, status: int, payload):
-                self.status = status
-                self._payload = payload
-
-            def read(self):
-                return json.dumps(self._payload).encode("utf-8")
-
-            def __enter__(self):
-                return self
-
-            def __exit__(self, exc_type, exc, tb):
-                return False
-
-        def fake_urlopen(req, timeout=0):
-            url = req.full_url
+        def handler(request):
+            url = request.full_url
             if "/storage/v1/bucket" in url:
-                return _FakeResponse(200, [{"id": "tts-audio"}])
+                return 200, json.dumps([{"id": "tts-audio"}])
             if "/rpc/monitor_storage_bucket_usage" in url:
-                raise HTTPError(
-                    url,
-                    404,
-                    "Not Found",
-                    hdrs=None,
-                    fp=type(
-                        "Body",
-                        (),
-                        {"read": lambda self: b'{"code":"PGRST202"}', "close": lambda self: None},
-                    )(),
-                )
+                return 404, '{"code":"PGRST202"}'
             if "/rest/v1/objects" in url:
-                raise HTTPError(
-                    url,
-                    406,
-                    "Not Acceptable",
-                    hdrs=None,
-                    fp=type(
-                        "Body",
-                        (),
-                        {
-                            "read": lambda self: b'{"message":"The schema must be one of the following: public, graphql_public"}',
-                            "close": lambda self: None,
-                        },
-                    )(),
-                )
+                return 406, '{"message":"The schema must be one of the following: public, graphql_public"}'
             if "/storage/v1/object/list/tts-audio" in url:
-                return _FakeResponse(
-                    200,
-                    [{"id": "file_1", "name": "clip.mp3", "metadata": {"size": 980_000_000}}],
+                return 200, json.dumps(
+                    [{"id": "file_1", "name": "clip.mp3", "metadata": {"size": 980_000_000}}]
                 )
             raise AssertionError(url)
 
-        with patch.object(self.dashpro_supabase_storage, "urlopen", side_effect=fake_urlopen):
+        with self._patch_request(handler):
             status, detail = self.dashpro_supabase_storage.check_supabase_storage_quota(
                 env={
                     "EXPO_PUBLIC_SUPABASE_URL": "https://example.supabase.co",
@@ -265,6 +197,61 @@ class DashProSupabaseStorageMonitorTests(unittest.TestCase):
 
         self.assertEqual("critical", status)
         self.assertIn("tts-audio", detail)
+
+    def test_connection_reset_on_early_probe_falls_through_to_rpc(self) -> None:
+        rows = [{"bucket_id": "tts-audio", "object_count": 1, "total_bytes": 100_000_000}]
+        calls = {"storage_bucket": 0}
+
+        def handler(request):
+            url = request.full_url
+            if "/storage/v1/bucket" in url:
+                calls["storage_bucket"] += 1
+                raise URLError("[Errno 104] Connection reset by peer")
+            if "/rpc/monitor_storage_bucket_usage" in url:
+                return 200, json.dumps(rows)
+            raise AssertionError(url)
+
+        with self._patch_request(handler):
+            status, detail = self.dashpro_supabase_storage.check_supabase_storage_quota(
+                env={
+                    "EXPO_PUBLIC_SUPABASE_URL": "https://example.supabase.co",
+                    "SUPABASE_SERVICE_ROLE_KEY": "service-role-key",
+                },
+                retries=2,
+            )
+
+        self.assertEqual("ok", status)
+        self.assertIn("tts-audio", detail)
+        self.assertGreaterEqual(calls["storage_bucket"], 1)
+
+    def test_connection_reset_retries_before_warning(self) -> None:
+        attempts = {"count": 0}
+
+        def fake_urlopen_with_retries(request, *, timeout, retries, backoff_seconds=0.5, read_response=None):
+            attempts["count"] += 1
+            url = request.full_url
+            if "/storage/v1/bucket" in url:
+                return 200, "[]"
+            raise URLError("[Errno 104] Connection reset by peer")
+
+        with patch.object(
+            self.dashpro_supabase_storage,
+            "urlopen_with_retries",
+            side_effect=fake_urlopen_with_retries,
+        ):
+            status, detail = self.dashpro_supabase_storage.check_supabase_storage_quota(
+                env={
+                    "EXPO_PUBLIC_SUPABASE_URL": "https://example.supabase.co",
+                    "SUPABASE_SERVICE_ROLE_KEY": "service-role-key",
+                },
+                retries=2,
+            )
+
+        self.assertEqual("warning", status)
+        self.assertIn("Supabase Storage API query failed", detail)
+        self.assertIn("after 3 attempts", detail)
+        # Early probe succeeds once; RPC path is attempted after transient fall-through.
+        self.assertGreaterEqual(attempts["count"], 2)
 
 
 if __name__ == "__main__":

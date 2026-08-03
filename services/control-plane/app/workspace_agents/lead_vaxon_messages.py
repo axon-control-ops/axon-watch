@@ -78,7 +78,7 @@ def build_ad_hoc_lead_vaxon_message(
     if next_line:
         lines.append(f"Next action: {sentence_text(next_line, max_len=220)}")
     else:
-        lines.append("Next action: Dana will advance the active plan or surface the blocker.")
+        lines.append("Next action: Dana is queued to verify the active plan and advance the next safe step.")
     lines.append("Confidence: 8/10")
     return "\n".join(lines)
 

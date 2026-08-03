@@ -24,7 +24,9 @@
     {
       "id": "dashpro_supabase_storage_quota",
       "type": "supabase_storage_quota",
-      "service": "Supabase Storage"
+      "service": "Supabase Storage",
+      "timeout_seconds": 20,
+      "retries": 2
     },
     {
       "id": "dashpro_marketing_site_health",

@@ -44,6 +44,19 @@ class LeadTakeoverTests(unittest.TestCase):
         )
         self.assertIn("decide when to run the parent notify", extract_lead_next(text))
 
+    def test_extract_lead_next_accepts_specialist_next_action(self) -> None:
+        from app.workspace_agents.lead_takeover import extract_lead_next
+
+        text = (
+            "Outcome: self-hosted Quality Gates are hardened locally.\n"
+            "Next action: Decide whether to commit and push the verified changes to development.\n"
+            "Confidence: 8/10"
+        )
+        self.assertEqual(
+            "Decide whether to commit and push the verified changes to development.",
+            extract_lead_next(text),
+        )
+
     def test_ad_hoc_specialist_completion_posts_dana_takeover(self) -> None:
         from app.persistence import chat_store, task_store
         from app.workspace_agents import lead_adhoc_receipt_store

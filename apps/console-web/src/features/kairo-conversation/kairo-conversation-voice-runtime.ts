@@ -17,6 +17,7 @@ import {
   scheduleBriefingSurfaceOffer,
 } from './conversation-briefing-surface';
 import { recordVaxonBriefingInteraction } from '../../lib/vaxon-briefing-interaction';
+import { vaxonLineAsksForReply } from '../../lib/vaxon-reply-prompt';
 import { kairoConversationReply } from './kairo-conversation-state';
 import {
   RUNTIME_ASSISTANT_CUE_LINE,
@@ -104,7 +105,8 @@ export function createKairoVoiceDelivery(input: {
     const spokenReply = sanitizeSpokenReply(options?.spokenReply || reply);
     kairoConversationReply.value = normalizeKairoCopy(displayReply || spokenReply);
     const workspaceId = input.shell.currentWorkspace?.workspace_id?.trim();
-    if (workspaceId && kairoConversationReply.value) {
+    // Decision cards are intentionally sticky; status narration is not.
+    if (workspaceId && vaxonLineAsksForReply(kairoConversationReply.value)) {
       recordVaxonBriefingInteraction({
         workspaceId,
         line: kairoConversationReply.value,

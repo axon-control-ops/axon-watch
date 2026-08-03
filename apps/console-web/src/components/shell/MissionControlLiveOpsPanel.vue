@@ -21,6 +21,8 @@ import { resolveGalaxyPresence } from '../../features/brain-galaxy/galaxy-presen
 import { projectLiveOperationsStream } from '../../features/brain-galaxy/live-operations-stream';
 import { companyBusyEmployeesCount } from '../../features/workspace-agents/company-roster-busy';
 import MissionControlAutonomyControl from './MissionControlAutonomyControl.vue';
+import WorkerDeliveryPipelineCard from './WorkerDeliveryPipelineCard.vue';
+import { useDockDeliveryPipeline } from './use-dock-delivery-pipeline';
 import { resolveVaxonTransmissionView } from '../../lib/mc-vaxon-transmission-view';
 import {
   vaxonAffirmReplyCta,
@@ -93,6 +95,14 @@ const streamItems = computed(() =>
     autonomyMode: autonomyMode.value,
   }),
 );
+
+// A Lead run may finish as soon as it opens a draft PR while the delivery
+// watcher continues through CI. Keep that visible in Mission Control instead
+// of reverting the operator surface to an apparently idle state.
+const deliveryPipeline = useDockDeliveryPipeline({
+  receiptLabels: computed(() => shell.runHistoryRows.map((row) => row.label)),
+  employees: computed(() => shell.companyEmployeesForCurrentWorkspace),
+});
 
 const transmission = computed(() =>
   resolveVaxonTransmissionView({
@@ -304,6 +314,11 @@ onUnmounted(() => {
           Standby
         </span>
       </div>
+
+      <WorkerDeliveryPipelineCard
+        v-if="deliveryPipeline"
+        :pipeline="deliveryPipeline"
+      />
 
       <ul class="mc-live-ops__stream" aria-label="Live updates">
         <li

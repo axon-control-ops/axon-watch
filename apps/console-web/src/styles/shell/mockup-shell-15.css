@@ -274,6 +274,74 @@
   font-style: normal;
 }
 
+.kairo-conversation-bar__decision {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.7rem;
+  padding: 0.5rem 0.65rem;
+  border: 1px solid rgba(255, 196, 72, 0.42);
+  border-radius: 0.55rem;
+  background: rgba(42, 28, 5, 0.88);
+  box-shadow: inset 0 0 0 1px rgba(255, 196, 72, 0.08);
+}
+
+.kairo-conversation-bar__decision-label,
+.kairo-conversation-bar__decision-copy {
+  margin: 0;
+}
+
+.kairo-conversation-bar__decision-label {
+  color: rgba(255, 214, 140, 0.95);
+  font-size: 0.61rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.kairo-conversation-bar__decision-copy {
+  margin-top: 0.14rem;
+  color: var(--text-secondary);
+  font-size: 0.68rem;
+  line-height: 1.35;
+}
+
+.kairo-conversation-bar__decision-actions {
+  display: flex;
+  flex: 0 0 auto;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.3rem;
+}
+
+.kairo-conversation-bar__decision-actions button {
+  border: 1px solid rgba(255, 196, 72, 0.35);
+  border-radius: 999px;
+  background: rgba(255, 196, 72, 0.1);
+  color: rgba(255, 222, 155, 0.95);
+  font-size: 0.58rem;
+  letter-spacing: 0.04em;
+  padding: 0.24rem 0.48rem;
+  text-transform: uppercase;
+}
+
+.kairo-conversation-bar__decision-actions .kairo-conversation-bar__decision-dismiss {
+  border-color: transparent;
+  background: transparent;
+  color: var(--text-muted);
+}
+
+@media (max-width: 720px) {
+  .kairo-conversation-bar__decision {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .kairo-conversation-bar__decision-actions {
+    justify-content: flex-start;
+  }
+}
+
 .handoff-to-ide-button {
   margin-top: 0.35rem;
   border: 1px solid rgba(0, 242, 255, 0.28);
@@ -344,4 +412,3 @@
   padding: 0.85rem;
   overflow: auto;
 }
-

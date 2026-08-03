@@ -25,6 +25,10 @@ _LEAD_NEXT_RE = re.compile(
     r"(?:blockers?\s*/\s*lead\s*next|lead\s*next|lead:)\s*[-–—:]?\s*(.+)",
     re.IGNORECASE,
 )
+_NEXT_ACTION_RE = re.compile(
+    r"^(?:next\s+action|next\s+step|recommended\s+next\s+step)\s*[-–—:]?\s*(.+)$",
+    re.IGNORECASE,
+)
 
 
 def _utc_now_iso() -> str:
@@ -52,6 +56,9 @@ def extract_lead_next(reply_text: str | None) -> str:
         lead_match = re.match(r"^lead\s*:?\s*\*{0,2}\s*(.+)$", cleaned, flags=re.IGNORECASE)
         if lead_match:
             return _truncate(lead_match.group(1).strip().lstrip("*").strip(), max_len=280)
+        next_action_match = _NEXT_ACTION_RE.match(cleaned)
+        if next_action_match:
+            return _truncate(next_action_match.group(1).strip().lstrip("*").strip(), max_len=280)
     match = _LEAD_NEXT_RE.search(body)
     if not match:
         return ""

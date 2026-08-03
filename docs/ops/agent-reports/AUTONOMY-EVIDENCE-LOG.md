@@ -304,3 +304,18 @@ Template:
 - upgrade proposals: (1) Reed: inspect/light Gate 6 when paths=0 on decision/triage tasks; (2) include failed check excerpts in delivery blocker text; (3) reduce failed_shift clone storms when Lead Gate 6 retries
 - residual risks: Rowan still Gate 6-blocked until watcher thread clears; DashPro CI still product-owned; no product code change this Lead turn (receipts/handoff only)
 - next gate unlocked: Rowan clear Gate 6 on watcher thread; Reed land paths=0 triage policy; Dana clear DashPro CI signals
+
+### Lead continuous shift retry (Gate 6) — 2026-08-03 (~09:40 SAST)
+- owner: lead (`run_f42211bb2de9`; prior task-bound fails `run_b7a3c9ab4b17` / `run_24d5fbf29824` on `task-b6518ca32de34c37` — Gate 6 `acceptance=fail · failed_checks=typecheck,test,build · mode=contract · paths=0`)
+- commit: evidence append only (no push this shift)
+- commands run: `GET /health` + `/api/runtime/summary` + `/api/briefing` + `/api/workspaces/workspace_axon_watch/company` + `/api/connectors` + `/api/runs/run_24d5fbf29824/history`; console `:5173` (200); `gh run list` Fast Gate success `30788906859` + `30788814056`; `unittest` Gate6+Lead (36 OK); `check_hotspot_changes.py` pass; `check_file_sizes.py` pass; `POST /api/lead/plans/lead-plan-806a09922d6040ac/synthesize` → `lead-receipt-2e8b6534dfed4c4e`; receipt append in `lead-continuous-shift-retry-gate6-2026-07-28.md`
+- pass/fail: pass for bounded Lead retry — prior Gate 6 root-caused, fleet green, Fast Gate green, plan synthesized, Gate 6 acceptance receipt documented
+- exit criteria met: yes for bounded Lead shift (priorities / hierarchy / Fast Gate triage / coach workspace leads / propose upgrades)
+- Fast Gate: **success** latest `30788906859` on `worker/extract-autonomous-attention-status` — https://github.com/axon-control-ops/axon-watch/actions/runs/30788906859 ; Rowan pipeline `30788814056` — https://github.com/axon-control-ops/axon-watch/actions/runs/30788814056
+- fleet: control-plane ok · watch connected · connectors 6/6 ok (mid-shift github_api timeout recovered on re-probe) · console 200 · Jules/Reed/Quinn last_outcome completed · Rowan last_outcome completed (`run_1900a404b619`)
+- root cause: task-bound isolation with **paths=0** still executes full contract typecheck/test/build; Critical Review 9/10 can pass while delivery fails on Gate 6 alone
+- acceptance evidence: `acceptance=pass · intent=gate6_acceptance · actor=lead-retry-receipt · summary=Prior run_24d5fbf29824/run_b7a3c9ab4b17 triaged (paths=0 + typecheck/test/build); health+console green; connectors 6/6; Fast Gate 30788906859 + 30788814056; Gate6+Lead 36 OK; hotspot+file-size pass; lead-plan-806a09922d6040ac → lead-receipt-2e8b6534dfed4c4e; Reed owns paths=0 inspect policy; ship not approved`
+- coach decisions: Reed → Gate 6 light/inspect when paths=0 on triage/Lead decision tasks; Rowan → watch GitHub API probe flaps; Dana → DashPro CI remains product-owned; Jules/Quinn idle/green; do not re-decompose Lead Gate 6 retries onto specialists
+- upgrade proposals: (1) Reed: inspect/light Gate 6 when paths=0 on decision/triage tasks; (2) include failed check excerpts in delivery blocker text; (3) keep Lead/Gate6 shift retries on Lead (synthesize already cancelled clones)
+- residual risks: next task-bound Lead continuous dispatch can still Gate 6-fail until Reed lands paths=0 policy; DashPro Android CI needs Dana/Sir King Decide
+- next gate unlocked: Reed land paths=0 triage policy; Dana clear DashPro CI signals
