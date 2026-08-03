@@ -42,7 +42,10 @@ const riskDraft = ref('normal');
 const attemptBudgetDraft = ref(3);
 const dependenciesDraft = ref('');
 const createAsLeadPlan = ref(false);
-const showCreate = ref(false);
+// Mission Control is VAXON's orchestration surface. Keep the task composer
+// visible so an operator can delegate or fan out work without dropping into
+// the compact conversational reply seam.
+const showCreate = ref(true);
 const showHistory = ref(false);
 const selectedTaskId = ref<string | null>(null);
 const selectedDrawerEl = ref<HTMLElement | null>(null);
@@ -288,7 +291,6 @@ async function submitTask(): Promise<void> {
   goalDraft.value = '';
   acceptanceDraft.value = '';
   dependenciesDraft.value = '';
-  showCreate.value = false;
   if (result.selectedTaskId) {
     selectedTaskId.value = result.selectedTaskId;
   }
@@ -419,7 +421,7 @@ function activateNextUp(row: TaskBoardRow): void {
               :aria-expanded="showCreate ? 'true' : 'false'"
               @click="showCreate = !showCreate"
             >
-              {{ showCreate ? 'Hide form' : '+ Add task' }}
+              {{ showCreate ? 'Hide work composer' : 'Show work composer' }}
             </button>
           </div>
         </div>

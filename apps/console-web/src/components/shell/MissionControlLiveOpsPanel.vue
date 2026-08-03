@@ -32,11 +32,11 @@ import {
   markTransmissionAskAnswered,
 } from '../../lib/vaxon-transmission-reply-state';
 import { useShellStore } from '../../stores/shell';
+import VaxonExecutiveComposer from './VaxonExecutiveComposer.vue';
 
 const shell = useShellStore();
 const { spokenText } = useSpokenUtteranceText();
 const { pending, submitTurn, speechCapture } = useKairoConversation();
-const reply = ref('');
 const showTransmissionDetail = ref(false);
 const autonomyReceipts = ref<AutonomyReceipt[]>([]);
 const autonomyEffective = ref(false);
@@ -147,16 +147,21 @@ const focusedWorkspaceLabel = computed(() => {
   return ws.display_name?.trim() || ws.workspace_id;
 });
 
-async function sendReply(content?: string): Promise<void> {
-  const message = (content ?? reply.value).trim();
+async function sendReply({
+  content,
+  submissionIntent = 'ask',
+}: {
+  content: string;
+  submissionIntent?: 'ask' | 'dispatch';
+}): Promise<void> {
+  const message = content.trim();
   if (!message || pending.value) {
     return;
   }
-  if (content === 'yes' || content === 'not now') {
+  if (message === 'yes' || message === 'not now') {
     markTransmissionAskAnswered(spokenLine.value);
   }
-  reply.value = '';
-  await submitTurn(message);
+  await submitTurn(message, { submissionIntent });
 }
 
 function toggleMic(): void {
@@ -278,10 +283,10 @@ onUnmounted(() => {
           {{ showTransmissionDetail ? 'Hide detail' : `Show detail (${transmission.detailLines.length})` }}
         </button>
         <div v-if="asksForReply" class="mc-transmission__actions">
-          <button type="button" :disabled="pending" @click="void sendReply('yes')">
+          <button type="button" :disabled="pending" @click="void sendReply({ content: 'yes' })">
             {{ affirmCta }}
           </button>
-          <button type="button" :disabled="pending" @click="void sendReply('not now')">
+          <button type="button" :disabled="pending" @click="void sendReply({ content: 'not now' })">
             Not now
           </button>
         </div>
@@ -329,34 +334,14 @@ onUnmounted(() => {
       </ul>
     </div>
 
-    <div class="mc-live-ops__reply">
-      <form class="mc-live-ops__reply-form" @submit.prevent="void sendReply()">
-        <button
-          type="button"
-          class="mc-live-ops__mic"
-          :data-live="micLive ? 'true' : 'false'"
-          :disabled="!speechCapture.supported || pending"
-          :title="micLive ? 'Stop listening' : 'Talk to VAXON'"
-          :aria-pressed="micLive"
-          @click="toggleMic"
-        >
-          Mic
-        </button>
-        <input
-          v-model="reply"
-          type="text"
-          autocomplete="off"
-          :placeholder="`Talk to ${OPERATOR_PERSONA_NAME}… or REPORT`"
-          :disabled="pending"
-        >
-        <span class="mc-live-ops__wave" aria-hidden="true">
-          <i /><i /><i /><i /><i />
-        </span>
-        <button type="submit" class="mc-live-ops__send" :disabled="pending || !reply.trim()">
-          {{ pending ? '…' : 'Send' }}
-        </button>
-      </form>
-    </div>
+    <VaxonExecutiveComposer
+      :pending="pending"
+      :mic-live="micLive"
+      :mic-supported="speechCapture.supported"
+      :focused-workspace-label="focusedWorkspaceLabel"
+      @submit="void sendReply($event)"
+      @toggle-mic="toggleMic"
+    />
   </section>
 </template>
 
