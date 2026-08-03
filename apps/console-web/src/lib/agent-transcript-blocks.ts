@@ -1,6 +1,9 @@
 /** Parse block-annotated agent transcripts (:::thinking / :::edit / :::tool / :::terminal). */
+/** Parse caching is extracted to ./agent-transcript/parse-cache.ts. */
+/** Callers should keep importing from this module; exports are unchanged. */
 
 import { sanitizeAgentThinkingForOperator, THINKING_SPEECH_FALLBACK } from './agent-live-line-view';
+import { tryParseClarifyingMarkdown } from './agent-question-view';
 import { tryParseLegacyLeadFanOutText } from './lead-fan-out-card';
 import { looksLikeLeadStandupReport } from './lead-standup-card';
 
@@ -22,8 +25,9 @@ export {
 import type { AgentTranscriptSegment } from './agent-transcript/types';
 import {
   parseAgentTranscriptBlocksUncached,
-  type ParseAgentTranscriptOptions,
 } from './agent-transcript/parse-transcript-blocks';
+export { parseAgentTranscriptBlocks } from './agent-transcript/parse-cache';
+import { parseAgentTranscriptBlocks } from './agent-transcript/parse-cache';
 
 export function agentContentHasTranscriptBlocks(content: string): boolean {
   if (
@@ -31,6 +35,15 @@ export function agentContentHasTranscriptBlocks(content: string): boolean {
       content,
     )
   ) {
+    return true;
+  }
+  // A runtime can return an ordinary numbered clarification instead of the
+  // preferred :::ask fence. The parser already upgrades that form, but the
+  // conversation surface used to gate the parser behind this function and
+  // therefore rendered it as inert markdown. Keep the render gate aligned
+  // with the parser so an operator never hears "choose on the ask card" with
+  // no card available to choose from.
+  if (tryParseClarifyingMarkdown(content) != null) {
     return true;
   }
   // Legacy Lead essays (pre-fence) still get the cinematic fan-out / stand-up cards.
@@ -51,23 +64,6 @@ export function countAgentTranscriptHeaders(content: string): {
     tool: content.match(/^:::tool\s+/gm)?.length ?? 0,
     research: content.match(/^:::research\s+/gm)?.length ?? 0,
   };
-}
-
-const PARSE_CACHE_LIMIT = 2;
-const parseCache = new Map<string, AgentTranscriptSegment[]>();
-
-function rememberParsedSegments(
-  content: string,
-  segments: AgentTranscriptSegment[],
-): AgentTranscriptSegment[] {
-  parseCache.set(content, segments);
-  if (parseCache.size > PARSE_CACHE_LIMIT) {
-    const oldest = parseCache.keys().next().value;
-    if (oldest !== undefined) {
-      parseCache.delete(oldest);
-    }
-  }
-  return segments;
 }
 
 export function collapseClosedEditSegmentsForDisplay(
@@ -119,20 +115,6 @@ export function prepareAgentTranscriptSegmentsForDisplay(
       ? parseAgentTranscriptBlocksUncached(content, { omitClosedEditDiffs: true })
       : parseAgentTranscriptBlocks(content);
   return collapseClosedEditSegmentsForDisplay(segments, threshold);
-}
-
-export function parseAgentTranscriptBlocks(
-  content: string,
-  options?: ParseAgentTranscriptOptions,
-): AgentTranscriptSegment[] {
-  if (options?.omitClosedEditDiffs) {
-    return parseAgentTranscriptBlocksUncached(content, options);
-  }
-  const cached = parseCache.get(content);
-  if (cached) {
-    return cached;
-  }
-  return rememberParsedSegments(content, parseAgentTranscriptBlocksUncached(content));
 }
 
 export type DiffLineTone = 'add' | 'remove' | 'meta' | 'context';

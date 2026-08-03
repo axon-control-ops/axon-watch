@@ -169,7 +169,8 @@ const displayActions = computed(() =>
       :aria-live="failure ? 'polite' : undefined"
       role="status"
     >
-      {{ liveBeat }}
+      <span class="agent-persona-dock__beat-label">Live report</span>
+      <span class="agent-persona-dock__beat-copy">{{ liveBeat }}</span>
     </p>
 
     <div

@@ -158,6 +158,9 @@ export async function createXtermSession(
     mirrorMode = true;
     disposeSocket();
     const normalized = text.replace(/\n/g, '\r\n');
+    if (normalized === lastMirrorText) {
+      return;
+    }
     if (lastMirrorText && normalized.startsWith(lastMirrorText)) {
       const delta = normalized.slice(lastMirrorText.length);
       if (delta) {
@@ -166,7 +169,14 @@ export async function createXtermSession(
       lastMirrorText = normalized;
       return;
     }
-    terminal.reset();
+    if (lastMirrorText) {
+      // A streamed runtime can occasionally correct or compact earlier output.
+      // Keep the existing xterm buffer stable rather than resetting it (which
+      // flashes the terminal blank and loses the operator's scroll position).
+      terminal.write('\r\n[mirror snapshot updated]\r\n');
+    } else {
+      terminal.reset();
+    }
     terminal.write(normalized);
     lastMirrorText = normalized;
   };

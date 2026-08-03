@@ -312,6 +312,29 @@ describe('parseAgentTranscriptBlocks', () => {
       { kind: 'text', text: 'Just a reply' },
     ]);
   });
+
+  it('flags plain numbered clarifications so the conversation renders an Ask card', () => {
+    const content = [
+      'Which path should Marco take?',
+      '',
+      '1. Retry the focused check',
+      '2. Open the failure receipt first',
+      '',
+      'Reply with 1 or 2.',
+    ].join('\n');
+    expect(agentContentHasTranscriptBlocks(content)).toBe(true);
+    expect(parseAgentTranscriptBlocks(content)).toEqual([
+      {
+        kind: 'question',
+        prompt: 'Which path should Marco take?',
+        options: [
+          { id: '1', label: 'Retry the focused check' },
+          { id: '2', label: 'Open the failure receipt first' },
+        ],
+        open: false,
+      },
+    ]);
+  });
 });
 
 describe('diffLineTone', () => {

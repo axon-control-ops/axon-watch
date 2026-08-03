@@ -3,18 +3,35 @@ from __future__ import annotations
 import sys
 import unittest
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 CONTROL_PLANE_ROOT = Path(__file__).resolve().parents[1] / "services" / "control-plane"
 sys.path.insert(0, str(CONTROL_PLANE_ROOT))
 
 from app.cli_runtime.cursor_usage_probe import (  # noqa: E402
+    _read_cursor_auth_item,
     cursor_usage_allows_agent_retry,
     probe_cursor_usage,
 )
 
 
 class CursorUsageProbeTests(unittest.TestCase):
+    def test_auth_probe_closes_its_read_only_state_database(self) -> None:
+        connection = MagicMock()
+        connection.execute.return_value.fetchone.return_value = ("token",)
+        with (
+            patch(
+                "app.cli_runtime.cursor_usage_probe._state_db_path",
+                return_value=Path("/tmp/cursor-state.vscdb"),
+            ),
+            patch(
+                "app.cli_runtime.cursor_usage_probe.sqlite3.connect",
+                return_value=connection,
+            ),
+        ):
+            self.assertEqual("token", _read_cursor_auth_item("cursorAuth/accessToken"))
+        connection.close.assert_called_once_with()
+
     def test_allows_retry_when_on_demand_or_auto_headroom(self) -> None:
         self.assertTrue(
             cursor_usage_allows_agent_retry(

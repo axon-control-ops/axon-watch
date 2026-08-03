@@ -360,8 +360,7 @@ def build_operator_briefing(
         },
         "active_runs": active_runs,
         "next_safe_actions": next_safe_actions,
-        "awaiting_engagement_count": lead_awaiting_engagement_count
-        + sum(1 for run in active_runs if run.get("phase") == "review_ready"),
+        "awaiting_engagement_count": lead_awaiting_engagement_count,
         "degraded": runtime_summary["degraded"],
         "cli_runtime": runtime_summary.get("cli_runtime", {}),
         "connectivity": connectivity,

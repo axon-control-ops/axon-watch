@@ -44,7 +44,7 @@ describe('agent terminal mirror', () => {
         output: '',
         open: true,
       }),
-    ).toBe('$ npm test\nrunning…\n');
+    ).toBe('$ npm test\n');
 
     expect(
       buildAgentTerminalMirrorText({
@@ -70,9 +70,16 @@ describe('agent terminal mirror', () => {
         'Release guard: dirty tree',
         '',
         '$ RELEASE_GUARD_ALLOW_DIRTY=1 npm run ota',
-        'running…',
       ].join('\n') + '\n',
     );
+  });
+
+  it('keeps a live run append-only as output arrives', () => {
+    const before = buildAgentTerminalMirrorScrollback(':::terminal npm run ota');
+    const after = buildAgentTerminalMirrorScrollback(
+      [':::terminal npm run ota', 'Exporting…'].join('\n'),
+    );
+    expect(after?.startsWith(before ?? '')).toBe(true);
   });
 
   it('keeps every terminal segment unless a caller explicitly limits history', () => {

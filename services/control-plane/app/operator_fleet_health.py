@@ -72,7 +72,11 @@ def build_operator_fleet_health(
         pending_approvals_count = sum(
             1 for run in workspace_runs if run.get("phase") == "awaiting_approval"
         )
+        # Badge count = true critical only. Health tone still goes hot for high.
         critical_signals_count = sum(
+            1 for signal in workspace_signals if signal.get("severity") == "critical"
+        )
+        hot_signals_count = sum(
             1
             for signal in workspace_signals
             if signal.get("severity") in {"critical", "high"}
@@ -89,7 +93,7 @@ def build_operator_fleet_health(
                     executing_count=executing_count,
                     pending_approvals_count=pending_approvals_count,
                     open_signals_count=len(workspace_signals),
-                    critical_signals_count=critical_signals_count,
+                    critical_signals_count=hot_signals_count,
                 ),
                 "active_runs": len(workspace_runs),
                 "review_ready_count": review_ready_count,

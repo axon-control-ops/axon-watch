@@ -36,8 +36,8 @@ class WorkerSchedulerRouteTests(unittest.TestCase):
         # Test DB isolation disables the env brake so the scheduler loop never starts.
         self.assertFalse(payload["env_allowed"])
         self.assertTrue(payload["blocked_by_env"])
-        self.assertEqual(4, payload["max_active"])
-        self.assertEqual(2, payload["max_starts_per_tick"])
+        self.assertEqual(1, payload["max_active"])
+        self.assertEqual(1, payload["max_starts_per_tick"])
         self.assertEqual(0, payload["executing_count"])
         self.assertEqual({}, payload["employee_enabled"])
 

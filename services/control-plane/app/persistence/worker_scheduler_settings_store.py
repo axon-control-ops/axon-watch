@@ -46,8 +46,11 @@ def default_settings() -> dict[str, Any]:
     # Safe default: continuous workers stay off until an operator enables them in UI.
     return {
         "scheduler_enabled": False,
-        "max_active": 4,
-        "max_starts_per_tick": 2,
+        # One local Cursor worker can itself fan out into tool/build processes.
+        # Keep the default well below the point where desktop responsiveness
+        # becomes unreliable; an operator can intentionally raise it later.
+        "max_active": 1,
+        "max_starts_per_tick": 1,
         "employee_enabled": {},
     }
 

@@ -72,6 +72,24 @@
     0 0 1.2rem rgba(0, 140, 200, 0.12);
 }
 
+/*
+ * Stability mode: the host has exhibited repeated NVIDIA DRM warnings while
+ * GNOME/Wayland releases accelerated surfaces.  Keep the embedded operations
+ * Orb informative but static: it should not add a permanent compositor load
+ * or create more animated layers while the host graphics stack is unstable.
+ */
+.mc-live-ops__orb-stage,
+.mc-live-ops__orb-stage *,
+.mc-live-ops__orb-stage::before,
+.mc-live-ops__orb-stage::after {
+  animation: none !important;
+  transition: none !important;
+}
+
+.mc-live-ops__orb-stage :is(.kairo-galaxy-orb__cinematic, .kairo-galaxy-orb__trigger) {
+  filter: none !important;
+}
+
 .mc-live-ops__orb-visual {
   position: relative;
   display: grid;
@@ -181,6 +199,10 @@
   flex: 1 1 auto;
   min-height: 0;
   overflow: hidden;
+}
+
+.mc-live-ops__approval-tray:empty {
+  display: none;
 }
 
 .mc-live-ops__modes {

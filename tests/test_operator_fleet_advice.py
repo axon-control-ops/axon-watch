@@ -260,8 +260,8 @@ class OperatorFleetAdviceTests(unittest.TestCase):
             },
         )
         self.assertEqual(
-            "Handoff to DashPro is open — switch there and finish “Finish DashPro follow-up”."
-            " Pause more axon-watch work until that closes.",
+            "VAXON owns an open handoff in DashPro: “Finish DashPro follow-up”."
+            " Route or close it; keep axon-watch moving on fresh verified work.",
             advise,
         )
         from app.operator_fleet_advice import build_advise_ui_action
@@ -274,10 +274,12 @@ class OperatorFleetAdviceTests(unittest.TestCase):
         self.assertEqual("workspace_dashpro", action["workspace_id"])
         self.assertTrue(action["focus_attention"])
 
-    def test_open_handoff_advice_keeps_the_complete_task(self) -> None:
+    def test_open_handoff_advice_truncates_long_task_bodies(self) -> None:
         task = (
             "DashPro PostHog warning, PostHog API query failed, "
-            "The read operation timed out while loading project insights"
+            "The read operation timed out while loading project insights. "
+            "Also keep recycling this long control-plane history paragraph so the "
+            "operator cannot read the Live Transmission card at a glance."
         )
         pack = build_fleet_advice_pack(
             active_run_records=[],
@@ -308,8 +310,11 @@ class OperatorFleetAdviceTests(unittest.TestCase):
             },
         )
 
-        self.assertIn(f"finish “{task}”", advise)
-        self.assertNotIn("…", advise)
+        self.assertIn("VAXON owns an open handoff in DashPro", advise)
+        self.assertIn("DashPro PostHog warning", advise)
+        # Long handoff bodies are truncated so Live Transmission stays readable.
+        self.assertIn("…", advise)
+        self.assertNotIn("cannot read the Live Transmission card", advise)
 
 
 if __name__ == "__main__":

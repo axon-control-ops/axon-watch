@@ -178,7 +178,13 @@ class WorkspaceAgentSchedulerTests(unittest.TestCase):
                 },
                 clear=False,
             ):
-                worker_scheduler_settings_store.patch_settings({"scheduler_enabled": True})
+                worker_scheduler_settings_store.patch_settings(
+                    {
+                        "scheduler_enabled": True,
+                        "max_active": 2,
+                        "max_starts_per_tick": 2,
+                    }
+                )
                 first = run_continuous_worker_tick()
                 second = run_continuous_worker_tick()
 

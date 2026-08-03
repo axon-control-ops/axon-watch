@@ -140,6 +140,44 @@ class DashProPostHogMonitorTests(unittest.TestCase):
         assert item is not None
         self.assertEqual("warning", item["severity"])
 
+    def test_dns_failure_falls_back_to_alternate_api_base(self) -> None:
+        class _FakeResponse:
+            def __init__(self, status: int, payload):
+                self.status = status
+                self._payload = payload
+
+            def read(self):
+                return json.dumps(self._payload).encode("utf-8")
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, exc_type, exc, tb):
+                return False
+
+        calls: list[str] = []
+
+        def fake_urlopen(req, timeout=0):
+            calls.append(req.full_url)
+            if "us.i.posthog.com" in req.full_url:
+                raise OSError("[Errno -3] Temporary failure in name resolution")
+            return _FakeResponse(200, {"results": [{"event": "session_started"}]})
+
+        with patch.object(dashpro_posthog, "urlopen", side_effect=fake_urlopen):
+            status, detail = dashpro_posthog.check_posthog_recent_events(
+                env={
+                    "POSTHOG_PERSONAL_API_KEY": "phx_test",
+                    "DASHPRO_POSTHOG_PROJECT_ID": "proj_123",
+                    "EXPO_PUBLIC_POSTHOG_HOST": "https://us.i.posthog.com",
+                },
+                retries=0,
+            )
+
+        self.assertEqual("ok", status)
+        self.assertIn("session_started", detail)
+        self.assertGreater(len(calls), 1)
+        self.assertTrue(any("us.posthog.com" in url or "app.posthog.com" in url for url in calls[1:]))
+
     def test_zero_events_maps_to_high_inbox_severity(self) -> None:
         from app.signals.monitor_signal import monitor_inbox_item  # noqa: WPS433
 

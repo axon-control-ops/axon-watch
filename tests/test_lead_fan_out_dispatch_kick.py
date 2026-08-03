@@ -65,6 +65,15 @@ class LeadFanOutDispatchKickTests(unittest.TestCase):
         self.assertIsNone(mock_dispatch.call_args.kwargs["target_run_id"])
         self.assertEqual([], tick)
 
+    def test_paused_scheduler_does_not_run_autonomous_work_sources(self) -> None:
+        with patch.dict(os.environ, {"AXON_WATCH_WORKER_SCHEDULER": "1"}, clear=False):
+            worker_scheduler_settings_store.patch_settings({"scheduler_enabled": False})
+            with patch(
+                "app.workspace_agents.company_work_sources.run_scheduled_work_sources"
+            ) as sources:
+                self.assertEqual([], run_continuous_worker_tick())
+        sources.assert_not_called()
+
     def test_kick_can_target_one_operator_started_run(self) -> None:
         with patch.dict(
             os.environ,
