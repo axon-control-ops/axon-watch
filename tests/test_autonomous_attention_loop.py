@@ -23,6 +23,7 @@ from app.persistence import (  # noqa: E402
 )
 from app.workspace_agents.autonomous_attention import (  # noqa: E402
     ATTEND_GOAL_PREFIX,
+    build_autonomy_status_feed,
     collect_handoff_findings,
     enqueue_attend_actions,
     resolve_autonomy_decision,
@@ -378,6 +379,53 @@ class AutonomousAttentionLoopTests(unittest.TestCase):
                 params={"workspace_id": "workspace_axon_watch"},
             ).json()
             self.assertEqual(after["pending_critical_decisions"], [])
+
+    def test_completed_role_supersedes_older_failed_shift_decision(self) -> None:
+        stale = autonomous_attention_store.append_receipt(
+            kind="operator_blocker",
+            decision="escalate",
+            tier="operator_gated",
+            risk="high",
+            title="Marco (backend) last shift failed",
+            detail="The previous backend shift stopped.",
+            workspace_id="workspace_dashpro",
+            dedupe_key="failed_shift:workspace_dashpro:backend:run_failed",
+            ask_operator=True,
+            payload={"owner_role": "backend"},
+        )
+        unrelated = autonomous_attention_store.append_receipt(
+            kind="critical_signal",
+            decision="escalate",
+            tier="operator_gated",
+            risk="critical",
+            title="Production approval still required",
+            detail="Must remain operator-gated.",
+            workspace_id="workspace_dashpro",
+            dedupe_key="signal:workspace_dashpro:production:critical",
+            ask_operator=True,
+        )
+
+        with patch(
+            "app.workspace_agents.autonomous_attention.latest_role_run_outcome",
+            return_value={
+                "run_id": "run_completed",
+                "outcome": "completed",
+                "detail": "Backend fix completed.",
+                "phase": "completed",
+                "terminal": "1",
+            },
+        ):
+            feed = build_autonomy_status_feed(workspace_id="workspace_dashpro")
+
+        self.assertEqual(feed["pending_critical_count"], 1)
+        self.assertEqual(
+            feed["pending_critical_decisions"][0]["receipt_id"],
+            unrelated["receipt_id"],
+        )
+        resolved = autonomous_attention_store.get_receipt(stale["receipt_id"])
+        assert resolved is not None
+        self.assertEqual(resolved["status"], "resolved")
+        self.assertEqual(resolved["resolution"], "superseded")
 
     def test_concurrent_scans_create_one_task(self) -> None:
         finding = LeadCheckinFinding(

@@ -26,12 +26,59 @@ from app.workspace_agents.lead_checkin_assign import (
     LeadCheckinFinding,
 )
 from app.workspace_agents.lead_team_checkin import run_lead_team_checkin
+from app.workspace_agents.run_outcome import latest_role_run_outcome
 
 logger = logging.getLogger(__name__)
 
 DEFAULT_MAX_DISPATCH_PER_TICK = 3
 DEFAULT_MAX_ESCALATIONS_PER_TICK = 5
 _ATTEND_ENQUEUE_LOCK = threading.Lock()
+
+
+def _failed_shift_role(receipt: dict[str, Any], workspace_id: str) -> tuple[str, str] | None:
+    """Extract the role and failed run from a receipt created by lead check-in."""
+    workspace = str(workspace_id or "").strip()
+    dedupe_key = str(receipt.get("dedupe_key") or "").strip()
+    prefix = f"failed_shift:{workspace}:"
+    if not workspace or not dedupe_key.startswith(prefix):
+        return None
+    role, separator, failed_run_id = dedupe_key[len(prefix) :].partition(":")
+    role = role.strip().lower()
+    failed_run_id = failed_run_id.strip()
+    if not separator or not role or not failed_run_id:
+        return None
+    return role, failed_run_id
+
+
+def _reconcile_recovered_failed_shift_decisions(
+    workspace_id: str,
+    pending: list[dict[str, Any]],
+) -> None:
+    """Close stale failed-shift approvals when newer work for that role succeeded.
+
+    ``latest_role_run_outcome`` already applies the roster's terminal-run ordering,
+    including the later-success-over-earlier-failure rule.  Restrict reconciliation
+    to the explicit failed-shift receipt key so unrelated operator approvals remain
+    visible until the operator resolves them.
+    """
+    outcomes: dict[str, dict[str, str] | None] = {}
+    for receipt in pending:
+        parsed = _failed_shift_role(receipt, workspace_id)
+        if parsed is None:
+            continue
+        role, failed_run_id = parsed
+        if role not in outcomes:
+            outcomes[role] = latest_role_run_outcome(workspace_id, role)
+        outcome = outcomes[role] or {}
+        completed_run_id = str(outcome.get("run_id") or "").strip()
+        if (
+            str(outcome.get("outcome") or "").strip().lower() == "completed"
+            and completed_run_id
+            and completed_run_id != failed_run_id
+        ):
+            autonomous_attention_store.supersede_pending_decision(
+                str(receipt.get("receipt_id") or "")
+            )
 
 
 def _open_attend_tasks(workspace_id: str) -> list[dict[str, Any]]:
@@ -384,7 +431,7 @@ def run_autonomous_attention_scan(
 
 
 def build_autonomy_status_feed(*, workspace_id: str | None = None) -> dict[str, Any]:
-    """Read-only status for Mission Control autonomy control."""
+    """Return Mission Control status and repair stale recovered-shift approvals."""
     from app.persistence import operator_presence_settings_store
     from app.workspace_agents.fleet_control import build_scheduler_status
 
@@ -413,6 +460,12 @@ def build_autonomy_status_feed(*, workspace_id: str | None = None) -> dict[str, 
         limit=500,
         workspace_id=scoped_workspace or None,
     )
+    if scoped_workspace:
+        _reconcile_recovered_failed_shift_decisions(scoped_workspace, pending)
+        pending = autonomous_attention_store.list_pending_decisions(
+            limit=500,
+            workspace_id=scoped_workspace,
+        )
     last_scan_key = f"last_scan:{scoped_workspace}" if scoped_workspace else "last_scan"
     last_scan = autonomous_attention_store.get_meta(last_scan_key) or {}
     return {
