@@ -2,6 +2,7 @@
 import { computed, ref } from 'vue';
 
 import WorkspaceAddForm from '../../components/shell/WorkspaceAddForm.vue';
+import { useWorkspaceWorkerSwitches } from '../../composables/useWorkspaceWorkerSwitches';
 import type { BrainGraphSnapshot } from '../../lib/operator-brain-graph-view';
 import type { FleetHealthSnapshot } from '../../lib/operator-fleet-health-view';
 import type { WorkspaceRecord } from '../../contracts/canonical';
@@ -25,6 +26,11 @@ const emit = defineEmits<{
 
 const query = ref('');
 const showAddForm = ref(false);
+const {
+  savingId: workspaceSwitchSavingId,
+  isWorkspaceWorkerOn,
+  setWorkspaceWorkerOn,
+} = useWorkspaceWorkerSwitches();
 
 const items = computed(() =>
   galaxyMockupRailItemsWithChips(
@@ -56,6 +62,16 @@ function isActive(item: GalaxyMockupRailItem): boolean {
 function onOpen(event: Event, item: GalaxyMockupRailItem): void {
   event.stopPropagation();
   emit('open', item);
+}
+
+async function onWorkspacePower(event: Event, item: GalaxyMockupRailItem): Promise<void> {
+  event.preventDefault();
+  event.stopPropagation();
+  const workspaceId = String(item.workspace_id || '').trim();
+  if (!workspaceId) {
+    return;
+  }
+  await setWorkspaceWorkerOn(workspaceId, !isWorkspaceWorkerOn(workspaceId));
 }
 </script>
 
@@ -146,6 +162,34 @@ function onOpen(event: Event, item: GalaxyMockupRailItem): void {
                 </span>
               </span>
               <span class="galaxy-workspaces-rail__dot" aria-hidden="true" />
+            </button>
+            <button
+              v-if="item.kind === 'workspace' && item.workspace_id"
+              type="button"
+              class="galaxy-workspaces-rail__power"
+              role="switch"
+              :aria-checked="isWorkspaceWorkerOn(item.workspace_id)"
+              :aria-label="`${item.label} workers ${
+                isWorkspaceWorkerOn(item.workspace_id) ? 'on' : 'off'
+              }`"
+              :title="
+                isWorkspaceWorkerOn(item.workspace_id)
+                  ? 'Turn workers off for this workspace'
+                  : 'Turn workers on for this workspace'
+              "
+              :disabled="workspaceSwitchSavingId === item.workspace_id"
+              :class="{
+                'galaxy-workspaces-rail__power--on': isWorkspaceWorkerOn(item.workspace_id),
+                'galaxy-workspaces-rail__power--off': !isWorkspaceWorkerOn(item.workspace_id),
+              }"
+              @click="onWorkspacePower($event, item)"
+            >
+              <span class="galaxy-workspaces-rail__power-track" aria-hidden="true">
+                <span class="galaxy-workspaces-rail__power-thumb" />
+              </span>
+              <span class="galaxy-workspaces-rail__power-label">
+                {{ isWorkspaceWorkerOn(item.workspace_id) ? 'On' : 'Off' }}
+              </span>
             </button>
             <button
               v-if="item.kind === 'workspace'"
