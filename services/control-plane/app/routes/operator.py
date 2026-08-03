@@ -369,6 +369,7 @@ def kairo_converse(
             context_node_id=body.context_node_id or None,
             force_refresh=refresh,
             attachment_ids=attachment_ids,
+            submission_intent=body.submission_intent,
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc

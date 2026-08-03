@@ -65,6 +65,9 @@ onMounted(() => {
   if (shell.cursorCatalogLoadState === 'idle') {
     void shell.loadCursorCatalog();
   }
+  if (shell.codexCatalogLoadState === 'idle') {
+    void shell.loadCodexCatalog();
+  }
   const workspaceId = shell.currentWorkspace?.workspace_id;
   // Bootstrap already hydrates IDE chat; only retry here when the dock mounts before
   // bootstrap finished and the conversation is still empty.

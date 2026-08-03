@@ -5,6 +5,7 @@ from __future__ import annotations
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 from app.workspace_delivery import store as delivery_store
 from app.workspace_delivery.ci_status import apply_ci_status_to_delivery, classify_workflow_status

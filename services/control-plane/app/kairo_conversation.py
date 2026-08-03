@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import hashlib
-import re
 import time
 from typing import Any, Literal
 
@@ -12,8 +11,8 @@ from app.chat.command_intent import (
     command_display_name,
     command_requires_confirmation,
     expand_command_shortcuts,
-    is_question,
     is_auto_complete_run_summary,
+    is_question,
 )
 from app.cli_runtime.router import dispatch_ide_composer
 from app.kairo.context_pack_cache import get_cached_context_pack
@@ -25,6 +24,11 @@ from app.kairo.voice_dispatch import (
 )
 from app.kairo.voice_autonomy import resolve_voice_action_tier
 from app.kairo_early_intents import maybe_handle_early_converse_intent
+from app.kairo.conversation_classification import (
+    ConversationTurnKind,
+    classify_conversation_turn as _classify_conversation_turn,
+)
+from app.kairo.operator_input_safety import is_pasted_operational_context
 from app.persistence.operator_presence_settings_store import load_settings as load_presence_settings
 from app.kairo.turn_memory import (
     entity_context as _entity_context,
@@ -49,7 +53,6 @@ from app.kairo_conversation_reply import (
     build_conversation_facts,
     compose_conversation_reply,
     compose_smalltalk_reply,
-    is_open_style_question,
 )
 from app.kairo_conversation_runtime_context import (
     OPEN_DETAIL_RE as _OPEN_DETAIL_RE,
@@ -69,25 +72,8 @@ from app.operator_fleet_health import build_operator_fleet_health
 from app.operator_persona_stt_aliases import normalize_persona_stt_aliases
 from app.persistence import chat_store
 from app.workspace_project_bindings import get_workspace_project_binding, load_workspace_project_bindings
-ConversationTurnKind = Literal["status_question", "open_question", "command", "chat", "action"]
 ConversationSource = Literal["template", "model", "fallback"]; ConversationAnswerTier = Literal["fast", "deep"]
 _MAX_RUNTIME_VOICE_REPLY_CHARS = 1200
-
-_STATUS_HINT_RE = re.compile(
-    r"\b("
-    r"approval|approvals|attention|on fire|status|briefing|fleet|health|"
-    r"signal|signals|running|active run|what needs|what's wrong|what is wrong|"
-    r"happening|nominal|degraded|waiting|clear"
-    r")\b",
-    re.IGNORECASE,
-)
-_WORKSPACE_ACTIVITY_RE = re.compile(
-    r"(?:\b(check|show|tell me|what|pull up)\b[\w\s,-]*)?"
-    r"\b(workspace|dashpro|axon[\s-]*watch|axon[\s-]*local)\b"
-    r"[\w\s,-]*\b(check|show|what|pull up)?\b[\w\s,-]*"
-    r"\b(just did|doing|latest|recent|activity)\b",
-    re.IGNORECASE,
-)
 def _runtime_workspace_id(*, workspace_id: str | None, pack: dict[str, Any]) -> str:
     return runtime_workspace_id(workspace_id=workspace_id, pack=pack)
 
@@ -115,24 +101,15 @@ def _build_runtime_context_block(
     )
 
 
-def classify_conversation_turn(content: str) -> ConversationTurnKind:
-    trimmed = content.strip()
-    if not trimmed:
-        return "chat"
-    normalized = expand_command_shortcuts(trimmed)
-    intent = classify_command(normalized)
-    if intent != "unsupported":
-        return "command"
-    if is_open_style_question(trimmed):
-        return "open_question"
-    if _WORKSPACE_ACTIVITY_RE.search(trimmed):
-        return "status_question"
-    if _STATUS_HINT_RE.search(trimmed):
-        return "status_question"
-    if is_question(trimmed):
-        return "open_question"
-    return "chat"
 
+def classify_conversation_turn(content: str) -> ConversationTurnKind:
+    """Classify a turn while retaining the public patch seam used by callers/tests."""
+    return _classify_conversation_turn(
+        content,
+        classify_command_fn=classify_command,
+        expand_command_shortcuts_fn=expand_command_shortcuts,
+        is_question_fn=is_question,
+    )
 
 
 def answer_status_question(content: str, pack: dict[str, Any]) -> str:
@@ -154,12 +131,22 @@ def converse_turn(
     context_node_id: str | None = None,
     force_refresh: bool = False,
     attachment_ids: list[str] | None = None,
+    submission_intent: str = "dispatch",
 ) -> dict[str, object]:
     started_at = time.perf_counter()
     raw_content = content.strip()
     trimmed = normalize_persona_stt_aliases(raw_content)
     if not trimmed:
         raise ValueError("content must not be empty")
+    pasted_operational_context = is_pasted_operational_context(trimmed)
+    dispatch_requested = str(submission_intent or "").strip().lower() == "dispatch"
+    allow_actions = dispatch_requested and not pasted_operational_context
+
+    def _record_turn(**kwargs: object) -> dict[str, object]:
+        payload = dict(kwargs.get("payload") or {})
+        payload["submission_intent"] = "dispatch" if dispatch_requested else "ask"
+        kwargs["payload"] = payload
+        return _log_voice_turn(**kwargs)  # type: ignore[arg-type]
 
     from app.kairo.converse_attachments import ConverseAttachmentError, prepare_converse_attachment_paths
 
@@ -203,7 +190,9 @@ def converse_turn(
             target_workspace_id=resolved_workspace_id,
             task=f"Investigate signal {context_signal_id}",
         )
-    followup = _resolve_followup_action(trimmed, session_id)
+    # Ask turns and quoted receipts must not confirm a remembered action or
+    # trigger one of the convenience action routes below.
+    followup = _resolve_followup_action(trimmed, session_id) if allow_actions else None
     if followup:
         action_type = str(followup.get("type", ""))
         if action_type == "handoff_signal":
@@ -219,7 +208,7 @@ def converse_turn(
             _remember_entities(session_id, pending_dig_in="")
             _remember_turn(session_id, "user", trimmed)
             _remember_turn(session_id, "assistant", reply)
-            return _log_voice_turn(
+            return _record_turn(
                 session_id=session_id,
                 workspace_id=workspace_id,
                 raw_content=raw_content,
@@ -256,7 +245,7 @@ def converse_turn(
             _remember_entities(session_id, pending_command="")
             _remember_turn(session_id, "user", trimmed)
             _remember_turn(session_id, "assistant", reply)
-            return _log_voice_turn(
+            return _record_turn(
                 session_id=session_id,
                 workspace_id=workspace_id,
                 raw_content=raw_content,
@@ -286,7 +275,7 @@ def converse_turn(
             _remember_entities(session_id, pending_briefing_surface="")
             _remember_turn(session_id, "user", trimmed)
             _remember_turn(session_id, "assistant", reply)
-            return _log_voice_turn(
+            return _record_turn(
                 session_id=session_id,
                 workspace_id=workspace_id,
                 raw_content=raw_content,
@@ -303,11 +292,15 @@ def converse_turn(
                 duration_ms=round((time.perf_counter() - started_at) * 1000),
             )
 
-    early_intent = maybe_handle_early_converse_intent(
-        content=trimmed,
-        session_id=session_id,
-        workspace_id=resolved_workspace_id,
-        guest_name=guest_name,
+    early_intent = (
+        maybe_handle_early_converse_intent(
+            content=trimmed,
+            session_id=session_id,
+            workspace_id=resolved_workspace_id,
+            guest_name=guest_name,
+        )
+        if allow_actions
+        else None
     )
     if early_intent is not None:
         reply = str(early_intent.get("reply") or "")
@@ -325,7 +318,7 @@ def converse_turn(
         }
         if early_intent.get("action_tier"):
             payload["action_tier"] = early_intent.get("action_tier")
-        return _log_voice_turn(
+        return _record_turn(
             session_id=session_id,
             workspace_id=workspace_id,
             raw_content=raw_content,
@@ -335,6 +328,11 @@ def converse_turn(
         )
 
     turn_kind = classify_conversation_turn(trimmed)
+    # Ask is an answer-only capability.  Command-looking text is still useful
+    # evidence (for example, "git status" in a copied receipt), but it must
+    # not reach the bounded-command lane without an explicit Dispatch submit.
+    if not dispatch_requested and turn_kind == "command":
+        turn_kind = "status_question"
     # Keep caller use_runtime; voice_routing_mode gates lanes inside the router.
     recent = _recent_turns(session_id)
 
@@ -361,6 +359,7 @@ def converse_turn(
         context_signal_id=context_signal_id,
         context_node_id=context_node_id,
         preferred_model=preferred_vaxon_model,
+        allow_actions=allow_actions,
     )
 
     reply = decision.reply
@@ -382,7 +381,7 @@ def converse_turn(
     _remember_turn(session_id, "user", trimmed)
     _remember_turn(session_id, "assistant", reply)
 
-    return _log_voice_turn(
+    return _record_turn(
         session_id=session_id,
         workspace_id=workspace_id,
         raw_content=raw_content,

@@ -19,6 +19,7 @@ export type AgentDockComposerToolbarSource = {
   showAddModelsEntry: MaybeRef<boolean>;
   showExtraPinnedRows: MaybeRef<boolean>;
   showCursorCatalog: MaybeRef<boolean>;
+  showCodexCatalog: MaybeRef<boolean>;
   showVaultAction: MaybeRef<boolean>;
   attachmentChips: MaybeRef<AgentDockComposerAttachmentChip[]>;
   composerImages: MaybeRef<unknown[]>;
@@ -58,6 +59,8 @@ export type AgentDockComposerToolbarSource = {
   cursorStaleWarning: MaybeRef<string | null>;
   cursorManageRows: MaybeRef<CursorCatalogRow[]>;
   cursorCatalogCount: MaybeRef<string>;
+  codexCatalogRows: MaybeRef<CursorCatalogRow[]>;
+  codexCatalogStatus: MaybeRef<string>;
   modelSearchQuery: MaybeRef<string>;
   runtimeHint: MaybeRef<string>;
   canConvertInstructions: MaybeRef<boolean>;
@@ -77,6 +80,7 @@ export function useAgentDockComposerToolbarProps(
     showAddModelsEntry: toValue(composer.showAddModelsEntry),
     showExtraPinnedRows: toValue(composer.showExtraPinnedRows),
     showCursorCatalog: toValue(composer.showCursorCatalog),
+    showCodexCatalog: toValue(composer.showCodexCatalog),
     showVaultAction: toValue(composer.showVaultAction),
     attachmentChips: toValue(composer.attachmentChips),
     composerImageCount: toValue(composer.composerImages).length,
@@ -116,6 +120,8 @@ export function useAgentDockComposerToolbarProps(
     cursorStaleWarning: toValue(composer.cursorStaleWarning) ?? '',
     cursorManageRows: toValue(composer.cursorManageRows),
     cursorCatalogCount: toValue(composer.cursorCatalogCount),
+    codexCatalogRows: toValue(composer.codexCatalogRows),
+    codexCatalogStatus: toValue(composer.codexCatalogStatus),
     modelSearchQuery: toValue(composer.modelSearchQuery),
     runtimeHint: toValue(composer.runtimeHint),
     canConvertInstructions: toValue(composer.canConvertInstructions),

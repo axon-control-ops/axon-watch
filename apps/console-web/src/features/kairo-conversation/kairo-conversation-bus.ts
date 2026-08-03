@@ -1,4 +1,5 @@
 import type { ComposerClipboardImage } from '../../lib/composer-clipboard-paste';
+import type { KairoConverseSubmissionIntent } from '../../lib/kairo-converse-client';
 
 type SubmitHandler = (
   content: string,
@@ -8,6 +9,7 @@ type SubmitHandler = (
 export type KairoConversationSubmitOptions = {
   voiceCaptureMode?: 'manual' | 'hands_free' | 'barge_in';
   dockAttachments?: ComposerClipboardImage[];
+  submissionIntent?: KairoConverseSubmissionIntent;
 };
 
 export type KairoConversationSubmitDispatchResult = 'submitted' | 'queued' | 'ignored';

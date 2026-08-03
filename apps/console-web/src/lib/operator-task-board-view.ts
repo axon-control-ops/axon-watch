@@ -423,8 +423,11 @@ export function buildOperatorTaskBoardView(
   const planGroups: TaskBoardPlanGroup[] = [];
   const groupedTaskIds = new Set<string>();
   for (const plan of plans) {
-    const planRows = rows.filter((row) => row.planId === plan.plan_id && row.bucket !== 'cancelled');
-    if (!planRows.length) {
+    const allPlanRows = rows.filter((row) => row.planId === plan.plan_id);
+    const planRows = allPlanRows.filter((row) => row.bucket !== 'cancelled');
+    // A valid Lead review can have only completed/cancelled specialist tasks.
+    // Keep it visible until the operator resolves its VAXON handoff.
+    if (!planRows.length && !plan.awaiting_engagement) {
       continue;
     }
     for (const row of planRows) {

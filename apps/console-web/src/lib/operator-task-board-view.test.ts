@@ -139,6 +139,22 @@ describe('buildOperatorTaskBoardView', () => {
     expect(view.rows[0]?.planLabel).toBe(group?.planLabel);
   });
 
+  it('keeps an awaiting Lead review visible when every linked task is cancelled', () => {
+    const view = buildOperatorTaskBoardView(
+      [task({ task_id: 'task-cancelled', goal: 'Superseded', status: 'cancelled', plan_id: 'lead-plan-review' })],
+      [{
+        plan_id: 'lead-plan-review', workspace_id: 'workspace_dashpro', goal: 'Review recovery handoff',
+        mode: 'fan_out', status: 'awaiting_engagement', plan: {}, supersedes_plan_id: null,
+        created_at: '2026-07-22T11:00:00Z', updated_at: '2026-07-22T12:00:00Z',
+        task_links: [{ plan_key: 'backend', task_id: 'task-cancelled' }], task_ids: ['task-cancelled'],
+        awaiting_engagement: true,
+      }],
+    );
+    const group = view.planGroups.find((item) => item.planId === 'lead-plan-review');
+    expect(group?.awaitingEngagement).toBe(true);
+    expect(group?.rows).toEqual([]);
+  });
+
   it('shortens long task goals on cards while keeping full text for detail', () => {
     const essay =
       'Please confirm if we did this job "The Payments button is still hidden" — check backend billing route and frontend nav gate, then report.';

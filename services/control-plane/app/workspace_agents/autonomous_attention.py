@@ -26,6 +26,10 @@ from app.workspace_agents.lead_checkin_assign import (
     LeadCheckinFinding,
 )
 from app.workspace_agents.lead_team_checkin import run_lead_team_checkin
+from app.workspace_agents.autonomous_attention_recovery import (
+    reconcile_recovered_failed_shift_decisions,
+)
+from app.workspace_agents.run_outcome import latest_role_run_outcome
 
 logger = logging.getLogger(__name__)
 
@@ -456,7 +460,7 @@ def run_autonomous_attention_scan(
 
 
 def build_autonomy_status_feed(*, workspace_id: str | None = None) -> dict[str, Any]:
-    """Read-only status for Mission Control autonomy control."""
+    """Return Mission Control status and repair stale recovered-shift approvals."""
     from app.persistence import operator_presence_settings_store
     from app.workspace_agents.fleet_control import build_scheduler_status
 
@@ -486,6 +490,16 @@ def build_autonomy_status_feed(*, workspace_id: str | None = None) -> dict[str, 
         workspace_id=scoped_workspace or None,
     )
     pending = _collapse_pending_decisions(pending_raw)
+    if scoped_workspace:
+        reconcile_recovered_failed_shift_decisions(
+            scoped_workspace,
+            pending,
+            latest_outcome=latest_role_run_outcome,
+        )
+        pending = _collapse_pending_decisions(autonomous_attention_store.list_pending_decisions(
+            limit=500,
+            workspace_id=scoped_workspace,
+        ))
     last_scan_key = f"last_scan:{scoped_workspace}" if scoped_workspace else "last_scan"
     last_scan = autonomous_attention_store.get_meta(last_scan_key) or {}
     return {

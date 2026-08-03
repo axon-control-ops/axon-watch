@@ -14,6 +14,7 @@ from app.cli_runtime.approval_gate import (
     resolve_runtime_execution_tier,
 )
 from app.cli_runtime.catalog import runtime_status_snapshot
+from app.cli_runtime.codex_models import default_codex_model
 from app.cli_runtime.mcp_registry import mcp_tools_for_composer_mode
 from app.cli_runtime.non_cursor_dispatch import run_non_cursor_local
 from app.cli_runtime.recovery import ordered_runtime_candidates
@@ -29,6 +30,7 @@ from app.cli_runtime.cursor_agent import (
 )
 from app.cli_runtime.runtime_auth import (
     claude_dispatch_env,
+    codex_dispatch_env,
     cursor_dispatch_env,
     env_has_api_key,
     env_without_api_keys,
@@ -127,10 +129,7 @@ def _sentry_monitor_context(user_prompt: str) -> str:
             "Live monitor evidence is temporarily unavailable. Report that limitation; "
             "do not claim the Sentry token is absent."
         )
-
-
     return "\n".join(lines)
-
 
 def _operator_persona_enabled() -> bool:
     return bool(load_settings().get("operator_persona_enabled", True))
@@ -192,8 +191,6 @@ def _system_prompt(
         f"edited files or ran commands. {ask_fence_instruction()}"
         f"{_INSTRUCTION_TAKING} {research_line} {_REPLY_STYLE}"
     )
-
-
 def _build_prompt(
     *,
     composer_mode: str,
@@ -227,26 +224,24 @@ def _build_prompt(
         f"{sentry_section}\n\n"
         f"Operator request:\n{user_prompt.strip()}"
     )
-
-
 def _resolve_workspace_root(workspace_id: str) -> Path | None:
     try:
         return resolve_workspace_root(workspace_id)
     except WorkspaceRootError:
         return None
-
-
 def _cloud_runtime_message(record: dict[str, object]) -> str:
     label = str(record.get("label") or record.get("id") or "cloud runtime")
     return (
         f"{label} is configured in the catalog, but its execution adapter has not landed yet. "
         "Use the local runtime target or switch the default runtime back to a local CLI."
     )
-
-
 def _effective_cli_model(family: str, runtime_model: str) -> str:
     normalized = str(runtime_model or "").strip()
     if not normalized or normalized.lower() == "auto":
+        # Codex does not provide Cursor-style Auto routing.  Its config may
+        # contain an obsolete model id, so use the account catalog below.
+        if family == "codex":
+            return ""
         if family == "cursor":
             env_key = "AXON_WATCH_CURSOR_MODEL"
         elif family == "claude":
@@ -257,6 +252,15 @@ def _effective_cli_model(family: str, runtime_model: str) -> str:
     if normalized.lower() == "auto":
         return ""
     return normalized
+
+
+def _split_codex_model_selection(model: str) -> tuple[str, str]:
+    """Decode the UI's model@effort preference into Codex CLI arguments."""
+    selected = str(model or "").strip()
+    model_id, marker, effort = selected.rpartition("@")
+    if marker and model_id and effort in {"low", "medium", "high", "xhigh"}:
+        return model_id, effort
+    return selected, ""
 
 
 def _ordered_candidates_for_dispatch(
@@ -372,6 +376,7 @@ def dispatch_ide_composer(
         family = str(record.get("family") or "")
         target_type = str(record.get("target_type") or "local")
         model = _effective_cli_model(family, str(runtime_model or ""))
+        reasoning_effort = ""
         runtime_label = str(record.get("label") or runtime_id)
         dispatch_env = subprocess_env
         if family == "cursor":
@@ -384,6 +389,14 @@ def dispatch_ide_composer(
                 subprocess_env,
                 auth=record.get("auth") if isinstance(record.get("auth"), dict) else None,
             )
+        elif family == "codex":
+            model, reasoning_effort = _split_codex_model_selection(model)
+            dispatch_env = codex_dispatch_env(
+                subprocess_env,
+                auth=record.get("auth") if isinstance(record.get("auth"), dict) else None,
+            )
+            if not model:
+                model = default_codex_model(binary, env=dispatch_env)
         try:
             if target_type == "cloud":
                 raise RuntimeError(_cloud_runtime_message(record))
@@ -421,6 +434,7 @@ def dispatch_ide_composer(
                     composer_mode=composer_mode,
                     execution_tier=execution_tier,
                     model=model,
+                    reasoning_effort=reasoning_effort,
                     subprocess_env=dispatch_env,
                     run_id=run_id,
                     on_chunk=on_chunk,
@@ -489,6 +503,7 @@ def dispatch_ide_composer(
                                 composer_mode=composer_mode,
                                 execution_tier=execution_tier,
                                 model=model,
+                                reasoning_effort=reasoning_effort,
                                 subprocess_env=retry_env,
                                 run_id=run_id,
                                 on_chunk=on_chunk,

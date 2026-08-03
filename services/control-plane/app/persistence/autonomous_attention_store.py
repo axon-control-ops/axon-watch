@@ -12,6 +12,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from app.persistence import run_store_sqlite
+from app.persistence.autonomous_attention_decisions import supersede_pending_decision
 
 _SECRET_ASSIGNMENT_RE = re.compile(
     r"(?i)\b([A-Z0-9_]*(?:TOKEN|SECRET|PASSWORD|API_KEY|APIKEY))"
@@ -492,6 +493,7 @@ __all__ = [
     "append_receipt",
     "begin_decision_resolution",
     "complete_decision_resolution",
+    "supersede_pending_decision",
     "ensure_autonomy_receipt_schema",
     "get_receipt",
     "get_meta",

@@ -82,6 +82,30 @@ function selectEngagePlan(planId: string | null | undefined): void {
         Filter the board. Engage opens Lead review in VAXON.
       </p>
     </div>
+    <section
+      v-for="group in engageGroups"
+      :key="`decision-${group.planId}`"
+      class="operator-task-board__lead-decision"
+    >
+      <p class="operator-task-board__lead-decision-eyebrow">Lead decision ready</p>
+      <strong>{{ group.planLabel }}</strong>
+      <p>{{ group.planGoal }}</p>
+      <small>Review the verified Lead rollup before starting any follow-up work.</small>
+      <div class="operator-task-board__lead-decision-actions">
+        <button type="button" @click="selectEngagePlan(group.planId)">Review now</button>
+        <button
+          type="button"
+          class="operator-task-board__lead-decision-complete"
+          :disabled="leadPlansMutating"
+          @click="emit('closeLeadPlan', group.planId)"
+        >
+          Mark review complete
+        </button>
+      </div>
+    </section>
+    <p class="operator-task-board__plan-filter-help">
+      Review now opens the Lead rollup in VAXON. Mark review complete records that no further handoff is needed.
+    </p>
     <div class="operator-task-board__plan-tabs" role="tablist" aria-label="Lead plan filter">
       <button
         type="button"
@@ -117,7 +141,7 @@ function selectEngagePlan(planId: string | null | undefined): void {
       >
         <span class="operator-task-board__plan-chip-text">{{ group.planLabel }}</span>
         <span v-if="group.awaitingEngagement" class="operator-task-board__plan-chip-tag">
-          engage
+          review now
         </span>
       </button>
       <span

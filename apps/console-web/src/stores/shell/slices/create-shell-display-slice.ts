@@ -344,7 +344,12 @@ export function createShellDisplaySlice(input: CreateShellDisplaySliceInput) {
   const pendingApprovalsCount = computed(() => {
     const fromSummary = input.runtimeSummary.value?.approvals.pending_count ?? 0;
     const fromBriefing = input.operatorBriefing.value?.pending_approvals.count ?? 0;
-    return Math.max(fromSummary, fromBriefing);
+    // A freshly loaded run can be awaiting approval before the briefing/items
+    // projection catches up. The run ledger is authoritative for that gap.
+    const fromRuns = input.runs.value.filter(
+      (run) => run.phase === 'awaiting_approval',
+    ).length;
+    return Math.max(fromSummary, fromBriefing, fromRuns);
   });
 
   const leftSidebarAttentionBadgeCount = computed(() => {

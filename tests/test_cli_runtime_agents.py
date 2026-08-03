@@ -8,7 +8,7 @@ from unittest.mock import patch
 CONTROL_PLANE_ROOT = Path(__file__).resolve().parents[1] / "services" / "control-plane"
 sys.path.insert(0, str(CONTROL_PLANE_ROOT))
 
-from app.cli_runtime.codex_agent import run_codex_local  # noqa: E402
+from app.cli_runtime.codex_agent import _build_codex_exec_command, run_codex_local  # noqa: E402
 from app.cli_runtime.claude_agent import run_claude_local  # noqa: E402
 from app.cli_runtime.cursor_agent import CursorAgentReply, _cursor_mode_flag, run_cursor_local  # noqa: E402
 
@@ -153,6 +153,27 @@ class CliRuntimeAgentTests(unittest.TestCase):
                 workspace_root=Path("/tmp"),
                 composer_mode="ask",
             )
+
+    def test_codex_uses_the_explicit_catalog_model(self) -> None:
+        command = _build_codex_exec_command(
+            binary="/usr/bin/codex",
+            prompt="hello",
+            workspace_root=Path("/tmp"),
+            composer_mode="agent",
+            model="gpt-5.5",
+        )
+        self.assertEqual("gpt-5.5", command[command.index("--model") + 1])
+
+    def test_codex_passes_the_selected_reasoning_effort(self) -> None:
+        command = _build_codex_exec_command(
+            binary="/usr/bin/codex",
+            prompt="hello",
+            workspace_root=Path("/tmp"),
+            composer_mode="agent",
+            model="gpt-5.5",
+            reasoning_effort="high",
+        )
+        self.assertIn('model_reasoning_effort="high"', command)
 
     @patch("app.cli_runtime.claude_agent.communicate_registered_process")
     def test_claude_parses_stream_json_reply(self, mock_communicate) -> None:

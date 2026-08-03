@@ -247,6 +247,7 @@ def route_voice_turn(
     context_signal_id: str | None = None,
     context_node_id: str | None = None,
     preferred_model: str | None = None,
+    allow_actions: bool = True,
 ) -> VoiceDispatchDecision:
     """Route a classified turn into a VAXON lane with autonomy + model receipts."""
     mode = normalize_voice_routing_mode(voice_routing_mode)
@@ -290,7 +291,7 @@ def route_voice_turn(
             },
         )
 
-    if turn_kind == "command":
+    if turn_kind == "command" and allow_actions:
         normalized = expand_command_shortcuts(content)
         requires_confirmation = command_requires_confirmation(normalized)
         tier = resolve_voice_action_tier(normalized)
@@ -321,7 +322,7 @@ def route_voice_turn(
             model_receipt=receipt,
         )
 
-    if turn_kind in {"chat", "open_question"}:
+    if allow_actions and turn_kind in {"chat", "open_question"}:
         specialty_action = build_specialty_task_action(
             content,
             workspace_id=workspace_id,
