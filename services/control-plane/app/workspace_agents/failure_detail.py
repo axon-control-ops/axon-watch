@@ -116,6 +116,22 @@ def is_restart_interrupted_failure(detail: str | None) -> bool:
     return any(marker in lowered for marker in _RESTART_INTERRUPT_MARKERS)
 
 
+def is_stale_timeout_failure(detail: str | None) -> bool:
+    """True when a continuous worker was reaped for idle/stale timeout."""
+    normalized = normalize_operator_failure_detail(detail)
+    if not normalized:
+        return False
+    lowered = normalized.lower()
+    return (
+        "continuous worker run exceeded stale timeout" in lowered
+        or "paused continuous worker run abandoned after stale timeout" in lowered
+        or (
+            "stale continuous worker run" in lowered
+            and "idle timeout" in lowered
+        )
+    )
+
+
 def is_operator_stopped_failure(detail: str | None) -> bool:
     """True when the operator stopped the CLI before the shift could finish."""
     normalized = normalize_operator_failure_detail(detail)

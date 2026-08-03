@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import copy
 import os
 import re
+import threading
 import time
 from typing import Any
 
@@ -23,6 +25,9 @@ _MODEL_BADGE_RE = re.compile(r"\b(Fast|High|Medium|Low|Max)\b", re.IGNORECASE)
 _LIST_MODELS_TIMEOUT_SECONDS = 20
 _MODEL_CACHE: dict[str, tuple[float, list[ModelRecord]]] = {}
 _MODEL_CACHE_TTL_SECONDS = 300.0
+_RUNTIME_SNAPSHOT_CACHE: tuple[float, StatusPayload] | None = None
+_RUNTIME_SNAPSHOT_CACHE_TTL_SECONDS = 60.0
+_RUNTIME_SNAPSHOT_LOCK = threading.Lock()
 
 CURSOR_CLI_MODEL_OPTIONS: list[ModelRecord] = [
     {
@@ -129,6 +134,61 @@ def list_cursor_models(binary: str = "") -> list[ModelRecord]:
 
 
 def cursor_runtime_snapshot(*, force_refresh: bool = False) -> StatusPayload:
+    """Return a short-lived Cursor catalog/auth snapshot.
+
+    A single snapshot runs both ``cursor agent --list-models`` and ``cursor
+    agent status``.  This endpoint is mounted with the composer, so caching it
+    prevents remounts and status-bar refreshes from repeatedly starting costly
+    Cursor subprocesses.  ``force_refresh`` remains available for an explicit
+    operator refresh.
+    """
+    global _RUNTIME_SNAPSHOT_CACHE
+    now = time.monotonic()
+    with _RUNTIME_SNAPSHOT_LOCK:
+        cached = _RUNTIME_SNAPSHOT_CACHE
+        if (
+            not force_refresh
+            and cached is not None
+            and (now - cached[0]) < _RUNTIME_SNAPSHOT_CACHE_TTL_SECONDS
+        ):
+            return copy.deepcopy(cached[1])
+
+        if not force_refresh:
+            # The composer mounts with the console.  Avoid launching Cursor
+            # just to paint a model menu; a user-initiated refresh (or actual
+            # dispatch) is the appropriate point for the expensive CLI probe.
+            snapshot = _unverified_cursor_runtime_snapshot()
+            _RUNTIME_SNAPSHOT_CACHE = (time.monotonic(), copy.deepcopy(snapshot))
+            return snapshot
+
+        snapshot = _build_cursor_runtime_snapshot(force_refresh=force_refresh)
+        _RUNTIME_SNAPSHOT_CACHE = (time.monotonic(), copy.deepcopy(snapshot))
+        return copy.deepcopy(snapshot)
+
+
+def _unverified_cursor_runtime_snapshot() -> StatusPayload:
+    binary = find_cursor_cli(os.environ.get("AXON_WATCH_CURSOR_CLI_PATH", "").strip())
+    installed = bool(binary)
+    return {
+        "installed": installed,
+        "binary": binary,
+        "auth": {
+            "logged_in": False,
+            "auth_method": "",
+            "provider_label": "Not checked" if installed else "Not installed",
+            "message": (
+                "Cursor status has not been checked yet. Use Refresh in Runtime settings to verify it."
+                if installed
+                else "Install Cursor CLI to use the interactive runtime."
+            ),
+        },
+        "available_models": [dict(item) for item in CURSOR_CLI_MODEL_OPTIONS],
+        "cursor_models": [dict(item) for item in CURSOR_CLI_MODEL_OPTIONS],
+        "catalog_source": "fallback",
+    }
+
+
+def _build_cursor_runtime_snapshot(*, force_refresh: bool = False) -> StatusPayload:
     context = fetch_runtime_context(force_refresh=force_refresh)
     vault_posture = dict(context.get("vault_runtime") or {})
     merged_env = dict(os.environ)

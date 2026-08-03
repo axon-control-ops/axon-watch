@@ -28,6 +28,7 @@ commands:
   diff_budget:
     - ./scripts/guardrails/check_file_sizes.py
 allowed_paths:
+  - project.axon.yaml
   - apps/
   - services/
   - packages/

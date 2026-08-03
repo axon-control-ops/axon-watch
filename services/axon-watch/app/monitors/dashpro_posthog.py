@@ -6,14 +6,62 @@ import json
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
+_DEFAULT_US_API = "https://us.i.posthog.com/api"
+_DEFAULT_EU_API = "https://eu.i.posthog.com/api"
+_DEFAULT_APP_API = "https://app.posthog.com/api"
+
+
+def _normalize_api_base(raw: str) -> str:
+    text = str(raw or "").strip().rstrip("/")
+    if not text:
+        return ""
+    if text.endswith("/api"):
+        return text
+    if text.endswith(".posthog.com") or text.endswith(".i.posthog.com"):
+        return f"{text}/api"
+    return text
+
 
 def _posthog_api_base(env: dict[str, str]) -> str:
+    override = _normalize_api_base(
+        str(env.get("POSTHOG_PERSONAL_API_BASE") or env.get("POSTHOG_API_BASE") or "")
+    )
+    if override:
+        return override
+
     host = str(env.get("EXPO_PUBLIC_POSTHOG_HOST") or "https://us.i.posthog.com").strip().lower()
-    if "eu.i.posthog.com" in host:
-        return "https://eu.posthog.com/api"
-    if "us.i.posthog.com" in host:
-        return "https://us.posthog.com/api"
-    return "https://app.posthog.com/api"
+    if "eu.i.posthog.com" in host or "eu.posthog.com" in host:
+        return _DEFAULT_EU_API
+    if "us.i.posthog.com" in host or "us.posthog.com" in host:
+        return _DEFAULT_US_API
+    return _DEFAULT_APP_API
+
+
+def _posthog_api_base_candidates(env: dict[str, str]) -> list[str]:
+    primary = _posthog_api_base(env)
+    host = str(env.get("EXPO_PUBLIC_POSTHOG_HOST") or "").strip().lower()
+    region_fallbacks = (
+        [_DEFAULT_EU_API, "https://eu.posthog.com/api", _DEFAULT_APP_API]
+        if "eu" in host
+        else [_DEFAULT_US_API, "https://us.posthog.com/api", _DEFAULT_APP_API]
+    )
+    candidates: list[str] = []
+    for base in [primary, *region_fallbacks]:
+        normalized = _normalize_api_base(base)
+        if normalized and normalized not in candidates:
+            candidates.append(normalized)
+    return candidates
+
+
+def _is_transport_error(exc: Exception) -> bool:
+    if isinstance(exc, TimeoutError):
+        return True
+    if isinstance(exc, URLError):
+        return True
+    if isinstance(exc, OSError):
+        message = str(exc).lower()
+        return "name resolution" in message or "temporary failure" in message or exc.errno in (-2, -3)
+    return False
 
 
 def check_posthog_recent_events(
@@ -38,39 +86,41 @@ def check_posthog_recent_events(
     if not project_id:
         return "skipped", "PostHog check skipped until DASHPRO_POSTHOG_PROJECT_ID is available"
 
-    url = f"{_posthog_api_base(env)}/projects/{project_id}/events/?limit={max(1, limit)}"
-    request = Request(
-        url,
-        method="GET",
-        headers={
-            "Authorization": f"Bearer {api_key}",
-            "User-Agent": "Axon-Watch-DashPro-Monitor/1.0",
-        },
-    )
+    path = f"/projects/{project_id}/events/?limit={max(1, limit)}"
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "User-Agent": "Axon-Watch-DashPro-Monitor/1.0",
+    }
     attempts = max(1, int(retries) + 1)
     timeout = max(1.0, float(timeout_seconds))
+    api_bases = _posthog_api_base_candidates(env)
     status = 0
     body = ""
     last_exc: Exception | None = None
-    for attempt in range(attempts):
-        try:
-            with urlopen(request, timeout=timeout) as response:
-                status = int(response.status)
-                body = response.read().decode("utf-8", errors="replace")
-            last_exc = None
+
+    for base in api_bases:
+        request = Request(f"{base}{path}", method="GET", headers=headers)
+        for attempt in range(attempts):
+            try:
+                with urlopen(request, timeout=timeout) as response:
+                    status = int(response.status)
+                    body = response.read().decode("utf-8", errors="replace")
+                last_exc = None
+                break
+            except HTTPError as exc:
+                status = int(exc.code)
+                body = exc.read().decode("utf-8", errors="replace")
+                last_exc = None
+                break
+            except (TimeoutError, URLError, OSError) as exc:
+                last_exc = exc
+                if attempt + 1 < attempts:
+                    continue
+                if _is_transport_error(exc) and base != api_bases[-1]:
+                    break
+                return "warning", f"PostHog API query failed: {exc}"
+        if last_exc is None:
             break
-        except HTTPError as exc:
-            status = int(exc.code)
-            body = exc.read().decode("utf-8", errors="replace")
-            last_exc = None
-            break
-        except (TimeoutError, URLError, OSError) as exc:
-            last_exc = exc
-            if attempt + 1 < attempts:
-                continue
-            # Transient network blips stay warning (not critical) so inbox severity
-            # can keep them below Attention thresholds via the shared marker.
-            return "warning", f"PostHog API query failed: {exc}"
 
     if last_exc is not None:
         return "warning", f"PostHog API query failed: {last_exc}"

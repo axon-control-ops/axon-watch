@@ -48,6 +48,10 @@ class KairoVoicePromptTests(unittest.TestCase):
         self.assertIn("smiley face", KAIRO_VOICE_SYSTEM.lower())
         self.assertNotIn("Do NOT use", KAIRO_VOICE_SYSTEM)
         self.assertIn('Address the primary listener as "Sir King"', KAIRO_CONVERSATION_VOICE_SYSTEM)
+        self.assertIn("Executive Operating System", KAIRO_VOICE_SYSTEM)
+        self.assertIn("Chief Operating Officer", KAIRO_VOICE_SYSTEM)
+        self.assertIn("Planned, Dispatched, Observed", KAIRO_CONVERSATION_VOICE_SYSTEM)
+        self.assertIn("never claim a later state", KAIRO_CONVERSATION_VOICE_SYSTEM)
 
     def test_guest_name_appears_in_speak_prompt(self) -> None:
         prompt = build_speak_user_prompt(

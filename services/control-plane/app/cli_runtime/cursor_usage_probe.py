@@ -9,6 +9,7 @@ import threading
 import time
 import urllib.error
 import urllib.request
+from contextlib import closing
 from pathlib import Path
 from typing import Any
 
@@ -47,7 +48,10 @@ def _read_cursor_auth_item(key: str) -> str | None:
     if db_path is None:
         return None
     try:
-        with sqlite3.connect(f"file:{db_path}?mode=ro", uri=True) as connection:
+        # sqlite3's transaction context manager commits/rolls back but does
+        # not close the connection. The probe runs on each briefing refresh,
+        # so close the read-only handle deterministically.
+        with closing(sqlite3.connect(f"file:{db_path}?mode=ro", uri=True)) as connection:
             row = connection.execute(
                 "SELECT value FROM ItemTable WHERE key = ?",
                 (key,),

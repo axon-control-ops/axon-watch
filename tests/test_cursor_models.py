@@ -12,6 +12,9 @@ from app.cli_runtime import cursor_models  # noqa: E402
 
 
 class CursorModelsTests(unittest.TestCase):
+    def setUp(self) -> None:
+        cursor_models._RUNTIME_SNAPSHOT_CACHE = None
+
     def test_list_cursor_models_parses_available_models_output(self) -> None:
         proc = type(
             "Proc",
@@ -52,6 +55,42 @@ class CursorModelsTests(unittest.TestCase):
         self.assertTrue(snapshot["installed"])
         self.assertEqual("live", snapshot["catalog_source"])
         self.assertEqual(1, len(snapshot["available_models"]))
+
+    @patch("app.cli_runtime.cursor_models.fetch_runtime_context")
+    @patch("app.cli_runtime.cursor_models.find_cursor_cli", return_value="/usr/bin/cursor")
+    @patch("app.cli_runtime.cursor_models.list_cursor_models")
+    @patch("app.cli_runtime.cursor_models._cursor_auth_status")
+    def test_cursor_runtime_snapshot_caches_cli_results_for_ui_remounts(
+        self,
+        mock_auth,
+        mock_list_models,
+        _find_cursor,
+        mock_fetch_context,
+    ) -> None:
+        mock_fetch_context.return_value = {"vault_runtime": {"unlocked": False}, "env": {}}
+        mock_auth.return_value = {"logged_in": True, "message": "ready"}
+        mock_list_models.return_value = []
+
+        cursor_models.cursor_runtime_snapshot(force_refresh=True)
+        cursor_models.cursor_runtime_snapshot()
+
+        self.assertEqual(1, mock_auth.call_count)
+        self.assertEqual(1, mock_list_models.call_count)
+
+    @patch("app.cli_runtime.cursor_models.find_cursor_cli", return_value="/usr/bin/cursor")
+    @patch("app.cli_runtime.cursor_models._cursor_auth_status")
+    @patch("app.cli_runtime.cursor_models.list_cursor_models")
+    def test_cursor_runtime_snapshot_defers_cli_probe_until_explicit_refresh(
+        self,
+        mock_list_models,
+        mock_auth,
+        _find_cursor,
+    ) -> None:
+        snapshot = cursor_models.cursor_runtime_snapshot()
+
+        self.assertEqual("Not checked", snapshot["auth"]["provider_label"])
+        mock_auth.assert_not_called()
+        mock_list_models.assert_not_called()
 
 
 if __name__ == "__main__":

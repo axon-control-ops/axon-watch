@@ -31,12 +31,12 @@ class LeadTakeoverVoiceTests(unittest.TestCase):
             ),
             lead_name="Dana",
         )
-        self.assertIn("Dana here", line)
-        self.assertIn("Soren (integrations) just completed", line)
-        self.assertIn("Specialist report:", line)
-        self.assertIn("My read:", line)
-        self.assertIn("hold OTA", line)
+        self.assertIn("Dana update", line)
+        self.assertIn("Soren completed", line)
+        self.assertIn("Outcome:", line)
+        self.assertIn("Hold OTA", line)
         self.assertNotIn("Confidence:", line)
+        self.assertNotIn("..", line)
 
     def test_takeover_spoken_line_names_parent_ask_first(self) -> None:
         line = build_lead_takeover_spoken_line(
@@ -51,12 +51,8 @@ class LeadTakeoverVoiceTests(unittest.TestCase):
             lead_name="Dana",
             parent_plan_goal="Push OTA to canary",
         )
-        self.assertIn("Parent ask remains: Push OTA to canary", line)
-        self.assertIn("will not restart it as the mission", line)
-        self.assertLess(
-            line.index("Parent ask remains"),
-            line.index("Cass (watcher) just completed"),
-        )
+        self.assertIn("Goal: Push OTA to canary", line)
+        self.assertLess(line.index("Cass completed"), line.index("Goal:"))
         self.assertNotIn("Confidence:", line)
 
     def test_synthesis_spoken_line_lists_specialists(self) -> None:
@@ -80,8 +76,8 @@ class LeadTakeoverVoiceTests(unittest.TestCase):
             lead_name="Dana",
         )
         self.assertIn("Dana here", line)
-        self.assertIn("Priya completed", line)
-        self.assertIn("Marco failed", line)
+        self.assertIn("1 complete; 1 need attention", line)
+        self.assertIn("Marco needs attention", line)
 
     def test_lead_shift_spoken_line(self) -> None:
         line = build_lead_shift_spoken_line(
@@ -89,9 +85,9 @@ class LeadTakeoverVoiceTests(unittest.TestCase):
             phase="completed",
             reply_text="Assigned Cass next.\nLead: wait for operator Decide.\nConfidence: 8/10",
         )
-        self.assertIn("Dana here", line)
-        self.assertIn("Lead shift just completed", line)
-        self.assertIn("Lead next:", line)
+        self.assertIn("Dana update", line)
+        self.assertIn("Lead shift completed", line)
+        self.assertIn("Next action:", line)
         self.assertNotIn("Confidence:", line)
 
     @patch("app.live_events.broadcast_spoken_line", return_value=1)

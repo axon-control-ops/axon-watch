@@ -41,11 +41,11 @@ def _plan_handoff_rows(*, workspace_id: str | None, limit: int) -> list[dict[str
                 "created_at": row.get("created_at"),
                 "employee_name": None,
                 "employee_role": "lead",
-                "phase": "awaiting_engagement",
+                "phase": "completed",
                 "lead_summary": summary,
                 "lead_next": "",
                 "headline": (
-                    f"Lead-team plan {plan_id} rollup ready"
+                    "VAXON engaged the Lead-team rollup"
                     + (f" — {summary}" if summary else "")
                 ).strip(" —"),
                 "message_id": payload.get("message_id"),

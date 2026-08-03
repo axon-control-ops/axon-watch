@@ -18,7 +18,7 @@ class CliRuntimeCatalogTests(unittest.TestCase):
         catalog._SNAPSHOT_REFRESH_THREAD = None
 
     @patch("app.cli_runtime.catalog_snapshot.schedule_runtime_status_refresh")
-    def test_allow_stale_returns_cache_without_blocking_probe(self, mock_schedule) -> None:
+    def test_allow_stale_returns_cache_without_starting_a_cli_probe(self, mock_schedule) -> None:
         catalog._SNAPSHOT_CACHE["payload"] = {
             "updated_at": "2026-07-18T00:00:00Z",
             "default_runtime": "cursor_local",
@@ -29,7 +29,7 @@ class CliRuntimeCatalogTests(unittest.TestCase):
         catalog._SNAPSHOT_CACHE["fetched_at"] = 0.0  # expired TTL
         snapshot = catalog.runtime_status_snapshot(allow_stale=True)
         self.assertEqual("cursor_local", snapshot["default_runtime"])
-        mock_schedule.assert_called()
+        mock_schedule.assert_not_called()
 
     @patch("app.cli_runtime.catalog_snapshot.fetch_runtime_context")
     @patch("app.cli_runtime.catalog.find_cursor_cli", return_value="/usr/bin/cursor")

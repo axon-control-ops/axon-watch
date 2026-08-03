@@ -58,6 +58,11 @@ const VOICE_TRANSCRIPT_REPLACEMENTS: Array<[RegExp, string]> = [
   [/\btps\b/gi, 'TPS'],
 ];
 
+const DISPLAY_ACRONYM_REPLACEMENTS: Array<[RegExp, string]> = [
+  [/\bC\s+I\s+C\s+D\b/gi, 'CI/CD'],
+  [/\bC\s+I\b/gi, 'CI'],
+];
+
 function normalizeAliasKey(value: string): string {
   return value.trim().toLowerCase().replace(/[_\s-]+/g, ' ');
 }
@@ -71,7 +76,11 @@ export function normalizeVoiceTranscript(text: string): string {
 }
 
 export function normalizeKairoCopy(text: string): string {
-  return normalizeVoiceTranscript(text);
+  let result = normalizeVoiceTranscript(text);
+  for (const [pattern, replacement] of DISPLAY_ACRONYM_REPLACEMENTS) {
+    result = result.replace(pattern, replacement);
+  }
+  return result;
 }
 
 export function canonicalWorkspaceLabel(

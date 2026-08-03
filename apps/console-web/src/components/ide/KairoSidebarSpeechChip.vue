@@ -86,6 +86,10 @@ const view = computed(() =>
   }),
 );
 const canExpand = computed(() => sidebarSpeechCanExpand(view.value.displayText));
+// While an agent is speaking, let a substantive live update take the room it
+// needs. The class drops as soon as speech settles, returning the left rail to
+// its compact, scannable state without an operator having to close it.
+const autoExpandForSpeech = computed(() => props.speaking && canExpand.value);
 const showReplyBlock = computed(
   () => Boolean(props.awaitingReply) && !view.value.empty,
 );
@@ -194,6 +198,7 @@ async function send(content?: string): Promise<void> {
     class="kairo-sidebar-speech"
     :class="{
       'kairo-sidebar-speech--expanded': expanded || showReplyBlock,
+      'kairo-sidebar-speech--auto-expanded': autoExpandForSpeech,
       'kairo-sidebar-speech--awaiting-reply': showReplyBlock,
     }"
     :data-speaking="speaking ? 'true' : 'false'"

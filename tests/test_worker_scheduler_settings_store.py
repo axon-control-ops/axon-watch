@@ -21,8 +21,8 @@ class WorkerSchedulerSettingsStoreTests(unittest.TestCase):
     def test_load_settings_defaults_off(self) -> None:
         settings = worker_scheduler_settings_store.load_settings()
         self.assertFalse(settings["scheduler_enabled"])
-        self.assertEqual(4, settings["max_active"])
-        self.assertEqual(2, settings["max_starts_per_tick"])
+        self.assertEqual(1, settings["max_active"])
+        self.assertEqual(1, settings["max_starts_per_tick"])
         self.assertEqual({}, settings["employee_enabled"])
 
     def test_patch_settings_persists_scheduler_toggle(self) -> None:
@@ -91,6 +91,27 @@ class WorkerSchedulerSettingsStoreTests(unittest.TestCase):
         settings = worker_scheduler_settings_store.load_settings()
         self.assertFalse(settings["scheduler_enabled"])
         self.assertEqual({}, settings["employee_enabled"])
+
+    def test_workspace_enabled_defaults_true_and_pauses_all_workspace_roles(self) -> None:
+        self.assertTrue(worker_scheduler_settings_store.is_workspace_enabled("workspace_dashpro"))
+        worker_scheduler_settings_store.patch_settings(
+            {"workspace_enabled": {"workspace_bkk_invoice_system": False}}
+        )
+        self.assertFalse(
+            worker_scheduler_settings_store.is_workspace_enabled(
+                "workspace_bkk_invoice_system"
+            )
+        )
+        self.assertFalse(
+            worker_scheduler_settings_store.is_employee_enabled(
+                "workspace_bkk_invoice_system", "watcher", file_enabled=True
+            )
+        )
+        self.assertTrue(
+            worker_scheduler_settings_store.is_employee_enabled(
+                "workspace_dashpro", "watcher", file_enabled=True
+            )
+        )
 
 
 if __name__ == "__main__":

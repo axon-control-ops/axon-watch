@@ -32,7 +32,7 @@ class LeadVaxonHandoffTests(unittest.TestCase):
                 del sys.modules[name]
         sys.modules.update(self._saved)
 
-    def test_synthesis_posts_vaxon_message_and_marks_awaiting_engagement(self) -> None:
+    def test_synthesis_posts_vaxon_message_and_completes_vaxon_engagement(self) -> None:
         from app.persistence import chat_store, task_store
         from app.workspace_agents import lead_plan_store
         from app.workspace_agents.lead_fan_out import materialize_lead_fan_out
@@ -67,7 +67,7 @@ class LeadVaxonHandoffTests(unittest.TestCase):
         plan = lead_plan_store.get_plan(result["plan_id"])
         self.assertIsNotNone(plan)
         assert plan is not None
-        self.assertEqual("awaiting_engagement", plan["status"])
+        self.assertEqual("completed", plan["status"])
 
         kinds = {
             row["kind"] for row in lead_plan_store.list_receipts(result["plan_id"])
@@ -84,10 +84,40 @@ class LeadVaxonHandoffTests(unittest.TestCase):
         messages = chat_store.list_thread_messages(str(thread["thread_id"]))
         agent_messages = [row for row in messages if row["role"] == "agent"]
         self.assertTrue(agent_messages)
-        self.assertIn("Lead team rollup", agent_messages[-1]["content"])
+        self.assertIn("VAXON update — Lead rollup engaged", agent_messages[-1]["content"])
+        self.assertIn("Action taken:", agent_messages[-1]["content"])
 
         again = synthesize_lead_plan(result["plan_id"])
         self.assertEqual("already_posted", (again.get("vaxon_handoff") or {}).get("status"))
+
+    def test_existing_handoff_is_settled_instead_of_reappearing_as_operator_work(self) -> None:
+        from app.persistence import task_store
+        from app.workspace_agents import lead_plan_store
+        from app.workspace_agents.lead_fan_out import materialize_lead_fan_out
+        from app.workspace_agents.lead_replan import synthesize_lead_plan
+        from app.workspace_agents.lead_vaxon_handoff import count_awaiting_engagement_plans
+
+        result = materialize_lead_fan_out(
+            workspace_id="workspace_axon_watch",
+            goal="Verify the release recommendation",
+            mode="fan_out",
+            create_runs=False,
+        )
+        for task in result["tasks"]:
+            leased = task_store.lease_task(
+                str(task["task_id"]),
+                lease_holder=f"test-{task['owner_role']}",
+            )
+            task_store.complete_task(str(leased["task_id"]), terminal_outcome="verified")
+        synthesize_lead_plan(result["plan_id"])
+        lead_plan_store.set_plan_status(result["plan_id"], "awaiting_engagement")
+
+        self.assertEqual(
+            0,
+            count_awaiting_engagement_plans(workspace_id="workspace_axon_watch"),
+        )
+        plan = lead_plan_store.get_plan(result["plan_id"])
+        self.assertEqual("completed", (plan or {}).get("status"))
 
 
 if __name__ == "__main__":

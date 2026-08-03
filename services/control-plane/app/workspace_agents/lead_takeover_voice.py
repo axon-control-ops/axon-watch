@@ -7,6 +7,7 @@ from typing import Any
 
 from app.workspace_agents.lead_text import (
     lead_summary_from_reply,
+    sentence_text,
     strip_confidence_lines,
     truncate_text,
 )
@@ -36,7 +37,7 @@ def build_lead_takeover_spoken_line(
     lead_name: str = "Lead",
     parent_plan_goal: str | None = None,
 ) -> str:
-    """TTS-friendly Lead takeover — parent ask first, then specialist dig."""
+    """TTS-friendly Lead update: outcome, goal, and one directive next action."""
     name = (employee_name or employee_role or "specialist").strip()
     role = (employee_role or "specialist").strip()
     status = "completed" if phase == "completed" else (phase or "ended")
@@ -44,35 +45,19 @@ def build_lead_takeover_spoken_line(
     from app.workspace_agents.lead_takeover import extract_lead_next
 
     parent_ask = truncate_text(parent_plan_goal, max_len=160)
-    excerpt = truncate_text(strip_confidence_lines(reply_text), max_len=240)
+    summary = lead_summary_from_reply(reply_text)
     lead_next = extract_lead_next(reply_text)
-    parts = [f"{lead} here."]
+    parts = [f"{lead} update: {name} {status}."]
     if parent_ask:
-        parts.append(f"Parent ask remains: {parent_ask}.")
-    parts.append(f"{name} ({role}) just {status}.")
-    if excerpt:
-        parts.append(f"Specialist report: {excerpt}")
-    if parent_ask:
-        parts.append(
-            f"My read: I still own completing {parent_ask}. "
-            f"{name}'s dig is an input — I will not restart it as the mission."
-        )
-    elif status == "completed":
-        parts.append(
-            f"My read: {name} finished their slice. I own the handoff — "
-            "cross-team decisions stay with me until you Decide."
-        )
-    else:
-        parts.append(
-            f"My read: {name}'s job {status}. I will triage blockers and reassign if needed."
-        )
+        parts.append(f"Goal: {sentence_text(parent_ask, max_len=160)}")
+    if summary:
+        parts.append(f"Outcome: {sentence_text(summary, max_len=200)}")
     if lead_next:
-        parts.append(f"Decision needed: {lead_next}")
+        parts.append(f"Next action: {sentence_text(lead_next, max_len=220)}")
+    elif status == "completed":
+        parts.append("Next action: I will verify the remaining gate and advance only the unfinished work.")
     else:
-        parts.append(
-            "Lead next: review their report, confirm any Decide gates, then assign or approve."
-        )
-    parts.append("Open my Lead tab for the full rollup. Ask me what to do next.")
+        parts.append("Next action: I will isolate the blocker, then reassign or escalate it.")
     return " ".join(parts)
 
 
@@ -89,24 +74,31 @@ def build_lead_synthesis_spoken_line(
         f"{lead} here — team rollup is ready.",
         f"Goal: {goal_line}.",
     ]
-    clean_summary = truncate_text(strip_confidence_lines(summary), max_len=240)
-    if clean_summary:
-        parts.append(f"Outcome: {clean_summary}")
+    completed = [row for row in findings if str(row.get("status") or "").strip() == "completed"]
+    attention = [row for row in findings if str(row.get("status") or "").strip() != "completed"]
+    if findings and not attention:
+        parts.append(f"Outcome: all {len(completed)} specialist checks are complete.")
+    elif findings:
+        parts.append(f"Outcome: {len(completed)} complete; {len(attention)} need attention.")
+    else:
+        clean_summary = truncate_text(strip_confidence_lines(summary), max_len=200)
+        if clean_summary:
+            parts.append(f"Outcome: {sentence_text(clean_summary, max_len=200)}")
     bits: list[str] = []
-    for row in findings[:5]:
+    for row in attention[:3]:
         owner = str(row.get("assignee_name") or row.get("owner_role") or "specialist").strip()
         status = str(row.get("status") or "unknown").strip()
         excerpt = truncate_text(
             strip_confidence_lines(str(row.get("specialist_reply_excerpt") or "")),
             max_len=120,
         )
-        bit = f"{owner} {status}"
+        bit = f"{owner} needs attention ({status})"
         if excerpt:
-            bit = f"{bit}: {excerpt}"
+            bit = f"{bit}: {sentence_text(excerpt, max_len=120)}"
         bits.append(bit)
     if bits:
-        parts.append("Specialists: " + "; ".join(bits) + ".")
-    parts.append("Open my Lead tab for the full narrative, or ask me what to do next.")
+        parts.append("Attention: " + "; ".join(bits) + ".")
+    parts.append("Next action: Dana will advance the remaining gate or surface the one decision required.")
     return " ".join(parts)
 
 
@@ -122,12 +114,13 @@ def build_lead_shift_spoken_line(
     status = "completed" if phase == "completed" else (phase or "ended")
     summary = lead_summary_from_reply(reply_text)
     lead_next = extract_lead_next(reply_text)
-    parts = [f"{name} here. My Lead shift just {status}."]
+    parts = [f"{name} update: Lead shift {status}."]
     if summary:
         parts.append(f"Report: {summary}")
     if lead_next:
-        parts.append(f"Lead next: {lead_next}")
-    parts.append("Ask me what to do next.")
+        parts.append(f"Next action: {sentence_text(lead_next, max_len=220)}")
+    else:
+        parts.append("Next action: I will advance the active plan or surface the blocker.")
     return " ".join(parts)
 
 

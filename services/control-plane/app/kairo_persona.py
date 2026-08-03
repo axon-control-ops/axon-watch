@@ -68,7 +68,7 @@ def build_persona_voice_line(
         return f"{prefix}{spoken}" if persona_enabled else spoken
 
     return (
-        f"{prefix}Online and listening, sir. What shall we focus on?"
+        f"{prefix}Online and listening, Sir King. What shall we focus on?"
         if persona_enabled
         else "Ready. Tell me what to focus on."
     )

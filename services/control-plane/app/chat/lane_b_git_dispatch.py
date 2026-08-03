@@ -84,6 +84,17 @@ def _terminal_receipt(command: str, output: str) -> str:
     return f":::terminal {command}\n{body}\n:::"
 
 
+def _with_confidence(content: str, confidence: int) -> str:
+    """Keep direct control-plane Git replies valid Agent shift completions.
+
+    This path deliberately bypasses Cursor because Cursor CLI cannot currently
+    execute Git subprocesses. It must still satisfy the same Critical Review
+    completion contract as a regular Lane B reply; otherwise a successful Git
+    handoff is projected as a failed Lead shift solely for a missing footer.
+    """
+    return f"{content.rstrip()}\n\nConfidence: {confidence}/10"
+
+
 def _paths_mentioned_in_prompt(prompt: str, changed: list[str]) -> list[str]:
     tokens = [match.group(1) for match in _PATH_TOKEN_RE.finditer(prompt)]
     if not tokens:
@@ -164,7 +175,7 @@ def try_lane_b_git_commit_dispatch(
 
     if not status.success:
         return {
-            "content": "\n".join(lines),
+            "content": _with_confidence("\n".join(lines), 3),
             "dispatched": True,
             "continue_prompt": None,
             "execution_tier": "executing",
@@ -181,7 +192,7 @@ def try_lane_b_git_commit_dispatch(
             ]
         )
         return {
-            "content": "\n".join(lines),
+            "content": _with_confidence("\n".join(lines), 9),
             # Clean tree is not a failure — still continue the remainder when present.
             "dispatched": True,
             "continue_prompt": continue_prompt,
@@ -199,7 +210,7 @@ def try_lane_b_git_commit_dispatch(
     if stage_refusal:
         lines.extend(["", stage_refusal])
         return {
-            "content": "\n".join(lines),
+            "content": _with_confidence("\n".join(lines), 4),
             "dispatched": False,
             "continue_prompt": None,
             "execution_tier": "executing",
@@ -221,7 +232,7 @@ def try_lane_b_git_commit_dispatch(
             ]
         )
         return {
-            "content": "\n".join(lines),
+            "content": _with_confidence("\n".join(lines), 4),
             "dispatched": False,
             "continue_prompt": None,
             "execution_tier": "executing",
@@ -246,7 +257,7 @@ def try_lane_b_git_commit_dispatch(
     )
     if not staged.success:
         return {
-            "content": "\n".join(lines),
+            "content": _with_confidence("\n".join(lines), 3),
             "dispatched": True,
             "continue_prompt": None,
             "execution_tier": "executing",
@@ -282,7 +293,10 @@ def try_lane_b_git_commit_dispatch(
             summary += f" Push failed: {pushed.receipt_summary}"
 
     return {
-        "content": f"{summary}\n\n" + "\n".join(lines),
+        "content": _with_confidence(
+            f"{summary}\n\n" + "\n".join(lines),
+            8 if committed.success else 3,
+        ),
         "dispatched": committed.success,
         # Only continue the remainder when the commit (or clean-tree noop) succeeded.
         "continue_prompt": continue_prompt if committed.success else None,

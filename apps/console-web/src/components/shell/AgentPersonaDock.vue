@@ -2,6 +2,7 @@
 import { computed } from 'vue';
 
 import type { CompanyEmployeeRecord } from '../../contracts/canonical';
+import type { LeadDirectiveView } from '../../features/workspace-agents/lead-directive-view';
 import { buildEmployeeAvatar } from '../../features/workspace-agents/employee-avatar';
 import {
   employeeDockDisplayActions,
@@ -30,6 +31,7 @@ const props = defineProps<{
   controlBusy: boolean;
   liveBusy?: boolean;
   handoffWaiting?: boolean;
+  leadDirective?: LeadDirectiveView | null;
 }>();
 
 const emit = defineEmits<{
@@ -169,8 +171,19 @@ const displayActions = computed(() =>
       :aria-live="failure ? 'polite' : undefined"
       role="status"
     >
-      {{ liveBeat }}
+      <span class="agent-persona-dock__beat-label">Live report</span>
+      <span class="agent-persona-dock__beat-copy">{{ liveBeat }}</span>
     </p>
+
+    <section
+      v-if="leadDirective"
+      class="agent-persona-dock__directive"
+      :data-phase="leadDirective.phase"
+      aria-live="polite"
+    >
+      <p class="agent-persona-dock__directive-label">Lead directive · {{ leadDirective.label }}</p>
+      <p class="agent-persona-dock__directive-copy">{{ leadDirective.instruction }}</p>
+    </section>
 
     <div
       v-if="deliveryLinks"

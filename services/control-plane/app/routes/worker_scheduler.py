@@ -14,6 +14,7 @@ from app.workspace_agents.fleet_control import (
     patch_scheduler_settings,
     resume_scheduler,
     set_employee_enabled,
+    set_workspace_enabled,
     stop_active_runs,
 )
 
@@ -27,6 +28,10 @@ class WorkerSchedulerPatchRequest(BaseModel):
 
 
 class EmployeeEnabledPatchRequest(BaseModel):
+    enabled: bool
+
+
+class WorkspaceEnabledPatchRequest(BaseModel):
     enabled: bool
 
 
@@ -58,6 +63,18 @@ def worker_scheduler_hard_kill() -> dict[str, Any]:
 def worker_scheduler_resume() -> dict[str, Any]:
     """Re-enable continuous workers from Settings. Host env brake still applies if set."""
     return resume_scheduler()
+
+
+@router.patch("/api/workspaces/{workspace_id}/worker-enabled")
+def workspace_worker_enabled_patch(
+    workspace_id: str,
+    body: WorkspaceEnabledPatchRequest,
+) -> dict[str, Any]:
+    """Toggle continuous workers for one workspace from the Workspaces panel."""
+    try:
+        return set_workspace_enabled(workspace_id=workspace_id, enabled=body.enabled)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
 @router.patch("/api/workspaces/{workspace_id}/company/employees/{employee_id}")

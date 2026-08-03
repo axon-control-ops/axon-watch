@@ -9,6 +9,7 @@ from app.persistence import run_store
 from app.runs.service import list_runs
 from app.workspace_agents.failure_detail import (
     is_restart_interrupted_failure,
+    is_stale_timeout_failure,
     normalize_operator_failure_detail,
 )
 from app.workspace_agents.critical_review_clause import MISSING_CONFIDENCE_DETAIL
@@ -114,7 +115,21 @@ def _is_restart_interrupt_without_success(run: dict[str, Any]) -> bool:
 
 
 def _failure_detail_from_history(history_ref: str) -> str | None:
+    """Pick an operator-visible failure cause from history.
+
+    Prefer explicit ``run_failed`` receipts. Skip successful late ``runtime_dispatch``
+    rows that land after a stale reap — those are finalize receipts, not the failure.
+    """
     items = run_store.list_history(history_ref)
+    for item in reversed(items):
+        receipt = item.get("receipt") if isinstance(item, dict) else None
+        if not isinstance(receipt, dict):
+            continue
+        if str(receipt.get("type") or "").strip() != "run_failed":
+            continue
+        summary = str(receipt.get("summary") or "").strip()
+        if summary:
+            return _truncate(summary)
     for item in reversed(items):
         receipt = item.get("receipt") if isinstance(item, dict) else None
         if not isinstance(receipt, dict):
@@ -123,8 +138,9 @@ def _failure_detail_from_history(history_ref: str) -> str | None:
         summary = str(receipt.get("summary") or "").strip()
         if not summary:
             continue
+        if receipt_type == "runtime_dispatch" and "success=true" in summary.lower():
+            continue
         if receipt_type in {
-            "run_failed",
             "runtime_dispatch",
             "finalization_error",
             "control_plane_restart",
@@ -149,6 +165,24 @@ def _is_restart_interrupt_run(run: dict[str, Any]) -> bool:
             return True
         summary = str(receipt.get("summary") or "").strip()
         if summary and is_restart_interrupted_failure(summary):
+            return True
+    return False
+
+
+def _is_stale_timeout_run(run: dict[str, Any]) -> bool:
+    """Return True when a run was reaped for continuous-worker stale/idle timeout."""
+    step = str(run.get("current_step") or "").strip()
+    if step and is_stale_timeout_failure(step):
+        return True
+    history_ref = str(run.get("history_ref") or "").strip()
+    if not history_ref:
+        return False
+    for item in reversed(run_store.list_history(history_ref)):
+        receipt = item.get("receipt") if isinstance(item, dict) else None
+        if not isinstance(receipt, dict):
+            continue
+        summary = str(receipt.get("summary") or "").strip()
+        if summary and is_stale_timeout_failure(summary):
             return True
     return False
 
@@ -223,9 +257,12 @@ def latest_role_run_outcome(workspace_id: str, role: str) -> dict[str, str] | No
     run = _select_role_outcome_run(candidates)
     phase = str(run.get("phase") or "").strip()
     success_detail = _successful_critical_review_detail(run)
-    # Restart may cancel the run after Lane B already finished Critical Review —
-    # treat that as completed so Team does not cling to an older usage failure.
-    if success_detail and phase in {"cancelled", "failed"} and _is_restart_interrupt_run(run):
+    # Restart or stale reap may mark the run failed/cancelled after Lane B already
+    # finished Critical Review — treat that as completed so Team does not open a
+    # false failed_shift on a successful finalize (success=True runtime_dispatch).
+    if success_detail and phase in {"cancelled", "failed"} and (
+        _is_restart_interrupt_run(run) or _is_stale_timeout_run(run)
+    ):
         return {
             "run_id": str(run.get("run_id") or ""),
             "outcome": "completed",

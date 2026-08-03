@@ -48,4 +48,27 @@ describe('resolveVaxonTransmissionView', () => {
       body: 'VAXON is watching the fleet.',
     });
   });
+
+  it('restores CI spelling for on-screen transmission copy', () => {
+    expect(
+      resolveVaxonTransmissionView({
+        spokenText: 'Android C I C D Pipeline failed on main.',
+        speaking: true,
+      }).body,
+    ).toBe('Android CI/CD Pipeline failed on main.');
+  });
+
+  it('holds an unanswered decision above later live-status copy', () => {
+    expect(
+      resolveVaxonTransmissionView({
+        pendingDecision: 'Open Attention for the Android CI/CD failure?',
+        spokenText: 'AUTONOMOUS ON · attending Mission Control',
+        speaking: true,
+      }),
+    ).toMatchObject({
+      mode: 'locked',
+      eyebrow: 'Decision needed',
+      body: 'Open Attention for the Android CI/CD failure?',
+    });
+  });
 });

@@ -14,12 +14,23 @@ export type VaxonTransmissionView = {
 export function resolveVaxonTransmissionView(input: {
   spokenText?: string | null;
   conversationReply?: string | null;
+  pendingDecision?: string | null;
   speaking?: boolean;
   pending?: boolean;
 }): VaxonTransmissionView {
+  const decision = normalizeKairoCopy(input.pendingDecision?.trim() || '');
   const spoken = normalizeKairoCopy(input.spokenText?.trim() || '');
   const reply = normalizeKairoCopy(input.conversationReply?.trim() || '');
-  const body = spoken || reply;
+  const body = decision || spoken || reply;
+
+  if (decision) {
+    return {
+      mode: 'locked',
+      eyebrow: 'Decision needed',
+      body,
+      empty: false,
+    };
+  }
 
   if (!body) {
     return {

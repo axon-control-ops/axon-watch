@@ -255,11 +255,23 @@ onUnmounted(() => {
       </div>
     </div>
 
-    <div v-if="pendingCritical.length" class="orb-hud__sheet orb-hud__sheet--critical">
-      <ul aria-label="Needs your decision">
+  </section>
+
+  <Teleport to="#mission-control-approval-tray">
+    <section v-if="pendingCritical.length" class="orb-decision-tray" aria-label="Needs your decision">
+      <header class="orb-decision-tray__header">
+        <div>
+          <p>Needs you</p>
+          <span>Guarded action — VAXON will wait for your choice.</span>
+        </div>
+        <span class="orb-decision-tray__count">{{ pendingCriticalTotal }}</span>
+      </header>
+      <ul>
         <li v-for="item in pendingCritical.slice(0, 2)" :key="item.receipt_id">
-          <strong>Needs you</strong>
-          <span>{{ item.title || item.kind }}</span>
+          <div class="orb-decision-tray__copy">
+            <strong>{{ item.title || item.kind }}</strong>
+            <span>{{ item.detail || 'Review the exact action before continuing.' }}</span>
+          </div>
           <div class="orb-hud__sheet-actions">
             <button
               type="button"
@@ -279,11 +291,11 @@ onUnmounted(() => {
           </div>
         </li>
       </ul>
-      <p v-if="pendingCriticalTotal > 2" class="orb-hud__whisper" data-tone="warn">
-        +{{ pendingCriticalTotal - 2 }} more
+      <p v-if="pendingCriticalTotal > 2" class="orb-decision-tray__more">
+        +{{ pendingCriticalTotal - 2 }} more decisions in the queue
       </p>
-    </div>
-  </section>
+    </section>
+  </Teleport>
 </template>
 
 <style scoped>
@@ -543,16 +555,6 @@ onUnmounted(() => {
   animation: orb-hud-sheet-in 180ms ease-out;
 }
 
-.orb-hud__sheet--critical {
-  border-color: rgba(255, 120, 140, 0.4);
-  background:
-    linear-gradient(180deg, rgba(50, 12, 18, 0.55), rgba(16, 4, 8, 0.72)),
-    rgba(16, 4, 8, 0.55);
-  max-height: 6.5rem;
-  overflow: auto;
-  overscroll-behavior: contain;
-}
-
 .orb-hud__sheet p,
 .orb-hud__sheet span {
   margin: 0;
@@ -602,6 +604,96 @@ onUnmounted(() => {
   border-color: rgba(90, 255, 190, 0.55) !important;
   color: rgba(210, 255, 230, 0.98) !important;
   background: rgba(10, 40, 28, 0.55) !important;
+}
+
+.orb-decision-tray {
+  display: grid;
+  gap: 0.45rem;
+  padding: 0.58rem 0.65rem;
+  border: 1px solid rgba(255, 126, 148, 0.48);
+  border-radius: 0.65rem;
+  background:
+    linear-gradient(145deg, rgba(55, 12, 22, 0.86), rgba(13, 7, 14, 0.94)),
+    rgba(8, 10, 18, 0.92);
+  box-shadow: inset 0 0 0 1px rgba(255, 188, 198, 0.08);
+}
+
+.orb-decision-tray__header,
+.orb-decision-tray li {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 0.55rem;
+}
+
+.orb-decision-tray__header p,
+.orb-decision-tray__header span,
+.orb-decision-tray__copy strong,
+.orb-decision-tray__copy span,
+.orb-decision-tray__more {
+  margin: 0;
+}
+
+.orb-decision-tray__header p {
+  color: rgba(255, 182, 194, 0.98);
+  font: 700 0.58rem/1 var(--font-mono, ui-monospace, monospace);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.orb-decision-tray__header span,
+.orb-decision-tray__copy span,
+.orb-decision-tray__more {
+  color: rgba(222, 230, 242, 0.78);
+  font: 0.6rem/1.3 system-ui, sans-serif;
+}
+
+.orb-decision-tray__count {
+  display: grid;
+  min-width: 1.3rem;
+  min-height: 1.3rem;
+  place-items: center;
+  border: 1px solid rgba(255, 150, 170, 0.42);
+  border-radius: 999px;
+  color: rgba(255, 215, 225, 0.98) !important;
+  font: 700 0.58rem/1 var(--font-mono, ui-monospace, monospace) !important;
+}
+
+.orb-decision-tray ul {
+  display: grid;
+  gap: 0.42rem;
+  max-height: 8rem;
+  margin: 0;
+  padding: 0;
+  overflow: auto;
+  list-style: none;
+  overscroll-behavior: contain;
+}
+
+.orb-decision-tray li {
+  padding-top: 0.42rem;
+  border-top: 1px solid rgba(255, 180, 195, 0.13);
+}
+
+.orb-decision-tray__copy {
+  display: grid;
+  min-width: 0;
+  gap: 0.12rem;
+}
+
+.orb-decision-tray__copy strong {
+  overflow: hidden;
+  color: rgba(255, 228, 234, 0.98);
+  font: 650 0.64rem/1.2 system-ui, sans-serif;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.orb-decision-tray__copy span {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
 }
 
 @keyframes orb-hud-arc-breathe {
