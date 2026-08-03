@@ -264,6 +264,7 @@ export function useAgentDockComposerSetup() {
     composerImages,
     composerHistory,
     composerHistoryIndex,
+    dismissedDebugReproduceMessageId,
     submitKairoTurn,
     recordComposerHistoryIfSent,
     handleHistory,

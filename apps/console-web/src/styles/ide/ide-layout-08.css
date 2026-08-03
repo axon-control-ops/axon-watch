@@ -343,19 +343,6 @@
   background: rgba(46, 16, 101, 0.58);
 }
 
-.agent-dock-composer__debug-reproduce-copy {
-  margin: 0;
-  font-size: 0.62rem;
-  line-height: 1.4;
-  color: rgba(237, 233, 254, 0.95);
-}
-
-.agent-dock-composer__debug-reproduce-copy code {
-  font-family: var(--font-mono);
-  font-size: 0.58rem;
-  color: rgba(196, 181, 253, 0.98);
-}
-
 .agent-dock-composer__debug-reproduce-steps {
   margin: 0;
   padding-left: 1.05rem;
