@@ -1,0 +1,32 @@
+.agent-persona-dock__directive {
+  display: grid;
+  gap: 0.2rem;
+  padding: 0.46rem 0.52rem;
+  border: 1px solid rgba(90, 210, 255, 0.28);
+  border-radius: 0.45rem;
+  background: rgba(5, 38, 54, 0.44);
+}
+
+.agent-persona-dock__directive[data-phase='executing'] {
+  border-color: rgba(45, 255, 154, 0.38);
+  background: rgba(4, 46, 30, 0.38);
+}
+
+.agent-persona-dock__directive-label {
+  margin: 0;
+  color: rgba(150, 225, 250, 0.95);
+  font: 650 0.56rem/1.15 var(--font-mono, ui-monospace, monospace);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.agent-persona-dock__directive[data-phase='executing'] .agent-persona-dock__directive-label {
+  color: rgba(160, 255, 205, 0.96);
+}
+
+.agent-persona-dock__directive-copy {
+  margin: 0;
+  color: rgba(224, 244, 252, 0.96);
+  font-size: 0.72rem;
+  line-height: 1.35;
+}

@@ -169,8 +169,8 @@
 
 .galaxy-workspaces-rail__row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: stretch;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
   gap: 0.28rem;
   border: 1px solid transparent;
   border-radius: 0.38rem;
@@ -370,4 +370,74 @@
 .galaxy-workspaces-rail__chip--info {
   border-color: rgba(72, 196, 255, 0.45);
   color: #7ad8ff;
+}
+
+.galaxy-workspaces-rail__power {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.24rem;
+  flex-shrink: 0;
+  border: 1px solid rgba(0, 210, 255, 0.3);
+  border-radius: 999px;
+  padding: 0.14rem 0.3rem 0.14rem 0.18rem;
+  background: rgba(0, 14, 22, 0.78);
+  color: rgba(170, 210, 230, 0.9);
+  font: inherit;
+  font-size: 0.52rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.galaxy-workspaces-rail__power:disabled {
+  opacity: 0.55;
+  cursor: wait;
+}
+
+.galaxy-workspaces-rail__power-track {
+  position: relative;
+  width: 1.4rem;
+  height: 0.74rem;
+  border-radius: 999px;
+  background: rgba(90, 110, 130, 0.45);
+}
+
+.galaxy-workspaces-rail__power-thumb {
+  position: absolute;
+  top: 0.08rem;
+  left: 0.08rem;
+  width: 0.58rem;
+  height: 0.58rem;
+  border-radius: 50%;
+  background: #d7e6f0;
+  transition: transform 120ms ease, background 120ms ease;
+}
+
+.galaxy-workspaces-rail__power--on {
+  border-color: rgba(45, 255, 154, 0.55);
+  color: #9dffc9;
+}
+
+.galaxy-workspaces-rail__power--on .galaxy-workspaces-rail__power-track {
+  background: rgba(20, 140, 90, 0.72);
+}
+
+.galaxy-workspaces-rail__power--on .galaxy-workspaces-rail__power-thumb {
+  transform: translateX(0.64rem);
+  background: #2dff9a;
+}
+
+.galaxy-workspaces-rail__power--off {
+  opacity: 0.88;
+}
+
+.galaxy-workspaces-rail__power-label {
+  min-width: 1.2rem;
+}
+
+.galaxy-workspaces-rail__switch-error {
+  margin: 0;
+  color: rgba(255, 176, 150, 0.98);
+  font-size: 0.6rem;
+  line-height: 1.3;
 }
