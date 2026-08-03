@@ -28,6 +28,7 @@ import {
   resolveTalkSpeakMode,
 } from '../../features/workspace-agents/company-roster-intro-prefs';
 import { resolveEmployeeManualHandoff } from '../../features/workspace-agents/employee-manual-handoff';
+import { resolveLeadDirective } from '../../features/workspace-agents/lead-directive-view';
 import {
   employeeComposerOpenPayload,
   employeeQuickActions,
@@ -233,6 +234,14 @@ const selectedActions = computed(() =>
       })
     : [],
 );
+
+const selectedLeadDirective = computed(() => {
+  const employee = selectedEmployee.value;
+  if (!employee || (employee.role !== 'lead' && !employee.primary)) {
+    return null;
+  }
+  return resolveLeadDirective(shell.workspaceTasksForCurrentWorkspace);
+});
 
 const handoffWaitingEmployeeIds = computed(() => {
   const mode = shell.operatorPresenceSettings.autonomy_mode;
@@ -476,6 +485,7 @@ async function onPresenceSelect(employee: CompanyEmployeeRecord): Promise<void> 
           :control-busy="controlBusyId === selectedEmployee.employee_id"
           :live-busy="liveBusyEmployeeIds.includes(selectedEmployee.employee_id)"
           :handoff-waiting="handoffWaitingEmployeeIds.includes(selectedEmployee.employee_id)"
+          :lead-directive="selectedLeadDirective"
           @talk="void startChat(selectedEmployee, 'talk')"
           @action="onQuickAction(selectedEmployee, $event)"
         />

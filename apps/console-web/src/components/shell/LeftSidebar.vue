@@ -36,6 +36,7 @@ import { useWorkspaceWorkerSwitches } from '../../composables/useWorkspaceWorker
 
 const shell = useShellStore();
 const {
+  error: workspaceSwitchError,
   savingId: workspaceSwitchSavingId,
   isWorkspaceWorkerOn,
   setWorkspaceWorkerOn,
@@ -418,6 +419,9 @@ onBeforeUnmount(() => {
             + New Workspace
           </button>
           <p v-if="shell.workspacesError" class="region-copy">{{ shell.workspacesError }}</p>
+          <p v-if="workspaceSwitchError" class="region-copy" role="alert">
+            Worker switch: {{ workspaceSwitchError }}
+          </p>
         </div>
 
         <AttentionStackPanel
