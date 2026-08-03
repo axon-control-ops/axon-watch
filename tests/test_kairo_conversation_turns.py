@@ -416,6 +416,7 @@ class KairoConversationTurnTests(unittest.TestCase):
     @patch(_GRAPH_PATCH, return_value=_MOCK_GRAPH)
     @patch(_FLEET_PATCH, return_value=_MOCK_FLEET)
     @patch(_BRIEFING_PATCH, return_value=_MOCK_BRIEFING)
+    @patch("app.kairo_conversation.dispatch_ide_composer", return_value={"content": "", "dispatched": False})
     def test_school_capability_question_has_useful_template_fallback(
         self,
         *_mocks: object,

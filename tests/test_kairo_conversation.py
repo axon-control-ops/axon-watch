@@ -92,8 +92,12 @@ class KairoConversationUnitTests(unittest.TestCase):
     def test_pasted_lead_rollup_is_ask_evidence_not_a_command(self) -> None:
         self.assertEqual("status_question", classify_conversation_turn(_PASTED_LEAD_ROLLUP))
 
+    @patch(
+        "app.kairo_conversation.dispatch_ide_composer",
+        return_value={"content": "I can discuss the current Git state without running a command.", "dispatched": True},
+    )
     @patch("app.kairo_conversation.build_conversation_context_pack", return_value=_MOCK_PACK)
-    def test_ask_intent_cannot_enter_the_command_lane(self, _pack: object) -> None:
+    def test_ask_intent_cannot_enter_the_command_lane(self, *_mocks: object) -> None:
         payload = converse_turn(
             content="git status",
             session_id="ask-only-session",

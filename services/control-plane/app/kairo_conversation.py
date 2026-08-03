@@ -340,6 +340,13 @@ def converse_turn(
         tier = "deep"
     # Keep caller use_runtime; voice_routing_mode gates lanes inside the router.
     recent = _recent_turns(session_id)
+    # A fleet-level Ask still needs a concrete workspace for the read-only
+    # runtime context. The helper falls back to Axon Watch instead of passing
+    # an empty workspace id into the Lane B context builder.
+    consultative_workspace_id = _runtime_workspace_id(
+        workspace_id=resolved_workspace_id,
+        pack=pack,
+    )
 
     def _runtime_context_with_attachments(**kwargs: Any) -> str:
         return _build_runtime_context_block(**kwargs, image_paths=image_paths)
@@ -347,7 +354,7 @@ def converse_turn(
     decision = route_voice_turn(
         content=trimmed,
         session_id=session_id,
-        workspace_id=resolved_workspace_id,
+        workspace_id=consultative_workspace_id,
         pack=pack,
         turn_kind=turn_kind,
         voice_routing_mode=voice_routing_mode,

@@ -18,10 +18,13 @@ export function shouldPrimeRuntimeAssistantCue(content: string): boolean {
   if (!trimmed) {
     return false;
   }
+  if (CONSULTATIVE_STYLE_RE.test(trimmed)) {
+    return true;
+  }
   if (COMMAND_STYLE_RE.test(trimmed) || STATUS_STYLE_RE.test(trimmed)) {
     return false;
   }
-  return OPEN_STYLE_RE.test(trimmed) || CONSULTATIVE_STYLE_RE.test(trimmed);
+  return OPEN_STYLE_RE.test(trimmed);
 }
 
 export const RUNTIME_ASSISTANT_CUE_LINE =

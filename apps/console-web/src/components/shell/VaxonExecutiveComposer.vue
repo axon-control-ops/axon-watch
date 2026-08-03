@@ -22,7 +22,9 @@ const emit = defineEmits<{
 }>();
 
 const draft = ref('');
-const mode = ref<VaxonExecutiveComposerMode>('mission');
+// Conversation is the safe default. Dispatching work is a deliberate choice
+// made after VAXON and the operator have agreed the mission.
+const mode = ref<VaxonExecutiveComposerMode>('ask');
 const expanded = ref(false);
 const composerInput = ref<HTMLTextAreaElement | null>(null);
 
