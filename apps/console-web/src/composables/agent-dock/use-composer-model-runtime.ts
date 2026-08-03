@@ -90,6 +90,9 @@ export function useComposerModelRuntime(
     }
     return 'Codex model catalog is unavailable. Check the Codex CLI sign-in.';
   });
+  // Pinia unwraps computed store fields on access. Keep this as a computed ref so
+  // the toolbar receives the rows that arrive after the async catalog request.
+  const codexCatalogRows = computed(() => shell.codexCatalogRows);
   const autoModelRow = computed(() =>
     shell.cursorCatalogRows.find((row) => row.id === 'auto') ?? {
       id: 'auto',
@@ -251,7 +254,7 @@ export function useComposerModelRuntime(
     cursorCatalogCount,
     cursorCatalogStatus,
     cursorCatalogTotal,
-    codexCatalogRows: shell.codexCatalogRows,
+    codexCatalogRows,
     codexCatalogStatus,
     cursorManageRows,
     cursorStaleWarning,
