@@ -260,6 +260,79 @@ describe('buildOperatorTaskBoardView', () => {
     expect(view.rows[0]?.nextActionLabel).toBe('Review failure');
     expect(view.rows[0]?.nextActionHint).toContain('last outcome');
   });
+
+  it('moves failed sticky follow-ups from finished plans out of live attention', () => {
+    const view = buildOperatorTaskBoardView(
+      [
+        task({
+          task_id: 'task-old-lead-follow-up',
+          goal: 'Lead: advance "Ship OTA" toward Done [plan lead-plan-finished]',
+          status: 'failed',
+        }),
+      ],
+      [
+        {
+          plan_id: 'lead-plan-finished',
+          workspace_id: 'workspace_dashpro',
+          goal: 'Ship OTA',
+          mode: 'fan_out',
+          status: 'completed',
+          plan: {},
+          supersedes_plan_id: null,
+          created_at: '2026-07-22T11:00:00Z',
+          updated_at: '2026-07-22T12:00:00Z',
+          task_links: [],
+          task_ids: [],
+          awaiting_engagement: false,
+        },
+      ],
+    );
+
+    expect(view.counts.needsAttention).toBe(0);
+    expect(view.historyRows.map((row) => row.taskId)).toContain('task-old-lead-follow-up');
+    expect(filterTaskBoardRows(view.rows, 'board')).toHaveLength(0);
+  });
+
+  it('keeps only the latest failed follow-up for an active plan in attention', () => {
+    const view = buildOperatorTaskBoardView(
+      [
+        task({
+          task_id: 'task-new-failure',
+          goal: 'Lead: advance "Ship OTA" toward Done [plan lead-plan-active]',
+          status: 'failed',
+          updated_at: '2026-07-22T12:04:00Z',
+        }),
+        task({
+          task_id: 'task-old-failure',
+          goal: 'Lead: advance "Ship OTA" toward Done [plan lead-plan-active]',
+          status: 'failed',
+          updated_at: '2026-07-22T12:03:00Z',
+        }),
+      ],
+      [
+        {
+          plan_id: 'lead-plan-active',
+          workspace_id: 'workspace_dashpro',
+          goal: 'Ship OTA',
+          mode: 'fan_out',
+          status: 'active',
+          plan: {},
+          supersedes_plan_id: null,
+          created_at: '2026-07-22T11:00:00Z',
+          updated_at: '2026-07-22T12:00:00Z',
+          task_links: [],
+          task_ids: [],
+          awaiting_engagement: false,
+        },
+      ],
+    );
+
+    expect(view.columns.find((column) => column.id === 'needs_attention')?.rows).toHaveLength(1);
+    expect(view.columns.find((column) => column.id === 'needs_attention')?.rows[0]?.taskId).toBe(
+      'task-new-failure',
+    );
+    expect(view.historyRows.map((row) => row.taskId)).toContain('task-old-failure');
+  });
 });
 
 describe('columnForTask', () => {

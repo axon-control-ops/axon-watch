@@ -8,6 +8,40 @@ from app.ci_remediation import store as ci_store
 from app.adapters.watch_client import reset_watch_inbox_cache
 
 
+def _supersede_prior_failure_signals(
+    *,
+    dedupe_key: str,
+    workspace_id: str,
+    workflow_name: str,
+    head_branch: str,
+) -> None:
+    """Keep one actionable CI failure per workflow/branch.
+
+    A later failed head supersedes its predecessors: the repair queue should
+    show the newest failure, rather than every failed commit on that branch.
+    """
+    workflow = str(workflow_name or '').strip().lower()
+    branch = str(head_branch or '').strip()
+    if not workflow or not branch:
+        return
+    for prior in ci_store.list_open_signals():
+        if str(prior.get('dedupe_key') or '').strip() == dedupe_key:
+            continue
+        if str(prior.get('workspace_id') or '').strip() != workspace_id:
+            continue
+        meta = prior.get('meta') if isinstance(prior.get('meta'), dict) else {}
+        if str(meta.get('workflow_name') or '').strip().lower() != workflow:
+            continue
+        if str(meta.get('head_branch') or '').strip() != branch:
+            continue
+        signal_id = str(prior.get('signal_id') or '').strip()
+        if signal_id:
+            ci_store.resolve_signal(signal_id, reason='superseded_by_newer_failure')
+        prior_key = str(prior.get('dedupe_key') or '').strip()
+        if prior_key:
+            ci_store.set_event_status(prior_key, 'superseded')
+
+
 def reset_ci_signal_store_for_tests() -> None:
     ci_store.reset_store_for_tests()
 
@@ -56,6 +90,12 @@ def emit_failure_signal(
             "failing_step": failing_step,
             "phase": "failed",
         },
+    )
+    _supersede_prior_failure_signals(
+        dedupe_key=dedupe_key,
+        workspace_id=workspace_id,
+        workflow_name=workflow_name,
+        head_branch=head_branch,
     )
     reset_watch_inbox_cache()
     return record
@@ -178,7 +218,25 @@ def ci_inbox_items() -> list[dict[str, object]]:
     """Project open/repairing CI signals into watch-inbox shape for CP merge."""
     items: list[dict[str, object]] = []
     for row in ci_store.list_open_signals():
-        meta = row.get("meta") if isinstance(row.get("meta"), dict) else {}
+        meta = dict(row.get("meta")) if isinstance(row.get("meta"), dict) else {}
+        event = ci_store.get_event(str(row.get("dedupe_key") or ""))
+        task_id = str((event or {}).get("task_id") or "").strip()
+        if task_id:
+            try:
+                from app.persistence import task_store
+
+                task = task_store.get_task(task_id)
+            except Exception:  # noqa: BLE001 — inbox projection must remain available
+                task = None
+            if task is not None:
+                meta.update(
+                    {
+                        "task_id": task_id,
+                        "task_owner_role": str(task.get("owner_role") or ""),
+                        "task_status": str(task.get("status") or ""),
+                        "task_attempts": f"{task.get('attempts_used', 0)}/{task.get('attempt_budget', 0)}",
+                    }
+                )
         items.append(
             {
                 "signal_id": str(row.get("signal_id") or ""),

@@ -56,6 +56,8 @@ export type TaskBoardRow = {
   /** Short plan chip label — never the full Lead fan-out essay. */
   planLabel: string | null;
   planAwaitingEngagement: boolean;
+  /** A failed ticket from a finished/superseded plan belongs in history, not live attention. */
+  archived: boolean;
   nextActionLabel: string;
   nextActionHint: string;
   nextActionTone: TaskBoardNextActionTone;
@@ -155,6 +157,16 @@ function sortNewest(left: WorkspaceTaskRecord, right: WorkspaceTaskRecord): numb
 /** Shared plan-chip width so row labels match plan-group chips. */
 const PLAN_CHIP_LABEL_MAX = 28;
 const TASK_CARD_GOAL_MAX = 96;
+const PLAN_MARKER_RE = /\[plan\s+(lead-plan-[a-z0-9]+)\]/i;
+
+function planIdFromGoal(goal: string): string | null {
+  return goal.match(PLAN_MARKER_RE)?.[1] ?? null;
+}
+
+function planIsFinished(plan: LeadPlanRecord | undefined): boolean {
+  const status = String(plan?.status || '').trim().toLowerCase();
+  return status === 'completed' || status === 'superseded' || status === 'cancelled';
+}
 
 /** Compact operator-facing label for plan chips and dependency tags. */
 export function summarizeTaskBoardLabel(text: string, max = 52): string {
@@ -268,7 +280,9 @@ function toRow(
     };
   });
   const blockedByOpenDeps = dependencyChips.some((chip) => chip.blocking);
-  const planId = task.plan_id?.trim() || null;
+  // Sticky Lead follow-ups carry their plan marker in the goal rather than a
+  // direct task-link. Honour it so old plans cannot keep polluting Attention.
+  const planId = task.plan_id?.trim() || planIdFromGoal(task.goal) || null;
   const plan = planId ? planById.get(planId) : undefined;
   const column = columnForTask(task);
   const planGoal = plan?.goal?.trim() || null;
@@ -317,6 +331,7 @@ function toRow(
     planGoal,
     planLabel: planGoal ? summarizeTaskBoardLabel(planGoal, PLAN_CHIP_LABEL_MAX) : null,
     planAwaitingEngagement,
+    archived: task.status === 'failed' && planIsFinished(plan),
     nextActionLabel: nextAction.label,
     nextActionHint: nextAction.hint,
     nextActionTone: nextAction.tone,
@@ -348,9 +363,9 @@ export function filterTaskBoardRows(
     return rows;
   }
   if (filter === 'history') {
-    return rows.filter((row) => row.bucket === 'cancelled' || row.bucket === 'done');
+    return rows.filter((row) => row.archived || row.bucket === 'cancelled' || row.bucket === 'done');
   }
-  return rows.filter((row) => row.bucket !== 'cancelled');
+  return rows.filter((row) => row.bucket !== 'cancelled' && !row.archived);
 }
 
 export function buildOperatorTaskBoardView(
@@ -383,7 +398,19 @@ export function buildOperatorTaskBoardView(
       plan_key: meta.planKey,
     };
   });
-  const rows = ordered.map((task) => toRow(task, byId, planById, runPhaseByTaskId));
+  const latestFailedPlanIds = new Set<string>();
+  const rows = ordered.map((task) => {
+    const row = toRow(task, byId, planById, runPhaseByTaskId);
+    // Each plan gets one current Lead decision. Older failed hand-offs are
+    // evidence, not additional work items for the operator to triage.
+    if (row.status === 'failed' && row.planId) {
+      if (latestFailedPlanIds.has(row.planId)) {
+        return { ...row, archived: true };
+      }
+      latestFailedPlanIds.add(row.planId);
+    }
+    return row;
+  });
 
   const waiting = rows
     .filter((row) => row.column === 'waiting' && row.bucket !== 'cancelled')
@@ -395,9 +422,12 @@ export function buildOperatorTaskBoardView(
     .filter((row) => row.column === 'done' && row.bucket !== 'cancelled')
     .sort(sortRowsByNextAction);
   const needsAttention = rows
-    .filter((row) => row.column === 'needs_attention' && row.bucket !== 'cancelled')
+    .filter(
+      (row) =>
+        row.column === 'needs_attention' && row.bucket !== 'cancelled' && !row.archived,
+    )
     .sort(sortRowsByNextAction);
-  const historyRows = rows.filter((row) => row.bucket === 'cancelled');
+  const historyRows = rows.filter((row) => row.bucket === 'cancelled' || row.archived);
 
   const counts = {
     waiting: waiting.length,

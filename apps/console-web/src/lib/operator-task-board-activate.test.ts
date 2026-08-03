@@ -38,6 +38,7 @@ function row(overrides: Partial<TaskBoardRow>): TaskBoardRow {
     planGoal: null,
     planLabel: null,
     planAwaitingEngagement: false,
+    archived: false,
     nextActionLabel: 'Start',
     nextActionHint: '',
     nextActionTone: 'start',
