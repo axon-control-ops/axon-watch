@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref } from 'vue';
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 
 import {
   fetchAutonomyStatus,
@@ -21,6 +21,8 @@ import { resolveGalaxyPresence } from '../../features/brain-galaxy/galaxy-presen
 import { projectLiveOperationsStream } from '../../features/brain-galaxy/live-operations-stream';
 import { companyBusyEmployeesCount } from '../../features/workspace-agents/company-roster-busy';
 import MissionControlAutonomyControl from './MissionControlAutonomyControl.vue';
+import WorkerDeliveryPipelineCard from './WorkerDeliveryPipelineCard.vue';
+import { useDockDeliveryPipeline } from './use-dock-delivery-pipeline';
 import { resolveVaxonTransmissionView } from '../../lib/mc-vaxon-transmission-view';
 import {
   vaxonAffirmReplyCta,
@@ -29,13 +31,15 @@ import {
 import {
   isTransmissionAskAnswered,
   markTransmissionAskAnswered,
+  pendingTransmissionAsk,
+  retainTransmissionAsk,
 } from '../../lib/vaxon-transmission-reply-state';
 import { useShellStore } from '../../stores/shell';
+import VaxonExecutiveComposer from './VaxonExecutiveComposer.vue';
 
 const shell = useShellStore();
 const { spokenText } = useSpokenUtteranceText();
 const { pending, submitTurn, speechCapture } = useKairoConversation();
-const reply = ref('');
 const autonomyReceipts = ref<AutonomyReceipt[]>([]);
 const autonomyEffective = ref(false);
 let autonomyPoll: ReturnType<typeof setInterval> | null = null;
@@ -92,10 +96,19 @@ const streamItems = computed(() =>
   }),
 );
 
+// A Lead run may finish as soon as it opens a draft PR while the delivery
+// watcher continues through CI. Keep that visible in Mission Control instead
+// of reverting the operator surface to an apparently idle state.
+const deliveryPipeline = useDockDeliveryPipeline({
+  receiptLabels: computed(() => shell.runHistoryRows.map((row) => row.label)),
+  employees: computed(() => shell.companyEmployeesForCurrentWorkspace),
+});
+
 const transmission = computed(() =>
   resolveVaxonTransmissionView({
     spokenText: spokenText.value,
     conversationReply: kairoConversationReply.value,
+    pendingDecision: pendingTransmissionAsk.value,
     speaking: shell.kairoSpeechActive || presencePhase.value === 'speaking',
     pending: pending.value || presencePhase.value === 'thinking',
   }),
@@ -104,11 +117,22 @@ const transmission = computed(() =>
 const spokenLine = computed(() => transmission.value.body);
 const asksForReply = computed(
   () =>
+    Boolean(pendingTransmissionAsk.value) &&
     vaxonLineAsksForReply(spokenLine.value) &&
     !transmission.value.empty &&
     !isTransmissionAskAnswered(spokenLine.value),
 );
 const affirmCta = computed(() => vaxonAffirmReplyCta(spokenLine.value));
+
+watch(
+  () => spokenText.value || kairoConversationReply.value,
+  (line) => {
+    if (vaxonLineAsksForReply(line)) {
+      retainTransmissionAsk(line);
+    }
+  },
+  { immediate: true },
+);
 
 const modeChip = computed(() => {
   if (presencePhase.value === 'speaking') return 'speaking';
@@ -142,16 +166,16 @@ const focusedWorkspaceLabel = computed(() => {
   return ws.display_name?.trim() || ws.workspace_id;
 });
 
-async function sendReply(content?: string): Promise<void> {
-  const message = (content ?? reply.value).trim();
+async function sendReply(content: string): Promise<void> {
+  const message = content.trim();
   if (!message || pending.value) {
     return;
   }
-  if (content === 'yes' || content === 'not now') {
-    markTransmissionAskAnswered(spokenLine.value);
-  }
-  reply.value = '';
+  const decisionLine = pendingTransmissionAsk.value || spokenLine.value;
   await submitTurn(message);
+  if (content === 'yes' || content === 'not now') {
+    markTransmissionAskAnswered(decisionLine);
+  }
 }
 
 function toggleMic(): void {
@@ -236,6 +260,7 @@ onUnmounted(() => {
     </div>
 
     <div class="mc-live-ops__scroll">
+      <div id="mission-control-approval-tray" class="mc-live-ops__approval-tray" />
       <article
         class="mc-transmission"
         :data-mode="transmission.mode"
@@ -290,6 +315,11 @@ onUnmounted(() => {
         </span>
       </div>
 
+      <WorkerDeliveryPipelineCard
+        v-if="deliveryPipeline"
+        :pipeline="deliveryPipeline"
+      />
+
       <ul class="mc-live-ops__stream" aria-label="Live updates">
         <li
           v-for="item in streamItems"
@@ -305,34 +335,14 @@ onUnmounted(() => {
       </ul>
     </div>
 
-    <div class="mc-live-ops__reply">
-      <form class="mc-live-ops__reply-form" @submit.prevent="void sendReply()">
-        <button
-          type="button"
-          class="mc-live-ops__mic"
-          :data-live="micLive ? 'true' : 'false'"
-          :disabled="!speechCapture.supported || pending"
-          :title="micLive ? 'Stop listening' : 'Talk to VAXON'"
-          :aria-pressed="micLive"
-          @click="toggleMic"
-        >
-          Mic
-        </button>
-        <input
-          v-model="reply"
-          type="text"
-          autocomplete="off"
-          :placeholder="`Talk to ${OPERATOR_PERSONA_NAME}… or REPORT`"
-          :disabled="pending"
-        >
-        <span class="mc-live-ops__wave" aria-hidden="true">
-          <i /><i /><i /><i /><i />
-        </span>
-        <button type="submit" class="mc-live-ops__send" :disabled="pending || !reply.trim()">
-          {{ pending ? '…' : 'Send' }}
-        </button>
-      </form>
-    </div>
+    <VaxonExecutiveComposer
+      :pending="pending"
+      :mic-live="micLive"
+      :mic-supported="speechCapture.supported"
+      :focused-workspace-label="focusedWorkspaceLabel"
+      @submit="void sendReply($event)"
+      @toggle-mic="toggleMic"
+    />
   </section>
 </template>
 

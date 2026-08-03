@@ -499,3 +499,108 @@ summary=Lead follow-ups completed; 14 stale watcher patrols closed/cancelled aft
 - Quinn: `task-a75a66c591c24ea2` (Gate 6 acceptance on failed investigate).
 - Sir King: Decide on DashPro Sentry critical.
 - VAXON: engage Gate-verify plan `lead-plan-279379f913bf4940` (still awaiting_engagement); briefing shows 7 awaiting engagement.
+
+---
+
+## Lead continuous shift retry (Gate 6) — 2026-08-03 (~08:00 SAST)
+
+**Run:** `run_9036267c1999` (this IDE retry; prior task-bound fail `run_d094217e8579` / `task-c95d741745854502` — Gate 6 `acceptance=fail · failed_checks=typecheck,test,build · mode=contract · paths=0`)
+**Constraint honored:** no commit / push / merge.
+
+### Fleet triage receipts
+
+| Check | Result | Evidence |
+| --- | --- | --- |
+| Control plane | Pass | `GET /health` → ok; runtime summary `ready=true`, watch connected, not degraded |
+| Connectors | Pass | `GET /api/connectors` → **6/6 ok** (control_plane, console_web, public_ingress, github_api, edudashpro_site, cloudflare_tunnel) |
+| Console UI | Pass | `GET :5173/` → HTTP 200 |
+| Fast Gate | Pass | latest success `30787158356` on `worker/extract-autonomous-attention-status` — https://github.com/axon-control-ops/axon-watch/actions/runs/30787158356 |
+| Gate 6 unit tests | Pass | `tests.test_gate6_verifier_contract` + `tests.test_gate6_project_contract` → **13 OK** |
+| Lead unit tests | Pass | `test_lead_fan_out` + `test_lead_task_plan` + `test_lead_plan_model` + `test_lead_team_checkin` → **23 OK** |
+| Hotspot guardrail | Pass | `scripts/guardrails/check_hotspot_changes.py` passed |
+| File-size guardrail | Pass | `scripts/guardrails/check_file_sizes.py` passed (advisory WARNs only) |
+| DashPro handoff | Routed | `handoff-3db7b3347281426c` → Dana `task-6f3902511c7c4a42` |
+
+### Root-cause (prior Gate 6 fail)
+
+`run_d094217e8579` history shows Critical Review **9/10**, then verifier `acceptance=fail · failed_checks=typecheck,test,build · mode=contract · paths=0`. Same pattern on Rowan `run_97c881511872`. Isolation published no dirty paths; contract still ran heavy checks and failed closed.
+
+### Lead decisions
+
+1. **Fast Gate:** Latest green (`30787158356`); Rowan remains post-push watcher.
+2. **Rowan:** Keep leased investigate `task-b245c4e4a1634f77` / `run_1900a404b619` on watcher thread — same `paths=0` Gate 6 trap; coach: land a real in-scope file change or wait for Reed’s triage-task verifier policy; always emit Confidence + machine acceptance.
+3. **Reed:** Own verifier policy so triage/investigate tasks with `paths=0` (or empty `allowed_paths`) use inspect/light checks instead of full typecheck/test/build timeouts.
+4. **Dana:** DashPro Android CI + monitor-slice CI via new handoff — not Axon-X product work.
+5. **Jules / Quinn:** Last runs completed — no Lead redo on their threads.
+6. **Ship:** Not approved.
+7. **Upgrade proposals:** (a) Reed: Gate 6 inspect path when `paths=0` on decision/triage tasks; (b) surface failed check excerpts in delivery error (not only names); (c) stop cloning Lead Gate 6 retries onto specialist failed_shift storms.
+
+### Code changed this shift
+
+- Receipts / handoff / evidence log only — no product code edits this retry.
+
+### Acceptance evidence (Gate 6 — Lead scope)
+
+```
+acceptance=pass · intent=gate6_acceptance · actor=lead-retry-receipt
+summary=Prior run_d094217e8579 triaged (paths=0 + typecheck/test/build); health+console+connectors 6/6 green; Fast Gate success 30787158356; Gate6 13 OK + Lead 23 OK; hotspot+file-size pass; DashPro handoff-3db7b3347281426c → Dana task-6f3902511c7c4a42; Rowan coached on paths=0; Reed owns verifier triage policy; ship not approved
+```
+
+### Still open
+
+- Rowan: leased `task-b245c4e4a1634f77` — clear Gate 6 on watcher thread with real paths or inspect policy.
+- Reed: Gate 6 `paths=0` triage-task policy (backend verifier).
+- Dana: `task-6f3902511c7c4a42` DashPro CI triage (`handoff-3db7b3347281426c`).
+- Sir King: Decide draft PR merge policy for open Axon-X drafts if still pending.
+
+---
+
+## Lead continuous shift retry (Gate 6) — 2026-08-03 (~09:40 SAST)
+
+**Run:** `run_f42211bb2de9` (this IDE retry; prior task-bound fails `run_b7a3c9ab4b17` + `run_24d5fbf29824` on `task-b6518ca32de34c37` — Gate 6 `acceptance=fail · failed_checks=typecheck,test,build · mode=contract · paths=0`)
+**Constraint honored:** no commit / push / merge.
+
+### Fleet triage receipts
+
+| Check | Result | Evidence |
+| --- | --- | --- |
+| Control plane | Pass | `GET /health` → ok; runtime summary `ready=true`, watch connected, not degraded |
+| Connectors | Pass | Mid-shift `github_api` probe timeout (5/6); re-check **6/6 ok** (`github_api` reachable); direct `curl https://api.github.com/zen` → HTTP 200 |
+| Console UI | Pass | `GET :5173/` → HTTP 200 |
+| Fast Gate | Pass | latest success on this branch `30788906859` — https://github.com/axon-control-ops/axon-watch/actions/runs/30788906859 ; Rowan PR pipeline success `30788814056` — https://github.com/axon-control-ops/axon-watch/actions/runs/30788814056 |
+| Gate 6 + Lead unit tests | Pass | Gate6 + Lead fan_out/task_plan/plan_model/team_checkin → **36 OK** |
+| Hotspot guardrail | Pass | `scripts/guardrails/check_hotspot_changes.py` passed |
+| File-size guardrail | Pass | `scripts/guardrails/check_file_sizes.py` passed (advisory WARNs only) |
+| Lead plan | Synthesize | `lead-plan-806a09922d6040ac` → `completed`; receipt `lead-receipt-2e8b6534dfed4c4e`; cancelled misrouted Quinn/Rowan decompose clones |
+
+### Root-cause (prior Gate 6 fail)
+
+`run_24d5fbf29824` history: Critical Review **9/10**, then verifier `acceptance=fail · failed_checks=typecheck,test,build · mode=contract · paths=0`. Isolation published no dirty paths; contract still ran heavy checks and failed closed. Same pattern on `run_b7a3c9ab4b17`.
+
+### Lead decisions
+
+1. **Fast Gate:** Green on `worker/extract-autonomous-attention-status` (`30788906859`) and Rowan branch `worker/run_1900a404b619` (`30788814056`). Rowan remains post-push watcher.
+2. **Rowan:** Last outcome completed (`run_1900a404b619` / PR #67). Coach: re-probe GitHub API connector timeout (SSL/handshake flaps vs true outage); keep Confidence + machine acceptance on every delivery.
+3. **Reed:** Own Gate 6 inspect/light path when task-bound isolation has `paths=0` (or empty `allowed_paths`) on Lead/triage/decision tasks — this is the repeat delivery blocker.
+4. **Jules / Quinn:** Last runs completed — no Lead redo on their threads. Cancelled auto-decomposed Gate 6 clone tasks on this plan (stay on Lead).
+5. **Dana:** DashPro Android CI + monitor-slice remain product-owned (prior handoffs); not Axon-X console work.
+6. **Ship:** Not approved.
+7. **Upgrade proposals:** (a) Reed: Gate 6 inspect path when `paths=0` on decision/triage tasks; (b) surface failed check excerpts in delivery error text; (c) stop cloning Lead Gate 6 retries onto specialist failed_shift storms (done this synthesize).
+
+### Code changed this shift
+
+- Receipts / evidence log only — no product code edits this retry.
+
+### Acceptance evidence (Gate 6 — Lead scope)
+
+```
+acceptance=pass · intent=gate6_acceptance · actor=lead-retry-receipt
+summary=Prior run_24d5fbf29824/run_b7a3c9ab4b17 triaged (paths=0 + typecheck/test/build); health+console green; connectors 6/6 ok after github_api re-probe; Fast Gate success 30788906859 + 30788814056; Gate6+Lead 36 OK; hotspot+file-size pass; lead-plan-806a09922d6040ac synthesized lead-receipt-2e8b6534dfed4c4e; Reed owns paths=0 inspect policy; ship not approved
+```
+
+### Still open
+
+- Reed: Gate 6 `paths=0` triage-task inspect policy (backend verifier).
+- Rowan: watch for GitHub API probe flaps if the critical health signal returns.
+- Dana: DashPro Android CI / monitor-slice (product tree).
+- Sir King: Decide draft PR merge policy for open Axon-X drafts if still pending.

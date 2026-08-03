@@ -170,7 +170,43 @@ class CiRemediationTests(unittest.TestCase):
         self.assertTrue(str(task["goal"]).startswith("CI repair:"))
         self.assertIn(first.dedupe_key, str(task["goal"]))
         items = ci_inbox_items()
-        self.assertTrue(any("Fast Gate failed" in str(i.get("title")) for i in items))
+        item = next(i for i in items if "Fast Gate failed" in str(i.get("title")))
+        self.assertEqual(first.task_id, item.get("meta", {}).get("task_id"))
+        self.assertEqual("watcher", item.get("meta", {}).get("task_owner_role"))
+
+    def test_newer_failure_on_the_same_branch_supersedes_prior_signal(self) -> None:
+        from app.ci_remediation.ingest import ingest_workflow_run_event
+        from app.ci_remediation.report import ci_inbox_items
+
+        with mock.patch(
+            "app.ci_remediation.ingest.dispatch_repair_run",
+            return_value=None,
+        ):
+            first = ingest_workflow_run_event(_failure_payload(), dispatch=False)
+            newer_payload = _failure_payload()
+            newer_run = dict(newer_payload["workflow_run"])  # type: ignore[arg-type]
+            newer_run["id"] = 30075110719
+            newer_run["head_sha"] = "def456newhead"
+            newer_payload["workflow_run"] = newer_run
+            newer = ingest_workflow_run_event(newer_payload, dispatch=False)
+
+        self.assertNotEqual(first.signal_id, newer.signal_id)
+        items = ci_inbox_items()
+        self.assertEqual([newer.signal_id], [item.get("signal_id") for item in items])
+
+    def test_completed_repair_task_reconciles_its_open_signal(self) -> None:
+        from app.ci_remediation.ingest import ingest_workflow_run_event
+        from app.ci_remediation.report import ci_inbox_items
+        from app.persistence import task_store
+
+        with mock.patch(
+            "app.ci_remediation.ingest.dispatch_repair_run",
+            return_value=None,
+        ):
+            result = ingest_workflow_run_event(_failure_payload(), dispatch=False)
+        task_store.complete_task(result.task_id, terminal_outcome="CI confirmed green")
+
+        self.assertEqual([], ci_inbox_items())
 
     def test_inbox_projection_merges_ci_items(self) -> None:
         from app.ci_remediation.ingest import ingest_workflow_run_event

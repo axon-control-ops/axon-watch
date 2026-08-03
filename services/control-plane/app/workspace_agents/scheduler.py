@@ -38,7 +38,7 @@ DEFAULT_TICK_SECONDS = 45.0
 DEFAULT_MAX_STARTS_PER_TICK = 1
 # Skip new starts when non-terminal executing runs already exceed this bound.
 # 3+ concurrent agents with jest/tsserver thrash past MemoryHigh and trip systemd-oomd.
-DEFAULT_MAX_ACTIVE_EXECUTING = 2
+DEFAULT_MAX_ACTIVE_EXECUTING = 1
 
 _scheduler_task: asyncio.Task[None] | None = None
 
@@ -256,6 +256,13 @@ def run_continuous_worker_tick(
     if pruned:
         logger.info("continuous worker tick pruned %s terminal employee run(s)", len(pruned))
 
+    # A paused scheduler must be genuinely passive.  Previously the loop still
+    # ran scheduled work sources and Lead/handoff pickup before reaching this
+    # guard, which could dispatch a Cursor worker even after the operator had
+    # turned continuous workers off.
+    if not scheduler_enabled():
+        return []
+
     try:
         from app.workspace_delivery.poll import poll_pending_deliveries
 
@@ -314,9 +321,6 @@ def run_continuous_worker_tick(
     except Exception:  # noqa: BLE001 — never block scheduler on handoff retry
         logger.exception("handoff autostart retry failed")
 
-    if not scheduler_enabled():
-        return []
-
     _configs, _defaults, companies, _staffing = load_workspace_agent_configs()
     active_bound = max_active_executing()
     executing = _executing_run_count()
@@ -348,7 +352,10 @@ def run_continuous_worker_tick(
         for employee in company.employees:
             if len(started) >= starts_bound:
                 return started
-            if _executing_run_count() + len(started) >= active_bound:
+            # ``create_run`` is synchronous, so the live count already
+            # includes work started earlier in this tick.  Adding
+            # ``len(started)`` again halves the configured capacity.
+            if _executing_run_count() >= active_bound:
                 return started
             role = str(employee.role or "").strip().lower()
             if not worker_scheduler_settings_store.is_employee_enabled(

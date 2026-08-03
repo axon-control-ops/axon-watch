@@ -362,15 +362,6 @@ def _attention_bits(snapshot: dict[str, Any]) -> list[str]:
         noun = "approval" if pending == 1 else "approvals"
         bits.append(f"{_spell_count(pending)} {noun} waiting for your yes or no")
 
-    awaiting = int(snapshot.get("awaiting_engagement_count") or 0)
-    if awaiting > 0:
-        if awaiting == 1:
-            bits.append("a Lead-team plan waiting for you")
-        else:
-            bits.append(
-                f"Lead-team plans waiting for you — {_spell_count(awaiting)} of them"
-            )
-
     notice = str((snapshot.get("briefing") or {}).get("notice") or "").strip().rstrip(".")
     if notice:
         notice_l = notice.lower()
@@ -510,12 +501,6 @@ def _lead_rollup_bits(snapshot: dict[str, Any]) -> list[str]:
         if line not in seen:
             seen.add(line)
             bits.append(line)
-    if not bits and int(snapshot.get("awaiting_engagement_count") or 0) > 0:
-        bits.append(
-            f"{lead_name}: Lead-team plans are waiting. "
-            "Issue: engagement gate is open. "
-            "Plan: walk the rollup and decide the next handoff."
-        )
     if not bits:
         bits.append(f"{lead_name}: No verified rollup yet — standing by on the board.")
     return bits[:5]

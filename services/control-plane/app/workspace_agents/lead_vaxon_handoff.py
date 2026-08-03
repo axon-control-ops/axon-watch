@@ -125,10 +125,11 @@ def post_lead_synthesis_to_vaxon(
             "summary": summary,
         },
     )
+    # The handoff is VAXON's engagement: it posts the verified rollup and
+    # closes the plan instead of leaving an operator-facing engagement chore.
     try:
-        lead_plan_store.set_plan_status(plan_id, "awaiting_engagement")
+        lead_plan_store.set_plan_status(plan_id, "completed")
     except ValueError:
-        # Older DBs or unexpected status — synthesis already marked completed.
         pass
 
     try:
@@ -149,14 +150,28 @@ def post_lead_synthesis_to_vaxon(
 
 
 def list_awaiting_engagement_plans(*, workspace_id: str | None = None) -> list[dict[str, Any]]:
-    return lead_plan_store.list_plans_by_status(
+    plans = lead_plan_store.list_plans_by_status(
         "awaiting_engagement",
         workspace_id=workspace_id,
     )
+    pending: list[dict[str, Any]] = []
+    for plan in plans:
+        plan_id = str(plan.get("plan_id") or "").strip()
+        # Repair the legacy state only when the VAXON handoff receipt proves
+        # that engagement already happened. Manually reopened plans remain
+        # visible to their owner until they are acted on.
+        if plan_id and _handoff_already_posted(plan_id):
+            try:
+                lead_plan_store.set_plan_status(plan_id, "completed")
+            except ValueError:
+                pass
+            continue
+        pending.append(plan)
+    return pending
 
 
 def count_awaiting_engagement_plans(*, workspace_id: str | None = None) -> int:
-    """Count Lead plans waiting for operator engagement via VAXON."""
+    """Return genuinely unresolved legacy plans after settling VAXON handoffs."""
     return len(list_awaiting_engagement_plans(workspace_id=workspace_id))
 
 

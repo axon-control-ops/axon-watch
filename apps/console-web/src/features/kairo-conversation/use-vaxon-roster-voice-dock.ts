@@ -11,6 +11,7 @@ import {
   subscribeKairoVoiceUtterance,
 } from '../../lib/kairo-voice-utterance';
 import { kairoVoiceFollowupExpiresAt } from '../../lib/kairo-voice-followup-window';
+import { vaxonLineAsksForReply } from '../../lib/vaxon-reply-prompt';
 
 export function shouldShowVaxonRosterVoiceDock(input: {
   layoutMode: string;
@@ -51,7 +52,7 @@ export function useVaxonRosterVoiceDock(
       if (text) {
         lastLine.value = text;
         const ws = workspaceId.value?.trim();
-        if (ws) {
+        if (ws && vaxonLineAsksForReply(text)) {
           recordVaxonBriefingInteraction({
             workspaceId: ws,
             line: text,

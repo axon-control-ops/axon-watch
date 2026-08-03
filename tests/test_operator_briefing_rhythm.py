@@ -41,7 +41,7 @@ class OperatorBriefingRhythmTests(unittest.TestCase):
 
         self.assertEqual("Smoke run is ready for your review.", notice)
 
-    def test_notice_surfaces_lead_awaiting_engagement(self) -> None:
+    def test_notice_does_not_dump_vaxon_engagement_work_on_the_operator(self) -> None:
         notice = build_briefing_notice(
             active_runs=[],
             top_signals=[],
@@ -51,9 +51,9 @@ class OperatorBriefingRhythmTests(unittest.TestCase):
             lead_awaiting_engagement_count=1,
         )
 
-        self.assertEqual("A Lead-team plan is waiting for you in Mission Control.", notice)
+        self.assertEqual("", notice)
 
-    def test_notice_surfaces_multiple_lead_plans_tts_safe(self) -> None:
+    def test_notice_never_surfaces_multiple_lead_engagements(self) -> None:
         notice = build_briefing_notice(
             active_runs=[],
             top_signals=[],
@@ -63,12 +63,7 @@ class OperatorBriefingRhythmTests(unittest.TestCase):
             lead_awaiting_engagement_count=4,
         )
 
-        self.assertEqual(
-            "Lead-team plans are waiting for you in Mission Control — Four of them.",
-            notice,
-        )
-        self.assertNotRegex(notice, r"\b\d+\s+Lead\b")
-        self.assertNotRegex(notice, r"(?i)\bfour\s+Lead\b")
+        self.assertEqual("", notice)
 
     def test_idle_rhythm_stays_quiet_instead_of_inventing_status_copy(self) -> None:
         rhythm = build_operator_briefing_rhythm(

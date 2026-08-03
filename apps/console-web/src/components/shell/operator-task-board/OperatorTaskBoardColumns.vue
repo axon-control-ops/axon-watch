@@ -218,7 +218,7 @@ function hiddenWaitingCount(column: OperatorTaskBoardView['columns'][number]): n
       class="operator-task-board__add"
       @click="emit('update:showHistory', !showHistory)"
     >
-      {{ showHistory ? 'Hide cancelled' : `Cancelled history (${boardView.counts.cancelled})` }}
+      {{ showHistory ? 'Hide history' : `History (${boardView.historyRows.length})` }}
     </button>
   </div>
   <ul v-if="showHistory && boardView.historyRows.length" class="operator-task-board__list">
@@ -233,7 +233,7 @@ function hiddenWaitingCount(column: OperatorTaskBoardView['columns'][number]): n
         :title="row.goalFull"
         @click="emit('selectTask', row.taskId)"
       >
-        <span class="operator-task-board__item-status">cancelled</span>
+        <span class="operator-task-board__item-status">{{ row.archived ? 'archived' : 'cancelled' }}</span>
         <span class="operator-task-board__item-goal">{{ row.goal }}</span>
       </button>
     </li>

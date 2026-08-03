@@ -29,6 +29,14 @@ def truncate_text(text: str | None, *, max_len: int = 280) -> str:
     return f"{cleaned[: max_len - 1].rstrip()}…"
 
 
+def sentence_text(text: str | None, *, max_len: int = 280) -> str:
+    """Return one polished sentence for compact operator and voice updates."""
+    cleaned = truncate_text(text, max_len=max_len).rstrip(".?!… ")
+    if not cleaned:
+        return ""
+    return f"{cleaned[:1].upper()}{cleaned[1:]}."
+
+
 def strip_confidence_lines(text: str | None) -> str:
     """Remove Confidence: N/10 crumbs so TTS stays natural."""
     body = strip_thinking(text)
@@ -66,6 +74,7 @@ def lead_summary_from_reply(reply_text: str | None) -> str:
 
 __all__ = [
     "lead_summary_from_reply",
+    "sentence_text",
     "strip_confidence_lines",
     "strip_thinking",
     "truncate_text",

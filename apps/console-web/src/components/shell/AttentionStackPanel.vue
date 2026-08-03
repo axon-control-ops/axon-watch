@@ -107,6 +107,20 @@ function signalSeverityLabel(severity: string | null | undefined): string {
   return normalized === 'info' ? 'INFO' : normalized.toUpperCase();
 }
 
+function signalAssignmentLabel(signal: { meta?: Record<string, unknown> | null }): string | null {
+  const role = String(signal.meta?.task_owner_role ?? '').trim().toLowerCase();
+  const status = String(signal.meta?.task_status ?? '').trim().toLowerCase();
+  if (!role || !status) {
+    return null;
+  }
+  const employee = shell.companyEmployeesForCurrentWorkspace.find(
+    (candidate) => String(candidate.role || '').trim().toLowerCase() === role,
+  );
+  const name = employee?.name || employee?.role_label || role;
+  const state = status === 'leased' ? 'WORKING' : status === 'open' ? 'QUEUED' : 'NEEDS REVIEW';
+  return `${name} · ${state}`;
+}
+
 function phaseTagClass(phase: string | undefined): string {
   if (phase === 'review_ready') {
     return 'dock-tag--review';
@@ -146,7 +160,7 @@ function signalExplanation(signal: {
 function approvalExplanation(): OperatorAlertExplanation {
   const spoken = shell.operatorBriefing?.operator_presence?.spoken_alert;
   return resolveOperatorAlertExplanation({
-    pendingApprovals: Math.max(1, shell.pendingApprovalsCount),
+    pendingApprovals: shell.pendingApprovalsCount,
     reason: 'operator_approval_required',
     serverExplanation: spoken?.explanation ?? null,
     serverSignalId: spoken?.signal_id ?? null,
@@ -300,38 +314,43 @@ function approvalExplanation(): OperatorAlertExplanation {
       :show-view-all="variant === 'dock'"
       @toggle="shell.toggleDockSeam('approvals')"
     >
-      <p class="dock-seam__lead">
-        {{ approvalExplanation().what }}
-      </p>
-      <p v-if="shell.pendingApprovalsCount > 0" class="region-copy">
-        {{ approvalExplanation().youDo }}
-      </p>
-      <ul v-if="shell.operatorBriefing?.pending_approvals.items.length" class="dock-list">
-        <li
-          v-for="(item, index) in shell.operatorBriefing.pending_approvals.items"
-          :key="item.approval_id"
-          class="dock-list__item"
-        >
-          <span class="dock-list__title">
-            Job waiting for your yes or no
-            <template v-if="shell.primaryApprovalRun && index === 0">
-              — {{ formatRunDisplayName(shell.primaryApprovalRun) }}
-            </template>
-          </span>
-          <span class="dock-tag dock-tag--high">{{ index === 0 ? 'NEEDS YOU' : 'WAITING' }}</span>
-          <span class="region-copy dock-list__tech-note">ID {{ item.approval_id }}</span>
-        </li>
-      </ul>
-      <p v-else class="region-copy">Nothing waiting for your yes or no</p>
+      <template v-if="shell.pendingApprovalsCount > 0">
+        <p class="dock-seam__lead">
+          {{ approvalExplanation().what }}
+        </p>
+        <p class="region-copy">
+          {{ approvalExplanation().youDo }}
+        </p>
+        <ul v-if="shell.operatorBriefing?.pending_approvals.items.length" class="dock-list">
+          <li
+            v-for="(item, index) in shell.operatorBriefing.pending_approvals.items"
+            :key="item.approval_id"
+            class="dock-list__item"
+          >
+            <span class="dock-list__title">
+              Job waiting for your yes or no
+              <template v-if="shell.primaryApprovalRun && index === 0">
+                — {{ formatRunDisplayName(shell.primaryApprovalRun) }}
+              </template>
+            </span>
+            <span class="dock-tag dock-tag--high">{{ index === 0 ? 'NEEDS YOU' : 'WAITING' }}</span>
+            <span class="region-copy dock-list__tech-note">ID {{ item.approval_id }}</span>
+          </li>
+        </ul>
 
-      <div v-if="shell.primaryApprovalRun" class="dock-approval-run">
-        <p class="dock-approval-run__label">Job waiting for your decision</p>
-        <div class="dock-approval-run__header">
-          <strong>{{ formatRunDisplayName(shell.primaryApprovalRun) }}</strong>
-          <span class="dock-tag dock-tag--warning">WAITING</span>
+        <div v-if="shell.primaryApprovalRun" class="dock-approval-run">
+          <p class="dock-approval-run__label">Job waiting for your decision</p>
+          <div class="dock-approval-run__header">
+            <strong>{{ formatRunDisplayName(shell.primaryApprovalRun) }}</strong>
+            <span class="dock-tag dock-tag--warning">WAITING</span>
+          </div>
+          <p class="region-copy">{{ shell.primaryApprovalRun.summary }}</p>
         </div>
-        <p class="region-copy">{{ shell.primaryApprovalRun.summary }}</p>
-      </div>
+        <p v-else-if="!shell.operatorBriefing?.pending_approvals.items.length" class="region-copy">
+          Approval queued — loading the job details.
+        </p>
+      </template>
+      <p v-else class="region-copy">Nothing waiting for your yes or no</p>
 
       <p v-if="shell.runMutationError" class="dock-seam__error" role="alert">
         {{ shell.runMutationError }}
@@ -427,6 +446,13 @@ function approvalExplanation(): OperatorAlertExplanation {
                 :title="deliveryStateTooltip(signal.delivery_state ?? undefined)"
               >
                 {{ deliveryStateLabel(signal.delivery_state ?? undefined)?.toUpperCase() }}
+              </span>
+              <span
+                v-if="signalAssignmentLabel(signal)"
+                class="dock-tag dock-tag--status dock-tag--kairo"
+                :title="`Assigned job: ${signalAssignmentLabel(signal)}`"
+              >
+                {{ signalAssignmentLabel(signal) }}
               </span>
             </div>
           </div>

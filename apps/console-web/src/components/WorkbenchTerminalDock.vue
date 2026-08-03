@@ -7,11 +7,13 @@ import OperatorJarvisOpsPanel from './shell/OperatorJarvisOpsPanel.vue';
 import TerminalNewSessionMenu from './shell/TerminalNewSessionMenu.vue';
 import TerminalSessionRail from './shell/TerminalSessionRail.vue';
 import { useAgentTerminalMirror } from '../composables/useAgentTerminalMirror';
+import { listAgentTerminalMirrorSegments } from '../lib/agent-terminal-mirror';
 import {
   agentShellMirrorActive,
   agentShellMirrorForcedText,
   armAgentShellMirror,
   clearAgentShellMirror,
+  clearAgentShellMirrorForcedText,
   pendingAgentBackgroundCommand,
   pendingOperatorTerminalCommand,
 } from '../lib/agent-shell-mirror-state';
@@ -121,6 +123,30 @@ const { syncNow: syncAgentTerminalMirror } = useAgentTerminalMirror({
 });
 
 watch(
+  () => ({
+    streaming: agentStreamActive.value,
+    transcript: resolveMirrorTranscriptContent(),
+  }),
+  ({ streaming, transcript }, previous) => {
+    const hasOpenTerminal =
+      streaming && listAgentTerminalMirrorSegments(transcript).some((segment) => segment.open);
+    const hadOpenTerminal =
+      previous?.streaming &&
+      listAgentTerminalMirrorSegments(previous.transcript).some((segment) => segment.open);
+    if (!hasOpenTerminal || hadOpenTerminal) {
+      return;
+    }
+    // A server-owned OTA/push job can create its terminal block without a
+    // click on "Watch in terminal". Treat that open block as the same request:
+    // arm the mirror, ensure a vaxon session exists, and reveal this panel.
+    clearAgentShellMirrorForcedText();
+    armAgentShellMirror();
+    void shell.backgroundIdeAgentRun();
+  },
+  { flush: 'post' },
+);
+
+watch(
   () => [agentShellMirrorActive.value, agentShellMirrorForcedText.value, agentSessionId.value] as const,
   ([active, forced, sessionId]) => {
     if (!active || !sessionId) {
@@ -129,6 +155,10 @@ watch(
     if (!forced && !resolveMirrorTranscriptContent()) {
       return;
     }
+    // OPS is the operator-mode default, but it does not mount TerminalHost. Switch
+    // to the terminal as soon as an agent shell is active so OTA/push output has a
+    // live xterm target instead of waiting for the operator to find the tab.
+    bottomTab.value = 'terminal';
     // Focus the existing agent/vaxon pane only — never auto-split beside bash.
     visibleTerminalSessionIds.value = resolveMirrorVisibleTerminalSessionIds(sessionId);
     // Host may mount one tick after the agent session becomes active.

@@ -6,6 +6,7 @@ from copy import deepcopy
 from contextlib import contextmanager
 import json
 import os
+import sqlite3
 from typing import Any
 
 from app.persistence import run_store_sqlite
@@ -175,21 +176,32 @@ def delete_run(run_id: str) -> bool:
 
 
 def append_transition(history_ref: str, transition: dict[str, Any]) -> None:
+    """Append one history transition with monotonic sequence under concurrent writers."""
     payload = deepcopy(transition)
     encoded = json.dumps(payload, separators=(",", ":"), sort_keys=True)
-    with _managed_connection() as connection:
-        sequence = connection.execute(
-            "SELECT COALESCE(MAX(sequence), 0) + 1 FROM run_history WHERE history_ref = ?",
-            (history_ref,),
-        ).fetchone()[0]
-        connection.execute(
-            """
-            INSERT INTO run_history (history_ref, sequence, transition_json)
-            VALUES (?, ?, ?)
-            """,
-            (history_ref, sequence, encoded),
-        )
-        connection.commit()
+    max_attempts = 8
+    for attempt in range(max_attempts):
+        try:
+            with _managed_connection() as connection:
+                # IMMEDIATE reserves the writer lock before reading MAX(sequence),
+                # so heartbeat + stream progress threads cannot pick the same slot.
+                connection.execute("BEGIN IMMEDIATE")
+                sequence = connection.execute(
+                    "SELECT COALESCE(MAX(sequence), 0) + 1 FROM run_history WHERE history_ref = ?",
+                    (history_ref,),
+                ).fetchone()[0]
+                connection.execute(
+                    """
+                    INSERT INTO run_history (history_ref, sequence, transition_json)
+                    VALUES (?, ?, ?)
+                    """,
+                    (history_ref, sequence, encoded),
+                )
+                connection.commit()
+                return
+        except sqlite3.IntegrityError:
+            if attempt + 1 >= max_attempts:
+                raise
 
 
 def list_history(history_ref: str) -> list[dict[str, Any]]:

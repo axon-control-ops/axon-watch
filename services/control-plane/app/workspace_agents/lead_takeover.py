@@ -14,6 +14,7 @@ from app.workspace_agents.lead_fan_out import _employee_id_for_role
 from app.workspace_agents.lead_takeover_followup import enqueue_lead_follow_up_task
 from app.workspace_agents.lead_text import (
     lead_summary_from_reply as _lead_summary_from_reply,
+    sentence_text as _sentence,
     strip_thinking as _strip_thinking,
     truncate_text as _truncate,
 )
@@ -22,6 +23,10 @@ logger = logging.getLogger(__name__)
 
 _LEAD_NEXT_RE = re.compile(
     r"(?:blockers?\s*/\s*lead\s*next|lead\s*next|lead:)\s*[-–—:]?\s*(.+)",
+    re.IGNORECASE,
+)
+_NEXT_ACTION_RE = re.compile(
+    r"^(?:next\s+action|next\s+step|recommended\s+next\s+step)\s*[-–—:]?\s*(.+)$",
     re.IGNORECASE,
 )
 
@@ -51,6 +56,9 @@ def extract_lead_next(reply_text: str | None) -> str:
         lead_match = re.match(r"^lead\s*:?\s*\*{0,2}\s*(.+)$", cleaned, flags=re.IGNORECASE)
         if lead_match:
             return _truncate(lead_match.group(1).strip().lstrip("*").strip(), max_len=280)
+        next_action_match = _NEXT_ACTION_RE.match(cleaned)
+        if next_action_match:
+            return _truncate(next_action_match.group(1).strip().lstrip("*").strip(), max_len=280)
     match = _LEAD_NEXT_RE.search(body)
     if not match:
         return ""
@@ -129,9 +137,11 @@ def _already_posted_takeover(thread_id: str, run_id: str) -> bool:
         if str(message.get("role") or "") != "agent":
             continue
         content = str(message.get("content") or "")
-        if needle in content and "Lead takeover" in content:
+        if needle in content and ("Lead takeover" in content or "Lead update" in content):
             return True
-        if str(message.get("run_id") or "").strip() == cleaned_run and "Lead takeover" in content:
+        if str(message.get("run_id") or "").strip() == cleaned_run and (
+            "Lead takeover" in content or "Lead update" in content
+        ):
             return True
     return False
 
@@ -149,65 +159,38 @@ def build_lead_takeover_message(
     task_id: str | None = None,
     parent_plan_goal: str | None = None,
 ) -> str:
+    """Build the concise, directive Lead update shown in the Lead thread.
+
+    The worker transcript and identifiers remain available through receipts. The
+    operator-facing update is deliberately one screenful: outcome, the active
+    goal, and the next action. Repeating the specialist's full account, parent
+    goal, and a generic invitation to ask a question turned a useful handoff
+    into noise.
+    """
     name = (employee_name or employee_role or "specialist").strip()
-    role = (employee_role or "specialist").strip()
     status = "completed" if phase == "completed" else (phase or "ended")
-    excerpt = _truncate(_strip_thinking(reply_text or ""), max_len=420)
+    summary = _lead_summary_from_reply(reply_text)
     lead_next = extract_lead_next(reply_text)
-    lines = [
-        f"Lead takeover — {name} ({role}) just {status}.",
-        "",
-        f"Run: {run_id or '(none)'}",
-    ]
-    if task_id:
-        lines.append(f"Task: {task_id}")
-    if plan_id:
-        lines.append(f"Plan: {plan_id}")
     parent_ask = _truncate(parent_plan_goal or "", max_len=240)
-    if parent_ask:
-        lines.append(f"Parent ask (sole truth): {parent_ask}")
     goal_line = _truncate(goal, max_len=240)
-    if goal_line and goal_line != parent_ask:
-        lines.append(f"Specialist goal: {goal_line}")
-    elif goal_line and not parent_ask:
-        lines.append(f"Goal: {goal_line}")
     outcome_line = _truncate(outcome, max_len=200)
-    if outcome_line:
-        lines.append(f"Outcome: {outcome_line}")
-    if excerpt:
-        lines.extend(["", "Specialist report:", excerpt])
-    lines.extend(["", "My read (Lead):"])
-    if parent_ask:
-        lines.append(
-            f"I still own completing: {parent_ask}. "
-            f"{name}'s dig is an input — I will not restart it as the mission."
-        )
-    elif status == "completed":
-        lines.append(
-            f"{name} finished their slice. I own the handoff now — "
-            "cross-team decisions and next assignments stay with me until you Decide."
-        )
-    else:
-        lines.append(
-            f"{name}'s job {status}. I will triage blockers and reassign if needed."
-        )
+
+    lines = [f"Lead update — {name} {status}."]
+    active_goal = parent_ask or goal_line
+    if active_goal:
+        lines.append(f"Goal: {active_goal}")
+    if summary:
+        lines.append(f"Outcome: {_sentence(summary)}")
+    elif outcome_line:
+        lines.append(f"Outcome: {_sentence(outcome_line)}")
+
     if lead_next:
-        lines.extend(["", f"Decision needed (from specialist): {lead_next}"])
+        lines.append(f"Next action: {_sentence(lead_next)}")
+    elif status == "completed":
+        lines.append("Next action: I will verify the remaining gate and advance only the unfinished work.")
     else:
-        lines.extend(
-            [
-                "",
-                "Lead next: review their report, confirm any product Decide gates, "
-                "then assign the next specialist or approve ship.",
-            ]
-        )
-    lines.extend(
-        [
-            "",
-            "Open my Lead tab for this rollup. Ask me what to do next.",
-            "Confidence: 8/10",
-        ]
-    )
+        lines.append("Next action: I will isolate the blocker, then reassign or escalate it.")
+    lines.append("Confidence: 8/10")
     return "\n".join(lines)
 
 

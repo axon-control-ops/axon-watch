@@ -19,6 +19,7 @@ from app.chat.command_intent import (
 )
 from app.cli_runtime.catalog import runtime_status_snapshot
 from app.cli_runtime.recovery import ordered_runtime_candidates
+from app.kairo.specialty_action_reply import build_specialty_action_reply
 from app.kairo.teammate_handoff import build_specialty_task_action
 from app.kairo.voice_autonomy import resolve_voice_action_tier
 from app.kairo_conversation_reply import (
@@ -327,24 +328,13 @@ def route_voice_turn(
             workspace_id=workspace_id,
         )
         if specialty_action is not None:
-            action_type = str(specialty_action.get("type") or "")
-            if action_type == "lead_fan_out":
-                mode = str(specialty_action.get("mode") or "decompose").strip() or "decompose"
-                task_count = len(specialty_action.get("tasks") or [])
-                reply = (
-                    f"On it — handing this to Lead for {mode}"
-                    + (f" ({task_count} tasks)" if task_count else "")
-                    + ". Opening the Task Board."
-                )
-            else:
-                employee_name = str(specialty_action.get("employee_name") or "the specialist")
-                employee_role = str(specialty_action.get("employee_role") or "specialist")
-                reply = f"Routing this to {employee_name}, your {employee_role} specialist."
+            reply, spoken_reply = build_specialty_action_reply(specialty_action)
             return VoiceDispatchDecision(
                 lane="ide_handoff",
                 turn_kind="action",
                 source="model" if specialty_action.get("model_receipt") else "template",
                 reply=reply,
+                spoken_reply=spoken_reply,
                 action_tier="reversible_auto",
                 action=specialty_action,
             )

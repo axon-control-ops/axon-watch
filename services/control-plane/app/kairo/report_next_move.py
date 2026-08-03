@@ -126,9 +126,6 @@ def next_move(snapshot: dict[str, Any]) -> str:
         lead_next = _scrub_operator_line(str(handoff.get("lead_next") or ""), max_len=140)
         if lead_next:
             return f"I'll take the next Lead decision: {lead_next}"
-    awaiting = int(snapshot.get("awaiting_engagement_count") or 0)
-    if awaiting > 0:
-        return "I'll open Mission Control for the Lead rollup"
     actions = snapshot.get("next_safe_actions") or []
     if actions:
         label = str(actions[0].get("label") or actions[0].get("title") or "").strip()

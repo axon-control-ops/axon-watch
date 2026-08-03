@@ -32,8 +32,15 @@ import {
   resolveIdeSidebarWidthPx,
 } from '../../lib/ide-layout-prefs';
 import { useVerticalPanelResize } from '../../composables/useVerticalPanelResize';
+import { useWorkspaceWorkerSwitches } from '../../composables/useWorkspaceWorkerSwitches';
 
 const shell = useShellStore();
+const {
+  error: workspaceSwitchError,
+  savingId: workspaceSwitchSavingId,
+  isWorkspaceWorkerOn,
+  setWorkspaceWorkerOn,
+} = useWorkspaceWorkerSwitches();
 const workspaceFilter = ref('');
 const showAddWorkspaceForm = ref(false);
 const sidebarRef = ref<HTMLElement | null>(null);
@@ -117,6 +124,12 @@ function workspaceSubtext(workspaceId: string): string {
     isActiveWorkspace(workspaceId),
     runCountsByWorkspace.value,
   );
+}
+
+async function onWorkspaceWorkerToggle(event: Event, workspaceId: string): Promise<void> {
+  event.preventDefault();
+  event.stopPropagation();
+  await setWorkspaceWorkerOn(workspaceId, !isWorkspaceWorkerOn(workspaceId));
 }
 
 function syncShellSidebarWidth(): void {
@@ -314,48 +327,82 @@ onBeforeUnmount(() => {
           </label>
 
           <div class="workspace-list workspace-list--mockup">
-            <button
+            <div
               v-for="workspace in filteredWorkspaces"
               :key="workspace.workspace_id"
-              type="button"
-              class="workspace-list__button workspace-list__button--mockup hud-active-chip hud-active-chip--frame"
+              class="workspace-list__row"
               :class="{
-                'workspace-list__button--active hud-active-chip--active': isActiveWorkspace(
-                  workspace.workspace_id,
-                ),
+                'workspace-list__row--off': !isWorkspaceWorkerOn(workspace.workspace_id),
               }"
-              @click="shell.setCurrentWorkspace(workspace.workspace_id)"
             >
-              <WorkspaceIcon
-                class="workspace-list__icon"
-                :kind="workspaceIconKind(workspace.workspace_id)"
-              />
-              <span class="workspace-list__copy">
-                <span class="workspace-list__name">{{ workspaceDisplayLabel(workspace) }}</span>
-                <span
-                  v-if="workspace.display_name && workspace.display_name !== workspace.workspace_id"
-                  class="workspace-list__meta workspace-list__meta--id"
-                >
-                  {{ workspace.workspace_id }}
-                </span>
-                <span
-                  class="workspace-list__meta"
-                  :class="{
-                    'workspace-list__meta--active': isActiveWorkspace(workspace.workspace_id),
-                  }"
-                >
+              <button
+                type="button"
+                class="workspace-list__button workspace-list__button--mockup hud-active-chip hud-active-chip--frame"
+                :class="{
+                  'workspace-list__button--active hud-active-chip--active': isActiveWorkspace(
+                    workspace.workspace_id,
+                  ),
+                }"
+                @click="shell.setCurrentWorkspace(workspace.workspace_id)"
+              >
+                <WorkspaceIcon
+                  class="workspace-list__icon"
+                  :kind="workspaceIconKind(workspace.workspace_id)"
+                />
+                <span class="workspace-list__copy">
+                  <span class="workspace-list__name">{{ workspaceDisplayLabel(workspace) }}</span>
                   <span
-                    v-if="isActiveWorkspace(workspace.workspace_id)"
-                    class="workspace-list__status-dot"
-                    aria-hidden="true"
-                  />
-                  {{ workspaceSubtext(workspace.workspace_id) }}
+                    v-if="workspace.display_name && workspace.display_name !== workspace.workspace_id"
+                    class="workspace-list__meta workspace-list__meta--id"
+                  >
+                    {{ workspace.workspace_id }}
+                  </span>
+                  <span
+                    class="workspace-list__meta"
+                    :class="{
+                      'workspace-list__meta--active': isActiveWorkspace(workspace.workspace_id),
+                    }"
+                  >
+                    <span
+                      v-if="isActiveWorkspace(workspace.workspace_id)"
+                      class="workspace-list__status-dot"
+                      aria-hidden="true"
+                    />
+                    {{
+                      isWorkspaceWorkerOn(workspace.workspace_id)
+                        ? workspaceSubtext(workspace.workspace_id)
+                        : 'Workers off'
+                    }}
+                  </span>
                 </span>
-              </span>
-              <span class="workspace-list__menu" aria-hidden="true">
-                <WorkbenchIcon name="more" :size="12" />
-              </span>
-            </button>
+              </button>
+              <button
+                type="button"
+                class="workspace-list__power"
+                role="switch"
+                :aria-checked="isWorkspaceWorkerOn(workspace.workspace_id)"
+                :aria-label="`${workspaceDisplayLabel(workspace)} workers ${
+                  isWorkspaceWorkerOn(workspace.workspace_id) ? 'on' : 'off'
+                }`"
+                :title="
+                  isWorkspaceWorkerOn(workspace.workspace_id)
+                    ? 'Turn workers off for this workspace'
+                    : 'Turn workers on for this workspace'
+                "
+                :disabled="workspaceSwitchSavingId === workspace.workspace_id"
+                :class="{
+                  'workspace-list__power--on': isWorkspaceWorkerOn(workspace.workspace_id),
+                }"
+                @click="onWorkspaceWorkerToggle($event, workspace.workspace_id)"
+              >
+                <span class="workspace-list__power-track" aria-hidden="true">
+                  <span class="workspace-list__power-thumb" />
+                </span>
+                <span class="workspace-list__power-label">
+                  {{ isWorkspaceWorkerOn(workspace.workspace_id) ? 'On' : 'Off' }}
+                </span>
+              </button>
+            </div>
           </div>
 
           <WorkspaceAddForm
@@ -372,6 +419,9 @@ onBeforeUnmount(() => {
             + New Workspace
           </button>
           <p v-if="shell.workspacesError" class="region-copy">{{ shell.workspacesError }}</p>
+          <p v-if="workspaceSwitchError" class="region-copy" role="alert">
+            Worker switch: {{ workspaceSwitchError }}
+          </p>
         </div>
 
         <AttentionStackPanel

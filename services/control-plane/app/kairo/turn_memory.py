@@ -53,6 +53,16 @@ _PULL_LOGS_OFFER_RE = re.compile(
     r"\b(?:i\s+can|shall\s+i|want\s+me\s+to)\s+pull\s+(?:(?:the|those)\s+)?(?:failed\s+)?logs\b",
     re.IGNORECASE,
 )
+_TRANSIENT_APPLICATION_STATE_RE = re.compile(
+    r"\b(?:application|app|server|service)\s+(?:has\s+|was\s+|is\s+)?"
+    r"(?:stopped|started|restarted|shut\s+down|shutdown)\b",
+    re.IGNORECASE,
+)
+
+
+def _is_transient_application_state(content: str) -> bool:
+    """Do not carry an old process-lifecycle blip into later conversations."""
+    return bool(_TRANSIENT_APPLICATION_STATE_RE.search(str(content or "")))
 
 
 def session_key(session_id: str) -> str:
@@ -69,10 +79,15 @@ def _ensure_hydrated(session_id: str) -> None:
     if loaded is None:
         return
     turns, entities = loaded
-    if turns:
-        _TURN_MEMORY[key] = turns[-_MAX_TURN_MEMORY:]
+    filtered_turns = [
+        turn for turn in turns if not _is_transient_application_state(str(turn.get("content") or ""))
+    ]
+    if filtered_turns:
+        _TURN_MEMORY[key] = filtered_turns[-_MAX_TURN_MEMORY:]
     if entities:
         _ENTITY_MEMORY[key] = entities
+    if len(filtered_turns) != len(turns):
+        _persist(session_id)
 
 
 def _persist(session_id: str) -> None:
@@ -86,6 +101,8 @@ def _persist(session_id: str) -> None:
 
 def remember_turn(session_id: str, role: str, content: str) -> None:
     _ensure_hydrated(session_id)
+    if _is_transient_application_state(content):
+        return
     key = session_key(session_id)
     bucket = _TURN_MEMORY.setdefault(key, [])
     bucket.append({"role": role, "content": content.strip()})

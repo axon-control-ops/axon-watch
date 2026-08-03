@@ -36,8 +36,8 @@ class WorkerSchedulerRouteTests(unittest.TestCase):
         # Test DB isolation disables the env brake so the scheduler loop never starts.
         self.assertFalse(payload["env_allowed"])
         self.assertTrue(payload["blocked_by_env"])
-        self.assertEqual(4, payload["max_active"])
-        self.assertEqual(2, payload["max_starts_per_tick"])
+        self.assertEqual(1, payload["max_active"])
+        self.assertEqual(1, payload["max_starts_per_tick"])
         self.assertEqual(0, payload["executing_count"])
         self.assertEqual({}, payload["employee_enabled"])
 
@@ -154,7 +154,6 @@ class WorkerSchedulerRouteTests(unittest.TestCase):
         )
         self.assertEqual(200, created.status_code)
         run_id = created.json()["run_id"]
-
         response = self.client.post("/api/worker-scheduler/stop-active")
         self.assertEqual(200, response.status_code)
         payload = response.json()
@@ -301,6 +300,55 @@ class WorkerSchedulerRouteTests(unittest.TestCase):
                     {"workspace_sched_demo:frontend": False},
                     scheduler.json()["employee_enabled"],
                 )
+
+    def test_workspace_worker_enabled_patch_pauses_only_that_workspace(self) -> None:
+        created = self.client.post(
+            "/api/runs",
+            json={
+                "workspace_id": "workspace_bkk_invoice_system",
+                "mode": "agent",
+                "summary": "Continuous worker run",
+                "employee_role": "backend",
+            },
+        )
+        self.assertEqual(200, created.status_code)
+        run_id = created.json()["run_id"]
+        other_workspace = self.client.post(
+            "/api/runs",
+            json={
+                "workspace_id": "workspace_dashpro",
+                "mode": "agent",
+                "summary": "Other workspace worker run",
+                "employee_role": "frontend",
+            },
+        )
+        self.assertEqual(200, other_workspace.status_code)
+        other_run_id = other_workspace.json()["run_id"]
+
+        response = self.client.patch(
+            "/api/workspaces/workspace_bkk_invoice_system/worker-enabled",
+            json={"enabled": False},
+        )
+        self.assertEqual(200, response.status_code)
+        payload = response.json()
+        self.assertEqual("workspace_bkk_invoice_system", payload["workspace_id"])
+        self.assertFalse(payload["enabled"])
+        self.assertFalse(payload["workspace_enabled"]["workspace_bkk_invoice_system"])
+        self.assertIn(run_id, payload["stopped_run_ids"])
+
+        status = self.client.get("/api/worker-scheduler")
+        self.assertEqual(200, status.status_code)
+        self.assertFalse(status.json()["workspace_enabled"]["workspace_bkk_invoice_system"])
+        other_run = run_store.get_run(other_run_id)
+        assert other_run is not None
+        self.assertEqual("executing", other_run["phase"])
+
+        resume = self.client.patch(
+            "/api/workspaces/workspace_bkk_invoice_system/worker-enabled",
+            json={"enabled": True},
+        )
+        self.assertEqual(200, resume.status_code)
+        self.assertTrue(resume.json()["enabled"])
 
 
 if __name__ == "__main__":

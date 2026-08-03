@@ -37,11 +37,10 @@ export function buildAgentTerminalMirrorText(segment: AgentTerminalMirrorSegment
   if (output) {
     lines.push(output);
   }
-  // Cursor CLI only emits shell stdout on tool completion — keep an honest
-  // in-flight marker while the open `:::terminal` block has no final output yet.
-  if (segment.open && !/(^|\n)running…$/.test(output)) {
-    lines.push('running…');
-  }
+  // Do not append a trailing "running…" line here. When the first output
+  // arrives it would need to be inserted *before* that marker, turning every
+  // live update into a full xterm reset. The terminal-card header already
+  // presents the in-flight state; this mirror must remain append-only.
   return `${lines.join('\n')}\n`;
 }
 

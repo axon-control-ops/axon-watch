@@ -11,10 +11,9 @@ from app.cli_runtime.runtime_auth import env_without_api_keys
 
 StatusRecord = dict[str, Any]
 
-# `cursor agent status` commonly takes 6–8s on this host; keep headroom above that.
-# Occasional cold starts / contention can push past 15s — retry once before failing.
-_AUTH_PROBE_TIMEOUT_SECONDS = 20
-_AUTH_PROBE_RETRY_TIMEOUT_SECONDS = 30
+# CLI status is informational for the UI.  It must never monopolize a laptop
+# for almost a minute when Cursor is contended or unhealthy.
+_AUTH_PROBE_TIMEOUT_SECONDS = 10
 
 
 def _run_command(
@@ -37,12 +36,9 @@ def _run_command_with_timeout_retry(
     *,
     env: dict[str, str] | None = None,
 ) -> subprocess.CompletedProcess[str]:
-    try:
-        return _run_command(parts, timeout=_AUTH_PROBE_TIMEOUT_SECONDS, env=env)
-    except subprocess.TimeoutExpired:
-        # One longer retry — clears most false "auth timed out" flaps without
-        # blocking the operator UI forever (SWR callers still use the cache).
-        return _run_command(parts, timeout=_AUTH_PROBE_RETRY_TIMEOUT_SECONDS, env=env)
+    # Do not retry an interactive CLI status command on the request path.  A
+    # retry doubles CPU pressure precisely when the local CLI is already stuck.
+    return _run_command(parts, timeout=_AUTH_PROBE_TIMEOUT_SECONDS, env=env)
 
 
 def vault_auth_overlay(

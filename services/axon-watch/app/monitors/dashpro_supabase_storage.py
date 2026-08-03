@@ -5,7 +5,9 @@ from __future__ import annotations
 import json
 import time
 from urllib.error import HTTPError, URLError
-from urllib.request import Request, urlopen
+from urllib.request import Request
+
+from app.monitors.transport_retry import is_transient_transport_error, urlopen_with_retries
 
 
 def _supabase_rest_headers(env: dict[str, str]) -> dict[str, str] | None:
@@ -30,7 +32,27 @@ def _supabase_rest_headers(env: dict[str, str]) -> dict[str, str] | None:
     }
 
 
-def _supabase_rest_get_storage(headers: dict[str, str], path: str, *, timeout: float) -> tuple[int, str]:
+def _request_with_retries(
+    request: Request,
+    *,
+    timeout: float,
+    retries: int,
+) -> tuple[int, str]:
+    return urlopen_with_retries(
+        request,
+        timeout=max(1.0, float(timeout)),
+        retries=max(0, int(retries)),
+        backoff_seconds=0.5,
+    )
+
+
+def _supabase_rest_get_storage(
+    headers: dict[str, str],
+    path: str,
+    *,
+    timeout: float,
+    retries: int,
+) -> tuple[int, str]:
     base_url = headers["_base_url"]
     req = Request(
         f"{base_url}/rest/v1/{path}",
@@ -40,11 +62,16 @@ def _supabase_rest_get_storage(headers: dict[str, str], path: str, *, timeout: f
         }
         | {"Accept-Profile": "storage"},
     )
-    with urlopen(req, timeout=timeout) as response:
-        return int(response.status), response.read().decode("utf-8", errors="replace")
+    return _request_with_retries(req, timeout=timeout, retries=retries)
 
 
-def _supabase_rpc_call(headers: dict[str, str], rpc_name: str, *, timeout: float) -> tuple[int, str]:
+def _supabase_rpc_call(
+    headers: dict[str, str],
+    rpc_name: str,
+    *,
+    timeout: float,
+    retries: int,
+) -> tuple[int, str]:
     base_url = headers["_base_url"].rstrip("/")
     req = Request(
         f"{base_url}/rest/v1/rpc/{rpc_name}",
@@ -52,8 +79,7 @@ def _supabase_rpc_call(headers: dict[str, str], rpc_name: str, *, timeout: float
         data=b"{}",
         headers={k: v for k, v in headers.items() if not k.startswith("_")},
     )
-    with urlopen(req, timeout=timeout) as response:
-        return int(response.status), response.read().decode("utf-8", errors="replace")
+    return _request_with_retries(req, timeout=timeout, retries=retries)
 
 
 def _format_storage_bytes(value: int) -> str:
@@ -64,21 +90,27 @@ def _format_storage_bytes(value: int) -> str:
     return f"{megabytes:.0f} MB"
 
 
-def _transport_failure_detail(exc: Exception) -> str:
+def _transport_failure_detail(exc: Exception, *, attempts: int = 1) -> str:
     # Keep the shared " API query failed:" marker so inbox severity stays warning
     # (same ladder as PostHog/Sentry transport blips).
-    return f"Supabase Storage API query failed: {exc}"
+    detail = f"Supabase Storage API query failed: {exc}"
+    if attempts > 1:
+        detail = f"{detail} (after {attempts} attempts)"
+    return detail
 
 
 def _probe_storage_api_restricted(
-    headers: dict[str, str], *, timeout: float
+    headers: dict[str, str],
+    *,
+    timeout: float,
+    retries: int,
 ) -> tuple[str, str] | None:
     """Early Storage API probe for terminal outcomes.
 
     Returns:
       ("critical", detail) for HTTP 402 quota restriction
-      ("warning", detail) for transient network failures
-      None when unrestricted, or for non-402 HTTP so usage fetch can continue
+      None when unrestricted, non-402 HTTP, or transient network failures
+      (usage fetch via RPC continues with its own retry budget)
     """
     base_url = headers["_base_url"].rstrip("/")
     req = Request(
@@ -90,13 +122,12 @@ def _probe_storage_api_restricted(
         },
     )
     try:
-        with urlopen(req, timeout=timeout) as response:
-            if int(response.status) == 402:
-                body = response.read().decode("utf-8", errors="replace")
-                return (
-                    "critical",
-                    f"Supabase Storage API restricted (402): {body[:200]}",
-                )
+        status, body = _request_with_retries(req, timeout=timeout, retries=retries)
+        if status == 402:
+            return (
+                "critical",
+                f"Supabase Storage API restricted (402): {body[:200]}",
+            )
     except HTTPError as exc:
         if int(exc.code) == 402:
             body = exc.read().decode("utf-8", errors="replace")
@@ -107,6 +138,8 @@ def _probe_storage_api_restricted(
         # Non-402 HTTP: let the usage fetch path decide / fall back.
         return None
     except (TimeoutError, URLError, OSError) as exc:
+        if is_transient_transport_error(exc):
+            return None
         return "warning", _transport_failure_detail(exc)
     return None
 
@@ -117,6 +150,7 @@ def _storage_api_request(
     *,
     method: str,
     timeout: float,
+    retries: int,
     body: dict[str, object] | None = None,
 ) -> tuple[int, str]:
     base_url = headers["_base_url"].rstrip("/")
@@ -134,8 +168,7 @@ def _storage_api_request(
         data=payload,
         headers=request_headers,
     )
-    with urlopen(req, timeout=timeout) as response:
-        return int(response.status), response.read().decode("utf-8", errors="replace")
+    return _request_with_retries(req, timeout=timeout, retries=retries)
 
 
 def _object_size_bytes(row: dict[str, object]) -> int:
@@ -156,11 +189,13 @@ def _fetch_storage_bucket_totals_via_storage_api(
     headers: dict[str, str],
     *,
     timeout: float,
+    retries: int,
     page_size: int = 100,
     max_requests: int = 200,
 ) -> tuple[dict[str, dict[str, int]], str | None]:
     deadline = time.monotonic() + min(timeout, 8.0)
     request_timeout = max(1.0, min(timeout, 5.0))
+    attempts = max(1, int(retries) + 1)
 
     try:
         status, body = _storage_api_request(
@@ -168,6 +203,7 @@ def _fetch_storage_bucket_totals_via_storage_api(
             "bucket",
             method="GET",
             timeout=request_timeout,
+            retries=retries,
         )
     except HTTPError as exc:
         status = int(exc.code)
@@ -175,7 +211,7 @@ def _fetch_storage_bucket_totals_via_storage_api(
         if status == 402:
             return {}, "402 exceed_storage_size_quota"
     except (TimeoutError, URLError, OSError) as exc:
-        return {}, _transport_failure_detail(exc)
+        return {}, _transport_failure_detail(exc, attempts=attempts)
 
     if status == 402:
         return {}, "402 exceed_storage_size_quota"
@@ -217,6 +253,7 @@ def _fetch_storage_bucket_totals_via_storage_api(
                         f"object/list/{bucket_id}",
                         method="POST",
                         timeout=request_timeout,
+                        retries=retries,
                         body={
                             "prefix": prefix,
                             "limit": page_size,
@@ -230,7 +267,7 @@ def _fetch_storage_bucket_totals_via_storage_api(
                     if status == 402:
                         return {}, "402 exceed_storage_size_quota"
                 except (TimeoutError, URLError, OSError) as exc:
-                    return totals, _transport_failure_detail(exc)
+                    return totals, _transport_failure_detail(exc, attempts=attempts)
 
                 if status == 402:
                     return {}, "402 exceed_storage_size_quota"
@@ -278,16 +315,23 @@ def _fetch_storage_bucket_totals(
     *,
     rpc_name: str,
     timeout: float,
+    retries: int,
     page_size: int = 1000,
     max_pages: int = 50,
 ) -> tuple[dict[str, dict[str, int]], str | None]:
+    attempts = max(1, int(retries) + 1)
     try:
-        status, body = _supabase_rpc_call(headers, rpc_name, timeout=timeout)
+        status, body = _supabase_rpc_call(
+            headers,
+            rpc_name,
+            timeout=timeout,
+            retries=retries,
+        )
     except HTTPError as exc:
         status = int(exc.code)
         body = exc.read().decode("utf-8", errors="replace")
     except (TimeoutError, URLError, OSError) as exc:
-        return {}, _transport_failure_detail(exc)
+        return {}, _transport_failure_detail(exc, attempts=attempts)
 
     if status == 402:
         return {}, "402 exceed_storage_size_quota"
@@ -316,14 +360,19 @@ def _fetch_storage_bucket_totals(
     for _ in range(max_pages):
         path = f"objects?select=bucket_id,metadata&limit={page_size}&offset={offset}"
         try:
-            status, body = _supabase_rest_get_storage(headers, path, timeout=timeout)
+            status, body = _supabase_rest_get_storage(
+                headers,
+                path,
+                timeout=timeout,
+                retries=retries,
+            )
         except HTTPError as exc:
             status = int(exc.code)
             body = exc.read().decode("utf-8", errors="replace")
             if status == 402:
                 return {}, "402 exceed_storage_size_quota"
         except (TimeoutError, URLError, OSError) as exc:
-            return totals, _transport_failure_detail(exc)
+            return totals, _transport_failure_detail(exc, attempts=attempts)
 
         if status == 402:
             return {}, "402 exceed_storage_size_quota"
@@ -332,6 +381,7 @@ def _fetch_storage_bucket_totals(
                 return _fetch_storage_bucket_totals_via_storage_api(
                     headers,
                     timeout=timeout,
+                    retries=retries,
                 )
             if totals:
                 return totals, None
@@ -368,6 +418,7 @@ def _fetch_storage_bucket_totals(
         return _fetch_storage_bucket_totals_via_storage_api(
             headers,
             timeout=timeout,
+            retries=retries,
         )
     return totals, None
 
@@ -379,7 +430,8 @@ def check_supabase_storage_quota(
     warning_ratio: float = 0.80,
     critical_ratio: float = 0.90,
     rpc_name: str = "monitor_storage_bucket_usage",
-    timeout_seconds: float = 10,
+    timeout_seconds: float = 20,
+    retries: int = 2,
 ) -> tuple[str, str]:
     headers = _supabase_rest_headers(env)
     if not headers:
@@ -388,14 +440,23 @@ def check_supabase_storage_quota(
             "Storage quota check skipped until Supabase URL and service-role key are available",
         )
 
-    early = _probe_storage_api_restricted(headers, timeout=timeout_seconds)
+    timeout = max(1.0, float(timeout_seconds))
+    retry_count = max(0, int(retries))
+    attempts = max(1, retry_count + 1)
+
+    early = _probe_storage_api_restricted(
+        headers,
+        timeout=timeout,
+        retries=retry_count,
+    )
     if early is not None:
         return early
 
     totals, fetch_error = _fetch_storage_bucket_totals(
         headers,
         rpc_name=rpc_name,
-        timeout=timeout_seconds,
+        timeout=timeout,
+        retries=retry_count,
     )
     if fetch_error == "402 exceed_storage_size_quota":
         return (

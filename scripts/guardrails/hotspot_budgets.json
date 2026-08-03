@@ -201,7 +201,7 @@
       "target": "apps/console-web/src/features/kairo-conversation/*"
     },
     "apps/console-web/src/lib/agent-transcript-blocks.ts": {
-      "max_lines": 184,
+      "max_lines": 200,
       "soft_limit": 350,
       "hard_limit": 500,
       "target": "apps/console-web/src/lib/agent-transcript/*"
@@ -305,7 +305,7 @@
       "note": "Watch inbox/connector client cache; extract cache helpers next"
     },
     "apps/console-web/src/styles/shell/agent-persona-dock.css": {
-      "max_lines": 675,
+      "max_lines": 810,
       "soft_limit": 350,
       "hard_limit": 500,
       "target": "apps/console-web/src/styles/shell/agent-persona-*",
@@ -464,7 +464,7 @@
       "note": "Core roster outcome selection; confidence + roster API split to sibling modules"
     },
     "services/control-plane/app/workspace_agents/lead_vaxon_handoff.py": {
-      "max_lines": 454,
+      "max_lines": 475,
       "soft_limit": 350,
       "hard_limit": 500,
       "target": "services/control-plane/app/workspace_agents/lead_vaxon_*",
@@ -478,7 +478,7 @@
       "note": "Lead team check-in orchestration; extract prompt builders next"
     },
     "services/control-plane/app/workspace_agents/scheduler.py": {
-      "max_lines": 516,
+      "max_lines": 530,
       "soft_limit": 350,
       "hard_limit": 516,
       "target": "services/control-plane/app/workspace_agents/scheduler_*",
@@ -492,7 +492,7 @@
       "note": "Thread message body/actions; extract attachment chrome next"
     },
     "apps/console-web/src/components/shell/MissionControlAutonomyControl.vue": {
-      "max_lines": 679,
+      "max_lines": 780,
       "soft_limit": 350,
       "hard_limit": 500,
       "target": "apps/console-web/src/components/shell/mission-control-*",

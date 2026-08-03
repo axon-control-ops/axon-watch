@@ -15,7 +15,6 @@ from app.probe_failure_detail import format_probe_failure
 from app.cli_runtime.catalog import (
     runtime_identity_snapshot,
     runtime_status_snapshot,
-    schedule_runtime_status_refresh,
 )
 from app.cli_runtime.readiness import cli_runtime_degraded_reasons, summarize_cli_runtime_readiness
 from app.operator_briefing_signals import summarize_actionable_inbox
@@ -208,19 +207,10 @@ def assemble_runtime_summary(
         watch_inbox = inbox_loader() if watch_connected else None
         watch_summary = summary_loader() if watch_connected else None
 
-    # Always SWR for CLI auth — cold `cursor agent status` must not stall topbar.
+    # Topbar boot must not start a costly local CLI subprocess.  It displays a
+    # cached status when one exists; an explicit refresh or real dispatch
+    # verifies local CLI auth.
     cli_status_snapshot = runtime_status_snapshot(allow_stale=True)
-    schedule_runtime_status_refresh()
-    try:
-        from app.cli_runtime.catalog_snapshot import (
-            heal_cursor_auth_probe_timeout,
-            snapshot_has_auth_probe_timeout,
-        )
-
-        if snapshot_has_auth_probe_timeout(cli_status_snapshot):
-            heal_cursor_auth_probe_timeout()
-    except Exception:
-        pass
 
     degraded_reasons: list[str] = []
     if not watch_connected and watch_degraded_reason:

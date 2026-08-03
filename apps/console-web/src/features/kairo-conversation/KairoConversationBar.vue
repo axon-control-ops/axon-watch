@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted } from 'vue';
+import { computed, onMounted, onUnmounted, watch } from 'vue';
 
 import AgentDockTeammateRouteBanner from '../../components/ide/agent-dock/AgentDockTeammateRouteBanner.vue';
 import {
@@ -13,6 +13,7 @@ import { registerKairoConversationSubmit } from './kairo-conversation-bus';
 import OperatorPersonaMark from '../../components/OperatorPersonaMark.vue';
 import { OPERATOR_PERSONA_NAME } from '../../lib/operator-persona-name';
 import { clearKairoVoiceFollowupWindow } from '../../lib/kairo-voice-followup-window';
+import { useSpokenUtteranceText } from '../../composables/useSpokenUtteranceText';
 import { formatVoiceGateFeedback } from '../../lib/kairo-voice-gate';
 import { operatorExecutionStage } from '../../lib/operator-status-radar-view';
 import { formatRunShortId } from '../../lib/run-display';
@@ -23,6 +24,13 @@ import {
 } from '../../lib/apply-employee-specialty-route';
 import { teammateRouteNotice } from '../../lib/teammate-route-notice';
 import { useShellStore } from '../../stores/shell';
+import {
+  dismissVaxonBriefingInteraction,
+  recordVaxonBriefingInteraction,
+  vaxonBriefingInteractionKey,
+  vaxonBriefingPendingByWorkspace,
+} from '../../lib/vaxon-briefing-interaction';
+import { vaxonAffirmReplyCta, vaxonLineAsksForReply } from '../../lib/vaxon-reply-prompt';
 import VaxonConversationAttachControls from './VaxonConversationAttachControls.vue';
 
 const shell = useShellStore();
@@ -39,8 +47,32 @@ const {
   attachments,
 } = useKairoConversation();
 const pendingAttachments = attachments.pendingAttachments;
+const { spokenText, speaker } = useSpokenUtteranceText();
 
 const workspaceId = computed(() => shell.currentWorkspace?.workspace_id ?? null);
+const pendingDecision = computed(() => {
+  const id = workspaceId.value?.trim();
+  return id ? vaxonBriefingPendingByWorkspace.value[id] ?? null : null;
+});
+const pendingDecisionLine = computed(() => pendingDecision.value?.line.trim() ?? '');
+const pendingDecisionCta = computed(() => vaxonAffirmReplyCta(pendingDecisionLine.value));
+
+watch(
+  () => [spokenText.value, speaker.value?.kind, speaker.value?.id] as const,
+  ([line, kind, speakerId]) => {
+    const text = line?.trim() ?? '';
+    const id = workspaceId.value?.trim();
+    if (!id || kind !== 'vaxon' || !vaxonLineAsksForReply(text)) {
+      return;
+    }
+    recordVaxonBriefingInteraction({
+      workspaceId: id,
+      line: text,
+      utteranceKey: vaxonBriefingInteractionKey(text, speakerId),
+    });
+  },
+  { immediate: true },
+);
 const pendingApprovals = computed(
   () =>
     shell.operatorBriefing?.pending_approvals.count ??
@@ -208,6 +240,22 @@ const micTitle = computed(() => {
 
 async function handleSubmit(): Promise<void> {
   await submitTurn();
+}
+
+async function replyToPendingDecision(reply: 'yes' | 'not now'): Promise<void> {
+  const id = workspaceId.value?.trim();
+  if (!id || pending.value) {
+    return;
+  }
+  dismissVaxonBriefingInteraction(id);
+  await submitTurn(reply);
+}
+
+function dismissPendingDecision(): void {
+  const id = workspaceId.value?.trim();
+  if (id) {
+    dismissVaxonBriefingInteraction(id);
+  }
 }
 
 function startManualPtt(): boolean {
@@ -462,6 +510,43 @@ onUnmounted(() => {
     >
       {{ voiceGateFeedback }}
     </p>
+    <section
+      v-if="pendingDecisionLine"
+      class="kairo-conversation-bar__decision"
+      aria-label="VAXON decision required"
+    >
+      <div>
+        <p class="kairo-conversation-bar__decision-label">VAXON is waiting for your decision</p>
+        <p class="kairo-conversation-bar__decision-copy">{{ pendingDecisionLine }}</p>
+      </div>
+      <div class="kairo-conversation-bar__decision-actions">
+        <button
+          type="button"
+          class="kairo-conversation-bar__decision-affirm"
+          :disabled="pending"
+          @click="replyToPendingDecision('yes')"
+        >
+          {{ pendingDecisionCta }}
+        </button>
+        <button
+          type="button"
+          class="kairo-conversation-bar__decision-decline"
+          :disabled="pending"
+          @click="replyToPendingDecision('not now')"
+        >
+          Not now
+        </button>
+        <button
+          type="button"
+          class="kairo-conversation-bar__decision-dismiss"
+          :disabled="pending"
+          aria-label="Dismiss VAXON decision"
+          @click="dismissPendingDecision"
+        >
+          Dismiss
+        </button>
+      </div>
+    </section>
     <div v-if="showStickyReply" class="kairo-conversation-bar__reply">
       <span class="kairo-conversation-bar__reply-heading">
         <OperatorPersonaMark size="xs" />

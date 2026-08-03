@@ -114,6 +114,12 @@ for name in axon-watch control-plane console-web; do
   sed "s|%h/axon-nvme/repos/axon-watch|${repo_root}|g" "${src}" >"${dst}"
   echo "Installed ${dst}"
 done
+for name in console-web-rebuild.service console-web-rebuild.path; do
+  src="${unit_src}/${name}"
+  dst="${unit_dst}/${name}"
+  sed "s|%h/axon-nvme/repos/axon-watch|${repo_root}|g" "${src}" >"${dst}"
+  echo "Installed ${dst}"
+done
 # Soft-cutover proxy (:7734 -> :4173) is retired — Cloudflare points at :4173 directly.
 systemctl --user disable --now axon-public-origin-proxy.service 2>/dev/null || true
 
@@ -129,7 +135,8 @@ systemctl --user daemon-reload
 systemctl --user enable \
   axon-watch.service \
   control-plane.service \
-  console-web.service
+  console-web.service \
+  console-web-rebuild.path
 
 port_busy() {
   local port="$1"
