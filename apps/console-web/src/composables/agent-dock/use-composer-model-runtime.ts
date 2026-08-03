@@ -86,7 +86,8 @@ export function useComposerModelRuntime(
     if (shell.codexCatalogLoadState === 'loading') return 'Loading Codex / ChatGPT models…';
     if (shell.codexCatalogError) return shell.codexCatalogError;
     if (shell.codexRuntimeStatus?.catalog_source === 'live') {
-      return `${shell.codexCatalogRows.filter((row) => row.id !== 'auto').length} models available to your signed-in Codex account`;
+      return shell.codexCatalogRows.filter((row) => row.id !== 'auto').length
+        + ' model and reasoning options available to your signed-in Codex account';
     }
     return 'Codex model catalog is unavailable. Check the Codex CLI sign-in.';
   });

@@ -265,6 +265,15 @@ def _effective_cli_model(family: str, runtime_model: str) -> str:
     return normalized
 
 
+def _split_codex_model_selection(model: str) -> tuple[str, str]:
+    """Decode the UI's model@effort preference into Codex CLI arguments."""
+    selected = str(model or "").strip()
+    model_id, marker, effort = selected.rpartition("@")
+    if marker and model_id and effort in {"low", "medium", "high", "xhigh"}:
+        return model_id, effort
+    return selected, ""
+
+
 def _ordered_candidates_for_dispatch(
     snapshot: dict[str, object],
     runtime_target: str | None,
@@ -378,6 +387,7 @@ def dispatch_ide_composer(
         family = str(record.get("family") or "")
         target_type = str(record.get("target_type") or "local")
         model = _effective_cli_model(family, str(runtime_model or ""))
+        reasoning_effort = ""
         runtime_label = str(record.get("label") or runtime_id)
         dispatch_env = subprocess_env
         if family == "cursor":
@@ -391,6 +401,7 @@ def dispatch_ide_composer(
                 auth=record.get("auth") if isinstance(record.get("auth"), dict) else None,
             )
         elif family == "codex":
+            model, reasoning_effort = _split_codex_model_selection(model)
             dispatch_env = codex_dispatch_env(
                 subprocess_env,
                 auth=record.get("auth") if isinstance(record.get("auth"), dict) else None,
@@ -434,6 +445,7 @@ def dispatch_ide_composer(
                     composer_mode=composer_mode,
                     execution_tier=execution_tier,
                     model=model,
+                    reasoning_effort=reasoning_effort,
                     subprocess_env=dispatch_env,
                     run_id=run_id,
                     on_chunk=on_chunk,
@@ -502,6 +514,7 @@ def dispatch_ide_composer(
                                 composer_mode=composer_mode,
                                 execution_tier=execution_tier,
                                 model=model,
+                                reasoning_effort=reasoning_effort,
                                 subprocess_env=retry_env,
                                 run_id=run_id,
                                 on_chunk=on_chunk,

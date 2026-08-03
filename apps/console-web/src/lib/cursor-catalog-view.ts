@@ -13,6 +13,8 @@ export type CursorCatalogRow = {
   label: string;
   description: string;
   badge?: string;
+  defaultReasoningLevel?: string;
+  reasoningLevels?: string[];
   available: boolean;
 };
 

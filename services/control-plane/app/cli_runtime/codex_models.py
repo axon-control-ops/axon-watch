@@ -16,7 +16,7 @@ from app.cli_runtime.catalog import (
 from app.cli_runtime.runtime_auth import codex_dispatch_env
 from app.cli_runtime.vault_keys import fetch_runtime_context
 
-ModelRecord = dict[str, str]
+ModelRecord = dict[str, Any]
 StatusPayload = dict[str, Any]
 
 _LIST_MODELS_TIMEOUT_SECONDS = 20
@@ -38,6 +38,16 @@ def _normalize_model_record(record: object) -> ModelRecord | None:
     reasoning = str(record.get("default_reasoning_level") or "").strip()
     if reasoning:
         model["badge"] = reasoning.capitalize()
+        model["default_reasoning_level"] = reasoning
+    supported_reasoning = record.get("supported_reasoning_levels")
+    if isinstance(supported_reasoning, list):
+        levels = [
+            str(item.get("effort") or "").strip().lower()
+            for item in supported_reasoning
+            if isinstance(item, dict) and str(item.get("effort") or "").strip()
+        ]
+        if levels:
+            model["reasoning_levels"] = levels
     return model
 
 

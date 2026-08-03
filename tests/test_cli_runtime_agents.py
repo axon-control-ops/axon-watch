@@ -164,6 +164,17 @@ class CliRuntimeAgentTests(unittest.TestCase):
         )
         self.assertEqual("gpt-5.5", command[command.index("--model") + 1])
 
+    def test_codex_passes_the_selected_reasoning_effort(self) -> None:
+        command = _build_codex_exec_command(
+            binary="/usr/bin/codex",
+            prompt="hello",
+            workspace_root=Path("/tmp"),
+            composer_mode="agent",
+            model="gpt-5.5",
+            reasoning_effort="high",
+        )
+        self.assertIn('model_reasoning_effort="high"', command)
+
     @patch("app.cli_runtime.claude_agent.communicate_registered_process")
     def test_claude_parses_stream_json_reply(self, mock_communicate) -> None:
         mock_communicate.return_value = (_stream_json_stdout("PONG"), "", 0)

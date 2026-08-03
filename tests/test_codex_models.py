@@ -25,7 +25,9 @@ class CodexModelsTests(unittest.TestCase):
                     '{"models": ['
                     '{"slug":"gpt-5.5","display_name":"GPT-5.5",'
                     '"description":"Frontier coding model.",'
-                    '"default_reasoning_level":"medium","visibility":"list"},'
+                    '"default_reasoning_level":"medium",'
+                    '"supported_reasoning_levels":[{"effort":"low"},{"effort":"medium"},{"effort":"high"}],'
+                    '"visibility":"list"},'
                     '{"slug":"hidden","visibility":"hidden"}'
                     ']}'
                 ),
@@ -40,6 +42,8 @@ class CodexModelsTests(unittest.TestCase):
                 "label": "GPT-5.5",
                 "description": "Frontier coding model.",
                 "badge": "Medium",
+                "default_reasoning_level": "medium",
+                "reasoning_levels": ["low", "medium", "high"],
             }],
             models,
         )

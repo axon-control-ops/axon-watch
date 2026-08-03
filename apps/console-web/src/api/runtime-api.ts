@@ -64,6 +64,8 @@ export interface CursorModelRecord {
   description?: string;
   badge?: string;
   available?: boolean;
+  default_reasoning_level?: string;
+  reasoning_levels?: string[];
 }
 
 export interface CursorRuntimeStatusSnapshot {
