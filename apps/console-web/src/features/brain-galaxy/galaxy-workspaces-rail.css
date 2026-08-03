@@ -434,3 +434,10 @@
 .galaxy-workspaces-rail__power-label {
   min-width: 1.2rem;
 }
+
+.galaxy-workspaces-rail__switch-error {
+  margin: 0;
+  color: rgba(255, 176, 150, 0.98);
+  font-size: 0.6rem;
+  line-height: 1.3;
+}

@@ -27,6 +27,7 @@ const emit = defineEmits<{
 const query = ref('');
 const showAddForm = ref(false);
 const {
+  error: workspaceSwitchError,
   savingId: workspaceSwitchSavingId,
   isWorkspaceWorkerOn,
   setWorkspaceWorkerOn,
@@ -219,6 +220,9 @@ async function onWorkspacePower(event: Event, item: GalaxyMockupRailItem): Promi
       >
         + New Workspace
       </button>
+      <p v-if="workspaceSwitchError" class="galaxy-workspaces-rail__switch-error" role="alert">
+        Worker switch: {{ workspaceSwitchError }}
+      </p>
     </template>
   </aside>
 </template>
