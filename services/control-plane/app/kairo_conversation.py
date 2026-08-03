@@ -25,6 +25,7 @@ from app.kairo.voice_dispatch import (
 )
 from app.kairo.voice_autonomy import resolve_voice_action_tier
 from app.kairo_early_intents import maybe_handle_early_converse_intent
+from app.kairo.operator_input_safety import is_pasted_operational_context
 from app.persistence.operator_presence_settings_store import load_settings as load_presence_settings
 from app.kairo.turn_memory import (
     entity_context as _entity_context,
@@ -119,6 +120,11 @@ def classify_conversation_turn(content: str) -> ConversationTurnKind:
     trimmed = content.strip()
     if not trimmed:
         return "chat"
+    # A copied Lead/run receipt is evidence for an Ask reply, never an implied
+    # command.  Check this before command shortcuts: a receipt can legitimately
+    # start with a word such as "run" or contain several task verbs.
+    if is_pasted_operational_context(trimmed):
+        return "status_question"
     normalized = expand_command_shortcuts(trimmed)
     intent = classify_command(normalized)
     if intent != "unsupported":
@@ -160,6 +166,7 @@ def converse_turn(
     trimmed = normalize_persona_stt_aliases(raw_content)
     if not trimmed:
         raise ValueError("content must not be empty")
+    pasted_operational_context = is_pasted_operational_context(trimmed)
 
     from app.kairo.converse_attachments import ConverseAttachmentError, prepare_converse_attachment_paths
 
@@ -203,7 +210,13 @@ def converse_turn(
             target_workspace_id=resolved_workspace_id,
             task=f"Investigate signal {context_signal_id}",
         )
-    followup = _resolve_followup_action(trimmed, session_id)
+    # Quoted receipts must not accidentally confirm a remembered action or
+    # trigger one of the convenience action routes below.
+    followup = (
+        None
+        if pasted_operational_context
+        else _resolve_followup_action(trimmed, session_id)
+    )
     if followup:
         action_type = str(followup.get("type", ""))
         if action_type == "handoff_signal":
@@ -303,11 +316,15 @@ def converse_turn(
                 duration_ms=round((time.perf_counter() - started_at) * 1000),
             )
 
-    early_intent = maybe_handle_early_converse_intent(
-        content=trimmed,
-        session_id=session_id,
-        workspace_id=resolved_workspace_id,
-        guest_name=guest_name,
+    early_intent = (
+        None
+        if pasted_operational_context
+        else maybe_handle_early_converse_intent(
+            content=trimmed,
+            session_id=session_id,
+            workspace_id=resolved_workspace_id,
+            guest_name=guest_name,
+        )
     )
     if early_intent is not None:
         reply = str(early_intent.get("reply") or "")

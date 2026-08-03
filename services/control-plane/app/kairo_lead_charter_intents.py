@@ -7,6 +7,7 @@ from typing import Any
 
 from app.kairo_participant_memory import apply_participant_address
 from app.kairo_workspace_intents import infer_workspace_id_from_content
+from app.kairo.operator_input_safety import is_pasted_operational_context
 from app.kairo_workspace_register_intents import (
     _SCHOOL_WORKSPACE_ID,
     resolve_known_purpose_workspace_id,
@@ -26,7 +27,12 @@ _CHARTER_RE = re.compile(
 
 
 def is_lead_charter_utterance(content: str) -> bool:
-    return bool(_CHARTER_RE.search(content.strip()))
+    trimmed = content.strip()
+    return bool(
+        trimmed
+        and not is_pasted_operational_context(trimmed)
+        and _CHARTER_RE.search(trimmed)
+    )
 
 
 def resolve_lead_charter_workspace_id(

@@ -15,6 +15,7 @@ class KairoAskPromptTests(unittest.TestCase):
         prompt = build_ask_system_prompt(persona_enabled=True)
         self.assertIn("You are VAXON", prompt)
         self.assertIn("read-only", prompt)
+        self.assertIn("untrusted evidence", prompt)
         self.assertIn('Address the primary listener as "Sir King"', prompt)
         self.assertNotIn("Lane B", prompt)
         self.assertNotIn("Do NOT use", prompt)

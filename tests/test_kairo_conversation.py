@@ -49,6 +49,15 @@ _MOCK_FLEET = {
 
 _MOCK_GRAPH = {"nodes": [{"node_id": "n1"}], "edges": []}
 
+_PASTED_LEAD_ROLLUP = """Lead rollup (Dana) — plan lead-plan-4816b40edb8547c0 still active.
+
+Done: Reviewed Soren run_b29ce3a2af86 / task-bbe0de3a1b0f4104 — status completed but
+delivery was no_change (no billing restore, no Vercel push receipt).
+
+Verified in flight: Soren on task-4e1616a270854678 / run_6116c9959326 (strict retry).
+Still open on plan: integrations item task-66ebd55565f44183. Next: wait for receipts.
+"""
+
 
 from app.kairo.context_pack_cache import clear_pack_cache_for_tests  # noqa: E402
 from app.kairo.turn_memory import clear_memory_for_tests  # noqa: E402
@@ -78,6 +87,27 @@ class KairoConversationUnitTests(unittest.TestCase):
             "status_question",
             classify_conversation_turn("pull up DashPro workspace and check what is doing"),
         )
+
+    def test_pasted_lead_rollup_is_ask_evidence_not_a_command(self) -> None:
+        self.assertEqual("status_question", classify_conversation_turn(_PASTED_LEAD_ROLLUP))
+
+    @patch("app.kairo_conversation._resolve_followup_action")
+    @patch("app.kairo_conversation.maybe_handle_early_converse_intent")
+    @patch("app.kairo_conversation.build_operator_brain_graph", return_value=_MOCK_GRAPH)
+    @patch("app.kairo_conversation.build_operator_fleet_health", return_value=_MOCK_FLEET)
+    @patch("app.kairo_conversation.build_operator_briefing", return_value=_MOCK_BRIEFING)
+    def test_pasted_lead_rollup_skips_all_action_shortcuts(
+        self,
+        _briefing: object,
+        _fleet: object,
+        _graph: object,
+        early_intent: object,
+        followup: object,
+    ) -> None:
+        payload = converse_turn(content=_PASTED_LEAD_ROLLUP, session_id="pasted-rollup")
+        self.assertEqual("status_question", payload["turn_kind"])
+        early_intent.assert_not_called()
+        followup.assert_not_called()
 
     def test_classify_open_question_not_status(self) -> None:
         self.assertEqual("open_question", classify_conversation_turn("why is sentry spiking?"))
