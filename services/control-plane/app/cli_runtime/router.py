@@ -128,10 +128,7 @@ def _sentry_monitor_context(user_prompt: str) -> str:
             "Live monitor evidence is temporarily unavailable. Report that limitation; "
             "do not claim the Sentry token is absent."
         )
-
-
     return "\n".join(lines)
-
 
 def _operator_persona_enabled() -> bool:
     return bool(load_settings().get("operator_persona_enabled", True))
@@ -193,8 +190,6 @@ def _system_prompt(
         f"edited files or ran commands. {ask_fence_instruction()}"
         f"{_INSTRUCTION_TAKING} {research_line} {_REPLY_STYLE}"
     )
-
-
 def _build_prompt(
     *,
     composer_mode: str,
@@ -228,23 +223,17 @@ def _build_prompt(
         f"{sentry_section}\n\n"
         f"Operator request:\n{user_prompt.strip()}"
     )
-
-
 def _resolve_workspace_root(workspace_id: str) -> Path | None:
     try:
         return resolve_workspace_root(workspace_id)
     except WorkspaceRootError:
         return None
-
-
 def _cloud_runtime_message(record: dict[str, object]) -> str:
     label = str(record.get("label") or record.get("id") or "cloud runtime")
     return (
         f"{label} is configured in the catalog, but its execution adapter has not landed yet. "
         "Use the local runtime target or switch the default runtime back to a local CLI."
     )
-
-
 def _effective_cli_model(family: str, runtime_model: str) -> str:
     normalized = str(runtime_model or "").strip()
     if not normalized or normalized.lower() == "auto":
