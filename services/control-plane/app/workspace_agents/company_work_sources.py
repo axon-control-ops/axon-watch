@@ -99,10 +99,13 @@ def run_scheduled_work_sources(*, root: Path | None = None) -> dict[str, Any]:
                 results["sources"][source_id] = {"error": "file_size_patrol_failed"}
             continue
         if source_id == "ci_remediation":
-            # Webhook remains primary; scheduler only recovers leases above.
+            # Webhook is the fast path. Reconcile durable task outcomes when a
+            # GitHub completion arrived while the local control plane was down.
+            from app.ci_remediation.report import reconcile_linked_repair_task_outcomes
+
             results["sources"][source_id] = {
                 "work_source": "ci_remediation",
-                "mode": "recover_only",
+                "reconciled": reconcile_linked_repair_task_outcomes(),
             }
             continue
         if source_id == "lead_team_checkin" and "scheduler" in trigger:
