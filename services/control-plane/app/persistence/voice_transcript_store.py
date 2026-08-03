@@ -45,7 +45,8 @@ def _ensure_voice_log_table(connection: sqlite3.Connection) -> None:
             source TEXT NOT NULL,
             stt_note TEXT,
             duration_ms INTEGER,
-            runtime_dispatched INTEGER NOT NULL DEFAULT 0
+            runtime_dispatched INTEGER NOT NULL DEFAULT 0,
+            submission_intent TEXT
         );
 
         CREATE INDEX IF NOT EXISTS idx_kairo_voice_log_created
@@ -65,6 +66,7 @@ def _ensure_voice_log_table(connection: sqlite3.Connection) -> None:
         "action_tier": "ALTER TABLE kairo_voice_log ADD COLUMN action_tier TEXT",
         "voice_routing_mode": "ALTER TABLE kairo_voice_log ADD COLUMN voice_routing_mode TEXT",
         "model_receipt_json": "ALTER TABLE kairo_voice_log ADD COLUMN model_receipt_json TEXT",
+        "submission_intent": "ALTER TABLE kairo_voice_log ADD COLUMN submission_intent TEXT",
     }
     for column, statement in migrations.items():
         if column not in columns:
@@ -87,6 +89,7 @@ def append_voice_transcript(
     action_tier: str | None = None,
     model_receipt: dict[str, Any] | None = None,
     voice_routing_mode: str | None = None,
+    submission_intent: str | None = None,
 ) -> dict[str, str]:
     entry_id = f"voice_{uuid4().hex[:12]}"
     created_at = datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
@@ -99,8 +102,8 @@ def append_voice_transcript(
                 entry_id, created_at, session_id, workspace_id,
                 raw_content, normalized_content, reply, turn_kind, source, stt_note,
                 duration_ms, runtime_dispatched, dispatch_lane, action_tier,
-                voice_routing_mode, model_receipt_json
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                voice_routing_mode, model_receipt_json, submission_intent
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 entry_id,
@@ -119,6 +122,7 @@ def append_voice_transcript(
                 action_tier,
                 voice_routing_mode,
                 receipt_json,
+                submission_intent,
             ),
         )
         connection.commit()
@@ -140,7 +144,7 @@ def list_recent_voice_transcripts(
                 SELECT entry_id, created_at, session_id, workspace_id,
                        raw_content, normalized_content, reply, turn_kind, source, stt_note,
                        duration_ms, runtime_dispatched, dispatch_lane, action_tier,
-                       voice_routing_mode, model_receipt_json
+                       voice_routing_mode, model_receipt_json, submission_intent
                 FROM kairo_voice_log
                 WHERE session_id = ?
                 ORDER BY created_at DESC, entry_id DESC
@@ -154,7 +158,7 @@ def list_recent_voice_transcripts(
                 SELECT entry_id, created_at, session_id, workspace_id,
                        raw_content, normalized_content, reply, turn_kind, source, stt_note,
                        duration_ms, runtime_dispatched, dispatch_lane, action_tier,
-                       voice_routing_mode, model_receipt_json
+                       voice_routing_mode, model_receipt_json, submission_intent
                 FROM kairo_voice_log
                 ORDER BY created_at DESC, entry_id DESC
                 LIMIT ?

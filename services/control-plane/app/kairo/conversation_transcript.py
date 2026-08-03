@@ -40,6 +40,7 @@ def log_voice_turn(
             action_tier=str(payload.get("action_tier") or "") or None,
             model_receipt=receipt_dict,
             voice_routing_mode=str(payload.get("voice_routing_mode") or "") or None,
+            submission_intent=str(payload.get("submission_intent") or "") or None,
         )
     except Exception as exc:
         logger.warning("voice transcript persistence failed: %s", exc)

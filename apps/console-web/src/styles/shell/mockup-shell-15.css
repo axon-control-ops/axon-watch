@@ -229,6 +229,11 @@
   color: rgba(0, 242, 255, 0.95);
 }
 
+.kairo-conversation-bar__send--dispatch:not(:disabled) {
+  border-color: rgba(255, 190, 92, 0.46);
+  color: rgba(255, 207, 126, 0.98);
+}
+
 .kairo-conversation-bar__mic:disabled {
   opacity: 0.45;
   cursor: not-allowed;
@@ -344,4 +349,3 @@
   padding: 0.85rem;
   overflow: auto;
 }
-

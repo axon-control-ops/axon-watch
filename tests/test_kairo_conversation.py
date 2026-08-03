@@ -48,6 +48,7 @@ _MOCK_FLEET = {
 }
 
 _MOCK_GRAPH = {"nodes": [{"node_id": "n1"}], "edges": []}
+_MOCK_PACK = {"briefing": _MOCK_BRIEFING, "fleet": _MOCK_FLEET, "graph": _MOCK_GRAPH}
 
 _PASTED_LEAD_ROLLUP = """Lead rollup (Dana) — plan lead-plan-4816b40edb8547c0 still active.
 
@@ -91,16 +92,22 @@ class KairoConversationUnitTests(unittest.TestCase):
     def test_pasted_lead_rollup_is_ask_evidence_not_a_command(self) -> None:
         self.assertEqual("status_question", classify_conversation_turn(_PASTED_LEAD_ROLLUP))
 
+    @patch("app.kairo_conversation.build_conversation_context_pack", return_value=_MOCK_PACK)
+    def test_ask_intent_cannot_enter_the_command_lane(self, _pack: object) -> None:
+        payload = converse_turn(
+            content="git status",
+            session_id="ask-only-session",
+            submission_intent="ask",
+        )
+        self.assertEqual("status_question", payload["turn_kind"])
+        self.assertIsNone(payload["command_content"])
+
     @patch("app.kairo_conversation._resolve_followup_action")
     @patch("app.kairo_conversation.maybe_handle_early_converse_intent")
-    @patch("app.kairo_conversation.build_operator_brain_graph", return_value=_MOCK_GRAPH)
-    @patch("app.kairo_conversation.build_operator_fleet_health", return_value=_MOCK_FLEET)
-    @patch("app.kairo_conversation.build_operator_briefing", return_value=_MOCK_BRIEFING)
+    @patch("app.kairo_conversation.build_conversation_context_pack", return_value=_MOCK_PACK)
     def test_pasted_lead_rollup_skips_all_action_shortcuts(
         self,
-        _briefing: object,
-        _fleet: object,
-        _graph: object,
+        _pack: object,
         early_intent: object,
         followup: object,
     ) -> None:
@@ -264,15 +271,13 @@ class KairoConversationUnitTests(unittest.TestCase):
         self.assertEqual("template", payload["source"])
         self.assertEqual([], payload["artifacts"])
 
-    @patch("app.kairo_conversation.build_operator_brain_graph", return_value=_MOCK_GRAPH)
-    @patch("app.kairo_conversation.build_operator_fleet_health", return_value=_MOCK_FLEET)
-    @patch("app.kairo_conversation.build_operator_briefing", return_value=_MOCK_BRIEFING)
+    @patch("app.kairo_conversation.build_conversation_context_pack", return_value=_MOCK_PACK)
     def test_converse_execute_tier_command_requires_confirmation(
         self,
         *_mocks: object,
     ) -> None:
         payload = converse_turn(
-            content="run ./scripts/dev/check-health.sh",
+            content="run npm run verify",
             session_id="confirm-session",
         )
         self.assertEqual("command", payload["turn_kind"])

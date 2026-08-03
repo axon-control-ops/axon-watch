@@ -1,6 +1,7 @@
 import { computed, onBeforeUnmount } from 'vue';
 
 import { postKairoConverse } from '../../lib/kairo-converse-client';
+import type { KairoConverseSubmissionIntent } from '../../lib/kairo-converse-client';
 import { parseChatUiAction } from '../../lib/chat-ui-action';
 import {
   handleKairoComposerHistoryKeydown,
@@ -157,6 +158,7 @@ export function useKairoConversation() {
     options?: {
       voiceCaptureMode?: KairoVoiceCaptureMode;
       dockAttachments?: ComposerClipboardImage[];
+      submissionIntent?: KairoConverseSubmissionIntent;
     },
   ): Promise<boolean | void> {
     const pendingFiles = [
@@ -170,6 +172,7 @@ export function useKairoConversation() {
       return false;
     }
     const content = expandReportHotword(raw) ?? raw;
+    const submissionIntent = options?.submissionIntent ?? 'ask';
     lastOperatorPrompt = content;
     recordSharedKairoHistoryEntry(content);
     const answerTier = pendingFiles.length
@@ -234,6 +237,7 @@ export function useKairoConversation() {
         context_signal_id: brainGalaxyConversationFocus.value?.signalId ?? '',
         context_node_id: brainGalaxyConversationFocus.value?.nodeId ?? '',
         attachment_ids: attachmentIds.length ? attachmentIds : undefined,
+        submission_intent: submissionIntent,
       });
       clearRuntimeAssistantCue();
       if (response.artifacts.length) {

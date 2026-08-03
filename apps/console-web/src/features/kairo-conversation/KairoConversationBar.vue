@@ -207,7 +207,11 @@ const micTitle = computed(() => {
 });
 
 async function handleSubmit(): Promise<void> {
-  await submitTurn();
+  await submitTurn(undefined, { submissionIntent: 'ask' });
+}
+
+async function handleDispatch(): Promise<void> {
+  await submitTurn(undefined, { submissionIntent: 'dispatch' });
 }
 
 function startManualPtt(): boolean {
@@ -397,7 +401,16 @@ onUnmounted(() => {
           }}
         </button>
         <button type="submit" class="kairo-conversation-bar__send" :disabled="!canSubmit">
-          Send
+          Ask
+        </button>
+        <button
+          type="button"
+          class="kairo-conversation-bar__send kairo-conversation-bar__send--dispatch"
+          :disabled="!canSubmit"
+          title="Dispatch this as an action; VAXON will request confirmation when required"
+          @click="handleDispatch"
+        >
+          Dispatch
         </button>
       </form>
 

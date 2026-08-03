@@ -160,6 +160,7 @@ def converse_turn(
     context_node_id: str | None = None,
     force_refresh: bool = False,
     attachment_ids: list[str] | None = None,
+    submission_intent: str = "dispatch",
 ) -> dict[str, object]:
     started_at = time.perf_counter()
     raw_content = content.strip()
@@ -167,6 +168,14 @@ def converse_turn(
     if not trimmed:
         raise ValueError("content must not be empty")
     pasted_operational_context = is_pasted_operational_context(trimmed)
+    dispatch_requested = str(submission_intent or "").strip().lower() == "dispatch"
+    allow_actions = dispatch_requested and not pasted_operational_context
+
+    def _record_turn(**kwargs: object) -> dict[str, object]:
+        payload = dict(kwargs.get("payload") or {})
+        payload["submission_intent"] = "dispatch" if dispatch_requested else "ask"
+        kwargs["payload"] = payload
+        return _log_voice_turn(**kwargs)  # type: ignore[arg-type]
 
     from app.kairo.converse_attachments import ConverseAttachmentError, prepare_converse_attachment_paths
 
@@ -210,13 +219,9 @@ def converse_turn(
             target_workspace_id=resolved_workspace_id,
             task=f"Investigate signal {context_signal_id}",
         )
-    # Quoted receipts must not accidentally confirm a remembered action or
+    # Ask turns and quoted receipts must not confirm a remembered action or
     # trigger one of the convenience action routes below.
-    followup = (
-        None
-        if pasted_operational_context
-        else _resolve_followup_action(trimmed, session_id)
-    )
+    followup = _resolve_followup_action(trimmed, session_id) if allow_actions else None
     if followup:
         action_type = str(followup.get("type", ""))
         if action_type == "handoff_signal":
@@ -232,7 +237,7 @@ def converse_turn(
             _remember_entities(session_id, pending_dig_in="")
             _remember_turn(session_id, "user", trimmed)
             _remember_turn(session_id, "assistant", reply)
-            return _log_voice_turn(
+            return _record_turn(
                 session_id=session_id,
                 workspace_id=workspace_id,
                 raw_content=raw_content,
@@ -269,7 +274,7 @@ def converse_turn(
             _remember_entities(session_id, pending_command="")
             _remember_turn(session_id, "user", trimmed)
             _remember_turn(session_id, "assistant", reply)
-            return _log_voice_turn(
+            return _record_turn(
                 session_id=session_id,
                 workspace_id=workspace_id,
                 raw_content=raw_content,
@@ -299,7 +304,7 @@ def converse_turn(
             _remember_entities(session_id, pending_briefing_surface="")
             _remember_turn(session_id, "user", trimmed)
             _remember_turn(session_id, "assistant", reply)
-            return _log_voice_turn(
+            return _record_turn(
                 session_id=session_id,
                 workspace_id=workspace_id,
                 raw_content=raw_content,
@@ -317,14 +322,14 @@ def converse_turn(
             )
 
     early_intent = (
-        None
-        if pasted_operational_context
-        else maybe_handle_early_converse_intent(
+        maybe_handle_early_converse_intent(
             content=trimmed,
             session_id=session_id,
             workspace_id=resolved_workspace_id,
             guest_name=guest_name,
         )
+        if allow_actions
+        else None
     )
     if early_intent is not None:
         reply = str(early_intent.get("reply") or "")
@@ -342,7 +347,7 @@ def converse_turn(
         }
         if early_intent.get("action_tier"):
             payload["action_tier"] = early_intent.get("action_tier")
-        return _log_voice_turn(
+        return _record_turn(
             session_id=session_id,
             workspace_id=workspace_id,
             raw_content=raw_content,
@@ -352,6 +357,11 @@ def converse_turn(
         )
 
     turn_kind = classify_conversation_turn(trimmed)
+    # Ask is an answer-only capability.  Command-looking text is still useful
+    # evidence (for example, "git status" in a copied receipt), but it must
+    # not reach the bounded-command lane without an explicit Dispatch submit.
+    if not dispatch_requested and turn_kind == "command":
+        turn_kind = "status_question"
     # Keep caller use_runtime; voice_routing_mode gates lanes inside the router.
     recent = _recent_turns(session_id)
 
@@ -378,6 +388,7 @@ def converse_turn(
         context_signal_id=context_signal_id,
         context_node_id=context_node_id,
         preferred_model=preferred_vaxon_model,
+        allow_actions=allow_actions,
     )
 
     reply = decision.reply
@@ -399,7 +410,7 @@ def converse_turn(
     _remember_turn(session_id, "user", trimmed)
     _remember_turn(session_id, "assistant", reply)
 
-    return _log_voice_turn(
+    return _record_turn(
         session_id=session_id,
         workspace_id=workspace_id,
         raw_content=raw_content,

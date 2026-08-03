@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel
 
@@ -188,6 +188,9 @@ class KairoConverseRequest(BaseModel):
     context_signal_id: str = ""
     context_node_id: str = ""
     attachment_ids: list[str] | None = None
+    # Secure default for current and stale clients: text is an Ask unless the
+    # client deliberately declares the Dispatch action.
+    submission_intent: Literal["ask", "dispatch"] = "ask"
 
 
 class KairoTtsRequest(BaseModel):

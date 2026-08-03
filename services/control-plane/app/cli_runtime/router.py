@@ -29,6 +29,7 @@ from app.cli_runtime.cursor_agent import (
 )
 from app.cli_runtime.runtime_auth import (
     claude_dispatch_env,
+    codex_dispatch_env,
     cursor_dispatch_env,
     env_has_api_key,
     env_without_api_keys,
@@ -381,6 +382,11 @@ def dispatch_ide_composer(
             )
         elif family == "claude":
             dispatch_env = claude_dispatch_env(
+                subprocess_env,
+                auth=record.get("auth") if isinstance(record.get("auth"), dict) else None,
+            )
+        elif family == "codex":
+            dispatch_env = codex_dispatch_env(
                 subprocess_env,
                 auth=record.get("auth") if isinstance(record.get("auth"), dict) else None,
             )
