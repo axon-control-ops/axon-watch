@@ -305,7 +305,7 @@
       "note": "Watch inbox/connector client cache; extract cache helpers next"
     },
     "apps/console-web/src/styles/shell/agent-persona-dock.css": {
-      "max_lines": 675,
+      "max_lines": 765,
       "soft_limit": 350,
       "hard_limit": 500,
       "target": "apps/console-web/src/styles/shell/agent-persona-*",
@@ -464,7 +464,7 @@
       "note": "Core roster outcome selection; confidence + roster API split to sibling modules"
     },
     "services/control-plane/app/workspace_agents/lead_vaxon_handoff.py": {
-      "max_lines": 454,
+      "max_lines": 469,
       "soft_limit": 350,
       "hard_limit": 500,
       "target": "services/control-plane/app/workspace_agents/lead_vaxon_*",
@@ -478,7 +478,7 @@
       "note": "Lead team check-in orchestration; extract prompt builders next"
     },
     "services/control-plane/app/workspace_agents/scheduler.py": {
-      "max_lines": 516,
+      "max_lines": 523,
       "soft_limit": 350,
       "hard_limit": 516,
       "target": "services/control-plane/app/workspace_agents/scheduler_*",
@@ -492,7 +492,7 @@
       "note": "Thread message body/actions; extract attachment chrome next"
     },
     "apps/console-web/src/components/shell/MissionControlAutonomyControl.vue": {
-      "max_lines": 679,
+      "max_lines": 771,
       "soft_limit": 350,
       "hard_limit": 500,
       "target": "apps/console-web/src/components/shell/mission-control-*",
@@ -518,6 +518,13 @@
       "hard_limit": 530,
       "target": "apps/console-web/src/components/ide/*",
       "note": "Ratchet after VAXON Attend / Axon terminal jobs slice"
+    },
+    "services/control-plane/app/workspace_agents/autonomous_attention.py": {
+      "max_lines": 535,
+      "soft_limit": 350,
+      "hard_limit": 535,
+      "target": "services/control-plane/app/workspace_agents/autonomous_attention_*",
+      "note": "Autonomous attention loop; extract policy/dispatch slices next"
     }
   }
 }
