@@ -75,6 +75,15 @@ export interface CursorRuntimeStatusSnapshot {
   catalog_source: 'live' | 'fallback' | string;
 }
 
+export interface CodexRuntimeStatusSnapshot {
+  installed: boolean;
+  binary: string;
+  auth: RuntimeAuthStatus;
+  available_models: CursorModelRecord[];
+  codex_models: CursorModelRecord[];
+  catalog_source: 'live' | 'unavailable' | string;
+}
+
 export interface RuntimeMcpToolRecord {
   id: string;
   label: string;
@@ -137,6 +146,18 @@ export async function fetchCursorRuntimeStatus(
     `/api/runtime/cursor/status${query}`,
     {},
     'cursor runtime status request failed',
+    RUNTIME_STATUS_FETCH_TIMEOUT_MS,
+  );
+}
+
+export async function fetchCodexRuntimeStatus(
+  options: { forceRefresh?: boolean } = {},
+): Promise<CodexRuntimeStatusSnapshot> {
+  const query = options.forceRefresh ? '?force_refresh=1' : '';
+  return fetchJson<CodexRuntimeStatusSnapshot>(
+    `/api/runtime/codex/status${query}`,
+    {},
+    'Codex model catalog request failed',
     RUNTIME_STATUS_FETCH_TIMEOUT_MS,
   );
 }
