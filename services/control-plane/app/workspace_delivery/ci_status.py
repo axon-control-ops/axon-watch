@@ -142,6 +142,42 @@ def _post_delivery_update_to_agent_thread(
         logger.exception("delivery thread update failed for %s stage=%s", run_id, stage)
 
 
+def _queue_lead_after_ci_green(
+    *,
+    workspace_id: str,
+    run_id: str,
+    task_id: str | None,
+    workflow_name: str,
+    head_branch: str,
+    html_url: str,
+) -> None:
+    """Give the workspace Lead the verified post-green handoff automatically."""
+    try:
+        from app.workspace_agents.lead_takeover_followup import enqueue_lead_follow_up_task
+
+        follow_up = enqueue_lead_follow_up_task(
+            workspace_id=workspace_id,
+            employee_name="CI",
+            employee_role="watcher",
+            lead_next=(
+                f"{workflow_name or 'CI'} is green on {head_branch or 'the delivery branch'}. "
+                "Verify the PR/merge state and advance the next safe plan step."
+            ),
+            run_id=run_id,
+            phase="completed",
+            task_id=task_id,
+        )
+        if follow_up is not None:
+            logger.info(
+                "queued Lead CI-green follow-up workspace=%s delivery_run=%s task=%s",
+                workspace_id,
+                run_id,
+                follow_up.get("task_id"),
+            )
+    except Exception:  # noqa: BLE001 — delivery state must not depend on handoff UX
+        logger.exception("CI-green Lead handoff failed for %s", run_id)
+
+
 def classify_workflow_status(payload: dict[str, Any]) -> dict[str, str] | None:
     """Normalize success / failure / in-progress workflow_run events."""
     run = payload.get("workflow_run")
@@ -270,6 +306,14 @@ def apply_ci_status_to_delivery(
                 "commit_sha": head_sha,
                 "draft_pr_url": delivery.get("draft_pr_url"),
             },
+        )
+        _queue_lead_after_ci_green(
+            workspace_id=workspace_id,
+            run_id=run_id,
+            task_id=str(delivery.get("task_id") or "").strip() or None,
+            workflow_name=workflow_name,
+            head_branch=head_branch,
+            html_url=html_url,
         )
         return updated
 

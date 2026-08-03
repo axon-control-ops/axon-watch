@@ -167,6 +167,40 @@ class WorkspaceDeliveryTests(unittest.TestCase):
             },
         )
 
+    def test_ci_green_queues_lead_follow_up(self) -> None:
+        created = delivery_store.create_delivery(
+            workspace_id="workspace_axon_watch",
+            run_id="run_green_handoff",
+            task_id="task_delivery",
+            stage="ci_pending",
+            worker_branch="worker/run_green_handoff",
+            attempt_budget=3,
+        )
+        delivery_store.update_delivery(str(created["delivery_id"]), commit_sha="head")
+        with (
+            patch("app.workspace_delivery.ci_status.emit_delivery_receipt"),
+            patch("app.workspace_delivery.ci_status._post_delivery_update_to_agent_thread"),
+            patch("app.workspace_delivery.ci_status._queue_lead_after_ci_green") as handoff,
+            patch("app.live_events.broadcast_material_change"),
+        ):
+            apply_ci_status_to_delivery(
+                workspace_id="workspace_axon_watch",
+                head_branch="worker/run_green_handoff",
+                head_sha="head",
+                kind="success",
+                html_url="https://example.com/actions/green",
+                workflow_name="Fast Gate",
+            )
+
+        handoff.assert_called_once_with(
+            workspace_id="workspace_axon_watch",
+            run_id="run_green_handoff",
+            task_id="task_delivery",
+            workflow_name="Fast Gate",
+            head_branch="worker/run_green_handoff",
+            html_url="https://example.com/actions/green",
+        )
+
     def test_custom_config_path(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "delivery.json"

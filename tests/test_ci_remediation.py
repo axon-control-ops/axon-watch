@@ -194,6 +194,20 @@ class CiRemediationTests(unittest.TestCase):
         items = ci_inbox_items()
         self.assertEqual([newer.signal_id], [item.get("signal_id") for item in items])
 
+    def test_completed_repair_task_reconciles_its_open_signal(self) -> None:
+        from app.ci_remediation.ingest import ingest_workflow_run_event
+        from app.ci_remediation.report import ci_inbox_items
+        from app.persistence import task_store
+
+        with mock.patch(
+            "app.ci_remediation.ingest.dispatch_repair_run",
+            return_value=None,
+        ):
+            result = ingest_workflow_run_event(_failure_payload(), dispatch=False)
+        task_store.complete_task(result.task_id, terminal_outcome="CI confirmed green")
+
+        self.assertEqual([], ci_inbox_items())
+
     def test_inbox_projection_merges_ci_items(self) -> None:
         from app.ci_remediation.ingest import ingest_workflow_run_event
         from app.inbox_projection import build_inbox_response

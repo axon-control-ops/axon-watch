@@ -202,6 +202,58 @@ def mark_repair_outcome(
     return record
 
 
+def reconcile_linked_repair_task_outcomes() -> list[dict[str, str]]:
+    """Retire CI alerts whose linked repair ticket has already finished.
+
+    GitHub webhooks are the fast path, but they can be missed while the local
+    control plane is restarting. Completed/cancelled tickets are durable proof
+    that their former alert is no longer an active inbox item. Failed tickets
+    deliberately remain visible for a genuine retry or reassignment.
+    """
+    try:
+        from app.persistence import task_store
+    except Exception:  # noqa: BLE001 — a read-side recovery must fail open
+        return []
+
+    reconciled: list[dict[str, str]] = []
+    for signal in ci_store.list_open_signals():
+        dedupe_key = str(signal.get("dedupe_key") or "").strip()
+        event = ci_store.get_event(dedupe_key)
+        task_id = str((event or {}).get("task_id") or "").strip()
+        if not task_id:
+            continue
+        task = task_store.get_task(task_id)
+        task_status = str((task or {}).get("status") or "").strip().lower()
+        if task_status == "completed":
+            reason = "linked_repair_task_completed"
+            event_status = "repaired"
+        elif task_status == "cancelled":
+            reason = "linked_repair_task_cancelled"
+            event_status = "superseded"
+        else:
+            continue
+        signal_id = str(signal.get("signal_id") or "").strip()
+        if not signal_id:
+            continue
+        row = ci_store.resolve_signal(signal_id, reason=reason)
+        if row is None:
+            continue
+        if dedupe_key:
+            ci_store.set_event_status(dedupe_key, event_status)
+        reconciled.append({"signal_id": signal_id, "task_id": task_id, "reason": reason})
+    if reconciled:
+        reset_watch_inbox_cache()
+        try:
+            from app.live_events import broadcast_material_change
+
+            broadcast_material_change(receipt_id="ci_repair_task_reconciled")
+        except Exception:  # noqa: BLE001 — durable signal state is primary
+            import logging
+
+            logging.getLogger(__name__).exception("CI repair reconciliation live update failed")
+    return reconciled
+
+
 def spoken_report_line(*, success: bool, workflow_name: str, detail: str) -> str:
     if success:
         return (
@@ -216,6 +268,7 @@ def spoken_report_line(*, success: bool, workflow_name: str, detail: str) -> str
 
 def ci_inbox_items() -> list[dict[str, object]]:
     """Project open/repairing CI signals into watch-inbox shape for CP merge."""
+    reconcile_linked_repair_task_outcomes()
     items: list[dict[str, object]] = []
     for row in ci_store.list_open_signals():
         meta = dict(row.get("meta")) if isinstance(row.get("meta"), dict) else {}
