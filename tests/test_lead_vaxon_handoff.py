@@ -89,6 +89,40 @@ class LeadVaxonHandoffTests(unittest.TestCase):
         again = synthesize_lead_plan(result["plan_id"])
         self.assertEqual("already_posted", (again.get("vaxon_handoff") or {}).get("status"))
 
+    def test_stale_engagement_without_handoff_is_closed_when_work_is_settled(self) -> None:
+        from app.persistence import task_store
+        from app.workspace_agents import lead_plan_store
+        from app.workspace_agents.lead_fan_out import materialize_lead_fan_out
+        from app.workspace_agents.lead_vaxon_handoff import (
+            STALE_ENGAGEMENT_CLOSED_RECEIPT_KIND,
+            list_awaiting_engagement_plans,
+        )
+
+        result = materialize_lead_fan_out(
+            workspace_id="workspace_axon_watch",
+            goal="Check the completed recovery",
+            mode="fan_out",
+            create_runs=False,
+        )
+        for task in result["tasks"]:
+            task_store.cancel_task(
+                str(task["task_id"]),
+                terminal_outcome="superseded by completed recovery",
+            )
+        lead_plan_store.set_plan_status(result["plan_id"], "awaiting_engagement")
+
+        self.assertEqual(
+            list_awaiting_engagement_plans(workspace_id="workspace_axon_watch"),
+            [],
+        )
+        plan = lead_plan_store.get_plan(result["plan_id"])
+        assert plan is not None
+        self.assertEqual(plan["status"], "completed")
+        self.assertIn(
+            STALE_ENGAGEMENT_CLOSED_RECEIPT_KIND,
+            {row["kind"] for row in lead_plan_store.list_receipts(result["plan_id"])},
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

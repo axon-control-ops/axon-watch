@@ -50,8 +50,29 @@ function selectEngagePlan(planId: string | null | undefined): void {
 <template>
   <div v-if="showFilter" class="operator-task-board__plan-filter">
     <p class="operator-task-board__plan-filter-label">Plans</p>
+    <section
+      v-for="group in engageGroups"
+      :key="`decision-${group.planId}`"
+      class="operator-task-board__lead-decision"
+    >
+      <p class="operator-task-board__lead-decision-eyebrow">Lead decision ready</p>
+      <strong>{{ group.planLabel }}</strong>
+      <p>{{ group.planGoal }}</p>
+      <small>Review the verified Lead rollup before starting any follow-up work.</small>
+      <div class="operator-task-board__lead-decision-actions">
+        <button type="button" @click="selectEngagePlan(group.planId)">Review now</button>
+        <button
+          type="button"
+          class="operator-task-board__lead-decision-complete"
+          :disabled="leadPlansMutating"
+          @click="emit('closeLeadPlan', group.planId)"
+        >
+          Mark review complete
+        </button>
+      </div>
+    </section>
     <p class="operator-task-board__plan-filter-help">
-      Engage = Lead synthesis waiting in VAXON. Dismiss closes that review; Re-open brings the chip back.
+      Review now opens the Lead rollup in VAXON. Mark review complete records that no further handoff is needed.
     </p>
     <div class="operator-task-board__plan-tabs" role="tablist" aria-label="Lead plan filter">
       <button
@@ -85,7 +106,7 @@ function selectEngagePlan(planId: string | null | undefined): void {
       >
         <span class="operator-task-board__plan-chip-text">{{ group.planLabel }}</span>
         <span v-if="group.awaitingEngagement" class="operator-task-board__plan-chip-tag">
-          engage
+          review now
         </span>
       </button>
       <span
@@ -104,7 +125,7 @@ function selectEngagePlan(planId: string | null | undefined): void {
         :title="`Dismiss Lead review in VAXON: ${group.planGoal}`"
         @click.stop="emit('closeLeadPlan', group.planId)"
       >
-        Dismiss review · {{ group.planLabel }}
+        Mark review complete · {{ group.planLabel }}
       </button>
       <button
         v-for="group in reopenGroups"
