@@ -92,6 +92,27 @@ class WorkerSchedulerSettingsStoreTests(unittest.TestCase):
         self.assertFalse(settings["scheduler_enabled"])
         self.assertEqual({}, settings["employee_enabled"])
 
+    def test_workspace_enabled_defaults_true_and_pauses_all_workspace_roles(self) -> None:
+        self.assertTrue(worker_scheduler_settings_store.is_workspace_enabled("workspace_dashpro"))
+        worker_scheduler_settings_store.patch_settings(
+            {"workspace_enabled": {"workspace_bkk_invoice_system": False}}
+        )
+        self.assertFalse(
+            worker_scheduler_settings_store.is_workspace_enabled(
+                "workspace_bkk_invoice_system"
+            )
+        )
+        self.assertFalse(
+            worker_scheduler_settings_store.is_employee_enabled(
+                "workspace_bkk_invoice_system", "watcher", file_enabled=True
+            )
+        )
+        self.assertTrue(
+            worker_scheduler_settings_store.is_employee_enabled(
+                "workspace_dashpro", "watcher", file_enabled=True
+            )
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

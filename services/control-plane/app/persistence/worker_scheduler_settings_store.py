@@ -52,6 +52,8 @@ def default_settings() -> dict[str, Any]:
         "max_active": 1,
         "max_starts_per_tick": 1,
         "employee_enabled": {},
+        # Missing entries default to enabled; this is an explicit workspace pause overlay.
+        "workspace_enabled": {},
     }
 
 
@@ -68,6 +70,17 @@ def _normalize_employee_enabled(raw: Any) -> dict[str, bool]:
         if not cleaned or ":" not in cleaned:
             continue
         normalized[cleaned] = bool(value)
+    return normalized
+
+
+def _normalize_workspace_enabled(raw: Any) -> dict[str, bool]:
+    if not isinstance(raw, dict):
+        return {}
+    normalized: dict[str, bool] = {}
+    for key, value in raw.items():
+        cleaned = str(key or "").strip()
+        if cleaned:
+            normalized[cleaned] = bool(value)
     return normalized
 
 
@@ -98,6 +111,7 @@ def _normalize_settings(raw: dict[str, Any] | None) -> dict[str, Any]:
             maximum=_MAX_STARTS_CEILING,
         ),
         "employee_enabled": _normalize_employee_enabled(raw.get("employee_enabled")),
+        "workspace_enabled": _normalize_workspace_enabled(raw.get("workspace_enabled")),
     }
 
 
@@ -166,11 +180,29 @@ def patch_settings(patch: dict[str, Any]) -> dict[str, Any]:
                 continue
             merged[cleaned] = bool(value)
         current["employee_enabled"] = merged
+    if "workspace_enabled" in patch and isinstance(patch["workspace_enabled"], dict):
+        merged_workspace = dict(current.get("workspace_enabled") or {})
+        for key, value in patch["workspace_enabled"].items():
+            cleaned = str(key or "").strip()
+            if cleaned:
+                merged_workspace[cleaned] = bool(value)
+        current["workspace_enabled"] = merged_workspace
     return save_settings(current)
+
+
+def is_workspace_enabled(workspace_id: str) -> bool:
+    """Return the workspace continuous-worker switch; unconfigured workspaces are on."""
+    cleaned = str(workspace_id or "").strip()
+    if not cleaned:
+        return False
+    overlay = load_settings().get("workspace_enabled") or {}
+    return bool(overlay[cleaned]) if cleaned in overlay else True
 
 
 def is_employee_enabled(workspace_id: str, role: str, *, file_enabled: bool = True) -> bool:
     if not file_enabled:
+        return False
+    if not is_workspace_enabled(workspace_id):
         return False
     settings = load_settings()
     overlay = settings.get("employee_enabled") or {}
