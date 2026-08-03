@@ -255,23 +255,11 @@ onUnmounted(() => {
       </div>
     </div>
 
-  </section>
-
-  <Teleport to="#mission-control-approval-tray">
-    <section v-if="pendingCritical.length" class="orb-decision-tray" aria-label="Needs your decision">
-      <header class="orb-decision-tray__header">
-        <div>
-          <p>Needs you</p>
-          <span>Guarded action — VAXON will wait for your choice.</span>
-        </div>
-        <span class="orb-decision-tray__count">{{ pendingCriticalTotal }}</span>
-      </header>
-      <ul>
+    <div v-if="pendingCritical.length" class="orb-hud__sheet orb-hud__sheet--critical">
+      <ul aria-label="Needs your decision">
         <li v-for="item in pendingCritical.slice(0, 2)" :key="item.receipt_id">
-          <div class="orb-decision-tray__copy">
-            <strong>{{ item.title || item.kind }}</strong>
-            <span>{{ item.detail || 'Review the exact action before continuing.' }}</span>
-          </div>
+          <strong>Needs you</strong>
+          <span>{{ item.title || item.kind }}</span>
           <div class="orb-hud__sheet-actions">
             <button
               type="button"
@@ -291,11 +279,11 @@ onUnmounted(() => {
           </div>
         </li>
       </ul>
-      <p v-if="pendingCriticalTotal > 2" class="orb-decision-tray__more">
-        +{{ pendingCriticalTotal - 2 }} more decisions in the queue
+      <p v-if="pendingCriticalTotal > 2" class="orb-hud__whisper" data-tone="warn">
+        +{{ pendingCriticalTotal - 2 }} more
       </p>
-    </section>
-  </Teleport>
+    </div>
+  </section>
 </template>
 
 <style scoped>
@@ -553,6 +541,16 @@ onUnmounted(() => {
   backdrop-filter: blur(12px);
   pointer-events: auto;
   animation: orb-hud-sheet-in 180ms ease-out;
+}
+
+.orb-hud__sheet--critical {
+  border-color: rgba(255, 120, 140, 0.4);
+  background:
+    linear-gradient(180deg, rgba(50, 12, 18, 0.55), rgba(16, 4, 8, 0.72)),
+    rgba(16, 4, 8, 0.55);
+  max-height: 6.5rem;
+  overflow: auto;
+  overscroll-behavior: contain;
 }
 
 .orb-hud__sheet p,
