@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import hashlib
-import re
 import time
 from typing import Any, Literal
 
@@ -12,8 +11,8 @@ from app.chat.command_intent import (
     command_display_name,
     command_requires_confirmation,
     expand_command_shortcuts,
-    is_question,
     is_auto_complete_run_summary,
+    is_question,
 )
 from app.cli_runtime.router import dispatch_ide_composer
 from app.kairo.context_pack_cache import get_cached_context_pack
@@ -25,6 +24,10 @@ from app.kairo.voice_dispatch import (
 )
 from app.kairo.voice_autonomy import resolve_voice_action_tier
 from app.kairo_early_intents import maybe_handle_early_converse_intent
+from app.kairo.conversation_classification import (
+    ConversationTurnKind,
+    classify_conversation_turn as _classify_conversation_turn,
+)
 from app.kairo.operator_input_safety import is_pasted_operational_context
 from app.persistence.operator_presence_settings_store import load_settings as load_presence_settings
 from app.kairo.turn_memory import (
@@ -50,7 +53,6 @@ from app.kairo_conversation_reply import (
     build_conversation_facts,
     compose_conversation_reply,
     compose_smalltalk_reply,
-    is_open_style_question,
 )
 from app.kairo_conversation_runtime_context import (
     OPEN_DETAIL_RE as _OPEN_DETAIL_RE,
@@ -70,25 +72,8 @@ from app.operator_fleet_health import build_operator_fleet_health
 from app.operator_persona_stt_aliases import normalize_persona_stt_aliases
 from app.persistence import chat_store
 from app.workspace_project_bindings import get_workspace_project_binding, load_workspace_project_bindings
-ConversationTurnKind = Literal["status_question", "open_question", "command", "chat", "action"]
 ConversationSource = Literal["template", "model", "fallback"]; ConversationAnswerTier = Literal["fast", "deep"]
 _MAX_RUNTIME_VOICE_REPLY_CHARS = 1200
-
-_STATUS_HINT_RE = re.compile(
-    r"\b("
-    r"approval|approvals|attention|on fire|status|briefing|fleet|health|"
-    r"signal|signals|running|active run|what needs|what's wrong|what is wrong|"
-    r"happening|nominal|degraded|waiting|clear"
-    r")\b",
-    re.IGNORECASE,
-)
-_WORKSPACE_ACTIVITY_RE = re.compile(
-    r"(?:\b(check|show|tell me|what|pull up)\b[\w\s,-]*)?"
-    r"\b(workspace|dashpro|axon[\s-]*watch|axon[\s-]*local)\b"
-    r"[\w\s,-]*\b(check|show|what|pull up)?\b[\w\s,-]*"
-    r"\b(just did|doing|latest|recent|activity)\b",
-    re.IGNORECASE,
-)
 def _runtime_workspace_id(*, workspace_id: str | None, pack: dict[str, Any]) -> str:
     return runtime_workspace_id(workspace_id=workspace_id, pack=pack)
 
@@ -116,29 +101,15 @@ def _build_runtime_context_block(
     )
 
 
-def classify_conversation_turn(content: str) -> ConversationTurnKind:
-    trimmed = content.strip()
-    if not trimmed:
-        return "chat"
-    # A copied Lead/run receipt is evidence for an Ask reply, never an implied
-    # command.  Check this before command shortcuts: a receipt can legitimately
-    # start with a word such as "run" or contain several task verbs.
-    if is_pasted_operational_context(trimmed):
-        return "status_question"
-    normalized = expand_command_shortcuts(trimmed)
-    intent = classify_command(normalized)
-    if intent != "unsupported":
-        return "command"
-    if is_open_style_question(trimmed):
-        return "open_question"
-    if _WORKSPACE_ACTIVITY_RE.search(trimmed):
-        return "status_question"
-    if _STATUS_HINT_RE.search(trimmed):
-        return "status_question"
-    if is_question(trimmed):
-        return "open_question"
-    return "chat"
 
+def classify_conversation_turn(content: str) -> ConversationTurnKind:
+    """Classify a turn while retaining the public patch seam used by callers/tests."""
+    return _classify_conversation_turn(
+        content,
+        classify_command_fn=classify_command,
+        expand_command_shortcuts_fn=expand_command_shortcuts,
+        is_question_fn=is_question,
+    )
 
 
 def answer_status_question(content: str, pack: dict[str, Any]) -> str:

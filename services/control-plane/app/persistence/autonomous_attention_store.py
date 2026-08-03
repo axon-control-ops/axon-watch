@@ -12,6 +12,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from app.persistence import run_store_sqlite
+from app.persistence.autonomous_attention_decisions import supersede_pending_decision
 
 _SECRET_ASSIGNMENT_RE = re.compile(
     r"(?i)\b([A-Z0-9_]*(?:TOKEN|SECRET|PASSWORD|API_KEY|APIKEY))"
@@ -404,32 +405,6 @@ def complete_decision_resolution(
     resolved = get_receipt(cleaned)
     assert resolved is not None
     return resolved
-
-
-def supersede_pending_decision(receipt_id: str) -> dict[str, Any] | None:
-    """Resolve a pending approval that a later verified completion made obsolete.
-
-    The receipt remains in the audit trail; it simply no longer asks the operator
-    to approve work that has already recovered.
-    """
-    cleaned = str(receipt_id or "").strip()
-    if not cleaned:
-        return None
-    stamp = _utc_now_iso()
-    with _managed_connection() as connection:
-        ensure_autonomy_receipt_schema(connection)
-        connection.execute(
-            """
-            UPDATE autonomy_attention_receipts
-            SET status = 'resolved',
-                resolution = 'superseded',
-                resolved_at = ?
-            WHERE receipt_id = ? AND status = 'pending'
-            """,
-            (stamp, cleaned),
-        )
-        connection.commit()
-    return get_receipt(cleaned)
 
 
 def release_decision_resolution(receipt_id: str) -> None:
