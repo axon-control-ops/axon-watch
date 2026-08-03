@@ -160,7 +160,11 @@ export function useComposerMenus(shell: ShellStore, options: UseComposerMenusOpt
       void shell.loadRuntimeMcpTools();
     }
     if (openingModel) {
-      void Promise.all([shell.loadRuntimeStatus(), shell.loadCursorCatalog(true)]);
+      void Promise.all([
+        shell.loadRuntimeStatus(),
+        shell.loadCursorCatalog(true),
+        shell.loadCodexCatalog(true),
+      ]);
     }
     if (openingMode) {
       void refreshSandboxSession();

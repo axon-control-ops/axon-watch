@@ -1,6 +1,7 @@
 import { computed, type ComputedRef, type Ref } from 'vue';
 
 import type {
+  CodexRuntimeStatusSnapshot,
   CursorRuntimeStatusSnapshot,
   RuntimeStatusSnapshot,
 } from '../../../api/control-plane';
@@ -10,6 +11,7 @@ import {
   resolveCursorComposerModel,
   type CursorCatalogRow,
 } from '../../../lib/cursor-catalog-view';
+import { buildCodexCatalogRows, codexModelLabel } from '../../../lib/codex-catalog-view';
 import {
   readComposerRuntimePrefs,
   writeComposerRuntimePrefs,
@@ -25,6 +27,7 @@ interface CreateComposerRuntimePrefsSliceInput {
   currentWorkspace: Ref<WorkspaceRecord | null>;
   runtimeStatus: Ref<RuntimeStatusSnapshot | null>;
   cursorRuntimeStatus: Ref<CursorRuntimeStatusSnapshot | null>;
+  codexRuntimeStatus: Ref<CodexRuntimeStatusSnapshot | null>;
   composerRuntimePrefsRevision: Ref<number>;
   cursorPickerVisibleRevision: Ref<number>;
 }
@@ -45,6 +48,9 @@ export function createComposerRuntimePrefsSlice(input: CreateComposerRuntimePref
 
   const cursorCatalogRows: ComputedRef<CursorCatalogRow[]> = computed(() =>
     buildCursorCatalogRows(input.cursorRuntimeStatus.value),
+  );
+  const codexCatalogRows: ComputedRef<CursorCatalogRow[]> = computed(() =>
+    buildCodexCatalogRows(input.codexRuntimeStatus.value),
   );
 
   const selectedComposerModel = computed(() => {
@@ -93,7 +99,9 @@ export function createComposerRuntimePrefsSlice(input: CreateComposerRuntimePref
       });
     }
     const model = selectedComposerModel.value;
-    const modelLabel = model === 'auto' ? 'Auto' : model;
+    const modelLabel = family === 'codex'
+      ? codexModelLabel(model, codexCatalogRows.value)
+      : model === 'auto' ? 'Auto' : model;
     return `${family} ${scope} · ${modelLabel}`;
   });
 
@@ -142,6 +150,7 @@ export function createComposerRuntimePrefsSlice(input: CreateComposerRuntimePref
     selectedRuntimeTargetId,
     selectedComposerModel,
     cursorCatalogRows,
+    codexCatalogRows,
     cursorPickerVisibleModelIds,
     composerRuntimeLabel,
     setSelectedRuntimeTarget,

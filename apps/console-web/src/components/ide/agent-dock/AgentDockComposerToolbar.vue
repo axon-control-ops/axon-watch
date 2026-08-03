@@ -23,6 +23,7 @@ defineProps<{
   showAddModelsEntry: boolean;
   showExtraPinnedRows: boolean;
   showCursorCatalog: boolean;
+  showCodexCatalog: boolean;
   showVaultAction: boolean;
   attachmentChips: AgentDockComposerAttachmentChip[];
   composerImageCount: number;
@@ -62,6 +63,8 @@ defineProps<{
   cursorStaleWarning: string;
   cursorManageRows: CursorCatalogRow[];
   cursorCatalogCount: string;
+  codexCatalogRows: CursorCatalogRow[];
+  codexCatalogStatus: string;
   modelSearchQuery: string;
   runtimeHint: string;
   canConvertInstructions?: boolean;
@@ -412,6 +415,39 @@ function runtimeStatusLine(record: AgentDockComposerRuntimeTarget): string {
               No models match your search.
             </p>
           </template>
+        </template>
+        <template v-else-if="showCodexCatalog">
+          <p class="agent-dock-composer__menu-caption">Codex / ChatGPT models</p>
+          <p class="agent-dock-composer__menu-note agent-dock-composer__menu-note--status">
+            {{ codexCatalogStatus }}
+          </p>
+          <p v-if="shell.codexCatalogLoadState === 'loading'" class="agent-dock-composer__menu-note">
+            Loading models available to your signed-in Codex account…
+          </p>
+          <p v-else-if="shell.codexCatalogError" class="agent-dock-composer__menu-note">
+            {{ shell.codexCatalogError }}
+          </p>
+          <button
+            v-for="row in codexCatalogRows"
+            :key="row.id"
+            type="button"
+            class="agent-dock-composer__menu-item"
+            :class="{ 'agent-dock-composer__menu-item--selected': row.id === selectedModelId }"
+            :disabled="!row.available"
+            @click="emit('select-composer-model', row.id)"
+          >
+            <span class="agent-dock-composer__model-label">
+              {{ row.label }}
+              <span v-if="row.badge" class="agent-dock-composer__model-badge">{{ row.badge }}</span>
+            </span>
+            <small>{{ row.description }}</small>
+          </button>
+          <p
+            v-if="shell.codexCatalogLoadState === 'loaded' && codexCatalogRows.length === 1"
+            class="agent-dock-composer__menu-note agent-dock-composer__menu-note--warning"
+          >
+            No selectable models were returned. Confirm Codex is signed in with the intended ChatGPT account.
+          </p>
         </template>
         <p v-else class="agent-dock-composer__menu-note">
           Selected model: {{ selectedModelLabel }}

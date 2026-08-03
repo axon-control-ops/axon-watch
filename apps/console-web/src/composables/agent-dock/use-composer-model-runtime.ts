@@ -22,6 +22,7 @@ import {
 } from '../../lib/cursor-catalog-view';
 import { CURSOR_PICKER_COMPOSER_IDS, CURSOR_PICKER_DEFAULT_MODEL } from '../../lib/cursor-picker-prefs';
 import { composerCursorAuthLine } from '../../lib/runtime-auth-view';
+import { codexModelLabel } from '../../lib/codex-catalog-view';
 import { useShellStore } from '../../stores/shell';
 
 type ShellStore = ReturnType<typeof useShellStore>;
@@ -74,10 +75,21 @@ export function useComposerModelRuntime(
     const target = currentRuntimeTarget.value;
     return (target?.family ?? 'cursor') === 'cursor';
   });
+  const showCodexCatalog = computed(() => currentRuntimeTarget.value?.family === 'codex');
   const selectedModelId = computed(() => shell.selectedComposerModel || 'auto');
   const selectedModelLabel = computed(() =>
-    cursorModelLabel(selectedModelId.value, shell.cursorCatalogRows),
+    showCodexCatalog.value
+      ? codexModelLabel(selectedModelId.value, shell.codexCatalogRows)
+      : cursorModelLabel(selectedModelId.value, shell.cursorCatalogRows),
   );
+  const codexCatalogStatus = computed(() => {
+    if (shell.codexCatalogLoadState === 'loading') return 'Loading Codex / ChatGPT models…';
+    if (shell.codexCatalogError) return shell.codexCatalogError;
+    if (shell.codexRuntimeStatus?.catalog_source === 'live') {
+      return `${shell.codexCatalogRows.filter((row) => row.id !== 'auto').length} models available to your signed-in Codex account`;
+    }
+    return 'Codex model catalog is unavailable. Check the Codex CLI sign-in.';
+  });
   const autoModelRow = computed(() =>
     shell.cursorCatalogRows.find((row) => row.id === 'auto') ?? {
       id: 'auto',
@@ -239,6 +251,8 @@ export function useComposerModelRuntime(
     cursorCatalogCount,
     cursorCatalogStatus,
     cursorCatalogTotal,
+    codexCatalogRows: shell.codexCatalogRows,
+    codexCatalogStatus,
     cursorManageRows,
     cursorStaleWarning,
     currentRuntimeTarget,
@@ -259,6 +273,7 @@ export function useComposerModelRuntime(
     selectedRuntimeSummary,
     showAddModelsEntry,
     showCursorCatalog,
+    showCodexCatalog,
     showExtraPinnedRows,
     showVaultAction,
     toggleRuntimeTargetsPanel,
