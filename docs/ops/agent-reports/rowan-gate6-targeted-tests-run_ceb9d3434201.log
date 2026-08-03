@@ -1,0 +1,13 @@
+test_failure_detail_prefers_stale_run_failed_over_success_dispatch (tests.test_run_outcome_stale_critical_review.RunOutcomeStaleCriticalReviewTests.test_failure_detail_prefers_stale_run_failed_over_success_dispatch) ... ok
+test_is_stale_timeout_failure_markers (tests.test_run_outcome_stale_critical_review.RunOutcomeStaleCriticalReviewTests.test_is_stale_timeout_failure_markers) ... ok
+test_latest_role_outcome_completes_stale_fail_when_critical_review_succeeded (tests.test_run_outcome_stale_critical_review.RunOutcomeStaleCriticalReviewTests.test_latest_role_outcome_completes_stale_fail_when_critical_review_succeeded) ... ok
+test_reap_skips_executing_run_while_cli_runtime_registered (tests.test_run_stale_reconcile_cli_registered.RunStaleReconcileCliRegisteredTests.test_reap_skips_executing_run_while_cli_runtime_registered) ... ok
+test_default_check_timeout_covers_gate6_suite (tests.test_gate6_timeout_safe_suite.Gate6TimeoutSafeSuiteTests.test_default_check_timeout_covers_gate6_suite) ... ok
+test_frontend_checks_use_path_aware_gate6_wrapper (tests.test_gate6_timeout_safe_suite.Gate6TimeoutSafeSuiteTests.test_frontend_checks_use_path_aware_gate6_wrapper) ... ok
+test_gate6_runner_script_covers_verifier_contract (tests.test_gate6_timeout_safe_suite.Gate6TimeoutSafeSuiteTests.test_gate6_runner_script_covers_verifier_contract) ... ok
+test_repo_contract_points_test_check_at_gate6_runner (tests.test_gate6_timeout_safe_suite.Gate6TimeoutSafeSuiteTests.test_repo_contract_points_test_check_at_gate6_runner) ... ok
+
+----------------------------------------------------------------------
+Ran 8 tests in 0.058s
+
+OK

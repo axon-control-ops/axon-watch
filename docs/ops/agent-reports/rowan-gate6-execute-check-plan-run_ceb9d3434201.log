@@ -1,0 +1,22 @@
+CHANGED_PATHS 14
+  config/project-contracts/axon-watch.project.axon.yaml
+  docs/ops/agent-reports/rowan-failed-shift-ceb9d3434201-gate6-2026-08-03.md
+  docs/ops/agent-reports/rowan-gate6-execute-check-plan-run_ceb9d3434201.log
+  docs/ops/agent-reports/rowan-gate6-targeted-tests-run_ceb9d3434201.log
+  project.axon.yaml
+  scripts/verify/run_gate6_frontend_check.sh
+  scripts/verify/run_gate6_unit_tests.sh
+  services/control-plane/app/runs/stale_reconcile.py
+  services/control-plane/app/workspace_agents/failure_detail.py
+  services/control-plane/app/workspace_agents/run_outcome.py
+  services/control-plane/app/workspace_agents/verifier_runner.py
+  tests/test_gate6_timeout_safe_suite.py
+  tests/test_run_outcome_stale_critical_review.py
+  tests/test_run_stale_reconcile_cli_registered.py
+CHECK lint: passed=True
+CHECK typecheck: passed=True
+CHECK test: passed=True
+CHECK build: passed=True
+CHECK security: passed=True
+CHECK diff_budget: passed=True
+ACCEPTANCE True acceptance=pass · lint,typecheck,test,build,security,diff_budget

@@ -320,6 +320,28 @@ def reap_stale_employee_runs(
             )
             continue
 
+        # Long silent Cursor turns still hold a registered CLI subprocess. Do not
+        # stale-fail while that process is alive — finalize often lands seconds later
+        # and would otherwise leave a false failed_shift with success=True receipts.
+        if phase == "executing":
+            try:
+                from app.cli_runtime.process_registry import is_registered
+
+                if is_registered(run_id):
+                    logger.info(
+                        "skipping stale reap for %s — CLI runtime still registered "
+                        "(idle_s=%.0f cutoff_s=%.0f)",
+                        run_id,
+                        age,
+                        cutoff,
+                    )
+                    continue
+            except Exception:  # noqa: BLE001 — fail-open to existing reap behavior
+                logger.exception(
+                    "stale reap registry probe failed for %s; continuing with reap checks",
+                    run_id,
+                )
+
         if phase == "paused":
             if not _cancel_paused_employee_run(run_id, age=age, cutoff=cutoff):
                 continue
