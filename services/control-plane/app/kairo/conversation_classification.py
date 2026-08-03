@@ -26,6 +26,16 @@ _WORKSPACE_ACTIVITY_RE = re.compile(
     re.IGNORECASE,
 )
 
+# A leadership/capability question can naturally contain words such as "run"
+# ("help me run the school") without being a request for the technical run
+# queue. Keep these turns conversational so VAXON can advise before anyone
+# chooses to dispatch work.
+_CONSULTATIVE_ADVICE_RE = re.compile(
+    r"\b(?:will|can|could|should)\b.{0,180}\b(?:help|support|advise|suggest|"
+    r"recommend|manage|coordinate|prepare|grade|assess|run)\b",
+    re.IGNORECASE | re.DOTALL,
+)
+
 
 def classify_conversation_turn(
     content: str,
@@ -41,6 +51,8 @@ def classify_conversation_turn(
         return "status_question"
     if classify_command_fn(expand_command_shortcuts_fn(trimmed)) != "unsupported":
         return "command"
+    if _CONSULTATIVE_ADVICE_RE.search(trimmed):
+        return "open_question"
     if is_open_style_question(trimmed):
         return "open_question"
     if _WORKSPACE_ACTIVITY_RE.search(trimmed):

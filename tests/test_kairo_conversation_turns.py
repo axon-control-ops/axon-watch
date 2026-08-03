@@ -357,6 +357,84 @@ class KairoConversationTurnTests(unittest.TestCase):
     @patch(_FLEET_PATCH, return_value=_MOCK_FLEET)
     @patch(_BRIEFING_PATCH, return_value=_MOCK_BRIEFING)
     @patch("app.kairo_conversation.dispatch_ide_composer")
+    @patch(
+        "app.kairo_conversation_runtime_context.build_lane_b_context_block",
+        return_value="Workspace context",
+    )
+    def test_school_capability_question_uses_consultative_runtime(
+        self,
+        _mock_context: object,
+        mock_dispatch,
+        *_mocks: object,
+    ) -> None:
+        mock_dispatch.return_value = {
+            "content": "Imani can coordinate this, provided teachers approve grades and parent messages.",
+            "dispatched": True,
+        }
+        payload = converse_turn(
+            content=(
+                "Will Imani in Young Eagles be able to help me run the school, post daily "
+                "homework, help grade it, and prepare parent reports?"
+            ),
+            session_id="school-capability-session",
+            workspace_id="workspace_young_eagles_day_care",
+            use_runtime=True,
+            answer_tier="deep",
+            submission_intent="ask",
+        )
+        self.assertEqual("open_question", payload["turn_kind"])
+        self.assertEqual("model", payload["source"])
+        self.assertIn("Imani can coordinate", str(payload["reply"]))
+        mock_dispatch.assert_called_once()
+
+    @patch(_GRAPH_PATCH, return_value=_MOCK_GRAPH)
+    @patch(_FLEET_PATCH, return_value=_MOCK_FLEET)
+    @patch(_BRIEFING_PATCH, return_value=_MOCK_BRIEFING)
+    @patch("app.kairo_conversation.dispatch_ide_composer")
+    @patch(
+        "app.kairo_conversation_runtime_context.build_lane_b_context_block",
+        return_value="Workspace context",
+    )
+    def test_ask_always_uses_consultative_runtime_without_keyword_matching(
+        self,
+        _mock_context: object,
+        mock_dispatch,
+        *_mocks: object,
+    ) -> None:
+        mock_dispatch.return_value = {"content": "Here is my considered recommendation.", "dispatched": True}
+        payload = converse_turn(
+            content="I have a new idea.",
+            session_id="consultative-ask-session",
+            use_runtime=False,
+            answer_tier="fast",
+            submission_intent="ask",
+        )
+        self.assertEqual("model", payload["source"])
+        self.assertIn("considered recommendation", str(payload["reply"]))
+        mock_dispatch.assert_called_once()
+
+    @patch(_GRAPH_PATCH, return_value=_MOCK_GRAPH)
+    @patch(_FLEET_PATCH, return_value=_MOCK_FLEET)
+    @patch(_BRIEFING_PATCH, return_value=_MOCK_BRIEFING)
+    def test_school_capability_question_has_useful_template_fallback(
+        self,
+        *_mocks: object,
+    ) -> None:
+        payload = converse_turn(
+            content="Can Imani help me run the school and send weekly parent updates?",
+            session_id="school-fallback-session",
+            workspace_id="workspace_young_eagles_day_care",
+            submission_intent="ask",
+        )
+        self.assertEqual("open_question", payload["turn_kind"])
+        self.assertIn("Imani", str(payload["reply"]))
+        self.assertIn("teacher sign-off", str(payload["reply"]))
+        self.assertNotIn("run queue is idle", str(payload["reply"]).lower())
+
+    @patch(_GRAPH_PATCH, return_value=_MOCK_GRAPH)
+    @patch(_FLEET_PATCH, return_value=_MOCK_FLEET)
+    @patch(_BRIEFING_PATCH, return_value=_MOCK_BRIEFING)
+    @patch("app.kairo_conversation.dispatch_ide_composer")
     def test_converse_open_question_fast_tier_skips_runtime(
         self,
         mock_dispatch,

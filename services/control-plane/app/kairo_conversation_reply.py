@@ -19,10 +19,16 @@ QuestionFocus = Literal[
     "fleet",
     "runtime",
     "health",
+    "school_operations",
     "degraded",
     "general",
     "followup",
 ]
+_SCHOOL_OPERATIONS_RE = re.compile(
+    r"\b(?:school|homework|parent(?:s|'s)?|aftercare|child(?:ren)?|learner(?:s)?|"
+    r"student(?:s)?|exam(?:s)?|assessment(?:s)?|practice test(?:s)?|grading|grade)\b",
+    re.IGNORECASE,
+)
 _OPEN_QUESTION_RE = re.compile(
     r"\b(why|how|explain|tell me (?:more|about)|what happened|what went wrong|"
     r"walk me through|can you elaborate)\b",
@@ -67,6 +73,10 @@ def detect_question_focus(content: str, *, recent_user_turns: list[str]) -> Ques
     lower = trimmed.lower()
     if recent_user_turns and _FOLLOWUP_RE.search(lower):
         return "followup"
+    # This must precede the technical "run" focus: school leadership asks are
+    # consultative, not a request for a run-queue update.
+    if _SCHOOL_OPERATIONS_RE.search(trimmed):
+        return "school_operations"
     if _APPROVAL_RE.search(lower):
         return "approvals"
     if _ATTENTION_RE.search(lower):

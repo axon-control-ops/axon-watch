@@ -233,6 +233,24 @@ def general_candidates(facts: dict[str, Any], *, followup: bool) -> list[str]:
     return status_report_candidates(facts, followup=followup)
 
 
+def school_operations_candidates(facts: dict[str, Any], *, followup: bool) -> list[str]:
+    """Useful Ask-mode fallback for centre/school operating-model advice."""
+    workspace = str(facts.get("workspace_label") or "").strip().lower()
+    lead = "Imani" if "young eagles" in workspace else "the school lead"
+    return [
+        (
+            f"Yes — {lead} can help coordinate the operating rhythm, but we should set it up "
+            "as a supervised school workflow, not a magic inbox. The useful first four lanes are "
+            "daily homework, rubric-assisted marking with teacher sign-off, weekly parent updates, "
+            "and practice assessments. Child reports, parent messages, and aftercare records need "
+            "approved data, templates, permissions, and escalation rules before anything is sent. "
+            "For Young Eagles and the wider school programme, I would also bring the EDP Excellence "
+            "lead into the conversation so the handoff is explicit. In Ask mode, we can shape the "
+            "operating model first; nothing is dispatched until you choose to make it a mission."
+        ),
+    ]
+
+
 def status_report_candidates(facts: dict[str, Any], *, followup: bool) -> list[str]:
     """Categorized JARVIS-style stand-up in plain English."""
     prefix = "Still on it — " if followup else ""
@@ -331,6 +349,7 @@ CANDIDATE_BUILDERS = {
     "fleet": fleet_candidates,
     "runtime": runtime_candidates,
     "health": health_candidates,
+    "school_operations": school_operations_candidates,
     "degraded": lambda f, *, followup: general_candidates(f, followup=followup),
     "status_report": status_report_candidates,
     "general": general_candidates,

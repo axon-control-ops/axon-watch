@@ -333,6 +333,11 @@ def converse_turn(
     # not reach the bounded-command lane without an explicit Dispatch submit.
     if not dispatch_requested and turn_kind == "command":
         turn_kind = "status_question"
+    # Ask is VAXON's consultative COO lane. Do not make an operator learn a
+    # vocabulary in order to receive a considered answer; its read-only safety
+    # boundary is submission_intent, not text classification.
+    if not dispatch_requested:
+        tier = "deep"
     # Keep caller use_runtime; voice_routing_mode gates lanes inside the router.
     recent = _recent_turns(session_id)
 
@@ -360,6 +365,7 @@ def converse_turn(
         context_node_id=context_node_id,
         preferred_model=preferred_vaxon_model,
         allow_actions=allow_actions,
+        consultative=not dispatch_requested,
     )
 
     reply = decision.reply

@@ -120,6 +120,15 @@ class KairoConversationUnitTests(unittest.TestCase):
         self.assertEqual("open_question", classify_conversation_turn("why is sentry spiking?"))
         self.assertEqual("open_question", classify_conversation_turn("how did this happen?"))
 
+    def test_school_capability_question_is_not_a_run_queue_status(self) -> None:
+        self.assertEqual(
+            "open_question",
+            classify_conversation_turn(
+                "Will Imani in Young Eagles be able to help me run the school, "
+                "post daily homework, help grade it, and prepare parent reports?"
+            ),
+        )
+
     def test_classify_chat_greeting(self) -> None:
         self.assertEqual("chat", classify_conversation_turn("hello there"))
         self.assertEqual("chat", classify_conversation_turn("thanks"))

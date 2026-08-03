@@ -175,7 +175,9 @@ export function useKairoConversation() {
     const submissionIntent = options?.submissionIntent ?? 'ask';
     lastOperatorPrompt = content;
     recordSharedKairoHistoryEntry(content);
-    const answerTier = pendingFiles.length
+    // Ask is VAXON's executive consultation lane. Its quality must not depend
+    // on matching a particular question shape: only Mission may dispatch work.
+    const answerTier = pendingFiles.length || submissionIntent === 'ask'
       ? 'deep'
       : determineAnswerTier(content);
 
