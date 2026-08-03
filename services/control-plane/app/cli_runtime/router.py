@@ -14,6 +14,7 @@ from app.cli_runtime.approval_gate import (
     resolve_runtime_execution_tier,
 )
 from app.cli_runtime.catalog import runtime_status_snapshot
+from app.cli_runtime.codex_models import default_codex_model
 from app.cli_runtime.mcp_registry import mcp_tools_for_composer_mode
 from app.cli_runtime.non_cursor_dispatch import run_non_cursor_local
 from app.cli_runtime.recovery import ordered_runtime_candidates
@@ -248,6 +249,10 @@ def _cloud_runtime_message(record: dict[str, object]) -> str:
 def _effective_cli_model(family: str, runtime_model: str) -> str:
     normalized = str(runtime_model or "").strip()
     if not normalized or normalized.lower() == "auto":
+        # Codex does not provide Cursor-style Auto routing.  Its config may
+        # contain an obsolete model id, so use the account catalog below.
+        if family == "codex":
+            return ""
         if family == "cursor":
             env_key = "AXON_WATCH_CURSOR_MODEL"
         elif family == "claude":
@@ -390,6 +395,8 @@ def dispatch_ide_composer(
                 subprocess_env,
                 auth=record.get("auth") if isinstance(record.get("auth"), dict) else None,
             )
+            if not model:
+                model = default_codex_model(binary, env=dispatch_env)
         try:
             if target_type == "cloud":
                 raise RuntimeError(_cloud_runtime_message(record))

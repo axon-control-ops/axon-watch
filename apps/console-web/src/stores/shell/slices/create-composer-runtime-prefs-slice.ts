@@ -66,7 +66,11 @@ export function createComposerRuntimePrefsSlice(input: CreateComposerRuntimePref
     ].find((record) => record.id === target);
     const family = targetRecord?.family ?? 'cursor';
     if (family === 'codex') {
-      return prefs.codex_cli_model?.trim() || 'auto';
+      const stored = prefs.codex_cli_model?.trim();
+      if (stored && stored !== 'auto') {
+        return stored;
+      }
+      return codexCatalogRows.value.find((row) => row.available)?.id ?? '';
     }
     if (family === 'claude') {
       return prefs.claude_cli_model?.trim() || 'auto';
@@ -92,8 +96,8 @@ export function createComposerRuntimePrefsSlice(input: CreateComposerRuntimePref
     const family = target?.family ?? 'runtime';
     if (family === 'cursor') {
       return cursorComposerRuntimeLabel({
-        family,
-        scope,
+        family: target?.label || 'Cursor',
+        scope: target?.target_type === 'cloud' ? 'cloud' : '',
         modelId: selectedComposerModel.value,
         rows: cursorCatalogRows.value,
       });
@@ -102,7 +106,7 @@ export function createComposerRuntimePrefsSlice(input: CreateComposerRuntimePref
     const modelLabel = family === 'codex'
       ? codexModelLabel(model, codexCatalogRows.value)
       : model === 'auto' ? 'Auto' : model;
-    return `${family} ${scope} · ${modelLabel}`;
+    return `${target?.label || family} · ${modelLabel}`;
   });
 
   function setSelectedRuntimeTarget(runtimeTarget: string): void {
@@ -127,7 +131,9 @@ export function createComposerRuntimePrefsSlice(input: CreateComposerRuntimePref
     const family = targetRecord?.family ?? 'cursor';
     const normalized = modelId.trim() || 'auto';
     if (family === 'codex') {
-      writeComposerRuntimePrefs(workspaceId, { codex_cli_model: normalized });
+      writeComposerRuntimePrefs(workspaceId, {
+        codex_cli_model: normalized === 'auto' ? '' : normalized,
+      });
     } else if (family === 'claude') {
       writeComposerRuntimePrefs(workspaceId, { claude_cli_model: normalized });
     } else {

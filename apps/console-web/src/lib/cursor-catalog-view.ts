@@ -267,5 +267,5 @@ export function cursorComposerRuntimeLabel(input: {
 }): string {
   const normalized = input.modelId.trim();
   const modelLabel = cursorModelLabel(normalized || CURSOR_PICKER_DEFAULT_MODEL, input.rows);
-  return `${input.family} ${input.scope} · ${modelLabel}`;
+  return `${input.family}${input.scope ? ` ${input.scope}` : ''} · ${modelLabel}`;
 }

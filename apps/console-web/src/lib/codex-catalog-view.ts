@@ -4,15 +4,8 @@ import type { CursorCatalogRow } from './cursor-catalog-view';
 export function buildCodexCatalogRows(
   snapshot: CodexRuntimeStatusSnapshot | null,
 ): CursorCatalogRow[] {
-  const rows: CursorCatalogRow[] = [
-    {
-      id: 'auto',
-      label: 'Auto',
-      description: 'Let your signed-in Codex / ChatGPT account choose the default model.',
-      available: true,
-    },
-  ];
-  const seen = new Set(rows.map((row) => row.id));
+  const rows: CursorCatalogRow[] = [];
+  const seen = new Set<string>();
   for (const model of snapshot?.available_models ?? snapshot?.codex_models ?? []) {
     const id = String(model.id ?? '').trim();
     if (!id || seen.has(id)) continue;
@@ -29,6 +22,9 @@ export function buildCodexCatalogRows(
 }
 
 export function codexModelLabel(modelId: string, rows: CursorCatalogRow[]): string {
-  const normalized = modelId.trim() || 'auto';
-  return rows.find((row) => row.id === normalized)?.label ?? (normalized === 'auto' ? 'Auto' : normalized);
+  const normalized = modelId.trim();
+  if (!normalized || normalized === 'auto') {
+    return rows.find((row) => row.available)?.label ?? 'Choose model';
+  }
+  return rows.find((row) => row.id === normalized)?.label ?? normalized;
 }

@@ -443,7 +443,7 @@ function runtimeStatusLine(record: AgentDockComposerRuntimeTarget): string {
             <small>{{ row.description }}</small>
           </button>
           <p
-            v-if="shell.codexCatalogLoadState === 'loaded' && codexCatalogRows.length === 1"
+            v-if="shell.codexCatalogLoadState === 'loaded' && codexCatalogRows.length === 0"
             class="agent-dock-composer__menu-note agent-dock-composer__menu-note--warning"
           >
             No selectable models were returned. Confirm Codex is signed in with the intended ChatGPT account.

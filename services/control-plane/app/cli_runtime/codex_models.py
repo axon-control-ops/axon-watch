@@ -84,6 +84,18 @@ def list_codex_models(binary: str = "", *, env: dict[str, str] | None = None) ->
     return [dict(item) for item in models]
 
 
+def default_codex_model(binary: str, *, env: dict[str, str]) -> str:
+    """Return the account's first selectable Codex model, never a config-only id."""
+    return next(
+        (
+            str(model.get("id") or "").strip()
+            for model in list_codex_models(binary, env=env)
+            if str(model.get("id") or "").strip()
+        ),
+        "",
+    )
+
+
 def codex_runtime_snapshot(*, force_refresh: bool = False) -> StatusPayload:
     context = fetch_runtime_context(force_refresh=force_refresh)
     vault_posture = dict(context.get("vault_runtime") or {})

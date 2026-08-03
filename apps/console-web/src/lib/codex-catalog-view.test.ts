@@ -15,13 +15,13 @@ describe('codex-catalog-view', () => {
     catalog_source: 'live',
   });
 
-  it('keeps Auto and the exact models exposed by the signed-in Codex runtime', () => {
-    expect(rows.map((row) => row.id)).toEqual(['auto', 'gpt-5.5', 'gpt-5.4-mini']);
-    expect(rows[1]?.badge).toBe('Medium');
+  it('keeps only the exact models exposed by the signed-in Codex runtime', () => {
+    expect(rows.map((row) => row.id)).toEqual(['gpt-5.5', 'gpt-5.4-mini']);
+    expect(rows[0]?.badge).toBe('Medium');
   });
 
   it('uses the catalog display name for the selected Codex model', () => {
     expect(codexModelLabel('gpt-5.5', rows)).toBe('GPT-5.5');
-    expect(codexModelLabel('auto', rows)).toBe('Auto');
+    expect(codexModelLabel('', rows)).toBe('GPT-5.5');
   });
 });
