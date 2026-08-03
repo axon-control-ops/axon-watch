@@ -255,11 +255,23 @@ onUnmounted(() => {
       </div>
     </div>
 
-    <div v-if="pendingCritical.length" class="orb-hud__sheet orb-hud__sheet--critical">
-      <ul aria-label="Needs your decision">
+  </section>
+
+  <Teleport to="#mission-control-approval-tray">
+    <section v-if="pendingCritical.length" class="orb-decision-tray" aria-label="Needs your decision">
+      <header class="orb-decision-tray__header">
+        <div>
+          <p>Needs you</p>
+          <span>Guarded action — VAXON will wait for your choice.</span>
+        </div>
+        <span class="orb-decision-tray__count">{{ pendingCriticalTotal }}</span>
+      </header>
+      <ul>
         <li v-for="item in pendingCritical.slice(0, 2)" :key="item.receipt_id">
-          <strong>Needs you</strong>
-          <span>{{ item.title || item.kind }}</span>
+          <div class="orb-decision-tray__copy">
+            <strong>{{ item.title || item.kind }}</strong>
+            <span>{{ item.detail || 'Review the exact action before continuing.' }}</span>
+          </div>
           <div class="orb-hud__sheet-actions">
             <button
               type="button"
@@ -279,11 +291,11 @@ onUnmounted(() => {
           </div>
         </li>
       </ul>
-      <p v-if="pendingCriticalTotal > 2" class="orb-hud__whisper" data-tone="warn">
-        +{{ pendingCriticalTotal - 2 }} more
+      <p v-if="pendingCriticalTotal > 2" class="orb-decision-tray__more">
+        +{{ pendingCriticalTotal - 2 }} more decisions in the queue
       </p>
-    </div>
-  </section>
+    </section>
+  </Teleport>
 </template>
 
 <style scoped>
@@ -543,16 +555,6 @@ onUnmounted(() => {
   animation: orb-hud-sheet-in 180ms ease-out;
 }
 
-.orb-hud__sheet--critical {
-  border-color: rgba(255, 120, 140, 0.4);
-  background:
-    linear-gradient(180deg, rgba(50, 12, 18, 0.55), rgba(16, 4, 8, 0.72)),
-    rgba(16, 4, 8, 0.55);
-  max-height: 6.5rem;
-  overflow: auto;
-  overscroll-behavior: contain;
-}
-
 .orb-hud__sheet p,
 .orb-hud__sheet span {
   margin: 0;
@@ -604,69 +606,6 @@ onUnmounted(() => {
   background: rgba(10, 40, 28, 0.55) !important;
 }
 
-@keyframes orb-hud-arc-breathe {
-  0%,
-  100% {
-    opacity: 0.55;
-    transform: scaleX(0.98);
-  }
-  50% {
-    opacity: 1;
-    transform: scaleX(1);
-  }
-}
-
-@keyframes orb-hud-scan {
-  0% {
-    transform: translateX(-18%);
-    opacity: 0.25;
-  }
-  50% {
-    opacity: 1;
-  }
-  100% {
-    transform: translateX(18%);
-    opacity: 0.25;
-  }
-}
-
-@keyframes orb-hud-armed {
-  0%,
-  100% {
-    box-shadow:
-      inset 0 0 0 1px rgba(140, 255, 210, 0.12),
-      0 0 0.85rem rgba(40, 255, 170, 0.2);
-  }
-  50% {
-    box-shadow:
-      inset 0 0 0 1px rgba(160, 255, 220, 0.22),
-      0 0 1.35rem rgba(50, 255, 180, 0.38);
-  }
-}
-
-@keyframes orb-hud-pulse {
-  0%,
-  100% {
-    transform: scale(0.9);
-    opacity: 0.7;
-  }
-  50% {
-    transform: scale(1.15);
-    opacity: 1;
-  }
-}
-
-@keyframes orb-hud-sheet-in {
-  from {
-    opacity: 0;
-    transform: translateY(0.35rem) scale(0.98);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
-}
-
 @media (prefers-reduced-motion: reduce) {
   .orb-hud__arc,
   .orb-hud__arc::after,
@@ -677,3 +616,5 @@ onUnmounted(() => {
   }
 }
 </style>
+
+<style scoped src="./mission-control-autonomy-control.css"></style>
