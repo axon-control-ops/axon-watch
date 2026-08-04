@@ -127,17 +127,23 @@
 }
 
 .ide-agent-review-strip__bar {
-  display: grid;
-  grid-template-columns: 1fr auto 1fr;
+  position: relative;
+  display: flex;
+  flex-wrap: nowrap;
   align-items: center;
+  justify-content: space-between;
   gap: 0.35rem 0.55rem;
+  width: 100%;
+  box-sizing: border-box;
   padding: 0.42rem 0.65rem;
 }
 
 .ide-agent-review-strip__side {
   display: flex;
   align-items: center;
+  flex: 1 1 0;
   min-width: 0;
+  z-index: 1;
 }
 
 .ide-agent-review-strip__side--start {
@@ -149,15 +155,19 @@
 }
 
 .ide-agent-review-strip__runtime {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 2;
   display: inline-flex;
   align-items: center;
-  justify-self: center;
   flex-shrink: 0;
   min-height: 1.45rem;
   padding: 0 0.45rem;
   border: 1px solid rgba(0, 200, 220, 0.45);
   border-radius: 0.28rem;
-  background: rgba(8, 40, 48, 0.55);
+  background: rgba(8, 40, 48, 0.92);
   color: rgba(165, 243, 252, 0.95);
   font-size: 0.62rem;
   font-weight: 700;
@@ -165,6 +175,7 @@
   line-height: 1;
   white-space: nowrap;
   user-select: none;
+  pointer-events: none;
 }
 
 .ide-agent-review-strip__toggle {
