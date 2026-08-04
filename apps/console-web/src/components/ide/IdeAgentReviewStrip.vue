@@ -101,9 +101,8 @@ const showReviewControls = computed(() =>
   }) || shell.canResumeIdeAgentRun,
 );
 
-/** Always keep the composer-top strip in IDE so the runtime family chip has a home. */
 const showReviewStrip = computed(
-  () => shell.layoutMode === 'ide' || showReviewControls.value,
+  () => showReviewControls.value,
 );
 
 const reviewBar = computed(() =>
