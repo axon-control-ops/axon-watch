@@ -1,9 +1,16 @@
 import { computed, type ComputedRef, type Ref } from 'vue';
 
 import type {
+  ClaudeRuntimeStatusSnapshot,
   CursorRuntimeStatusSnapshot,
   RuntimeStatusSnapshot,
 } from '../../../api/control-plane';
+import {
+  buildClaudeCatalogRows,
+  claudeRuntimeLabel,
+  resolveClaudeModel,
+  type ClaudeCatalogRow,
+} from '../../../lib/claude-catalog-view';
 import {
   buildCursorCatalogRows,
   composerRuntimeFamilyLabel,
@@ -16,6 +23,10 @@ import {
   writeComposerRuntimePrefs,
 } from '../../../lib/composer-runtime-prefs';
 import {
+  readClaudePickerVisibleModelIds,
+  toggleClaudePickerVisibleModel as toggleClaudePickerVisibleModelPref,
+} from '../../../lib/claude-picker-prefs';
+import {
   readCursorPickerVisibleModelIds,
   toggleCursorPickerVisibleModel as toggleCursorPickerVisibleModelPref,
 } from '../../../lib/cursor-picker-prefs';
@@ -26,8 +37,10 @@ interface CreateComposerRuntimePrefsSliceInput {
   currentWorkspace: Ref<WorkspaceRecord | null>;
   runtimeStatus: Ref<RuntimeStatusSnapshot | null>;
   cursorRuntimeStatus: Ref<CursorRuntimeStatusSnapshot | null>;
+  claudeRuntimeStatus: Ref<ClaudeRuntimeStatusSnapshot | null>;
   composerRuntimePrefsRevision: Ref<number>;
   cursorPickerVisibleRevision: Ref<number>;
+  claudePickerVisibleRevision: Ref<number>;
 }
 
 export function createComposerRuntimePrefsSlice(input: CreateComposerRuntimePrefsSliceInput) {
@@ -48,6 +61,10 @@ export function createComposerRuntimePrefsSlice(input: CreateComposerRuntimePref
     buildCursorCatalogRows(input.cursorRuntimeStatus.value),
   );
 
+  const claudeCatalogRows: ComputedRef<ClaudeCatalogRow[]> = computed(() =>
+    buildClaudeCatalogRows(input.claudeRuntimeStatus.value),
+  );
+
   const selectedComposerModel = computed(() => {
     const workspaceId = input.currentWorkspace.value?.workspace_id ?? null;
     if (!workspaceId) {
@@ -64,7 +81,11 @@ export function createComposerRuntimePrefsSlice(input: CreateComposerRuntimePref
       return prefs.codex_cli_model?.trim() || 'auto';
     }
     if (family === 'claude') {
-      return prefs.claude_cli_model?.trim() || 'auto';
+      const stored = prefs.claude_cli_model?.trim();
+      if (!stored || stored === 'auto') {
+        return stored || 'auto';
+      }
+      return resolveClaudeModel(stored, claudeCatalogRows.value);
     }
     const stored = prefs.cursor_cli_model?.trim();
     if (!stored || stored === 'auto') {
@@ -76,6 +97,11 @@ export function createComposerRuntimePrefsSlice(input: CreateComposerRuntimePref
   const cursorPickerVisibleModelIds = computed(() => {
     input.cursorPickerVisibleRevision.value;
     return readCursorPickerVisibleModelIds();
+  });
+
+  const claudePickerVisibleModelIds = computed(() => {
+    input.claudePickerVisibleRevision.value;
+    return readClaudePickerVisibleModelIds();
   });
 
   const composerRuntimeLabel = computed(() => {
@@ -91,6 +117,13 @@ export function createComposerRuntimePrefsSlice(input: CreateComposerRuntimePref
         scope,
         modelId: selectedComposerModel.value,
         rows: cursorCatalogRows.value,
+      });
+    }
+    if (family === 'claude') {
+      return claudeRuntimeLabel({
+        family,
+        modelId: selectedComposerModel.value,
+        rows: claudeCatalogRows.value,
       });
     }
     const model = selectedComposerModel.value;
@@ -138,15 +171,23 @@ export function createComposerRuntimePrefsSlice(input: CreateComposerRuntimePref
     input.cursorPickerVisibleRevision.value += 1;
   }
 
+  function toggleClaudePickerVisibleModel(modelId: string): void {
+    toggleClaudePickerVisibleModelPref(modelId, readClaudePickerVisibleModelIds());
+    input.claudePickerVisibleRevision.value += 1;
+  }
+
   return {
     composerRuntimePrefs,
     selectedRuntimeTargetId,
     selectedComposerModel,
     cursorCatalogRows,
+    claudeCatalogRows,
     cursorPickerVisibleModelIds,
+    claudePickerVisibleModelIds,
     composerRuntimeLabel,
     setSelectedRuntimeTarget,
     setSelectedComposerModel,
     toggleCursorPickerVisibleModel,
+    toggleClaudePickerVisibleModel,
   };
 }

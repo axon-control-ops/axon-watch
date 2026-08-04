@@ -1,4 +1,9 @@
-import type { CursorRuntimeStatusSnapshot, RuntimeAuthStatus, RuntimeTargetRecord } from '../api/control-plane';
+import type {
+  ClaudeRuntimeStatusSnapshot,
+  CursorRuntimeStatusSnapshot,
+  RuntimeAuthStatus,
+  RuntimeTargetRecord,
+} from '../api/control-plane';
 
 import type { VaultConsumerRecord } from './vault-surface-view';
 

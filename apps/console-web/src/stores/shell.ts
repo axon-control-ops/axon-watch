@@ -20,6 +20,7 @@ import {
   stopRun,
 } from '../api/control-plane';
 import type {
+  ClaudeRuntimeStatusSnapshot,
   ConnectorProbeRecord,
   CursorRuntimeStatusSnapshot,
   FleetHealthSnapshot,
@@ -360,6 +361,9 @@ export const useShellStore = defineStore('shell', () => {
   const cursorRuntimeStatus = ref<CursorRuntimeStatusSnapshot | null>(null);
   const cursorCatalogLoadState = ref<'idle' | 'loading' | 'loaded' | 'error'>('idle');
   const cursorCatalogError = ref<string | null>(null);
+  const claudeRuntimeStatus = ref<ClaudeRuntimeStatusSnapshot | null>(null);
+  const claudeCatalogLoadState = ref<'idle' | 'loading' | 'loaded' | 'error'>('idle');
+  const claudeCatalogError = ref<string | null>(null);
   const agentStreamActive = ref(false);
   const agentStreamMessageId = ref<string | null>(null);
   type AgentReportEditorLink = {
@@ -379,6 +383,7 @@ export const useShellStore = defineStore('shell', () => {
   const chatStreamSessionsByWorkspace = new Map<string, ChatStreamSession>();
   const composerRuntimePrefsRevision = ref(0);
   const cursorPickerVisibleRevision = ref(0);
+  const claudePickerVisibleRevision = ref(0);
   const activeRun = ref<RunRecord | null>(null);
   const runs = ref<RunRecord[]>([]);
   const runsLoadState = ref<RunsLoadState>('idle');
@@ -3107,17 +3112,22 @@ export const useShellStore = defineStore('shell', () => {
     selectedRuntimeTargetId,
     selectedComposerModel,
     cursorCatalogRows,
+    claudeCatalogRows,
     cursorPickerVisibleModelIds,
+    claudePickerVisibleModelIds,
     composerRuntimeLabel,
     setSelectedRuntimeTarget,
     setSelectedComposerModel,
     toggleCursorPickerVisibleModel,
+    toggleClaudePickerVisibleModel,
   } = createComposerRuntimePrefsSlice({
     currentWorkspace,
     runtimeStatus,
     cursorRuntimeStatus,
+    claudeRuntimeStatus,
     composerRuntimePrefsRevision,
     cursorPickerVisibleRevision,
+    claudePickerVisibleRevision,
   });
 
   const {
@@ -3128,6 +3138,18 @@ export const useShellStore = defineStore('shell', () => {
     cursorCatalogLoadState,
     cursorCatalogError,
     cursorCatalogRows,
+    composerRuntimePrefsRevision,
+    currentWorkspaceId: () => currentWorkspace.value?.workspace_id ?? null,
+  });
+
+  const {
+    loadClaudeCatalog,
+    migrateClaudeComposerModelIfNeeded,
+  } = createClaudeCatalogSlice({
+    claudeRuntimeStatus,
+    claudeCatalogLoadState,
+    claudeCatalogError,
+    claudeCatalogRows,
     composerRuntimePrefsRevision,
     currentWorkspaceId: () => currentWorkspace.value?.workspace_id ?? null,
   });
@@ -3730,6 +3752,11 @@ export const useShellStore = defineStore('shell', () => {
     composerRuntimeLabel,
     composerRuntimePrefs,
     commandSeamHint,
+    claudeCatalogError,
+    claudeCatalogLoadState,
+    claudeCatalogRows,
+    claudePickerVisibleModelIds,
+    claudeRuntimeStatus,
     cursorCatalogError,
     cursorCatalogLoadState,
     cursorCatalogRows,
@@ -3838,6 +3865,7 @@ export const useShellStore = defineStore('shell', () => {
     loadOperatorPresenceSettings,
     loadRuns,
     loadCursorCatalog,
+    loadClaudeCatalog,
     loadRuntimeStatus,
     loadRuntimeSummary,
     loadWorkspaceThread,
@@ -3941,6 +3969,7 @@ export const useShellStore = defineStore('shell', () => {
     setLayoutMode,
     setLeftSidebarMode,
     toggleCursorPickerVisibleModel,
+    toggleClaudePickerVisibleModel,
     toggleAgentDock,
     toggleIdeExplorer,
     signalClearError,
