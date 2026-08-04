@@ -6,20 +6,10 @@ import {
 } from '../../lib/agent-dock-runtime-view';
 import { navigateToAppSurface } from '../../lib/app-surface-route';
 import {
-  claudeAutoModelDescription,
-  claudeCatalogCountLabel,
-  claudeCatalogModelRows,
   claudeCatalogStatusLabel,
-  claudeManageModelRows,
   claudeModelLabel,
-  claudePrimaryModelRows,
-  claudePrimaryPickerRowsForActiveModel,
-  claudeStaleModelWarning,
-  isClaudeAutoModel,
-  isClaudePrimaryModel,
-  shouldShowClaudeManualModelCatalog,
+  type ClaudeCatalogRow,
 } from '../../lib/claude-catalog-view';
-import { CLAUDE_PICKER_DEFAULT_MODEL } from '../../lib/claude-picker-prefs';
 import {
   cursorAutoModelDescription,
   cursorCatalogCountLabel,
@@ -49,7 +39,7 @@ type UseComposerModelRuntimeOptions = {
   closeMenus: () => void;
 };
 
-/** Only these families have a model catalog picker today — everything else falls back to a plain label. */
+/** Only these families have any model picker today — everything else falls back to a plain label. */
 type CatalogFamily = 'cursor' | 'claude';
 
 export function useComposerModelRuntime(
@@ -82,7 +72,9 @@ export function useComposerModelRuntime(
     if (family === 'claude') return 'claude';
     return null;
   });
+  /** Governs the plain "Selected model: X" fallback vs. either real picker below. */
   const showModelCatalog = computed(() => catalogFamily.value !== null);
+  /** Claude gets a flat list (see claudeFlatRows), not Cursor's curated/pinned/browse tiers. */
   const isClaudeCatalog = computed(() => catalogFamily.value === 'claude');
 
   const selectedModelId = computed(() => shell.selectedComposerModel || 'auto');
@@ -106,33 +98,20 @@ export function useComposerModelRuntime(
     }
     return `${runtimeFamilyLabel.value} · ${selectedModelLabel.value}`;
   });
-  const autoModelRow = computed(() => {
-    if (isClaudeCatalog.value) {
-      return (
-        shell.claudeCatalogRows.find((row) => row.id === 'auto') ?? {
-          id: 'auto',
-          label: 'Auto',
-          description: claudeAutoModelDescription(shell.claudeCatalogRows),
-          available: true,
-        }
-      );
-    }
-    return (
+
+  /** Claude's whole picker: every row (Auto included), flat, always visible — no tiers. */
+  const claudeFlatRows = computed<ClaudeCatalogRow[]>(() => shell.claudeCatalogRows);
+
+  const autoModelRow = computed(
+    () =>
       shell.cursorCatalogRows.find((row) => row.id === 'auto') ?? {
         id: 'auto',
         label: 'Auto',
         description: cursorAutoModelDescription(shell.cursorCatalogRows),
         available: true,
-      }
-    );
-  });
+      },
+  );
   const composerPickerRows = computed(() => {
-    if (isClaudeCatalog.value) {
-      return claudePrimaryPickerRowsForActiveModel({
-        rows: shell.claudeCatalogRows,
-        activeModelId: selectedModelId.value,
-      });
-    }
     const fromCatalog = cursorComposerPickerRowsForActiveModel({
       rows: shell.cursorCatalogRows,
       activeModelId: selectedModelId.value,
@@ -153,72 +132,42 @@ export function useComposerModelRuntime(
       available: true,
     }));
   });
-  const extraPinnedRows = computed(() => {
-    if (isClaudeCatalog.value) {
-      return claudePrimaryModelRows({
-        rows: shell.claudeCatalogRows,
-        activeModelId: selectedModelId.value,
-        visibleExtraModelIds: shell.claudePickerVisibleModelIds,
-      }).filter((row) => !isClaudePrimaryModel(row.id));
-    }
-    return cursorPrimaryModelRows({
+  const extraPinnedRows = computed(() =>
+    cursorPrimaryModelRows({
       rows: shell.cursorCatalogRows,
       activeModelId: selectedModelId.value,
       visibleExtraModelIds: shell.cursorPickerVisibleModelIds,
-    }).filter((row) => !isCursorComposerModel(row.id));
-  });
-  const cursorManageRows = computed(() => {
-    if (isClaudeCatalog.value) {
-      return claudeManageModelRows({
-        rows: shell.claudeCatalogRows,
-        searchQuery: modelSearchQuery.value,
-      });
-    }
-    return cursorManageModelRows({
+    }).filter((row) => !isCursorComposerModel(row.id)),
+  );
+  const cursorManageRows = computed(() =>
+    cursorManageModelRows({
       rows: shell.cursorCatalogRows,
       searchQuery: modelSearchQuery.value,
-    });
-  });
+    }),
+  );
   const cursorCatalogStatus = computed(() => {
     if (isClaudeCatalog.value) {
-      return claudeCatalogStatusLabel({
-        loading: shell.claudeCatalogLoadState === 'loading',
-        snapshot: shell.claudeRuntimeStatus,
-      });
+      return claudeCatalogStatusLabel({ loading: shell.claudeCatalogLoadState === 'loading' });
     }
     return cursorCatalogStatusLabel({
       loading: shell.cursorCatalogLoadState === 'loading',
       snapshot: shell.cursorRuntimeStatus,
     });
   });
-  const cursorCatalogCount = computed(() => {
-    if (isClaudeCatalog.value) {
-      return claudeCatalogCountLabel({
-        rows: shell.claudeCatalogRows,
-        visibleExtraModelIds: shell.claudePickerVisibleModelIds,
-        searchQuery: modelSearchQuery.value,
-      });
-    }
-    return cursorCatalogCountLabel({
+  const cursorCatalogCount = computed(() =>
+    cursorCatalogCountLabel({
       rows: shell.cursorCatalogRows,
       visibleExtraModelIds: shell.cursorPickerVisibleModelIds,
       searchQuery: modelSearchQuery.value,
-    });
-  });
-  const cursorStaleWarning = computed(() => {
-    if (isClaudeCatalog.value) {
-      return claudeStaleModelWarning({
-        modelId: selectedModelId.value,
-        rows: shell.claudeCatalogRows,
-        snapshot: shell.claudeRuntimeStatus,
-      });
-    }
-    return cursorStaleModelWarning({
+    }),
+  );
+  const cursorStaleWarning = computed(() =>
+    cursorStaleModelWarning({
       modelId: selectedModelId.value,
       rows: shell.cursorCatalogRows,
       snapshot: shell.cursorRuntimeStatus,
-    });
-  });
+    }),
+  );
   const cursorAuthLine = computed(() => {
     if (isClaudeCatalog.value) {
       return composerClaudeAuthLine({
@@ -239,26 +188,15 @@ export function useComposerModelRuntime(
     const status = target.ready ? 'Ready' : runtimeStatusLine(target);
     return `${composerRuntimeFamilyLabel(target.family)} · ${status}`;
   });
-  const autoModelEnabled = computed(() =>
-    isClaudeCatalog.value
-      ? isClaudeAutoModel(selectedModelId.value)
-      : isCursorAutoModel(selectedModelId.value),
+  const autoModelEnabled = computed(() => isCursorAutoModel(selectedModelId.value));
+  const showAddModelsEntry = computed(
+    () => !showAddModelsPanel.value && shouldShowCursorManualModelCatalog(selectedModelId.value),
   );
-  const showAddModelsEntry = computed(() => {
-    if (showAddModelsPanel.value) return false;
-    return isClaudeCatalog.value
-      ? shouldShowClaudeManualModelCatalog(selectedModelId.value)
-      : shouldShowCursorManualModelCatalog(selectedModelId.value);
-  });
   const autoToggleChecked = computed(() => autoModelEnabled.value && !showAddModelsPanel.value);
   const showExtraPinnedRows = computed(
     () => extraPinnedRows.value.length > 0 && !showAddModelsPanel.value,
   );
-  const cursorCatalogTotal = computed(() =>
-    isClaudeCatalog.value
-      ? claudeCatalogModelRows(shell.claudeCatalogRows).length
-      : cursorCatalogModelRows(shell.cursorCatalogRows).length,
-  );
+  const cursorCatalogTotal = computed(() => cursorCatalogModelRows(shell.cursorCatalogRows).length);
   /** "Loading Cursor models…" / "Loading Claude models…" — active-family loading note. */
   const modelCatalogLoadingLabel = computed(
     () => `Loading ${runtimeFamilyLabel.value} models…`,
@@ -320,11 +258,8 @@ export function useComposerModelRuntime(
   function onAutoToggleClick(event: MouseEvent): void {
     event.preventDefault();
     event.stopPropagation();
-    const fallbackDefault = isClaudeCatalog.value
-      ? CLAUDE_PICKER_DEFAULT_MODEL
-      : CURSOR_PICKER_DEFAULT_MODEL;
     if (autoModelEnabled.value && !showAddModelsPanel.value) {
-      selectComposerModel(fallbackDefault, { keepMenuOpen: true });
+      selectComposerModel(CURSOR_PICKER_DEFAULT_MODEL, { keepMenuOpen: true });
       return;
     }
     selectComposerModel('auto', { keepMenuOpen: true });
@@ -348,6 +283,7 @@ export function useComposerModelRuntime(
   return {
     autoModelRow,
     autoToggleChecked,
+    claudeFlatRows,
     closeAddModelsPanel,
     composerPickerRows,
     cursorAuthLine,
@@ -358,6 +294,7 @@ export function useComposerModelRuntime(
     cursorStaleWarning,
     currentRuntimeTarget,
     extraPinnedRows,
+    isClaudeCatalog,
     modelCatalogErrorMessage,
     modelCatalogLoading,
     modelCatalogLoadingLabel,

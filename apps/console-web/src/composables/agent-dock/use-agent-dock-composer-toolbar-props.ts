@@ -3,6 +3,7 @@ import { computed, toValue, type MaybeRef } from 'vue';
 import { MODE_OPTIONS, type ComposerMode } from './use-composer-menus';
 import type { AgentDockComposerAttachmentChip } from '../../components/ide/agent-dock/agent-dock-composer-toolbar-types';
 import type { ComposerMcpTool } from '../../lib/composer-mcp-tools-view';
+import type { ClaudeCatalogRow } from '../../lib/claude-catalog-view';
 import type { CursorCatalogRow } from '../../lib/cursor-catalog-view';
 import type { AgentDockComposerRuntimeTarget } from '../../components/ide/agent-dock/agent-dock-composer-toolbar-types';
 
