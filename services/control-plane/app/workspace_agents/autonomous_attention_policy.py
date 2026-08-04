@@ -167,12 +167,12 @@ def is_github_email_ci_noise(*, title: str = "", detail: str = "", dedupe_key: s
     return bool(_GITHUB_EMAIL_SIGNAL_RE.search(blob))
 
 
-def is_investigatory_critical(*, title: str = "", detail: str = "") -> bool:
+def is_investigatory_critical(*, title: str = "", detail: str = "", kind: str = "") -> bool:
     """True when a critical is safe to investigate automatically (CI/Sentry/monitor)."""
-    blob = f"{title}\n{detail}".strip()
+    blob = f"{kind}\n{title}\n{detail}".strip()
     if not blob:
         return False
-    if text_looks_dangerous(title, detail):
+    if text_looks_dangerous(title, detail, kind):
         return False
     return bool(_INVESTIGATORY_CRITICAL_RE.search(blob))
 
