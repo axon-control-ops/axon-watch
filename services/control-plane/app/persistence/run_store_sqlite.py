@@ -209,6 +209,7 @@ def ensure_schema(connection: sqlite3.Connection) -> None:
     )
     _ensure_chat_thread_kind_column(connection)
     _ensure_chat_thread_persona_columns(connection)
+    _ensure_workspace_composer_prefs_runtime_target_column(connection)
     _ensure_runs_employee_role_column(connection)
     _ensure_runs_task_id_column(connection)
     _ensure_workspace_tasks_table(connection)
@@ -231,6 +232,17 @@ def _ensure_runs_task_id_column(connection: sqlite3.Connection) -> None:
             ON runs(task_id)
         """
     )
+    connection.commit()
+
+
+def _ensure_workspace_composer_prefs_runtime_target_column(connection: sqlite3.Connection) -> None:
+    columns = {
+        str(row[1])
+        for row in connection.execute("PRAGMA table_info(workspace_composer_prefs)").fetchall()
+    }
+    if "runtime_target" in columns:
+        return
+    connection.execute("ALTER TABLE workspace_composer_prefs ADD COLUMN runtime_target TEXT")
     connection.commit()
 
 

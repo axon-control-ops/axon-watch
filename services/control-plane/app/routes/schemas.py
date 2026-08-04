@@ -13,6 +13,7 @@ class WriteWorkspaceFileRequest(BaseModel):
 
 class WorkspaceComposerPrefsRequest(BaseModel):
     cursor_cli_model: str | None = None
+    runtime_target: str | None = None
 
 
 class RenameWorkspaceFileRequest(BaseModel):

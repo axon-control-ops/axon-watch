@@ -40,6 +40,7 @@ def _utc_now_iso() -> str:
 def default_prefs() -> dict[str, Any]:
     return {
         "cursor_cli_model": "auto",
+        "runtime_target": "",
         "updated_at": None,
     }
 
@@ -51,7 +52,7 @@ def get_workspace_composer_prefs(workspace_id: str) -> dict[str, Any]:
     with _managed_connection() as connection:
         row = connection.execute(
             """
-            SELECT cursor_cli_model, updated_at
+            SELECT cursor_cli_model, runtime_target, updated_at
             FROM workspace_composer_prefs
             WHERE workspace_id = ?
             """,
@@ -62,6 +63,7 @@ def get_workspace_composer_prefs(workspace_id: str) -> dict[str, Any]:
     model = normalize_model_id(row["cursor_cli_model"]) or "auto"
     return {
         "cursor_cli_model": model if model else "auto",
+        "runtime_target": str(row["runtime_target"] or "").strip(),
         "updated_at": row["updated_at"],
     }
 
@@ -70,6 +72,7 @@ def set_workspace_composer_prefs(
     workspace_id: str,
     *,
     cursor_cli_model: str | None = None,
+    runtime_target: str | None = None,
 ) -> dict[str, Any]:
     cleaned = str(workspace_id or "").strip()
     if not cleaned:
@@ -78,21 +81,26 @@ def set_workspace_composer_prefs(
     next_model = current["cursor_cli_model"]
     if cursor_cli_model is not None:
         next_model = normalize_model_id(cursor_cli_model) or "auto"
+    next_runtime_target = current["runtime_target"]
+    if runtime_target is not None:
+        next_runtime_target = str(runtime_target or "").strip()
     updated_at = _utc_now_iso()
     with _managed_connection() as connection:
         connection.execute(
             """
-            INSERT INTO workspace_composer_prefs (workspace_id, cursor_cli_model, updated_at)
-            VALUES (?, ?, ?)
+            INSERT INTO workspace_composer_prefs (workspace_id, cursor_cli_model, runtime_target, updated_at)
+            VALUES (?, ?, ?, ?)
             ON CONFLICT(workspace_id) DO UPDATE SET
                 cursor_cli_model = excluded.cursor_cli_model,
+                runtime_target = excluded.runtime_target,
                 updated_at = excluded.updated_at
             """,
-            (cleaned, next_model, updated_at),
+            (cleaned, next_model, next_runtime_target, updated_at),
         )
         connection.commit()
     return {
         "cursor_cli_model": next_model,
+        "runtime_target": next_runtime_target,
         "updated_at": updated_at,
     }
 
@@ -107,3 +115,14 @@ def resolve_worker_runtime_model(workspace_id: str) -> str | None:
     if not model or model.lower() == "auto":
         return None
     return model
+
+
+def resolve_worker_runtime_target(workspace_id: str) -> str | None:
+    """Runtime family (e.g. ``claude_local``) workers should dispatch through.
+
+    Mirrors the operator's Agent Dock runtime-target pick so continuous/fleet
+    workers don't silently fall back to the server's default runtime.
+    """
+    prefs = get_workspace_composer_prefs(workspace_id)
+    target = str(prefs.get("runtime_target") or "").strip()
+    return target or None

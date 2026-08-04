@@ -140,6 +140,7 @@ def workspace_composer_prefs_put(
     prefs = set_workspace_composer_prefs(
         workspace_id,
         cursor_cli_model=body.cursor_cli_model,
+        runtime_target=body.runtime_target,
     )
     return {"workspace_id": workspace_id, **prefs}
 

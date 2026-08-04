@@ -159,6 +159,7 @@ export async function fetchWorkspace(workspaceId: string): Promise<WorkspaceReco
 export type WorkspaceComposerPrefs = {
   workspace_id: string;
   cursor_cli_model: string;
+  runtime_target: string;
   updated_at: string | null;
 };
 
@@ -175,7 +176,7 @@ export async function fetchWorkspaceComposerPrefs(
 
 export async function saveWorkspaceComposerPrefs(
   workspaceId: string,
-  body: { cursor_cli_model: string },
+  body: { cursor_cli_model?: string; runtime_target?: string },
 ): Promise<WorkspaceComposerPrefs> {
   const encoded = encodeURIComponent(workspaceId);
   return fetchJson<WorkspaceComposerPrefs>(
