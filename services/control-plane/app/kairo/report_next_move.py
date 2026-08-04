@@ -101,12 +101,23 @@ def next_move(snapshot: dict[str, Any]) -> str:
         lower = advise_clean.lower()
         if lower.startswith(("i'd", "i'll", "i will")):
             return advise_clean
+        if lower.startswith("vaxon is attending") or lower.startswith("vaxon owns"):
+            target = re.search(
+                r"\b(?:in|for)\s+([A-Za-z0-9][A-Za-z0-9 _-]{0,40})\b",
+                advise_clean,
+                re.IGNORECASE,
+            )
+            if target:
+                name = target.group(1).strip().rstrip("—,").strip()
+                if name:
+                    return f"I'll attend {name} and start that investigation next"
+            return "I'll attend that workspace and start the investigation next"
         if "needs review" in lower and "switch" in lower:
             target = re.search(r"\bsignal in ([a-z0-9_-]+)\b", advise_clean, re.IGNORECASE)
             return (
-                f"I'll switch to {target.group(1)} and start that investigation next"
+                f"I'll attend {target.group(1)} and start that investigation next"
                 if target
-                else "I'll switch us there and start that investigation next"
+                else "I'll attend that workspace and start the investigation next"
             )
         if "github" in lower and ("token" in lower or "vault" in lower or "api" in lower):
             return "I'll open Vault and restore the GitHub probe token next"

@@ -69,7 +69,7 @@ class OperatorDeterministicReportNextMoveTests(unittest.TestCase):
         )
 
         self.assertEqual(
-            "I'll switch to axon-watch and start that investigation next",
+            "I'll attend axon-watch and start that investigation next",
             composed["sections"]["next_move"],
         )
 

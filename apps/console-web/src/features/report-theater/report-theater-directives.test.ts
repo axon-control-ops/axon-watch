@@ -14,7 +14,15 @@ describe('report-theater-directives', () => {
       toVaxonDirectiveLine(
         'Critical signal in DashPro needs review; switch there before continuing',
       ),
-    ).toMatch(/^I'll switch us there/i);
+    ).toMatch(/^I'll attend that workspace/i);
+  });
+
+  it('keeps VAXON-owned attending copy as the directive', () => {
+    expect(
+      toVaxonDirectiveLine(
+        'VAXON is attending the critical signal in DashPro — routing specialists there; keep working here (Fast Gate)',
+      ),
+    ).toMatch(/^VAXON is attending/i);
   });
 
   it('rewrites inspect advise into Attention open', () => {
