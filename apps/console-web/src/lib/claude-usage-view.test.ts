@@ -48,6 +48,16 @@ describe('claude-usage-view', () => {
     expect(zone?.tone).toBe('warning');
   });
 
+  it('labels the ready chip with an explicit token unit, not a bare number', () => {
+    // Regression: "CLAUDE 81k" read as a percentage next to Cursor's "USAGE 90%" chip.
+    const chip = buildClaudeUsageStatusChip({
+      ok: true,
+      most_recent_day: { date: '2026-04-30', tokens: 80951, messages: 144, sessions: 3 },
+    });
+    expect(chip?.label).toBe('CLAUDE 81k tok');
+    expect(chip?.tone).toBe('ready');
+  });
+
   it('marks unavailable telemetry as a muted chip', () => {
     const chip = buildClaudeUsageStatusChip({ ok: false, message: 'no stats-cache on host' });
     expect(chip?.tone).toBe('muted');

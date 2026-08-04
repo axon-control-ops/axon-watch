@@ -111,7 +111,9 @@ export function buildClaudeUsageStatusChip(
     };
   }
   const recentTokens = usage.most_recent_day?.tokens;
-  const label = recentTokens == null ? 'CLAUDE OK' : `CLAUDE ${formatTokens(recentTokens)}`;
+  // Suffix "tok" explicitly — Cursor's chip next to this one reads in percent
+  // ("USAGE 90%"), so a bare "CLAUDE 81k" reads as a percentage by association.
+  const label = recentTokens == null ? 'CLAUDE OK' : `CLAUDE ${formatTokens(recentTokens)} tok`;
   const title = claudeUsageSummaryLine(usage);
   return {
     label,
