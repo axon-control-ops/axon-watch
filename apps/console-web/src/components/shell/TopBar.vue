@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, onUpdated, ref } from 'vue';
+import { computed } from 'vue';
 
 import IdeInterruptPanel from '../ide/IdeInterruptPanel.vue';
 import KairoPresenceBar from './KairoPresenceBar.vue';
@@ -14,10 +14,6 @@ import { useShellStore } from '../../stores/shell';
 
 const shell = useShellStore();
 const { appSurface: activeSurface } = useAppSurface();
-const topbarGridRef = ref<HTMLElement | null>(null);
-const identityZoneRef = ref<HTMLElement | null>(null);
-const kairoSlotRef = ref<HTMLElement | null>(null);
-const controlsRef = ref<HTMLElement | null>(null);
 
 const isFoundationSurface = computed(
   () =>
@@ -50,10 +46,9 @@ const showIdeInterruptTopbar = computed(
       pendingApprovalsCount: shell.pendingApprovalsCount,
     }),
 );
-const showMidStripContent = computed(
-  () => showIdeInterruptTopbar.value || shell.topbarChips.length > 0,
+const topbarHasNoMid = computed(
+  () => !showIdeInterruptTopbar.value && shell.topbarChips.length === 0,
 );
-const topbarHasNoMid = computed(() => !showMidStripContent.value);
 
 function openSurface(surface: AppSurface): void {
   navigateToAppSurface(surface);
@@ -66,98 +61,18 @@ function openSettings(): void {
 async function openStandup(): Promise<void> {
   await openOperatorStandup(shell);
 }
-
-function probeTopbarAlignment(): void {
-  const grid = topbarGridRef.value;
-  const identity = identityZoneRef.value;
-  const kairo = kairoSlotRef.value;
-  const controls = controlsRef.value;
-  if (!grid || !identity || !kairo || !controls) {
-    return;
-  }
-  const gridRect = grid.getBoundingClientRect();
-  const identityRect = identity.getBoundingClientRect();
-  const brand = identity.querySelector('.topbar-mockup__brand');
-  const brandRect = brand?.getBoundingClientRect();
-  const kairoChip = kairo.querySelector('.kairo-presence-module');
-  const kairoRect = kairoChip?.getBoundingClientRect() ?? kairo.getBoundingClientRect();
-  const navBtn = controls.querySelector('.layout-toggle__button');
-  const navRect = navBtn?.getBoundingClientRect();
-  const controlsRect = controls.getBoundingClientRect();
-  const gridStyle = window.getComputedStyle(grid);
-  const childCount = grid.children.length;
-  const midGapPx = Math.round(kairoRect.left - (brandRect?.right ?? identityRect.right));
-  const identityWastePx = brandRect
-    ? Math.round(identityRect.width - brandRect.width)
-    : null;
-  const brandKairoCenterDelta = Math.round(
-    (kairoRect.top + kairoRect.height / 2) -
-      ((brandRect?.top ?? identityRect.top) + (brandRect?.height ?? identityRect.height) / 2),
-  );
-  const kairoNavCenterDelta = navRect
-    ? Math.round(
-        (navRect.top + navRect.height / 2) - (kairoRect.top + kairoRect.height / 2),
-      )
-    : null;
-  // #region agent log
-  fetch('http://127.0.0.1:7706/ingest/90bcaec2-2b39-4d4a-84b5-157c12735440', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'X-Debug-Session-Id': 'bef50e',
-    },
-    body: JSON.stringify({
-      sessionId: 'bef50e',
-      runId: 'topbar-align-v2',
-      hypothesisId: 'H-TOP-GRID',
-      location: 'TopBar.vue:probeTopbarAlignment',
-      message: 'topbar geometry probe',
-      data: {
-        noMid: topbarHasNoMid.value,
-        interrupt: showIdeInterruptTopbar.value,
-        chipCount: shell.topbarChips.length,
-        childCount,
-        gridCols: gridStyle.gridTemplateColumns,
-        gridHeight: Math.round(gridRect.height),
-        identityWidth: Math.round(identityRect.width),
-        brandHeight: brandRect ? Math.round(brandRect.height) : null,
-        brandWidth: brandRect ? Math.round(brandRect.width) : null,
-        identityWastePx,
-        kairoHeight: Math.round(kairoRect.height),
-        navHeight: navRect ? Math.round(navRect.height) : null,
-        controlsHeight: Math.round(controlsRect.height),
-        midGapPx,
-        brandKairoCenterDelta,
-        kairoNavCenterDelta,
-        layoutMode: shell.layoutMode,
-        surface: activeSurface.value,
-      },
-      timestamp: Date.now(),
-    }),
-  }).catch(() => {});
-  // #endregion
-}
-
-onMounted(() => {
-  void nextTick(() => probeTopbarAlignment());
-});
-
-onUpdated(() => {
-  void nextTick(() => probeTopbarAlignment());
-});
 </script>
 
 <template>
   <header class="region region-topbar topbar-mockup">
     <div
-      ref="topbarGridRef"
       class="topbar-mockup__grid"
       :class="{
         'topbar-mockup__grid--ide-interrupt': showIdeInterruptTopbar,
         'topbar-mockup__grid--no-mid': topbarHasNoMid,
       }"
     >
-      <div ref="identityZoneRef" class="topbar-mockup__identity-zone">
+      <div class="topbar-mockup__identity-zone">
         <div class="topbar-mockup__brand">
           <AxonProductLogo />
           <p class="topbar-mockup__subtitle">{{ topbarSubtitle }}</p>
@@ -184,7 +99,7 @@ onUpdated(() => {
         aria-hidden="true"
       />
 
-      <div ref="kairoSlotRef" class="topbar-mockup__kairo-slot">
+      <div class="topbar-mockup__kairo-slot">
         <KairoPresenceBar
           v-if="showTopbarKairoPresence"
           compact
@@ -199,7 +114,7 @@ onUpdated(() => {
         />
       </div>
 
-      <div ref="controlsRef" class="topbar-mockup__controls">
+      <div class="topbar-mockup__controls">
         <WorkspacePickerMenu
           v-if="activeSurface === 'console'"
           compact
