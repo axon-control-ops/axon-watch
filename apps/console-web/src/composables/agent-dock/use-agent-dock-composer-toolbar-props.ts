@@ -18,7 +18,8 @@ export type AgentDockComposerToolbarSource = {
   showRuntimeTargetsPanel: MaybeRef<boolean>;
   showAddModelsEntry: MaybeRef<boolean>;
   showExtraPinnedRows: MaybeRef<boolean>;
-  showCursorCatalog: MaybeRef<boolean>;
+  showModelCatalog: MaybeRef<boolean>;
+  showFallbackCatalogNote: MaybeRef<boolean>;
   showVaultAction: MaybeRef<boolean>;
   attachmentChips: MaybeRef<AgentDockComposerAttachmentChip[]>;
   composerImages: MaybeRef<unknown[]>;
@@ -59,6 +60,9 @@ export type AgentDockComposerToolbarSource = {
   cursorStaleWarning: MaybeRef<string | null>;
   cursorManageRows: MaybeRef<CursorCatalogRow[]>;
   cursorCatalogCount: MaybeRef<string>;
+  modelCatalogLoading: MaybeRef<boolean>;
+  modelCatalogLoadingLabel: MaybeRef<string>;
+  modelCatalogErrorMessage: MaybeRef<string>;
   modelSearchQuery: MaybeRef<string>;
   runtimeHint: MaybeRef<string>;
   canConvertInstructions: MaybeRef<boolean>;
@@ -77,7 +81,8 @@ export function useAgentDockComposerToolbarProps(
     showRuntimeTargetsPanel: toValue(composer.showRuntimeTargetsPanel),
     showAddModelsEntry: toValue(composer.showAddModelsEntry),
     showExtraPinnedRows: toValue(composer.showExtraPinnedRows),
-    showCursorCatalog: toValue(composer.showCursorCatalog),
+    showModelCatalog: toValue(composer.showModelCatalog),
+    showFallbackCatalogNote: toValue(composer.showFallbackCatalogNote),
     showVaultAction: toValue(composer.showVaultAction),
     attachmentChips: toValue(composer.attachmentChips),
     composerImageCount: toValue(composer.composerImages).length,
@@ -118,6 +123,9 @@ export function useAgentDockComposerToolbarProps(
     cursorStaleWarning: toValue(composer.cursorStaleWarning) ?? '',
     cursorManageRows: toValue(composer.cursorManageRows),
     cursorCatalogCount: toValue(composer.cursorCatalogCount),
+    modelCatalogLoading: toValue(composer.modelCatalogLoading),
+    modelCatalogLoadingLabel: toValue(composer.modelCatalogLoadingLabel),
+    modelCatalogErrorMessage: toValue(composer.modelCatalogErrorMessage),
     modelSearchQuery: toValue(composer.modelSearchQuery),
     runtimeHint: toValue(composer.runtimeHint),
     canConvertInstructions: toValue(composer.canConvertInstructions),

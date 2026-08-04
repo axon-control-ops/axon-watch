@@ -88,6 +88,36 @@ export function composerCursorAuthLine(input: {
   return message || 'Not authenticated';
 }
 
+export function composerClaudeAuthLine(input: {
+  target: RuntimeTargetRecord | null;
+  claudeSnapshot: ClaudeRuntimeStatusSnapshot | null;
+}): string {
+  const auth = input.claudeSnapshot?.auth ?? input.target?.auth;
+  if (!auth) {
+    return 'Sign in with `claude auth login` on the host, or add ANTHROPIC_API_KEY in /vault for headless use.';
+  }
+  const account = runtimeAuthAccountLabel(auth);
+  const method = runtimeAuthMethodLabel(auth.auth_method);
+  if (auth.logged_in) {
+    if (account && account.includes('@')) {
+      return method ? `${method} · ${account}` : account;
+    }
+    const message = String(auth.message ?? '').trim();
+    if (message) {
+      return message;
+    }
+    if (account && method) {
+      return `${method} · ${account}`;
+    }
+    return method || 'Authenticated';
+  }
+  if (method === 'vault_locked') {
+    return 'Unlock /vault to inject provider keys, or run `claude auth login` on the host.';
+  }
+  const message = String(auth.message ?? '').trim();
+  return message || 'Not authenticated';
+}
+
 export function vaultSubscriptionAccountLabel(consumer: VaultConsumerRecord): string {
   const subscription = consumer.subscription_auth;
   if (!subscription?.logged_in) {

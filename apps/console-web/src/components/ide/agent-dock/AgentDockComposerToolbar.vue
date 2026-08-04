@@ -22,7 +22,8 @@ defineProps<{
   showRuntimeTargetsPanel: boolean;
   showAddModelsEntry: boolean;
   showExtraPinnedRows: boolean;
-  showCursorCatalog: boolean;
+  showModelCatalog: boolean;
+  showFallbackCatalogNote: boolean;
   showVaultAction: boolean;
   attachmentChips: AgentDockComposerAttachmentChip[];
   composerImageCount: number;
@@ -63,6 +64,9 @@ defineProps<{
   cursorStaleWarning: string;
   cursorManageRows: CursorCatalogRow[];
   cursorCatalogCount: string;
+  modelCatalogLoading: boolean;
+  modelCatalogLoadingLabel: string;
+  modelCatalogErrorMessage: string;
   modelSearchQuery: string;
   runtimeHint: string;
   canConvertInstructions?: boolean;
@@ -290,7 +294,7 @@ function runtimeStatusLine(record: AgentDockComposerRuntimeTarget): string {
           </button>
         </div>
 
-        <template v-if="showCursorCatalog">
+        <template v-if="showModelCatalog">
           <p class="agent-dock-composer__menu-caption">Model catalog</p>
           <p class="agent-dock-composer__menu-note agent-dock-composer__menu-note--status">
             {{ cursorCatalogStatus }}
@@ -298,11 +302,11 @@ function runtimeStatusLine(record: AgentDockComposerRuntimeTarget): string {
           <p v-if="cursorAuthLine" class="agent-dock-composer__menu-note agent-dock-composer__menu-note--auth">
             {{ cursorAuthLine }}
           </p>
-          <p v-if="shell.cursorCatalogLoadState === 'loading'" class="agent-dock-composer__menu-note">
-            Loading Cursor models…
+          <p v-if="modelCatalogLoading" class="agent-dock-composer__menu-note">
+            {{ modelCatalogLoadingLabel }}
           </p>
-          <p v-else-if="shell.cursorCatalogError" class="agent-dock-composer__menu-note">
-            {{ shell.cursorCatalogError }}
+          <p v-else-if="modelCatalogErrorMessage" class="agent-dock-composer__menu-note">
+            {{ modelCatalogErrorMessage }}
           </p>
 
           <template v-if="!showAddModelsPanel">
@@ -367,7 +371,7 @@ function runtimeStatusLine(record: AgentDockComposerRuntimeTarget): string {
             <p v-if="cursorStaleWarning" class="agent-dock-composer__menu-note agent-dock-composer__menu-note--warning">
               {{ cursorStaleWarning }}
             </p>
-            <p v-if="shell.cursorRuntimeStatus?.catalog_source === 'fallback'" class="agent-dock-composer__menu-note">
+            <p v-if="showFallbackCatalogNote" class="agent-dock-composer__menu-note">
               Live catalog unavailable — showing curated fallback models.
             </p>
           </template>
