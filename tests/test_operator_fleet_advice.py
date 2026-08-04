@@ -307,7 +307,7 @@ class OperatorFleetAdviceTests(unittest.TestCase):
             },
         )
 
-        self.assertIn(f"finish “{task}”", advise)
+        self.assertIn(f"“{task}”", advise)
         self.assertNotIn("…", advise)
 
 

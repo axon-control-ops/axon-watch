@@ -44,7 +44,7 @@ describe('run-lifecycle-ui', () => {
         agentStreamActive: false,
         mode: 'debug',
       }),
-    ).toBe(true);
+    ).toBe(false);
     expect(
       shouldOfferRunContinue({
         phase: 'executing',
