@@ -185,85 +185,89 @@ function focusReviewFiles(): void {
     aria-label="Agent review controls"
   >
     <div class="ide-agent-review-strip__bar">
+      <div class="ide-agent-review-strip__side ide-agent-review-strip__side--start">
+        <button
+          v-if="showReviewControls"
+          type="button"
+          class="ide-agent-review-strip__toggle"
+          :class="{ 'ide-agent-review-strip__toggle--disabled': !canExpandFileList }"
+          :disabled="!canExpandFileList"
+          :aria-expanded="canExpandFileList ? expanded : undefined"
+          @click="toggleExpanded"
+        >
+          <p class="ide-agent-review-strip__summary">{{ statusLabel }}</p>
+        </button>
+      </div>
       <span
         class="ide-agent-review-strip__runtime"
         :title="`CLI runtime: ${runtimeFamilyLabel}`"
       >{{ runtimeFamilyLabel }}</span>
-      <button
-        v-if="showReviewControls"
-        type="button"
-        class="ide-agent-review-strip__toggle"
-        :class="{ 'ide-agent-review-strip__toggle--disabled': !canExpandFileList }"
-        :disabled="!canExpandFileList"
-        :aria-expanded="canExpandFileList ? expanded : undefined"
-        @click="toggleExpanded"
-      >
-        <p class="ide-agent-review-strip__summary">{{ statusLabel }}</p>
-      </button>
-      <div v-if="showReviewControls" class="ide-agent-review-strip__actions">
-        <button
-          v-if="showRetryAction"
-          type="button"
-          class="ide-agent-review-strip__btn ide-agent-review-strip__btn--retry"
-          :disabled="actionsDisabled"
-          :title="`${retryLabel} this teammate's last job`"
-          @click="handleRetry"
-        >
-          {{ retrying ? 'Working…' : retryLabel }}
-        </button>
-        <button
-          v-if="showFailureActions && showExplainAction"
-          type="button"
-          class="ide-agent-review-strip__btn ide-agent-review-strip__btn--link"
-          title="Opens Ask so they explain what happened without changing code"
-          :disabled="actionsDisabled"
-          @click="handleExplain"
-        >
-          Explain
-        </button>
-        <button
-          v-if="showFailureActions"
-          type="button"
-          class="ide-agent-review-strip__btn ide-agent-review-strip__btn--link"
-          @click="handleOpenTeam"
-        >
-          Open team
-        </button>
-        <button
-          v-if="reviewBar.showStop"
-          type="button"
-          class="ide-agent-review-strip__btn ide-agent-review-strip__btn--stop"
-          :disabled="shell.runMutationState === 'stopping'"
-          @click="stopAgentRun"
-        >
-          {{ reviewBar.stopLabel }}
-        </button>
-        <button
-          v-if="reviewBar.showResume"
-          type="button"
-          class="ide-agent-review-strip__btn ide-agent-review-strip__btn--resume"
-          :disabled="shell.runMutationState === 'resuming'"
-          @click="resumeAgentRun"
-        >
-          {{ reviewBar.resumeLabel }}
-        </button>
-        <button
-          v-if="reviewBar.showReview"
-          type="button"
-          class="ide-agent-review-strip__btn ide-agent-review-strip__btn--review"
-          @click="focusReviewFiles"
-        >
-          {{ reviewBar.reviewLabel }}
-        </button>
-        <button
-          v-if="reviewBar.showApplyAll"
-          type="button"
-          class="ide-agent-review-strip__btn ide-agent-review-strip__btn--apply"
-          :disabled="shell.runMutationState === 'completing'"
-          @click="applyAllReviewReady"
-        >
-          {{ reviewBar.applyLabel }}
-        </button>
+      <div class="ide-agent-review-strip__side ide-agent-review-strip__side--end">
+        <div v-if="showReviewControls" class="ide-agent-review-strip__actions">
+          <button
+            v-if="showRetryAction"
+            type="button"
+            class="ide-agent-review-strip__btn ide-agent-review-strip__btn--retry"
+            :disabled="actionsDisabled"
+            :title="`${retryLabel} this teammate's last job`"
+            @click="handleRetry"
+          >
+            {{ retrying ? 'Working…' : retryLabel }}
+          </button>
+          <button
+            v-if="showFailureActions && showExplainAction"
+            type="button"
+            class="ide-agent-review-strip__btn ide-agent-review-strip__btn--link"
+            title="Opens Ask so they explain what happened without changing code"
+            :disabled="actionsDisabled"
+            @click="handleExplain"
+          >
+            Explain
+          </button>
+          <button
+            v-if="showFailureActions"
+            type="button"
+            class="ide-agent-review-strip__btn ide-agent-review-strip__btn--link"
+            @click="handleOpenTeam"
+          >
+            Open team
+          </button>
+          <button
+            v-if="reviewBar.showStop"
+            type="button"
+            class="ide-agent-review-strip__btn ide-agent-review-strip__btn--stop"
+            :disabled="shell.runMutationState === 'stopping'"
+            @click="stopAgentRun"
+          >
+            {{ reviewBar.stopLabel }}
+          </button>
+          <button
+            v-if="reviewBar.showResume"
+            type="button"
+            class="ide-agent-review-strip__btn ide-agent-review-strip__btn--resume"
+            :disabled="shell.runMutationState === 'resuming'"
+            @click="resumeAgentRun"
+          >
+            {{ reviewBar.resumeLabel }}
+          </button>
+          <button
+            v-if="reviewBar.showReview"
+            type="button"
+            class="ide-agent-review-strip__btn ide-agent-review-strip__btn--review"
+            @click="focusReviewFiles"
+          >
+            {{ reviewBar.reviewLabel }}
+          </button>
+          <button
+            v-if="reviewBar.showApplyAll"
+            type="button"
+            class="ide-agent-review-strip__btn ide-agent-review-strip__btn--apply"
+            :disabled="shell.runMutationState === 'completing'"
+            @click="applyAllReviewReady"
+          >
+            {{ reviewBar.applyLabel }}
+          </button>
+        </div>
       </div>
     </div>
 

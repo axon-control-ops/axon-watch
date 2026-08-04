@@ -127,19 +127,32 @@
 }
 
 .ide-agent-review-strip__bar {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
   align-items: center;
-  justify-content: space-between;
   gap: 0.35rem 0.55rem;
   padding: 0.42rem 0.65rem;
+}
+
+.ide-agent-review-strip__side {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+
+.ide-agent-review-strip__side--start {
+  justify-content: flex-start;
+}
+
+.ide-agent-review-strip__side--end {
+  justify-content: flex-end;
 }
 
 .ide-agent-review-strip__runtime {
   display: inline-flex;
   align-items: center;
+  justify-self: center;
   flex-shrink: 0;
-  order: -1;
   min-height: 1.45rem;
   padding: 0 0.45rem;
   border: 1px solid rgba(0, 200, 220, 0.45);
