@@ -161,6 +161,11 @@ def record_claude_usage_limit_hit(detail: str) -> None:
         _LIMIT_STATE["hit_at"] = time.time()
         _LIMIT_STATE["detail"] = str(detail or "").strip()
         _LIMIT_STATE["reset_epoch"] = reset_epoch
+    # A newly observed limit hit must be visible on the very next probe call —
+    # the TTL cache below would otherwise happily hand back a stale
+    # limit_reached=False payload for up to _USAGE_CACHE_TTL_SECONDS.
+    with _USAGE_LOCK:
+        _USAGE_CACHE["fetched_at"] = 0.0
 
 
 def reset_claude_usage_limit_state_for_tests() -> None:
