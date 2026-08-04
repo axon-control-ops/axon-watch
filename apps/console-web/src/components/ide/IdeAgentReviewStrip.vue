@@ -185,6 +185,9 @@ function probeRuntimeChipCenter(): void {
   const chipMid = chipRect.left + chipRect.width / 2;
   const offsetPx = Math.round(chipMid - barMid);
   const computedPos = window.getComputedStyle(chip).position;
+  const barDisplay = window.getComputedStyle(bar).display;
+  const distToRightPx = Math.round(barRect.right - chipRect.right);
+  const distToLeftPx = Math.round(chipRect.left - barRect.left);
   // #region agent log
   fetch('http://127.0.0.1:7706/ingest/90bcaec2-2b39-4d4a-84b5-157c12735440', {
     method: 'POST',
@@ -194,18 +197,22 @@ function probeRuntimeChipCenter(): void {
     },
     body: JSON.stringify({
       sessionId: 'bef50e',
-      runId: 'cursor-chip-center',
-      hypothesisId: 'H-CENTER',
+      runId: 'cursor-chip-center-grid',
+      hypothesisId: 'H-GRID',
       location: 'IdeAgentReviewStrip.vue:probeRuntimeChipCenter',
-      message: 'runtime chip vs strip midpoint',
+      message: 'runtime chip vs strip midpoint (grid center cell)',
       data: {
         offsetPx,
         centered: Math.abs(offsetPx) <= 4,
         barWidth: Math.round(barRect.width),
         chipWidth: Math.round(chipRect.width),
         computedPos,
+        barDisplay,
+        distToLeftPx,
+        distToRightPx,
         label: runtimeFamilyLabel.value,
         showControls: showReviewControls.value,
+        chipClass: String(chip.className),
       },
       timestamp: Date.now(),
     }),
@@ -236,7 +243,6 @@ onUpdated(() => {
     <div
       ref="stripBarRef"
       class="ide-agent-review-strip__bar"
-      style="position: relative; width: 100%; box-sizing: border-box;"
     >
       <div class="ide-agent-review-strip__side ide-agent-review-strip__side--start">
         <button
@@ -251,18 +257,13 @@ onUpdated(() => {
           <p class="ide-agent-review-strip__summary">{{ statusLabel }}</p>
         </button>
       </div>
-      <span
-        ref="runtimeChipRef"
-        class="ide-agent-review-strip__runtime"
-        :title="`CLI runtime: ${runtimeFamilyLabel}`"
-        :style="{
-          position: 'absolute',
-          left: '50%',
-          top: '50%',
-          transform: 'translate(-50%, -50%)',
-          zIndex: 2,
-        }"
-      >{{ runtimeFamilyLabel }}</span>
+      <div class="ide-agent-review-strip__side ide-agent-review-strip__side--center">
+        <span
+          ref="runtimeChipRef"
+          class="ide-agent-review-strip__runtime"
+          :title="`CLI runtime: ${runtimeFamilyLabel}`"
+        >{{ runtimeFamilyLabel }}</span>
+      </div>
       <div class="ide-agent-review-strip__side ide-agent-review-strip__side--end">
         <div v-if="showReviewControls" class="ide-agent-review-strip__actions">
           <button

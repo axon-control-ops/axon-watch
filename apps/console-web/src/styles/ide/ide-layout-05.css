@@ -130,13 +130,12 @@
 }
 
 .ide-agent-review-strip__bar {
-  position: relative;
-  display: flex;
-  flex-wrap: nowrap;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
   align-items: center;
-  justify-content: space-between;
-  gap: 0.35rem 0.55rem;
+  column-gap: 0.45rem;
   width: 100%;
+  max-width: 100%;
   box-sizing: border-box;
   padding: 0.42rem 0.65rem;
 }
@@ -144,13 +143,16 @@
 .ide-agent-review-strip__side {
   display: flex;
   align-items: center;
-  flex: 1 1 0;
   min-width: 0;
-  z-index: 1;
 }
 
 .ide-agent-review-strip__side--start {
   justify-content: flex-start;
+}
+
+.ide-agent-review-strip__side--center {
+  justify-content: center;
+  justify-self: center;
 }
 
 .ide-agent-review-strip__side--end {
@@ -158,11 +160,6 @@
 }
 
 .ide-agent-review-strip__runtime {
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  transform: translate(-50%, -50%);
-  z-index: 2;
   display: inline-flex;
   align-items: center;
   flex-shrink: 0;
@@ -178,7 +175,6 @@
   line-height: 1;
   white-space: nowrap;
   user-select: none;
-  pointer-events: none;
 }
 
 .ide-agent-review-strip__toggle {
