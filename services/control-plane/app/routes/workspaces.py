@@ -363,6 +363,7 @@ def workspace_terminal_agent_jobs_enqueue(
             stream_to_chat=body.stream_to_chat,
             thread_id=body.thread_id,
             message_id=body.message_id,
+            source_workspace_id=body.source_workspace_id,
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc

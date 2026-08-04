@@ -1,0 +1,242 @@
+"""Deterministic, fail-closed shell policy used by per-run Cursor hooks."""
+
+from __future__ import annotations
+
+import json
+import os
+import shlex
+import sys
+from pathlib import Path
+from typing import Any, Mapping, Sequence
+
+_MAX_COMMAND_BYTES = 32_768
+_SHELL_META = frozenset(";&|<>`$\\\n\r\x00(){}[]*?!~#")
+_RAW_NETWORK_TOOLS = frozenset(
+    {
+        "aria2c",
+        "curl",
+        "ftp",
+        "gh",
+        "http",
+        "httpie",
+        "nc",
+        "netcat",
+        "nmap",
+        "rsync",
+        "scp",
+        "sftp",
+        "socat",
+        "ssh",
+        "telnet",
+        "wget",
+    }
+)
+_PRIVILEGE_TOOLS = frozenset({"doas", "pkexec", "su", "sudo"})
+_INTERPRETER_ESCAPES = frozenset(
+    {
+        "ash",
+        "bash",
+        "builtin",
+        "bun",
+        "busybox",
+        "command",
+        "dash",
+        "deno",
+        "env",
+        "eval",
+        "exec",
+        "fish",
+        "js",
+        "lua",
+        "node",
+        "perl",
+        "php",
+        "python",
+        "python2",
+        "python3",
+        "ruby",
+        "sh",
+        "source",
+        "zsh",
+    }
+)
+_DESTRUCTIVE_GIT_SUBCOMMANDS = frozenset(
+    {
+        "branch",
+        "checkout",
+        "cherry-pick",
+        "clean",
+        "commit",
+        "config",
+        "fetch",
+        "merge",
+        "pull",
+        "push",
+        "rebase",
+        "remote",
+        "reset",
+        "restore",
+        "revert",
+        "switch",
+        "tag",
+    }
+)
+_GENERIC_ESCAPE_ARGUMENTS = frozenset(
+    {
+        "-exec",
+        "-execdir",
+        "--exec",
+        "--exec-path",
+        "--config-env",
+        "--upload-pack",
+        "--receive-pack",
+    }
+)
+
+
+def _deny(reason: str) -> dict[str, str]:
+    return {
+        "permission": "deny",
+        "user_message": f"Agent sandbox blocked this action: {reason}.",
+        "agent_message": f"Sandbox policy denied the action ({reason}). Use an approved wrapper.",
+    }
+
+
+def _allow() -> dict[str, str]:
+    return {"permission": "allow"}
+
+
+def _string_tuple(value: Any) -> tuple[str, ...]:
+    if not isinstance(value, Sequence) or isinstance(value, (str, bytes)):
+        raise ValueError("policy list is malformed")
+    result = tuple(str(item) for item in value)
+    if any(not item or "\x00" in item for item in result):
+        raise ValueError("policy contains an empty or invalid value")
+    return result
+
+
+def _load_policy(policy_path: Path) -> tuple[frozenset[str], tuple[tuple[str, ...], ...]]:
+    with policy_path.open("r", encoding="utf-8") as handle:
+        document = json.load(handle)
+    if not isinstance(document, Mapping) or document.get("version") != 1:
+        raise ValueError("unsupported policy document")
+
+    wrappers = frozenset(_string_tuple(document.get("approved_wrappers", ())))
+    prefixes_raw = document.get("approved_command_prefixes", ())
+    if not isinstance(prefixes_raw, Sequence) or isinstance(prefixes_raw, (str, bytes)):
+        raise ValueError("approved command prefixes are malformed")
+    prefixes = tuple(_string_tuple(prefix) for prefix in prefixes_raw)
+    return wrappers, prefixes
+
+
+def _extract_shell_command(payload: Mapping[str, Any]) -> str:
+    event = str(payload.get("hook_event_name") or "")
+    if event == "beforeShellExecution":
+        command = payload.get("command")
+    elif event == "preToolUse":
+        tool_name = str(
+            payload.get("tool_name")
+            or payload.get("tool")
+            or payload.get("tool_type")
+            or ""
+        ).lower()
+        if tool_name and tool_name not in {"shell", "terminal"}:
+            raise ValueError("unsupported preToolUse tool")
+        tool_input = payload.get("tool_input", payload.get("input"))
+        command = tool_input.get("command") if isinstance(tool_input, Mapping) else None
+    else:
+        raise ValueError("unsupported hook event")
+
+    if not isinstance(command, str) or not command.strip():
+        raise ValueError("missing shell command")
+    if len(command.encode("utf-8")) > _MAX_COMMAND_BYTES:
+        raise ValueError("shell command is too long")
+    return command.strip()
+
+
+def _git_is_destructive(tokens: Sequence[str]) -> bool:
+    executable = os.path.basename(tokens[0]).lower()
+    if executable != "git":
+        return False
+    lowered = [token.lower() for token in tokens[1:]]
+    if any(token in _GENERIC_ESCAPE_ARGUMENTS or token == "-c" for token in lowered):
+        return True
+    return any(token in _DESTRUCTIVE_GIT_SUBCOMMANDS for token in lowered)
+
+
+def _matches_prefix(tokens: Sequence[str], prefix: Sequence[str]) -> bool:
+    return len(tokens) >= len(prefix) and tuple(tokens[: len(prefix)]) == tuple(prefix)
+
+
+def evaluate_hook_payload(
+    payload: Mapping[str, Any],
+    *,
+    approved_wrappers: frozenset[str],
+    approved_command_prefixes: tuple[tuple[str, ...], ...],
+) -> dict[str, str]:
+    """Return a Cursor hook permission response; malformed input always denies."""
+    try:
+        command = _extract_shell_command(payload)
+    except (TypeError, ValueError) as exc:
+        return _deny(str(exc))
+
+    if any(character in command for character in _SHELL_META):
+        return _deny("shell operators, expansion, redirection, and escapes are not allowed")
+
+    try:
+        tokens = shlex.split(command, posix=True)
+    except ValueError:
+        return _deny("malformed shell quoting")
+    if not tokens:
+        return _deny("empty shell command")
+
+    executable_token = tokens[0]
+    executable = os.path.basename(executable_token).lower()
+    if executable_token.startswith("-") or "=" in executable_token:
+        return _deny("environment assignments and option-shaped executables are not allowed")
+    if executable in _PRIVILEGE_TOOLS:
+        return _deny("privilege escalation is not allowed")
+    if executable in _RAW_NETWORK_TOOLS:
+        return _deny("raw network tools are not allowed")
+    if executable in _INTERPRETER_ESCAPES:
+        return _deny("shell and interpreter escapes are not allowed")
+    if _git_is_destructive(tokens):
+        return _deny("destructive or networked Git operations are not allowed")
+    if any(token.lower() in _GENERIC_ESCAPE_ARGUMENTS for token in tokens[1:]):
+        return _deny("command execution escape arguments are not allowed")
+
+    if executable != "git" and executable_token == executable and executable in approved_wrappers:
+        return _allow()
+    if any(_matches_prefix(tokens, prefix) for prefix in approved_command_prefixes):
+        return _allow()
+    return _deny("command does not match an approved wrapper or command prefix")
+
+
+def run_hook(policy_path: Path, raw_input: str) -> dict[str, str]:
+    """Evaluate one hook input, converting every policy/input failure to deny."""
+    try:
+        payload = json.loads(raw_input)
+        if not isinstance(payload, Mapping):
+            raise ValueError("hook input must be a JSON object")
+        wrappers, prefixes = _load_policy(policy_path)
+        return evaluate_hook_payload(
+            payload,
+            approved_wrappers=wrappers,
+            approved_command_prefixes=prefixes,
+        )
+    except Exception as exc:  # Hook boundaries must fail closed, including I/O errors.
+        return _deny(f"hook policy unavailable: {type(exc).__name__}")
+
+
+def main(argv: Sequence[str] | None = None) -> int:
+    arguments = list(sys.argv[1:] if argv is None else argv)
+    policy_path = Path(arguments[0]) if len(arguments) == 1 else Path("")
+    response = run_hook(policy_path, sys.stdin.read()) if arguments else _deny(
+        "hook policy path is required"
+    )
+    sys.stdout.write(json.dumps(response, sort_keys=True, separators=(",", ":")) + "\n")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

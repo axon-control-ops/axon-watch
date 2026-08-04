@@ -26,6 +26,7 @@ from app.terminal.agent_job_chat import (
 )
 from app.terminal.session_registry import ensure_agent_session, serialize_session
 from app.terminal.session_runtime import ensure_runtime
+from app.terminal.ship_command_guards import assert_ship_command_allowed
 from app.terminal.workspace_roots import WorkspaceRootError, resolve_workspace_root
 
 _MAX_COMMAND_CHARS = 32_768
@@ -259,6 +260,7 @@ def enqueue_agent_terminal_job(
     stream_to_chat: bool | None = None,
     thread_id: str | None = None,
     message_id: str | None = None,
+    source_workspace_id: str | None = None,
 ) -> dict[str, Any]:
     """Ensure agent PTY runtime, write the command, return a chat-friendly receipt."""
     clean_workspace = str(workspace_id or "").strip()
@@ -270,6 +272,11 @@ def enqueue_agent_terminal_job(
         raise ValueError("command is required")
 
     command_text = payload.decode("utf-8", errors="replace").rstrip("\n")
+    assert_ship_command_allowed(
+        workspace_id=clean_workspace,
+        command=command_text,
+        source_workspace_id=source_workspace_id,
+    )
     should_stream = (
         bool(stream_to_chat)
         if stream_to_chat is not None

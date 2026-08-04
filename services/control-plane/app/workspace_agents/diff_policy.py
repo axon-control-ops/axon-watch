@@ -54,15 +54,20 @@ def resolve_effective_allowed_paths(
     *,
     contract_allowed_paths: Iterable[str] | None = None,
     task_allowed_paths: Iterable[str] | None = None,
+    fail_closed_missing_task: bool = False,
 ) -> list[str]:
     """Intersect repo contract scope with per-task write scope.
 
     Missing task scope falls back to the contract (or empty = unrestricted by
-    path allowlist). When both are present, a path must satisfy both prefixes.
+    path allowlist) for legacy/read-only callers. Enforcement boundaries can set
+    ``fail_closed_missing_task`` so an unscoped task receives no write access.
+    When both scopes are present, a path must satisfy both prefixes.
     """
     contract = normalize_path_prefixes(contract_allowed_paths or [])
     task = normalize_path_prefixes(task_allowed_paths or [])
     if not task:
+        if fail_closed_missing_task:
+            return ["__axon_deny_all__"]
         return contract
     if not contract:
         return task
