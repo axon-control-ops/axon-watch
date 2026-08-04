@@ -94,7 +94,7 @@
       "target": "apps/console-web/src/components/workbench/*"
     },
     "services/control-plane/app/kairo_conversation_reply.py": {
-      "max_lines": 330,
+      "max_lines": 270,
       "soft_limit": 350,
       "hard_limit": 500,
       "target": "services/control-plane/app/kairo/replies/*"

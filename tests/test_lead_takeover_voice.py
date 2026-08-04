@@ -32,9 +32,11 @@ class LeadTakeoverVoiceTests(unittest.TestCase):
             lead_name="Dana",
         )
         self.assertIn("Dana here", line)
-        self.assertIn("Soren (integrations) just completed", line)
-        self.assertIn("What landed:", line)
-        self.assertIn("Next:", line)
+        self.assertIn("Soren (integrations) completed", line)
+        self.assertIn("Progress:", line)
+        self.assertIn("What remains:", line)
+        self.assertIn("What I am doing next:", line)
+        self.assertIn("Your action:", line)
         self.assertIn("hold OTA", line)
         self.assertNotIn("Specialist report:", line)
         self.assertNotIn("Ask me what to do next", line)
@@ -53,11 +55,11 @@ class LeadTakeoverVoiceTests(unittest.TestCase):
             lead_name="Dana",
             parent_plan_goal="Push OTA to canary",
         )
-        self.assertIn("Situation: Push OTA to canary", line)
-        self.assertIn("Next:", line)
+        self.assertIn("Goal: Push OTA to canary", line)
+        self.assertIn("What I am doing next:", line)
         self.assertLess(
-            line.index("Situation:"),
-            line.index("Cass (watcher) just completed"),
+            line.index("Goal:"),
+            line.index("Cass (watcher) completed"),
         )
         self.assertNotIn("Ask me what to do next", line)
         self.assertNotIn("Confidence:", line)

@@ -115,8 +115,8 @@ class OperatorFleetAdviceTests(unittest.TestCase):
         )
         line = resolve_fleet_briefing_advise(pack=pack)
         self.assertEqual(
-            "VAXON is attending the critical signal in axon-local — "
-            "routing specialists there; keep working here (Fast Gate failed).",
+            "VAXON is investigating the critical signal in axon-local "
+            "and will report back here; keep working here.",
             line,
         )
 
@@ -204,8 +204,8 @@ class OperatorFleetAdviceTests(unittest.TestCase):
         )
         self.assertNotIn("GH_TOKEN", line)
         self.assertEqual(
-            "VAXON is attending the critical signal in DashPro — "
-            "routing specialists there; keep working here (DashPro GitHub API warning).",
+            "VAXON is investigating the critical signal in DashPro "
+            "and will report back here; keep working here.",
             line,
         )
 
@@ -264,8 +264,8 @@ class OperatorFleetAdviceTests(unittest.TestCase):
             },
         )
         self.assertEqual(
-            "VAXON owns an open handoff in DashPro: “Finish DashPro follow-up”. "
-            "Route or close it; keep axon-watch moving on fresh verified work.",
+            "VAXON owns the open handoff in DashPro: “Finish DashPro follow-up”."
+            " Keep working in axon-watch; VAXON will report the outcome here.",
             advise,
         )
         from app.operator_fleet_advice import build_advise_ui_action
@@ -311,7 +311,8 @@ class OperatorFleetAdviceTests(unittest.TestCase):
             },
         )
 
-        self.assertIn(f"VAXON owns an open handoff in DashPro: “{task}”", advise)
+        self.assertIn(f"“{task}”", advise)
+        self.assertIn("VAXON owns the open handoff in DashPro", advise)
         self.assertNotIn("…", advise)
         self.assertNotIn("switch there", advise)
 
@@ -357,10 +358,13 @@ class OperatorFleetAdviceTests(unittest.TestCase):
             msg=advise,
         )
         self.assertIn("…", advise)
+        shown_task = advise.split("“", 1)[1].split("”", 1)[0].removesuffix("…")
+        self.assertTrue(task.startswith(shown_task))
+        self.assertEqual(" ", task[len(shown_task)])
         self.assertNotIn("switch there", advise)
         self.assertNotIn("Cursor usage quota", advise)
         self.assertNotIn("Pause more Axon Watch work until that closes.", advise)
-        self.assertIn("Dispatch or close it with evidence", advise)
+        self.assertIn("VAXON will dispatch or close it with evidence", advise)
 
 
 if __name__ == "__main__":

@@ -24,6 +24,7 @@ from app.workspace_agents.config_loader import EmployeeConfig, load_workspace_ag
 from app.workspace_agents.scheduler_auto_start_gates import (
     continuous_auto_start_skip_reason,
 )
+from app.workspace_agents.scheduler_attention_scan import run_due_attention_scan_and_log
 from app.workspace_agents.scheduler_queued_fan_out import dispatch_queued_lead_fan_out_runs
 from app.workspace_agents.worker_dispatch import dispatch_continuous_worker_run, worker_dispatch_enabled
 
@@ -467,6 +468,7 @@ async def _scheduler_loop() -> None:
     await asyncio.sleep(interval)
     while True:
         try:
+            await asyncio.to_thread(run_due_attention_scan_and_log)
             started = await asyncio.to_thread(run_continuous_worker_tick)
             if started:
                 logger.info("continuous worker tick started %s run(s)", len(started))

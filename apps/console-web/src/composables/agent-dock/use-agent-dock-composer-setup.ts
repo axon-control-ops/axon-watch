@@ -1,27 +1,20 @@
-import { computed, ref } from 'vue';
-
+import { computed, nextTick, ref } from 'vue';
 import { resizeCommandComposer } from '../../lib/command-composer-autosize';
 import { useKairoConversation } from '../../features/kairo-conversation/use-kairo-conversation';
 import { useShellStore } from '../../stores/shell';
-import {
-  useComposerActions,
-  type PlanSoftSwitchNotice,
-} from './use-composer-actions';
+import { useComposerActions, type PlanSoftSwitchNotice } from './use-composer-actions';
 import { useComposerContext } from './use-composer-context';
 import { useComposerDisplayState } from './use-composer-display-state';
 import { useComposerHistory } from './use-composer-history';
 import { useComposerImages } from './use-composer-images';
-import {
-  useComposerMenus,
-  type ComposerMode,
-} from './use-composer-menus';
+import { useComposerMenus, type ComposerMode } from './use-composer-menus';
 import { useComposerModelRuntime } from './use-composer-model-runtime';
 import { useComposerTypeahead } from './use-composer-typeahead';
 import { useComposerWorkspaceSync } from './use-composer-workspace-sync';
 import { readWorkspaceComposerMode } from '../../lib/composer-mode-prefs';
+import { persistIdeComposerDraft } from '../../lib/ide-composer-draft-prefs';
 import { teammateRouteNotice } from '../../lib/teammate-route-notice';
 import { buildAgentDockComposerApi } from './build-agent-dock-composer-api';
-
 export function useAgentDockComposerSetup() {
   const shell = useShellStore();
   const {
@@ -39,7 +32,6 @@ export function useAgentDockComposerSetup() {
   function setInputRef(el: HTMLTextAreaElement | null): void {
     inputRef.value = el;
   }
-
   const defaultComposerMode =
     (shell.runtimeSummary?.runtime_identity.mode_default as ComposerMode) || 'agent';
   const composerMode = ref<ComposerMode>(
@@ -49,7 +41,6 @@ export function useAgentDockComposerSetup() {
       shell.activeIdeThreadId,
     ) ?? defaultComposerMode,
   );
-
   const menus = useComposerMenus(shell, { composerMode });
   const {
     activeMode,
@@ -87,7 +78,6 @@ export function useAgentDockComposerSetup() {
     switchToConsultativeAccess,
     toggleSection,
   } = menus;
-
   const {
     contextWorkspace,
     contextSelection,
@@ -105,7 +95,6 @@ export function useAgentDockComposerSetup() {
     clearSkillAttachments,
     withSkillTokensForSubmit,
   } = useComposerContext(shell);
-
   const images = useComposerImages();
   const {
     composerImages,
@@ -124,7 +113,6 @@ export function useAgentDockComposerSetup() {
     disposeComposerImagesPersistTimer,
     revokeAllComposerImagePreviews,
   } = images;
-
   function attachFilesMedia(): void {
     images.openComposerAttachmentPicker();
     closeMenus();
@@ -324,6 +312,19 @@ export function useAgentDockComposerSetup() {
     void syncTypeaheadFromComposer();
   }
 
+  function clearComposerDraft(): void {
+    composerDraftModel.value = '';
+    if (composerMode.value !== 'kairo') {
+      persistIdeComposerDraft(
+        shell.currentWorkspace?.workspace_id ?? null,
+        '',
+        shell.activeIdeThreadId || null,
+      );
+    }
+    closeTypeahead();
+    void nextTick(syncComposerHeight);
+  }
+
   useComposerWorkspaceSync({
     shell,
     composerMode,
@@ -356,6 +357,7 @@ export function useAgentDockComposerSetup() {
     autoModelRow,
     autoToggleChecked,
     canSubmitComposer,
+    clearComposerDraft,
     closeAddModelsPanel,
     closeComposerImageLightbox,
     composerAccessBanner,

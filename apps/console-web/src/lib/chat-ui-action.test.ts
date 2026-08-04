@@ -16,9 +16,9 @@ describe('parseChatUiAction', () => {
       open_file_path: 'README.md',
       layout_mode: undefined,
       focus_attention: false,
+      auto_attend: false,
       signal_id: null,
       cta_label: null,
-      auto_attend: false,
     });
   });
 

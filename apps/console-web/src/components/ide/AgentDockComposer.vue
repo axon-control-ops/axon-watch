@@ -7,7 +7,6 @@ import AgentDockComposerChrome from './agent-dock/AgentDockComposerChrome.vue';
 import AgentDockComposerInput from './agent-dock/AgentDockComposerInput.vue';
 import AgentDockComposerToolbar from './agent-dock/AgentDockComposerToolbar.vue';
 import AgentDockKairoComposerFooter from './agent-dock/AgentDockKairoComposerFooter.vue';
-
 const composer = useAgentDockComposer();
 const toolbarProps = useAgentDockComposerToolbarProps(composer);
 </script>
@@ -95,6 +94,7 @@ const toolbarProps = useAgentDockComposerToolbarProps(composer);
           :typeahead-rows="composer.typeaheadRows.value"
           :typeahead-selected-index="composer.typeaheadSelectedIndex.value"
           @update:draft="composer.updateComposerDraft"
+          @clear-draft="composer.clearComposerDraft"
           @remove-chip="composer.removeChip"
           @open-image="composer.openComposerImage"
           @remove-image="composer.removeComposerImage"

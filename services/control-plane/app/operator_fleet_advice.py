@@ -10,6 +10,8 @@ from __future__ import annotations
 from collections.abc import Mapping
 
 from app.chat.command_intent import is_auto_complete_run_summary
+from app.workspace_agents.autonomous_attention_policy import is_investigatory_critical
+from app.workspace_agents.lead_text import truncate_text
 
 # Ranking keys (highest first).
 _RANK_PENDING_APPROVAL = 1
@@ -282,31 +284,34 @@ def build_fleet_coach_line(
         if "sentry" in title_l:
             if cross:
                 return (
-                    f"VAXON is attending Sentry in {name} — "
-                    f"routing the investigation without pausing you here ({title})."
+                    f"VAXON is investigating the Sentry alert in {name} "
+                    "and will report back here; keep working here."
                 )
-            return f"VAXON is attending Sentry: {title}."
+            return f"VAXON is investigating Sentry and will report back here: {title}."
         if cross:
             return (
-                f"VAXON is attending the critical signal in {name} — "
-                f"routing specialists there; keep working here ({title})."
+                f"VAXON is investigating the critical signal in {name} "
+                "and will report back here; keep working here."
             )
         if scope_mode == "fleet":
-            return f"VAXON is attending the critical signal in {name}: {title}."
-        return f"VAXON is attending the critical signal: {title}."
+            return (
+                f"VAXON is investigating the critical signal in {name} "
+                f"and will report back here: {title}."
+            )
+        return f"VAXON is investigating the critical signal and will report back here: {title}."
 
     if kind == "review_ready":
         if cross:
             return (
-                f"VAXON is opening the ready review in {name} — "
-                "no need to hunt across workspaces."
+                f"VAXON is reviewing the ready run in {name} and will report back here; "
+                "keep working here."
             )
         return f"VAXON is opening the ready review in {name}."
 
     if kind == "open_handoff":
         raw_task = str(fact.get("title") or "the listed task").strip() or "the listed task"
         # Mega task goals were being spoken verbatim in LIVE TRANSMISSION.
-        task = raw_task if len(raw_task) <= 96 else f"{raw_task[:95].rstrip()}…"
+        task = truncate_text(raw_task, max_len=96)
         title_l = raw_task.lower()
         auth_hint = ""
         if "401" in title_l or "unauthorized" in title_l or "github api" in title_l:
@@ -318,28 +323,31 @@ def build_fleet_coach_line(
         ):
             return (
                 f"VAXON owns an open {name} handoff: “{task}”."
-                f"{auth_hint} Dispatch or close it with evidence."
+                f"{auth_hint} VAXON will dispatch or close it with evidence and report back here."
             ).strip()
         if cross and focus_label:
             return (
-                f"VAXON owns an open handoff in {name}: “{task}”."
-                f"{auth_hint} Route or close it; keep {focus_label} moving "
-                "on fresh verified work."
+                f"VAXON owns the open handoff in {name}: “{task}”."
+                f"{auth_hint} Keep working in {focus_label}; "
+                "VAXON will report the outcome here."
             ).strip()
         if cross:
             return (
-                f"VAXON owns an open handoff in {name}: “{task}”."
-                f"{auth_hint} Route or close it with evidence."
+                f"VAXON owns the open handoff in {name}: “{task}”."
+                f"{auth_hint} VAXON will report the outcome here."
             ).strip()
-        return f"VAXON owns the open handoff in {name}: “{task}”."
+        return (
+            f"VAXON owns the open handoff in {name}: “{task}”. "
+            "VAXON will report the outcome here."
+        )
 
     if kind == "degraded_runtime":
         if fact.get("watch_connected") is False:
-            return "Check watch connectivity before continuing."
+            return "VAXON is checking watch connectivity and will report back here."
         title = str(fact.get("title") or "").strip()
         if title:
-            return f"Inspect degraded runtime ({title}) before dispatching more work."
-        return "Inspect degraded runtime before dispatching more work."
+            return f"VAXON is investigating the degraded service and will report back here ({title})."
+        return "VAXON is investigating the degraded service and will report back here."
 
     return ""
 
@@ -378,6 +386,15 @@ def build_advise_ui_action(
         signal_id = str(winner.get("signal_id") or "").strip()
         if signal_id:
             action["signal_id"] = signal_id
+        if kind == "critical_signal":
+            action["auto_attend"] = is_investigatory_critical(
+                kind=kind,
+                title=str(winner.get("title") or ""),
+                detail=" ".join(
+                    str(winner.get(field) or "")
+                    for field in ("summary", "detail", "reason")
+                ),
+            )
         return action
     if kind in {"critical_signal", "pending_approval", "review_ready", "degraded_runtime"}:
         if focused and not target:

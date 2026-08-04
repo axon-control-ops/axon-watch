@@ -6,49 +6,16 @@ from copy import deepcopy
 from contextlib import contextmanager
 import json
 import os
-import re
 import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from app.persistence import run_store_sqlite
 from app.persistence.autonomous_attention_decisions import supersede_pending_decision
-
-_SECRET_ASSIGNMENT_RE = re.compile(
-    r"(?i)\b([A-Z0-9_]*(?:TOKEN|SECRET|PASSWORD|API_KEY|APIKEY))"
-    r"\s*([:=])\s*([^\s,;]+)"
+from app.persistence.autonomous_attention_redaction import (
+    redact_payload as _redact_payload,
+    redact_text as _redact_text,
 )
-_BEARER_RE = re.compile(r"(?i)\bbearer\s+[A-Za-z0-9._~+/=-]+")
-_KNOWN_TOKEN_RE = re.compile(r"\b(?:gh[pousr]_[A-Za-z0-9]{20,}|sk-[A-Za-z0-9_-]{20,})\b")
-_SENSITIVE_KEY_RE = re.compile(
-    r"(?i)(token|secret|password|api[_-]?key|authorization|credential)"
-)
-
-
-def _redact_text(value: Any) -> str:
-    text = str(value or "")
-    text = _SECRET_ASSIGNMENT_RE.sub(r"\1\2[REDACTED]", text)
-    text = _BEARER_RE.sub("Bearer [REDACTED]", text)
-    return _KNOWN_TOKEN_RE.sub("[REDACTED]", text)
-
-
-def _redact_payload(value: Any) -> Any:
-    if isinstance(value, dict):
-        return {
-            str(key): (
-                "[REDACTED]"
-                if _SENSITIVE_KEY_RE.search(str(key))
-                else _redact_payload(item)
-            )
-            for key, item in value.items()
-        }
-    if isinstance(value, list):
-        return [_redact_payload(item) for item in value]
-    if isinstance(value, tuple):
-        return [_redact_payload(item) for item in value]
-    if isinstance(value, str):
-        return _redact_text(value)
-    return value
 
 _RECEIPT_COLUMNS = (
     "receipt_id",

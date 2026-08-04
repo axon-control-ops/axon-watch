@@ -39,6 +39,19 @@ describe('resolveKairoPresenceState', () => {
       }),
     ).toBe('observing');
   });
+
+  it('never reports idle while lower-severity signals remain open', () => {
+    expect(
+      resolveKairoPresenceState({
+        pendingApprovals: 0,
+        criticalSignals: 0,
+        highSignals: 0,
+        openSignals: 15,
+        watchConnected: false,
+        runtimeLoaded: true,
+      }),
+    ).toBe('observing');
+  });
 });
 
 describe('kairoPresenceLabel', () => {

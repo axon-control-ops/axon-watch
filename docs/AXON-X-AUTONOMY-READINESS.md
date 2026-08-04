@@ -9,7 +9,6 @@ before acting)
 **Current branch during assessment:** `dev`
 
 ---
-
 ## The short answer
 
 Axon-X is a real working system, not just a visual demonstration.

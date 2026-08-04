@@ -37,13 +37,14 @@ class AutonomousAttentionPolicyTests(unittest.TestCase):
         )
         self.assertEqual(decision.decision, "dispatch")
         self.assertFalse(decision.ask_operator)
+        self.assertEqual(decision.risk, "normal")
         self.assertEqual(decision.reason, "bounded_auto:investigate_critical")
 
-    def test_non_investigatory_critical_signal_escalates(self) -> None:
+    def test_unclassified_critical_signal_stays_operator_gated(self) -> None:
         decision = classify_attention_item(
             kind="critical_signal",
-            title="Unknown production incident",
-            detail="Customer-facing outage",
+            title="Executive decision required",
+            detail="Choose the commercial response",
             severity="critical",
         )
         self.assertEqual(decision.decision, "escalate")

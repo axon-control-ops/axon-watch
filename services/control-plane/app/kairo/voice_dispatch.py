@@ -21,6 +21,7 @@ from app.cli_runtime.catalog import runtime_status_snapshot
 from app.cli_runtime.recovery import ordered_runtime_candidates
 from app.kairo.teammate_handoff import build_specialty_task_action
 from app.kairo.voice_autonomy import resolve_voice_action_tier
+from app.kairo.voice_reply_summary import spoken_delivery_summary
 from app.kairo_conversation_reply import (
     compose_conversation_reply,
     compose_smalltalk_reply,
@@ -41,7 +42,6 @@ ConversationSource = Literal["template", "model", "fallback"]
 ConversationTurnKind = Literal["status_question", "open_question", "command", "chat", "action"]
 
 _MAX_RUNTIME_VOICE_REPLY_CHARS = 1200
-
 # Dedicated VAXON pool — independent from IDE Composer UI selection.
 _DEFAULT_VAXON_MODEL_POOL = (
     "cursor-grok-4.5-high-fast",
@@ -50,46 +50,6 @@ _DEFAULT_VAXON_MODEL_POOL = (
     "claude-sonnet-5-thinking-high",
 )
 _DEFAULT_VAXON_MODEL_ID = "cursor-grok-4.5-high-fast"
-
-
-def _short_spoken_summary(
-    reply: str,
-    *,
-    max_chars: int = 280,
-    max_sentences: int = 2,
-) -> str:
-    import re
-
-    trimmed = re.sub(r"\s+", " ", reply.strip())
-    if not trimmed:
-        return ""
-    sentences = re.split(r"(?<=[.!?])\s+", trimmed)
-    summary = ""
-    sentence_count = 0
-    for sentence in sentences:
-        candidate = sentence.strip()
-        if not candidate:
-            continue
-        next_summary = f"{summary} {candidate}".strip()
-        if len(next_summary) > max_chars:
-            break
-        summary = next_summary
-        sentence_count += 1
-        if sentence_count >= max_sentences:
-            break
-    if summary:
-        return summary
-    if len(trimmed) <= max_chars:
-        return trimmed
-    shortened = trimmed[: max_chars - 1].rstrip(" ,;:")
-    return f"{shortened}…"
-
-
-def _spoken_delivery_summary(reply: str, *, deep: bool) -> str:
-    """TTS may be shorter than the UI reply; deep/status reports keep more detail."""
-    if deep:
-        return _short_spoken_summary(reply, max_chars=900, max_sentences=6)
-    return _short_spoken_summary(reply, max_chars=280, max_sentences=2)
 
 
 @dataclass(frozen=True)
@@ -463,7 +423,7 @@ def route_voice_turn(
             or bool(OPEN_DETAIL_RE.search(content))
             or bool(STATUS_REPORT_RE.search(content))
         )
-        spoken = _spoken_delivery_summary(reply, deep=deep)
+        spoken = spoken_delivery_summary(reply, deep=deep)
         remember_top_signal(session_id, pack, fallback_workspace_id=workspace_id)
         return VoiceDispatchDecision(
             lane="vaxon_runtime",

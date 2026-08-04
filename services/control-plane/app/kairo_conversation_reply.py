@@ -6,33 +6,22 @@ import hashlib
 import re
 from typing import Any, Literal
 
+from app.kairo.conversation_facts import build_conversation_facts
 from app.kairo_smalltalk import self_intro_candidates
 from app.kairo_workspace_rename_intents import is_workspace_fleet_exempt_utterance
-from app.operator_briefing_signals import is_bootstrap_signal
 
 QuestionFocus = Literal[
-    "approvals",
-    "attention",
-    "signals",
-    "runs",
-    "activity",
-    "fleet",
-    "runtime",
-    "health",
-    "school_operations",
-    "degraded",
-    "general",
-    "followup",
+    "approvals", "attention", "signals", "runs",
+    "activity", "fleet", "runtime", "health",
+    "school_operations", "degraded", "general", "followup",
 ]
 _SCHOOL_OPERATIONS_RE = re.compile(
     r"\b(?:school|homework|parent(?:s|'s)?|aftercare|child(?:ren)?|learner(?:s)?|"
-    r"student(?:s)?|exam(?:s)?|assessment(?:s)?|practice test(?:s)?|grading|grade)\b",
-    re.IGNORECASE,
+    r"student(?:s)?|exam(?:s)?|assessment(?:s)?|practice test(?:s)?|grading|grade)\b", re.IGNORECASE,
 )
 _OPEN_QUESTION_RE = re.compile(
     r"\b(why|how|explain|tell me (?:more|about)|what happened|what went wrong|"
-    r"walk me through|can you elaborate)\b",
-    re.IGNORECASE,
+    r"walk me through|can you elaborate)\b", re.IGNORECASE,
 )
 _APPROVAL_RE = re.compile(r"\b(approval|approvals|approve|awaiting)\b", re.IGNORECASE)
 _SIGNAL_RE = re.compile(r"\b(signal|signals|sentry|posthog|monitor|inbox|incident)\b", re.IGNORECASE)
@@ -42,15 +31,12 @@ _FLEET_RE = re.compile(r"\b(fleet|workspace|workspaces|health|nominal)\b", re.IG
 _RUNTIME_RE = re.compile(
     r"\b(cli(?:\s+runtime)?|cursor(?:\s+cli)?|codex|agent\s+dispatch|lane\s+b|"
     r"vault|auth|login|api\s+key|"
-    r"(?<!canary\s)(?<!staging\s)(?<!production\s)(?<!prod\s)(?<!dev\s)runtime)\b",
-    re.I,
+    r"(?<!canary\s)(?<!staging\s)(?<!production\s)(?<!prod\s)(?<!dev\s)runtime)\b", re.I,
 )
 _HEALTH_RE = re.compile(
     r"\b("
     r"everything normal|all good|all clear|systems normal|anything wrong|"
-    r"how are things|status check|is everything|are we good|you ok|you okay"
-    r")\b",
-    re.IGNORECASE,
+    r"how are things|status check|is everything|are we good|you ok|you okay" r")\b", re.IGNORECASE,
 )
 _ATTENTION_RE = re.compile(
     r"\b(on fire|attention|urgent|wrong|needs me|needs my|priority|priorities)\b",
@@ -64,6 +50,8 @@ _ACTIVITY_RE = re.compile(
     r"\b(just did|just do|doing|latest|recent|recently|last thing|last run|activity)\b",
     re.I,
 )
+
+
 def is_open_style_question(content: str) -> bool:
     return bool(_OPEN_QUESTION_RE.search(content.strip()))
 
@@ -96,74 +84,6 @@ def detect_question_focus(content: str, *, recent_user_turns: list[str]) -> Ques
     if "degraded" in lower or "connectivity" in lower or "offline" in lower:
         return "degraded"
     return "general"
-
-def build_conversation_facts(pack: dict[str, Any]) -> dict[str, Any]:
-    briefing = pack["briefing"]
-    fleet = pack.get("fleet", {})
-    recent_dialogue = [
-        item
-        for item in pack.get("recent_dialogue", [])
-        if isinstance(item, dict) and str(item.get("content") or "").strip()
-    ]
-    top_signals = [
-        item
-        for item in briefing.get("top_signals", [])
-        if isinstance(item, dict) and not is_bootstrap_signal(item)
-    ]
-    active_runs = [
-        item for item in briefing.get("active_runs", []) if isinstance(item, dict)
-    ]
-    pending = int(briefing.get("pending_approvals", {}).get("count", 0))
-    next_actions = [
-        item for item in briefing.get("next_safe_actions", []) if isinstance(item, dict)
-    ]
-    top_signal = top_signals[0] if top_signals else {}
-    primary_run = active_runs[0] if active_runs else {}
-    review_ready_count = sum(
-        1 for item in active_runs if str(item.get("phase") or "") == "review_ready"
-    )
-    dialogue_topic = ""
-    for item in reversed(recent_dialogue):
-        if str(item.get("role") or "").strip() == "operator":
-            dialogue_topic = str(item.get("content") or "").strip()
-            break
-    if not dialogue_topic and recent_dialogue:
-        dialogue_topic = str(recent_dialogue[-1].get("content") or "").strip()
-    dialogue_topic = " ".join(dialogue_topic.split())
-    if len(dialogue_topic) > 140:
-        dialogue_topic = f"{dialogue_topic[:139].rstrip()}…"
-    return {
-        "pending_approvals": pending,
-        "top_signal_title": str(top_signal.get("title", "")).strip(),
-        "top_signal_summary": str(top_signal.get("summary", "")).strip(),
-        "top_signal_severity": str(top_signal.get("severity", "")).strip(),
-        "signal_count": len(top_signals),
-        "active_run_count": len(active_runs),
-        "review_ready_count": review_ready_count,
-        "primary_run_summary": str(primary_run.get("summary", "")).strip(),
-        "primary_run_phase": str(primary_run.get("phase", "")).strip(),
-        "workspace_label": (
-            str(pack.get("workspace", {}).get("display_name") or "").strip()
-            or str(pack.get("workspace", {}).get("workspace_id") or "").strip()
-        ),
-        "notice": str(briefing.get("notice") or "").strip(),
-        "advise": str(briefing.get("advise") or "").strip(),
-        "degraded": bool(briefing.get("degraded", {}).get("active")),
-        "watch_connected": bool(briefing.get("connectivity", {}).get("watch_connected")),
-        "workspace_count": int(fleet.get("workspace_count", 0)),
-        "critical_workspaces": int(fleet.get("critical_count", 0)),
-        "attention_workspaces": int(fleet.get("attention_count", 0)),
-        "next_action_title": str(next_actions[0].get("title", "")).strip() if next_actions else "",
-        "scope_mode": str(briefing.get("scope", {}).get("mode", "fleet")),
-        "cli_dispatch_ready": bool((briefing.get("cli_runtime") or {}).get("dispatch_ready", True)),
-        "cli_blockers": [
-            str(item).strip()
-            for item in (briefing.get("cli_runtime") or {}).get("blockers", [])
-            if str(item).strip()
-        ],
-        "recent_dialogue": recent_dialogue[-3:],
-        "recent_dialogue_topic": dialogue_topic,
-    }
 
 
 def _recent_assistant_lines(recent_turns: list[dict[str, str]]) -> list[str]:
@@ -216,6 +136,8 @@ def _select_line(
 
 _GREETING_RE = re.compile(r"^(hi|hello|hey|good morning|good evening|good afternoon)\b", re.IGNORECASE)
 _THANKS_RE = re.compile(r"^(thanks|thank you|cheers|much appreciated)\b", re.IGNORECASE)
+
+
 def compose_smalltalk_reply(
     *,
     content: str,
@@ -258,6 +180,8 @@ def compose_smalltalk_reply(
             recent_assistant=recent_assistant,
         )
     return None
+
+
 def compose_conversation_reply(
     *,
     content: str,
@@ -325,6 +249,8 @@ def build_converse_speak_context(
         "degraded_active": facts["degraded"],
         "recent_turns": recent_turns[-4:],
     }
+
+
 __all__ = [
     "build_conversation_facts",
     "build_converse_speak_context",

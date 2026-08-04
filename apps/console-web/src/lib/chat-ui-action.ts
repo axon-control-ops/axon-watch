@@ -63,9 +63,9 @@ export function parseChatUiAction(value: unknown): ChatUiAction | null {
       open_file_path: openFilePath || null,
       layout_mode: layoutMode === 'ide' || layoutMode === 'operator' ? layoutMode : undefined,
       focus_attention: record.focus_attention === true,
+      auto_attend: record.auto_attend === true,
       signal_id: signalId || null,
       cta_label: ctaLabel || null,
-      auto_attend: record.auto_attend === true,
     };
   }
 

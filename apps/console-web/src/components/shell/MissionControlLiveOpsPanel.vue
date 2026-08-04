@@ -75,6 +75,7 @@ const presence = computed(() =>
       0,
     criticalSignals: shell.runtimeSummary?.signals.critical_count ?? 0,
     highSignals: shell.runtimeSummary?.signals.high_count ?? 0,
+    openSignals: shell.runtimeSummary?.signals.open_count ?? 0,
     fullAutonomyActive: fullAutonomyActive.value,
   }),
 );
@@ -119,6 +120,7 @@ const modeChip = computed(() => {
   if (presencePhase.value === 'speaking') return 'speaking';
   if (presencePhase.value === 'listening') return 'listening';
   if (presencePhase.value === 'autonomous' || fullAutonomyActive.value) return 'autonomous';
+  if (presencePhase.value === 'alerting') return 'scanning';
   return 'standby';
 });
 
@@ -129,6 +131,7 @@ const liveBadge = computed(
     presencePhase.value === 'speaking' ||
     presencePhase.value === 'thinking' ||
     presencePhase.value === 'autonomous' ||
+    presencePhase.value === 'alerting' ||
     fullAutonomyActive.value ||
     Boolean(shell.primaryActiveRun) ||
     companyBusyCount.value > 0 ||
@@ -310,6 +313,12 @@ onUnmounted(() => {
           :data-active="modeChip === 'autonomous' ? 'true' : 'false'"
         >
           Autonomous
+        </span>
+        <span
+          class="mc-live-ops__mode"
+          :data-active="modeChip === 'scanning' ? 'true' : 'false'"
+        >
+          Scanning
         </span>
         <span
           class="mc-live-ops__mode"

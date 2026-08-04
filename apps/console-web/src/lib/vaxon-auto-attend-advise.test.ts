@@ -62,4 +62,28 @@ describe('vaxon-auto-attend-advise', () => {
     ).resolves.toBe(false);
     expect(triggerAutonomyScan).toHaveBeenCalledTimes(1);
   });
+
+  it('does not scan in manual mode or for an operator-gated advise', async () => {
+    await expect(
+      maybeTriggerAutoAttendAdvise({
+        autonomyMode: 'manual',
+        adviseUiAction: {
+          type: 'switch_workspace',
+          workspace_id: 'workspace_dashpro',
+          auto_attend: true,
+        },
+      }),
+    ).resolves.toBe(false);
+    await expect(
+      maybeTriggerAutoAttendAdvise({
+        autonomyMode: 'full',
+        adviseUiAction: {
+          type: 'switch_workspace',
+          workspace_id: 'workspace_dashpro',
+          auto_attend: false,
+        },
+      }),
+    ).resolves.toBe(false);
+    expect(triggerAutonomyScan).not.toHaveBeenCalled();
+  });
 });

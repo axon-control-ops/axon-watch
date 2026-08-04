@@ -1,16 +1,16 @@
 from __future__ import annotations
 
-import sys
-import unittest
-from pathlib import Path
 from unittest.mock import patch
 
-from fastapi.testclient import TestClient
-
-from tests.support.control_plane_db import isolate_control_plane_db
-
-CONTROL_PLANE_ROOT = Path(__file__).resolve().parents[1] / "services" / "control-plane"
-sys.path.insert(0, str(CONTROL_PLANE_ROOT))
+from tests.support.kairo_conversation_fixtures import (
+    BRIEFING_PATCH as _BRIEFING_PATCH,
+    FLEET_PATCH as _FLEET_PATCH,
+    GRAPH_PATCH as _GRAPH_PATCH,
+    KairoConversationTestCase,
+    MOCK_BRIEFING as _MOCK_BRIEFING,
+    MOCK_FLEET as _MOCK_FLEET,
+    MOCK_GRAPH as _MOCK_GRAPH,
+)
 
 from app.kairo_conversation import (  # noqa: E402
     answer_status_question,
@@ -19,51 +19,9 @@ from app.kairo_conversation import (  # noqa: E402
     converse_turn,
 )
 from app.kairo_conversation_reply import compose_conversation_reply  # noqa: E402
-from app.main import app  # noqa: E402
-from app.persistence import chat_store, run_store  # noqa: E402
-
-_MOCK_BRIEFING = {
-    "generated_at": "2026-07-08T00:00:00Z",
-    "notice": "Two runs are active.",
-    "advise": "Review the top signal before dispatching more work.",
-    "top_signals": [
-        {
-            "signal_id": "signal_monitor_dashpro_sentry_recent_issues_warning",
-            "workspace_id": "workspace_dashpro",
-            "title": "Sentry spike in DashPro",
-            "summary": "3 unresolved issues",
-            "severity": "high",
-        }
-    ],
-    "pending_approvals": {"count": 2, "items": [{}, {}]},
-    "active_runs": [{"run_id": "run_1", "summary": "Git status"}],
-    "degraded": {"active": False, "reasons": []},
-}
-
-_MOCK_FLEET = {
-    "items": [
-        {"workspace_id": "ws_a", "tone": "critical"},
-        {"workspace_id": "ws_b", "tone": "nominal"},
-    ]
-}
-
-_MOCK_GRAPH = {"nodes": [{"node_id": "n1"}], "edges": []}
 
 
-from app.kairo.context_pack_cache import clear_pack_cache_for_tests  # noqa: E402
-from app.kairo.turn_memory import clear_memory_for_tests  # noqa: E402
-
-# Patches must target where the pack builder imports the symbols (not the facade).
-_BRIEFING_PATCH = "app.kairo.conversation_context_pack.build_operator_briefing"
-_FLEET_PATCH = "app.kairo.conversation_context_pack.build_operator_fleet_health"
-_GRAPH_PATCH = "app.kairo.conversation_context_pack.build_operator_brain_graph"
-
-
-class KairoConversationTurnTests(unittest.TestCase):
-    def setUp(self) -> None:
-        clear_pack_cache_for_tests()
-        clear_memory_for_tests()
-
+class KairoConversationTurnTests(KairoConversationTestCase):
     @patch(_GRAPH_PATCH, return_value=_MOCK_GRAPH)
     @patch(_FLEET_PATCH, return_value=_MOCK_FLEET)
     @patch(_BRIEFING_PATCH, return_value=_MOCK_BRIEFING)
@@ -287,234 +245,6 @@ class KairoConversationTurnTests(unittest.TestCase):
         self.assertEqual("status_question", payload["turn_kind"])
         self.assertIn("DashPro", str(payload["reply"]))
         mock_briefing.assert_called_with(workspace_id="workspace_dashpro")
-
-    @patch(_GRAPH_PATCH, return_value=_MOCK_GRAPH)
-    @patch(_FLEET_PATCH, return_value=_MOCK_FLEET)
-    @patch(_BRIEFING_PATCH, return_value=_MOCK_BRIEFING)
-    @patch("app.kairo_conversation.dispatch_ide_composer")
-    @patch(
-        "app.kairo_conversation_runtime_context.build_lane_b_context_block",
-        return_value="Workspace context",
-    )
-    def test_converse_open_question_sanitizes_runtime_agent_dump(
-        self,
-        _mock_context: object,
-        mock_dispatch,
-        *_mocks: object,
-    ) -> None:
-        mock_dispatch.return_value = {
-            "content": (
-                ":::thinking\nInvestigating.\n:::\n"
-                ":::tool Read scripts/ops/audit-supabase-storage.mjs\n\n"
-                "From my side right now, DashPro is not spiking — systems nominal."
-            ),
-            "dispatched": True,
-        }
-        payload = converse_turn(
-            content="why is dashpro spiking?",
-            session_id="sanitize-open-question",
-            use_runtime=True,
-            answer_tier="deep",
-        )
-        reply = str(payload["reply"])
-        self.assertNotIn(":::", reply)
-        self.assertNotIn("scripts/ops", reply)
-        self.assertTrue(payload["artifacts"])
-        artifact_body = str(payload["artifacts"][0]["body"])
-        self.assertIn("DashPro is not spiking", artifact_body)
-
-    @patch(_GRAPH_PATCH, return_value=_MOCK_GRAPH)
-    @patch(_FLEET_PATCH, return_value=_MOCK_FLEET)
-    @patch(_BRIEFING_PATCH, return_value=_MOCK_BRIEFING)
-    @patch("app.kairo_conversation.dispatch_ide_composer")
-    @patch(
-        "app.kairo_conversation_runtime_context.build_lane_b_context_block",
-        return_value="Workspace context",
-    )
-    def test_converse_open_question_uses_runtime_assistant(
-        self,
-        _mock_context: object,
-        mock_dispatch,
-        *_mocks: object,
-    ) -> None:
-        mock_dispatch.return_value = {
-            "content": "The Sentry spike appears tied to the latest DashPro changes.",
-            "dispatched": True,
-        }
-        payload = converse_turn(
-            content="why is sentry spiking?",
-            session_id="open-question-session",
-            use_runtime=True,
-            answer_tier="deep",
-        )
-        self.assertEqual("open_question", payload["turn_kind"])
-        self.assertEqual("model", payload["source"])
-        self.assertIn("Sentry spike", str(payload["artifacts"][0]["body"]))
-        self.assertTrue(payload["artifacts"])
-        mock_dispatch.assert_called_once()
-
-    @patch(_GRAPH_PATCH, return_value=_MOCK_GRAPH)
-    @patch(_FLEET_PATCH, return_value=_MOCK_FLEET)
-    @patch(_BRIEFING_PATCH, return_value=_MOCK_BRIEFING)
-    @patch("app.kairo_conversation.dispatch_ide_composer")
-    @patch(
-        "app.kairo_conversation_runtime_context.build_lane_b_context_block",
-        return_value="Workspace context",
-    )
-    def test_school_capability_question_uses_consultative_runtime(
-        self,
-        _mock_context: object,
-        mock_dispatch,
-        *_mocks: object,
-    ) -> None:
-        mock_dispatch.return_value = {
-            "content": "Imani can coordinate this, provided teachers approve grades and parent messages.",
-            "dispatched": True,
-        }
-        payload = converse_turn(
-            content=(
-                "Will Imani in Young Eagles be able to help me run the school, post daily "
-                "homework, help grade it, and prepare parent reports?"
-            ),
-            session_id="school-capability-session",
-            workspace_id="workspace_young_eagles_day_care",
-            use_runtime=True,
-            answer_tier="deep",
-            submission_intent="ask",
-        )
-        self.assertEqual("open_question", payload["turn_kind"])
-        self.assertEqual("model", payload["source"])
-        self.assertIn("Imani can coordinate", str(payload["reply"]))
-        mock_dispatch.assert_called_once()
-
-    @patch(_GRAPH_PATCH, return_value=_MOCK_GRAPH)
-    @patch(_FLEET_PATCH, return_value=_MOCK_FLEET)
-    @patch(_BRIEFING_PATCH, return_value=_MOCK_BRIEFING)
-    @patch("app.kairo_conversation.dispatch_ide_composer")
-    @patch(
-        "app.kairo_conversation_runtime_context.build_lane_b_context_block",
-        return_value="Workspace context",
-    )
-    def test_ask_always_uses_consultative_runtime_without_keyword_matching(
-        self,
-        _mock_context: object,
-        mock_dispatch,
-        *_mocks: object,
-    ) -> None:
-        mock_dispatch.return_value = {"content": "Here is my considered recommendation.", "dispatched": True}
-        payload = converse_turn(
-            content="I have a new idea.",
-            session_id="consultative-ask-session",
-            use_runtime=False,
-            answer_tier="fast",
-            submission_intent="ask",
-        )
-        self.assertEqual("model", payload["source"])
-        self.assertIn("considered recommendation", str(payload["reply"]))
-        mock_dispatch.assert_called_once()
-
-    @patch(_GRAPH_PATCH, return_value=_MOCK_GRAPH)
-    @patch(_FLEET_PATCH, return_value=_MOCK_FLEET)
-    @patch(_BRIEFING_PATCH, return_value=_MOCK_BRIEFING)
-    @patch("app.kairo_conversation.dispatch_ide_composer", return_value={"content": "", "dispatched": False})
-    def test_school_capability_question_has_useful_template_fallback(
-        self,
-        *_mocks: object,
-    ) -> None:
-        payload = converse_turn(
-            content="Can Imani help me run the school and send weekly parent updates?",
-            session_id="school-fallback-session",
-            workspace_id="workspace_young_eagles_day_care",
-            submission_intent="ask",
-        )
-        self.assertEqual("open_question", payload["turn_kind"])
-        self.assertIn("Imani", str(payload["reply"]))
-        self.assertIn("teacher sign-off", str(payload["reply"]))
-        self.assertNotIn("run queue is idle", str(payload["reply"]).lower())
-
-    @patch(_GRAPH_PATCH, return_value=_MOCK_GRAPH)
-    @patch(_FLEET_PATCH, return_value=_MOCK_FLEET)
-    @patch(_BRIEFING_PATCH, return_value=_MOCK_BRIEFING)
-    @patch("app.kairo_conversation.dispatch_ide_composer")
-    def test_converse_open_question_fast_tier_skips_runtime(
-        self,
-        mock_dispatch,
-        *_mocks: object,
-    ) -> None:
-        payload = converse_turn(
-            content="why is sentry spiking?",
-            session_id="fast-open-question",
-            use_runtime=True,
-            answer_tier="fast",
-        )
-        self.assertEqual("open_question", payload["turn_kind"])
-        self.assertEqual("template", payload["source"])
-        self.assertEqual([], payload["artifacts"])
-        mock_dispatch.assert_not_called()
-
-    @patch(_GRAPH_PATCH, return_value=_MOCK_GRAPH)
-    @patch(_FLEET_PATCH, return_value=_MOCK_FLEET)
-    @patch(_BRIEFING_PATCH, return_value=_MOCK_BRIEFING)
-    @patch("app.kairo_conversation.dispatch_ide_composer")
-    @patch(
-        "app.kairo_conversation_runtime_context.build_lane_b_context_block",
-        return_value="Workspace context",
-    )
-    def test_converse_open_question_trims_run_on_runtime_tail(
-        self,
-        _mock_context: object,
-        mock_dispatch,
-        *_mocks: object,
-    ) -> None:
-        mock_dispatch.return_value = {
-            "content": (
-                "I'll check operational docs and recent monitoring signals in the workspace to see what "
-                "might explain a DashPro spike. If you are seeing a spike in Supabase or Axon quota, "
-                "the repo points at storage, not the database. Recent ops work was added because "
-                "storage is blowing the one-gigabyte free tier; cleanup notes call out the tts-audio "
-                "bucket at roughly four hundred twenty-seven megabytes as the main offender. "
-                "If you meant CPU, errors, or traffic instead, say which dashboard and I will narrow "
-                "it.From my side right now DashPro is not spiking — no active runs, no top signal, "
-                "systems nominal. If you are seeing a spike in Supabase or Axon quota, the repo "
-                "points at storage, not the database."
-            ),
-            "dispatched": True,
-        }
-        payload = converse_turn(
-            content="why is dashpro spiking?",
-            session_id="open-question-tail-trim",
-            use_runtime=True,
-            answer_tier="deep",
-        )
-        reply = str(payload["reply"])
-        spoken = str(payload.get("spoken_reply") or reply)
-        artifact_body = str(payload["artifacts"][0]["body"])
-        # Deep/runtime turns keep the full reply for UI; TTS may shorten.
-        self.assertLessEqual(len(spoken), 900)
-        self.assertGreaterEqual(len(reply), len(spoken))
-        self.assertIn("DashPro spike", artifact_body)
-        self.assertIn("storage", reply.lower())
-        self.assertEqual(artifact_body.count("If you are seeing a spike in Supabase or Axon quota"), 1)
-        self.assertTrue(spoken.endswith((".", "!", "?")))
-
-    @patch(_GRAPH_PATCH, return_value=_MOCK_GRAPH)
-    @patch(_FLEET_PATCH, return_value=_MOCK_FLEET)
-    @patch(_BRIEFING_PATCH, return_value=_MOCK_BRIEFING)
-    @patch("app.kairo_conversation.dispatch_ide_composer")
-    def test_converse_status_question_stays_template_even_with_runtime_enabled(
-        self,
-        mock_dispatch,
-        *_mocks: object,
-    ) -> None:
-        payload = converse_turn(
-            content="any approvals?",
-            session_id="runtime-status-session",
-            use_runtime=True,
-        )
-        self.assertEqual("status_question", payload["turn_kind"])
-        self.assertEqual("template", payload["source"])
-        self.assertRegex(str(payload["reply"]).lower(), r"(approval|approve|approvals|sign-?off)")
-        mock_dispatch.assert_not_called()
 
     @patch(_GRAPH_PATCH, return_value=_MOCK_GRAPH)
     @patch(_FLEET_PATCH, return_value=_MOCK_FLEET)

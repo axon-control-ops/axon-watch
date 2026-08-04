@@ -36,10 +36,11 @@ def build_lead_takeover_spoken_line(
     lead_name: str = "Lead",
     parent_plan_goal: str | None = None,
 ) -> str:
-    """TTS-friendly Lead executive brief — situation, outcome, Lead-owned next move."""
+    """TTS-friendly executive brief without runtime protocol or shell chores."""
     from app.workspace_agents.lead_executive_brief import (
         compress_ask,
         executive_next_step,
+        executive_operator_action,
         plain_outcome,
     )
     from app.workspace_agents.lead_takeover import extract_lead_next
@@ -48,24 +49,28 @@ def build_lead_takeover_spoken_line(
     role = (employee_role or "specialist").strip()
     status = "completed" if phase == "completed" else (phase or "ended")
     lead = (lead_name or "Lead").strip() or "Lead"
-    ask = compress_ask(parent_plan_goal, max_len=120)
+    parent_ask = compress_ask(parent_plan_goal)
     outcome = plain_outcome(reply_text)
     lead_next = extract_lead_next(reply_text)
     parts = [f"{lead} here."]
-    if ask:
-        parts.append(f"Situation: {ask}.")
-    parts.append(f"Update: {name} ({role}) just {status}.")
-    if outcome:
-        parts.append(f"What landed: {outcome}")
+    if parent_ask:
+        suffix = "" if parent_ask.endswith((".", "!", "?")) else "."
+        parts.append(f"Goal: {parent_ask}{suffix}")
+    else:
+        parts.append("Goal: Complete the requested result and verify that it is ready to use.")
+    progress = outcome or "no verified result is available yet."
+    parts.append(f"Progress: {name} ({role}) {status}; {progress}")
+    parts.append("What remains: The requested result must be verified and ready to use.")
     parts.append(
-        executive_next_step(
+        "What I am doing next: "
+        + executive_next_step(
             lead_next=lead_next,
             specialist_name=name,
-            parent_ask=ask,
+            parent_ask=parent_ask,
             status=status,
         )
     )
-    parts.append("Say stop only if you want a different order.")
+    parts.append("Your action: " + executive_operator_action(lead_next))
     return " ".join(parts)
 
 
@@ -100,8 +105,8 @@ def build_lead_synthesis_spoken_line(
     if bits:
         parts.append("Specialists: " + "; ".join(bits) + ".")
     parts.append(
-        "Next: I will convert this rollup into the next assignment "
-        "and only escalate a real decision gate to you."
+        "Next: I will turn this rollup into the next assignment and only "
+        "escalate a real decision gate."
     )
     return " ".join(parts)
 

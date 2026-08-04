@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import logging
 import os
-import re
 from collections.abc import Callable
 from pathlib import Path
 
@@ -22,6 +21,7 @@ from app.cli_runtime.runtime_failure import (
     fallback_reply as _fallback_reply,
     runtime_unready_reason as _runtime_unready_reason,
 )
+from app.cli_runtime.sentry_context import sentry_monitor_context
 from app.cli_runtime.subprocess_runner import RuntimeProcessStoppedError
 from app.cli_runtime.cursor_agent import (
     CursorAgentReply,
@@ -79,57 +79,11 @@ _INSTRUCTION_TAKING = (
     "quoted commit message when the operator provided one."
 )
 
-_SENTRY_REQUEST_RE = re.compile(r"\bsentry\b", re.IGNORECASE)
-
-
 def _sentry_monitor_context(user_prompt: str) -> str:
-    """Attach bounded, secret-free Watch evidence to Sentry agent requests."""
-    if not _SENTRY_REQUEST_RE.search(user_prompt):
-        return ""
-
-    payload = fetch_watch_monitors(timeout_seconds=2.0)
-    items = payload.get("items") if isinstance(payload, dict) else None
-    record = next(
-        (
-            item
-            for item in (items if isinstance(items, list) else [])
-            if isinstance(item, dict)
-            and str(item.get("check_type") or "") == "sentry_recent_issues"
-        ),
-        None,
+    return sentry_monitor_context(
+        user_prompt,
+        fetch_monitors=fetch_watch_monitors,
     )
-    lines = [
-        "Sentry operating rule: credentials are held by Axon Watch and intentionally "
-        "excluded from workspace subprocess environment variables. Do not inspect .env, "
-        "print tokens, or infer that Sentry access is missing from process.env. Use the "
-        "trusted Axon Watch monitor evidence below.",
-    ]
-    issue_count = 0
-    status = "unavailable"
-    if record:
-        status = str(record.get("status") or "unknown")
-        detail = str(record.get("detail") or "").strip()
-        lines.append(f"Monitor status: {status}. {detail}".strip())
-        issues = record.get("issues")
-        if isinstance(issues, list):
-            issue_count = len(issues)
-            for issue in issues[:5]:
-                if not isinstance(issue, dict):
-                    continue
-                short_id = str(issue.get("short_id") or issue.get("id") or "issue")
-                title = str(issue.get("title") or "Untitled Sentry issue").strip()
-                count = int(issue.get("count") or 0)
-                permalink = str(issue.get("permalink") or "").strip()
-                lines.append(
-                    f"- {short_id}: {title} ({count} events)"
-                    + (f" — {permalink}" if permalink else "")
-                )
-    else:
-        lines.append(
-            "Live monitor evidence is temporarily unavailable. Report that limitation; "
-            "do not claim the Sentry token is absent."
-        )
-    return "\n".join(lines)
 
 def _operator_persona_enabled() -> bool:
     return bool(load_settings().get("operator_persona_enabled", True))

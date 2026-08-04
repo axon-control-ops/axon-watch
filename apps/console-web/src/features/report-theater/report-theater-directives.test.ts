@@ -9,7 +9,7 @@ import {
 } from './report-theater-directives';
 
 describe('report-theater-directives', () => {
-  it('rewrites passive next-move copy into VAXON first person', () => {
+  it('rewrites passive cross-workspace review copy as VAXON attendance', () => {
     expect(
       toVaxonDirectiveLine(
         'Critical signal in DashPro needs review; switch there before continuing',
@@ -23,6 +23,20 @@ describe('report-theater-directives', () => {
         'VAXON is attending the critical signal in DashPro — routing specialists there; keep working here (Fast Gate)',
       ),
     ).toMatch(/^VAXON is attending/i);
+  });
+
+  it('treats an attending commitment as auto-executable', () => {
+    expect(
+      isAutoExecutableCommitment('VAXON is attending the critical signal', {
+        action_id: 'attend-critical',
+        kind: 'review_signal',
+        title: 'Review critical signal',
+        detail: 'Attend without switching operator focus.',
+        workspace_id: 'workspace_dashpro',
+        run_id: null,
+        signal_id: 'sig-critical',
+      }),
+    ).toBe(true);
   });
 
   it('rewrites inspect advise into Attention open', () => {

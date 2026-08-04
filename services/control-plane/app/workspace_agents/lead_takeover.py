@@ -129,9 +129,10 @@ def _already_posted_takeover(thread_id: str, run_id: str) -> bool:
         if str(message.get("role") or "") != "agent":
             continue
         content = str(message.get("content") or "")
-        if needle in content and "Lead takeover" in content:
+        is_lead_brief = "Lead takeover" in content or "Lead executive brief" in content
+        if needle in content and is_lead_brief:
             return True
-        if str(message.get("run_id") or "").strip() == cleaned_run and "Lead takeover" in content:
+        if str(message.get("run_id") or "").strip() == cleaned_run and is_lead_brief:
             return True
     return False
 
@@ -152,8 +153,7 @@ def build_lead_takeover_message(
     from app.workspace_agents.lead_executive_brief import (
         compress_ask,
         executive_next_step,
-        looks_like_shell_chore,
-        needs_operator_gate,
+        executive_operator_action,
         plain_outcome,
     )
 
@@ -161,69 +161,51 @@ def build_lead_takeover_message(
     role = (employee_role or "specialist").strip()
     status = "completed" if phase == "completed" else (phase or "ended")
     lead_next = extract_lead_next(reply_text)
-    parent_ask = compress_ask(parent_plan_goal, max_len=200)
-    landed = plain_outcome(reply_text) or _truncate(outcome, max_len=200)
-    goal_line = _truncate(goal, max_len=200)
+    parent_ask = compress_ask(parent_plan_goal, max_len=220)
+    goal_line = compress_ask(goal, max_len=220)
+    landed = plain_outcome(reply_text) or plain_outcome(outcome)
     next_line = executive_next_step(
         lead_next=lead_next,
         specialist_name=name,
         parent_ask=parent_ask,
         status=status,
     )
-
+    operator_action = executive_operator_action(lead_next)
     lines = [
-        f"Lead takeover — executive brief ({name} / {role} {status}).",
+        "Lead executive brief",
         "",
-        "Situation",
+        "Goal",
     ]
     if parent_ask:
-        lines.append(f"- Ask: {parent_ask}")
+        lines.append(f"- {parent_ask}")
     elif goal_line:
-        lines.append(f"- Ask: {goal_line}")
+        lines.append(f"- {goal_line}")
     else:
-        lines.append("- Ask: specialist slice finished; parent ask not attached.")
-    if goal_line and parent_ask and goal_line != parent_ask:
-        lines.append(f"- Specialist slice: {goal_line}")
-
-    lines.extend(["", "What landed"])
-    if landed:
-        lines.append(f"- {landed}")
-    else:
-        lines.append(f"- {name} {status}; no clean outcome line yet.")
-
-    lines.extend(["", "Still open"])
+        lines.append("- Complete the requested result and verify that it is ready to use.")
+    lines.extend(["", "Progress"])
+    lines.append(
+        f"- {name}: {landed}"
+        if landed
+        else f"- {name}'s check {status}; no verified result is available yet."
+    )
+    lines.extend(["", "What remains"])
     if parent_ask:
         lines.append(
-            f"- I still own the original ask. {name}'s work is input, not a restart of the mission."
+            "- The original goal is still open until the requested result is verified "
+            "and ready to use."
         )
     else:
-        lines.append("- Convert this result into the next assignment or a clear ship gate.")
-
-    lines.extend(["", "My next move", f"- {next_line}"])
-    if lead_next and needs_operator_gate(lead_next) and not looks_like_shell_chore(lead_next):
-        lines.extend(
-            [
-                "",
-                "Only if you disagree",
-                f"- Specialist suggested a gate: {lead_next}",
-            ]
-        )
-    else:
-        lines.extend(
-            [
-                "",
-                "Only if you disagree",
-                "- Say stop or change the order — otherwise I keep driving.",
-            ]
-        )
-
-    # Trace footer (kept for dedupe / receipts; not the spoken dump).
-    lines.extend(["", f"Run: {run_id or '(none)'}"])
-    if task_id:
-        lines.append(f"Task: {task_id}")
-    if plan_id:
-        lines.append(f"Plan: {plan_id}")
-    lines.append("Confidence: 8/10")
+        lines.append("- I will turn this result into the next assignment or a clear decision.")
+    lines.extend(
+        [
+            "",
+            "What I am doing next",
+            f"- {next_line}",
+            "",
+            "Your action",
+            f"- {operator_action}",
+        ]
+    )
     return "\n".join(lines)
 
 

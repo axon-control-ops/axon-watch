@@ -2,20 +2,15 @@
 
 from __future__ import annotations
 
-import hashlib
 import time
 from typing import Any, Literal
 
 from app.chat.command_intent import (
     classify_command,
-    command_display_name,
-    command_requires_confirmation,
     expand_command_shortcuts,
-    is_auto_complete_run_summary,
     is_question,
 )
 from app.cli_runtime.router import dispatch_ide_composer
-from app.kairo.context_pack_cache import get_cached_context_pack
 from app.kairo.voice_dispatch import (
     VoiceModelReceipt,
     normalize_voice_routing_mode,
@@ -49,13 +44,8 @@ from app.kairo.conversation_command_ack import command_ack_line, workspace_short
 from app.kairo.conversation_context_pack import build_conversation_context_pack
 from app.kairo.teammate_handoff import enrich_handoff_with_teammate
 from app.kairo.conversation_transcript import log_voice_turn as _log_voice_turn
-from app.kairo_conversation_reply import (
-    build_conversation_facts,
-    compose_conversation_reply,
-    compose_smalltalk_reply,
-)
+from app.kairo_conversation_reply import compose_conversation_reply
 from app.kairo_conversation_runtime_context import (
-    OPEN_DETAIL_RE as _OPEN_DETAIL_RE,
     build_runtime_context_block,
     runtime_workspace_id,
 )
@@ -70,8 +60,6 @@ from app.operator_briefing import build_operator_briefing
 from app.operator_brain_graph import build_operator_brain_graph
 from app.operator_fleet_health import build_operator_fleet_health
 from app.operator_persona_stt_aliases import normalize_persona_stt_aliases
-from app.persistence import chat_store
-from app.workspace_project_bindings import get_workspace_project_binding, load_workspace_project_bindings
 ConversationSource = Literal["template", "model", "fallback"]; ConversationAnswerTier = Literal["fast", "deep"]
 _MAX_RUNTIME_VOICE_REPLY_CHARS = 1200
 def _runtime_workspace_id(*, workspace_id: str | None, pack: dict[str, Any]) -> str:
@@ -99,7 +87,6 @@ def _build_runtime_context_block(
         context_signal_id=context_signal_id,
         image_paths=image_paths,
     )
-
 
 
 def classify_conversation_turn(content: str) -> ConversationTurnKind:

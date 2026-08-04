@@ -80,7 +80,7 @@ export function toVaxonActionLabel(action: BriefingAction): string {
   if (action.kind === 'review_signal') {
     const title = action.title?.trim() || 'that signal';
     if (/^review\b/i.test(title)) {
-      return `I'll switch us there and review that signal next`;
+      return `I'll attend that signal and report the outcome here`;
     }
     return `I'll open Attention for ${title}`;
   }

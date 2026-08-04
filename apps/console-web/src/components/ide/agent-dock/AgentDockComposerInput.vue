@@ -71,6 +71,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   'update:draft': [value: string];
+  'clear-draft': [];
   'remove-chip': [key: string];
   'open-image': [image: ComposerClipboardImage];
   'remove-image': [imageId: string];
@@ -275,6 +276,16 @@ const contextChips = computed(() =>
         @click="emit('sync-typeahead')"
         @paste="emit('paste', $event)"
       />
+      <button
+        v-if="draft.length"
+        type="button"
+        class="agent-dock-composer__clear"
+        aria-label="Clear message"
+        title="Clear message"
+        @click="emit('clear-draft')"
+      >
+        ×
+      </button>
     </div>
   </div>
 
