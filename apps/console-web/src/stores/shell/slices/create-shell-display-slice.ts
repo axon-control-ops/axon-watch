@@ -9,6 +9,7 @@ import type {
   RuntimeSummary,
   WorkspaceRecord,
 } from '../../../contracts/canonical';
+import { buildStatusBarClaudeUsageZone } from '../../../lib/claude-usage-view';
 import { buildStatusBarConnectorChip } from '../../../lib/connector-glance-view';
 import { buildStatusBarUsageZone } from '../../../lib/cursor-usage-view';
 import { shouldShowIdeAgentStop } from '../../../lib/ide-agent-run-active';
@@ -175,6 +176,11 @@ export function createShellDisplaySlice(input: CreateShellDisplaySliceInput) {
     const usageZone = buildStatusBarUsageZone(input.runtimeStatus.value?.cursor_usage);
     if (usageZone) {
       zones.center.push(usageZone);
+    }
+
+    const claudeUsageZone = buildStatusBarClaudeUsageZone(input.runtimeStatus.value?.claude_usage);
+    if (claudeUsageZone) {
+      zones.center.push(claudeUsageZone);
     }
 
     return zones;

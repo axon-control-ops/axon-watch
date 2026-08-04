@@ -354,3 +354,88 @@
   line-height: 1.35;
   opacity: 0.62;
 }
+
+.claude-usage-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 1rem;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 0.55rem;
+  background: rgba(0, 10, 18, 0.62);
+}
+
+.claude-usage-card__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.claude-usage-card__title {
+  margin: 0;
+  font-size: 0.88rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.claude-usage-card__summary {
+  margin: 0.3rem 0 0;
+  font-size: 0.78rem;
+  line-height: 1.35;
+  opacity: 0.78;
+}
+
+.claude-usage-card__badge {
+  flex: none;
+  padding: 0.15rem 0.5rem;
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.claude-usage-card__badge--warn {
+  background: rgba(245, 158, 11, 0.22);
+  color: #fbbf24;
+}
+
+.claude-usage-card__note {
+  margin: 0;
+  font-size: 0.7rem;
+  line-height: 1.4;
+  opacity: 0.55;
+}
+
+.claude-usage-card__stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(9.5rem, 1fr));
+  gap: 0.7rem;
+}
+
+.claude-usage-card__stat {
+  padding: 0.6rem 0.7rem;
+  border-radius: 0.45rem;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.claude-usage-card__stat-label {
+  margin: 0;
+  font-size: 0.68rem;
+  letter-spacing: 0.03em;
+  opacity: 0.65;
+}
+
+.claude-usage-card__stat-value {
+  margin: 0.2rem 0 0;
+  font-size: 1.05rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.claude-usage-card__stat-hint {
+  margin: 0.2rem 0 0;
+  font-size: 0.68rem;
+  line-height: 1.3;
+  opacity: 0.55;
+}

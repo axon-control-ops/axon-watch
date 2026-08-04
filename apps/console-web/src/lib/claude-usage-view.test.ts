@@ -18,8 +18,8 @@ describe('claude-usage-view', () => {
       lifetime_estimated_cost_usd: 12.34,
     });
     expect(stats.map((stat) => stat.id)).toEqual(['recent', 'week', 'sessions', 'cost']);
-    expect(stats[0].value).toBe('80.9k');
-    expect(stats[1].value).toBe('142.6k');
+    expect(stats[0].value).toBe('81k');
+    expect(stats[1].value).toBe('143k');
     expect(stats[2].value).toBe('106');
     expect(stats[3].value).toBe('$12.34');
   });
