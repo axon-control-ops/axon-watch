@@ -33,9 +33,7 @@ import {
 } from '../../lib/ide-composer-queue';
 import { persistIdeComposerDraft } from '../../lib/ide-composer-draft-prefs';
 import { focusAgentDockComposerInput } from '../../lib/agent-dock-composer-focus';
-import {
-  type TeammateRouteNotice,
-} from '../../lib/teammate-route-notice';
+import type { TeammateRouteNotice } from '../../lib/teammate-route-notice';
 import { resolveLiveBusyEmployeeIds } from '../../features/workspace-agents/company-roster-busy';
 import { useShellStore } from '../../stores/shell';
 import { useDebugReproduceActions } from './use-debug-reproduce-actions';

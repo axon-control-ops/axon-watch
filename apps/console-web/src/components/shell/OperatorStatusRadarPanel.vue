@@ -156,7 +156,6 @@ const attentionBadgeCount = computed(() =>
     inboxLoadState: shell.inboxLoadState,
   }),
 );
-
 const kairoParts = computed(() => {
   const highSignals =
     shell.operatorBriefing?.top_signals.filter((signal) => signal.severity === 'high').length ??
@@ -168,10 +167,7 @@ const kairoParts = computed(() => {
     pendingApprovals: pendingApprovals.value,
     criticalSignals,
     highSignals,
-    openSignals:
-      shell.runtimeSummary?.signals.open_count
-      ?? shell.operatorBriefing?.top_signals.length
-      ?? 0,
+    openSignals: shell.runtimeSummary?.signals.open_count ?? shell.operatorBriefing?.top_signals.length ?? 0,
     watchConnected: shell.runtimeSummary?.watch.connected ?? false,
     runtimeLoaded: shell.runtimeSummaryLoadState === 'loaded',
   });

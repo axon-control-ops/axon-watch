@@ -7,7 +7,6 @@ import AgentDockComposerChrome from './agent-dock/AgentDockComposerChrome.vue';
 import AgentDockComposerInput from './agent-dock/AgentDockComposerInput.vue';
 import AgentDockComposerToolbar from './agent-dock/AgentDockComposerToolbar.vue';
 import AgentDockKairoComposerFooter from './agent-dock/AgentDockKairoComposerFooter.vue';
-
 const composer = useAgentDockComposer();
 const toolbarProps = useAgentDockComposerToolbarProps(composer);
 </script>

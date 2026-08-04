@@ -6,16 +6,10 @@ import asyncio
 import logging
 import os
 import threading
-from datetime import datetime, timezone
 from typing import Any
 
 from app.domain.run_state import is_terminal_phase
-from app.persistence import (
-    autonomous_attention_store,
-    operator_presence_settings_store,
-    task_store,
-    worker_scheduler_settings_store,
-)
+from app.persistence import task_store, worker_scheduler_settings_store
 from app.runs.service import (
     RunLifecycleError,
     create_run,
@@ -27,10 +21,8 @@ from app.runs.service import (
 )
 from app.runs.stale_reconcile import BUSY_EMPLOYEE_PHASES
 from app.workspace_agents.config_loader import EmployeeConfig, load_workspace_agent_configs
-from app.workspace_agents.scheduler_auto_start_gates import (
-    runtime_auth_blocks_auto_start,
-    usage_limit_blocks_auto_start,
-)
+from app.workspace_agents.scheduler_auto_start_gates import runtime_auth_blocks_auto_start, usage_limit_blocks_auto_start
+from app.workspace_agents.scheduler_attention_scan import run_due_attention_scan_and_log
 from app.workspace_agents.scheduler_queued_fan_out import dispatch_queued_lead_fan_out_runs
 from app.workspace_agents.worker_dispatch import dispatch_continuous_worker_run, worker_dispatch_enabled
 
@@ -39,7 +31,6 @@ logger = logging.getLogger(__name__)
 CONTINUOUS_SCHEDULES = frozenset({"always_on", "continuous"})
 SKIP_ROLES = frozenset({"lead", "overview_agent"})
 DEFAULT_TICK_SECONDS = 45.0
-DEFAULT_AUTONOMY_SCAN_INTERVAL_SECONDS = 180.0
 # Cap new starts per tick so one restart cannot flood approvals / executing debt.
 # Keep these low: each cursor-agent is ~300MB+ and often spawns jest / tsserver workers.
 DEFAULT_MAX_STARTS_PER_TICK = 1
@@ -76,41 +67,6 @@ def tick_interval_seconds() -> float:
     except ValueError:
         return DEFAULT_TICK_SECONDS
     return max(5.0, value)
-
-
-def autonomy_scan_interval_seconds() -> float:
-    raw = os.environ.get("AXON_WATCH_AUTONOMY_SCAN_INTERVAL_SECONDS", "").strip()
-    if not raw:
-        return DEFAULT_AUTONOMY_SCAN_INTERVAL_SECONDS
-    try:
-        value = float(raw)
-    except ValueError:
-        return DEFAULT_AUTONOMY_SCAN_INTERVAL_SECONDS
-    return max(45.0, value)
-
-
-def run_scheduled_autonomous_attention_scan() -> dict[str, Any] | None:
-    """Occasionally inspect configured workspaces while Full autonomy is effective."""
-    if not scheduler_enabled():
-        return None
-    settings = operator_presence_settings_store.load_settings()
-    if str(settings.get("autonomy_mode") or "manual").strip().lower() != "full":
-        return None
-
-    last_scan = autonomous_attention_store.get_meta("last_scan") or {}
-    scanned_at = str(last_scan.get("scanned_at") or "").strip()
-    if scanned_at:
-        try:
-            previous = datetime.fromisoformat(scanned_at.replace("Z", "+00:00"))
-            age = (datetime.now(timezone.utc) - previous).total_seconds()
-            if age < autonomy_scan_interval_seconds():
-                return None
-        except ValueError:
-            pass
-
-    from app.workspace_agents.autonomous_attention import run_autonomous_attention_scan
-
-    return run_autonomous_attention_scan(include_lead_checkin=False)
 
 
 def _env_positive_int(name: str, default: int) -> int:
@@ -516,13 +472,7 @@ async def _scheduler_loop() -> None:
     await asyncio.sleep(interval)
     while True:
         try:
-            scan = await asyncio.to_thread(run_scheduled_autonomous_attention_scan)
-            if scan:
-                logger.info(
-                    "autonomous attention scan checked %s workspace(s), created %s task(s)",
-                    len(scan.get("checked_workspaces") or []),
-                    len(scan.get("created_tasks") or []),
-                )
+            await asyncio.to_thread(run_due_attention_scan_and_log)
             started = await asyncio.to_thread(run_continuous_worker_tick)
             if started:
                 logger.info("continuous worker tick started %s run(s)", len(started))

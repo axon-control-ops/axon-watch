@@ -3,18 +3,12 @@ import { computed, nextTick, ref } from 'vue';
 import { resizeCommandComposer } from '../../lib/command-composer-autosize';
 import { useKairoConversation } from '../../features/kairo-conversation/use-kairo-conversation';
 import { useShellStore } from '../../stores/shell';
-import {
-  useComposerActions,
-  type PlanSoftSwitchNotice,
-} from './use-composer-actions';
+import { useComposerActions, type PlanSoftSwitchNotice } from './use-composer-actions';
 import { useComposerContext } from './use-composer-context';
 import { useComposerDisplayState } from './use-composer-display-state';
 import { useComposerHistory } from './use-composer-history';
 import { useComposerImages } from './use-composer-images';
-import {
-  useComposerMenus,
-  type ComposerMode,
-} from './use-composer-menus';
+import { useComposerMenus, type ComposerMode } from './use-composer-menus';
 import { useComposerModelRuntime } from './use-composer-model-runtime';
 import { useComposerTypeahead } from './use-composer-typeahead';
 import { useComposerWorkspaceSync } from './use-composer-workspace-sync';
