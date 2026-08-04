@@ -218,22 +218,7 @@ def codex_auth_status(
     probe_env: dict[str, str] | None = None,
 ) -> StatusRecord:
     runtime_env = probe_env or {**os.environ, **env_keys}
-    if runtime_env.get("CODEX_API_KEY", "").strip() or runtime_env.get("OPENAI_API_KEY", "").strip():
-        source = "vault_api_key" if (
-            env_keys.get("CODEX_API_KEY") or env_keys.get("OPENAI_API_KEY")
-        ) else "api_key"
-        return {
-            "logged_in": True,
-            "auth_method": source,
-            "provider_label": "OpenAI API key",
-            "vault_posture": vault_posture.get("posture") if source == "vault_api_key" else "ready",
-            "message": "Authenticated via Codex/OpenAI API key"
-            + (" from vault." if source == "vault_api_key" else "."),
-        }
     vault_overlay = vault_auth_overlay("codex_local", vault_posture=vault_posture, env_keys=env_keys)
-    if vault_overlay and vault_posture.get("unlocked") and not vault_overlay.get("logged_in"):
-        if not binary:
-            return vault_overlay
     if not binary:
         if vault_overlay:
             return vault_overlay
@@ -244,35 +229,81 @@ def codex_auth_status(
             "vault_posture": vault_posture.get("posture"),
             "message": "Install Codex CLI to use the automation runtime.",
         }
-    try:
-        proc = _run_command_with_timeout_retry([binary, "login", "status"], env=runtime_env)
-    except subprocess.TimeoutExpired:
+
+    def _probe(env: dict[str, str]) -> StatusRecord:
+        try:
+            proc = _run_command_with_timeout_retry([binary, "login", "status"], env=env)
+        except subprocess.TimeoutExpired:
+            return {
+                "logged_in": False,
+                "auth_method": "",
+                "provider_label": "Timed out",
+                "vault_posture": vault_posture.get("posture"),
+                "message": "Codex auth probe timed out. Run `codex login status` manually.",
+            }
+        except Exception:
+            return {
+                "logged_in": False,
+                "auth_method": "",
+                "provider_label": "Probe failed",
+                "vault_posture": vault_posture.get("posture"),
+                "message": "Codex auth probe failed. Run `codex login status` manually.",
+            }
+        raw = (proc.stdout or proc.stderr or "").strip()
+        lowered = raw.lower()
+        if proc.returncode == 0 and raw:
+            method = "chatgpt" if "chatgpt" in lowered else "oauth"
+            return {
+                "logged_in": True,
+                "auth_method": method,
+                "provider_label": "Codex",
+                "account_label": raw.splitlines()[0].strip(),
+                "vault_posture": "ready",
+                "message": "Authenticated with Codex CLI.",
+            }
         return {
             "logged_in": False,
             "auth_method": "",
-            "provider_label": "Timed out",
+            "provider_label": "Not signed in",
             "vault_posture": vault_posture.get("posture"),
-            "message": "Codex auth probe timed out. Run `codex login status` manually.",
+            "message": "Codex is installed but not signed in. Run `codex login` or unlock /vault.",
         }
-    except Exception:
-        return {
-            "logged_in": False,
-            "auth_method": "",
-            "provider_label": "Probe failed",
-            "vault_posture": vault_posture.get("posture"),
-            "message": "Codex auth probe failed. Run `codex login status` manually.",
-        }
-    raw = (proc.stdout or proc.stderr or "").strip()
-    lowered = raw.lower()
-    if proc.returncode == 0 and raw:
-        method = "chatgpt" if "chatgpt" in lowered else "oauth"
+
+    has_api_key = bool(
+        runtime_env.get("CODEX_API_KEY", "").strip()
+        or runtime_env.get("OPENAI_API_KEY", "").strip()
+    )
+    if has_api_key:
+        key_source = "vault_api_key" if (
+            env_keys.get("CODEX_API_KEY") or env_keys.get("OPENAI_API_KEY")
+        ) else "api_key"
+        subscription_probe = _probe(env_without_api_keys(runtime_env, family="codex"))
+        if subscription_probe.get("logged_in"):
+            return {
+                **subscription_probe,
+                "auth_method": "chatgpt",
+                "provider_label": "Codex / ChatGPT subscription",
+                "message": (
+                    "Codex ChatGPT subscription is ready. "
+                    + (
+                        "A Codex/OpenAI key is also set in /vault and will be ignored for this session."
+                        if key_source == "vault_api_key"
+                        else "A Codex/OpenAI key is also set in the control-plane environment and will be ignored for this session."
+                    )
+                ),
+            }
+
+    probed = _probe(runtime_env)
+    if probed.get("logged_in"):
+        return probed
+    if has_api_key:
         return {
             "logged_in": True,
-            "auth_method": method,
-            "provider_label": "Codex",
-            "account_label": raw.splitlines()[0].strip(),
-            "vault_posture": "ready",
-            "message": "Authenticated with Codex CLI.",
+            "auth_method": key_source,
+            "provider_label": "OpenAI API key",
+            "vault_posture": vault_posture.get("posture") if key_source == "vault_api_key" else "ready",
+            "message": "Authenticated via Codex/OpenAI API key"
+            + (" from vault." if key_source == "vault_api_key" else "."),
         }
     if vault_overlay and vault_posture.get("unlocked"):
         return vault_overlay

@@ -115,7 +115,8 @@ class OperatorFleetAdviceTests(unittest.TestCase):
         )
         line = resolve_fleet_briefing_advise(pack=pack)
         self.assertEqual(
-            "Critical signal in axon-local needs review; switch there before continuing.",
+            "VAXON is investigating the critical signal in axon-local "
+            "and will report back here; keep working here.",
             line,
         )
 
@@ -169,7 +170,7 @@ class OperatorFleetAdviceTests(unittest.TestCase):
             scope_mode="fleet",
         )
         line = build_fleet_coach_line(pack["winner"], scope_mode="fleet")
-        self.assertEqual("Review the ready run in Finance.", line)
+        self.assertEqual("VAXON is opening the ready review in Finance.", line)
 
     def test_github_api_warning_advise_points_at_vault(self) -> None:
         line = build_fleet_coach_line(
@@ -185,7 +186,9 @@ class OperatorFleetAdviceTests(unittest.TestCase):
         )
         self.assertIn("Vault", line)
         self.assertIn("GH_TOKEN", line)
+        self.assertIn("VAXON", line)
         self.assertNotIn("needs review; switch there", line)
+        self.assertNotIn("before continuing", line)
 
     def test_generic_github_warning_does_not_invent_token_failure(self) -> None:
         line = build_fleet_coach_line(
@@ -201,7 +204,8 @@ class OperatorFleetAdviceTests(unittest.TestCase):
         )
         self.assertNotIn("GH_TOKEN", line)
         self.assertEqual(
-            "Critical signal in DashPro needs review; switch there before continuing.",
+            "VAXON is investigating the critical signal in DashPro "
+            "and will report back here; keep working here.",
             line,
         )
 
@@ -260,8 +264,8 @@ class OperatorFleetAdviceTests(unittest.TestCase):
             },
         )
         self.assertEqual(
-            "Handoff to DashPro is open — switch there and finish “Finish DashPro follow-up”."
-            " Pause more axon-watch work until that closes.",
+            "VAXON owns the open handoff in DashPro: “Finish DashPro follow-up”."
+            " Keep working in axon-watch; VAXON will report the outcome here.",
             advise,
         )
         from app.operator_fleet_advice import build_advise_ui_action
@@ -273,12 +277,11 @@ class OperatorFleetAdviceTests(unittest.TestCase):
         self.assertEqual("switch_workspace", action["type"])
         self.assertEqual("workspace_dashpro", action["workspace_id"])
         self.assertTrue(action["focus_attention"])
+        self.assertTrue(action["auto_attend"])
+        self.assertIn("VAXON attending", str(action.get("cta_label") or ""))
 
-    def test_open_handoff_advice_keeps_the_complete_task(self) -> None:
-        task = (
-            "DashPro PostHog warning, PostHog API query failed, "
-            "The read operation timed out while loading project insights"
-        )
+    def test_open_handoff_advice_keeps_short_task_titles(self) -> None:
+        task = "DashPro PostHog warning — API query timed out"
         pack = build_fleet_advice_pack(
             active_run_records=[],
             pending_approval_records=[],
@@ -308,8 +311,60 @@ class OperatorFleetAdviceTests(unittest.TestCase):
             },
         )
 
-        self.assertIn(f"finish “{task}”", advise)
+        self.assertIn(f"“{task}”", advise)
+        self.assertIn("VAXON owns the open handoff in DashPro", advise)
         self.assertNotIn("…", advise)
+        self.assertNotIn("switch there", advise)
+
+    def test_open_handoff_advice_truncates_mega_task_titles(self) -> None:
+        task = (
+            "Control-plane fix for DashPro Lead blocker on plan lead-plan-8fe646a5634c44ef "
+            "lead-plan-4816b40edb8547c0, one Attend task task-809465afd26b4e23 remains "
+            "open+approved after Priya run failed with ActionRequiredError, Increase limits "
+            "for faster responses — You're out of usage Cursor usage quota"
+        )
+        pack = build_fleet_advice_pack(
+            active_run_records=[],
+            pending_approval_records=[],
+            fleet_signals=[],
+            degraded={"active": False, "reasons": []},
+            watch_connected=True,
+            display_names={"workspace_dashpro": "DashPro"},
+            focused_workspace_id="workspace_axon_watch",
+            scope_mode="workspace",
+            open_handoffs=[
+                {
+                    "handoff_id": "handoff-mega-task",
+                    "source_workspace_id": "workspace_axon_watch",
+                    "target_workspace_id": "workspace_dashpro",
+                    "task": task,
+                    "status": "routed",
+                    "target_task_id": "task-mega",
+                }
+            ],
+        )
+
+        advise = resolve_fleet_briefing_advise(
+            pack=pack,
+            display_names={
+                "workspace_dashpro": "DashPro",
+                "workspace_axon_watch": "Axon Watch",
+            },
+        )
+
+        self.assertTrue(
+            "VAXON owns an open handoff in DashPro" in advise
+            or "VAXON owns an open DashPro handoff" in advise,
+            msg=advise,
+        )
+        self.assertIn("…", advise)
+        shown_task = advise.split("“", 1)[1].split("”", 1)[0].removesuffix("…")
+        self.assertTrue(task.startswith(shown_task))
+        self.assertEqual(" ", task[len(shown_task)])
+        self.assertNotIn("switch there", advise)
+        self.assertNotIn("Cursor usage quota", advise)
+        self.assertNotIn("Pause more Axon Watch work until that closes.", advise)
+        self.assertIn("VAXON will dispatch or close it with evidence", advise)
 
 
 if __name__ == "__main__":

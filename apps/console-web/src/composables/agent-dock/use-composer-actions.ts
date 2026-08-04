@@ -33,9 +33,7 @@ import {
 } from '../../lib/ide-composer-queue';
 import { persistIdeComposerDraft } from '../../lib/ide-composer-draft-prefs';
 import { focusAgentDockComposerInput } from '../../lib/agent-dock-composer-focus';
-import {
-  type TeammateRouteNotice,
-} from '../../lib/teammate-route-notice';
+import type { TeammateRouteNotice } from '../../lib/teammate-route-notice';
 import { resolveLiveBusyEmployeeIds } from '../../features/workspace-agents/company-roster-busy';
 import { useShellStore } from '../../stores/shell';
 import { useDebugReproduceActions } from './use-debug-reproduce-actions';
@@ -134,18 +132,10 @@ export function useComposerActions(options: UseComposerActionsOptions) {
     return applied.routed;
   }
 
-  const handleApproveRun = (): void => {
-    void shell.approveIdeAgentRun();
-  };
-  const handleRejectRun = (): void => {
-    void shell.rejectIdeAgentRun();
-  };
-  const handleStopRun = (): void => {
-    void shell.stopIdeAgentRun();
-  };
-  const handleResumeRun = (): void => {
-    void shell.resumeIdeAgentRun();
-  };
+  const handleApproveRun = (): void => { void shell.approveIdeAgentRun(); };
+  const handleRejectRun = (): void => { void shell.rejectIdeAgentRun(); };
+  const handleStopRun = (): void => { void shell.stopIdeAgentRun(); };
+  const handleResumeRun = (): void => { void shell.resumeIdeAgentRun(); };
   const toggleVoiceCapture = (): void => {
     if (speechCapture.capturing.value) {
       stopVoiceCapture();
@@ -158,6 +148,7 @@ export function useComposerActions(options: UseComposerActionsOptions) {
     debugReproduceActive,
     activeDebugReproduceMessageId,
     handleDebugReproduceProceed,
+    handleDebugReproduceResolved,
   } = useDebugReproduceActions({
     shell,
     composerMode,
@@ -248,8 +239,12 @@ export function useComposerActions(options: UseComposerActionsOptions) {
         ? rewriteNamedAssignPrompt(submitDraft, namedAssign.employee.name)
         : submitDraft;
 
-    // Never park the prompt on the destination tab — that bled drafts across agents
-    // when submit failed or the operator switched threads mid-flight.
+    // Clear both the visible draft and its origin-thread copy before dispatch.
+    // Waiting for the response let a thread route restore the old prompt after work started.
+    shell.ideComposerDraft = '';
+    if (originThreadId && workspaceId) {
+      persistIdeComposerDraft(workspaceId, '', originThreadId);
+    }
     const submitted = await shell.submitIdeComposer(modeForSubmit, {
       attachmentFiles,
       contentOverride: routedPrompt,
@@ -260,9 +255,6 @@ export function useComposerActions(options: UseComposerActionsOptions) {
       }
       shell.ideComposerDraft = submitDraft;
       return;
-    }
-    if (routed && originThreadId && workspaceId) {
-      persistIdeComposerDraft(workspaceId, '', originThreadId);
     }
     clearSkillAttachments?.();
     recordComposerHistoryIfSent(draft);
@@ -484,6 +476,7 @@ export function useComposerActions(options: UseComposerActionsOptions) {
     handleApproveRun,
     handleComposerKeydown,
     handleDebugReproduceProceed,
+    handleDebugReproduceResolved,
     handleRejectRun,
     handleResumeRun,
     handleSteer,

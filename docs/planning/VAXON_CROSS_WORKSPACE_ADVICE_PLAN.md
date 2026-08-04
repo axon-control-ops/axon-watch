@@ -63,7 +63,7 @@ One written Advise line (and optional spoken line) that can do all of:
 Example grounded lines (illustrative only):
 
 - “Approve the guarded run in DashPro before starting more axon-watch work.”
-- “Critical signal in axon-local needs review; switch there before continuing.”
+- “VAXON is attending the critical signal in axon-local; keep working here.”
 - “Handoff to DashPro is recorded — open that workspace and finish the listed task.”
 
 Non-examples (forbidden):

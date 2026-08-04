@@ -72,10 +72,10 @@ def signal_next_move(snapshot: dict[str, Any]) -> str | None:
         ):
             return "I'll open Vault and restore the GitHub probe token next"
         if "sentry" in hay:
-            return f"I'll open Attention for {title}"
+            return f"VAXON is investigating {title} and will report back here"
         severity = str(signal.get("severity") or "").strip().lower()
         if severity in {"critical", "high"}:
-            return f"I'll open Attention for {title}"
+            return f"VAXON is investigating {title} and will report back here"
     return None
 
 
@@ -101,12 +101,24 @@ def next_move(snapshot: dict[str, Any]) -> str:
         lower = advise_clean.lower()
         if lower.startswith(("i'd", "i'll", "i will")):
             return advise_clean
+        if lower.startswith("vaxon is attending") or lower.startswith("vaxon owns"):
+            target = re.search(
+                r"\b(?:in|for)\s+([A-Za-z0-9][A-Za-z0-9 _-]{0,40})\b",
+                advise_clean,
+                re.IGNORECASE,
+            )
+            if target:
+                name = target.group(1).strip().rstrip("—,").strip()
+                if name:
+                    return f"VAXON is investigating {name} and will report back here"
+            return "VAXON is investigating that signal and will report back here"
         if "needs review" in lower and "switch" in lower:
             target = re.search(r"\bsignal in ([a-z0-9_-]+)\b", advise_clean, re.IGNORECASE)
             return (
-                f"I'll switch to {target.group(1)} and start that investigation next"
+                f"VAXON is investigating the signal in {target.group(1)} "
+                "and will report back here"
                 if target
-                else "I'll switch us there and start that investigation next"
+                else "VAXON is investigating that signal and will report back here"
             )
         if "github" in lower and ("token" in lower or "vault" in lower or "api" in lower):
             return "I'll open Vault and restore the GitHub probe token next"
@@ -118,9 +130,9 @@ def next_move(snapshot: dict[str, Any]) -> str:
             return "I'll restart the public tunnel next"
         if lower.startswith("inspect "):
             target = advise_clean[8:].strip() or "that signal"
-            return f"I'll open Attention for {target}"
+            return f"VAXON is investigating {target} and will report back here"
         if "sentry" in lower:
-            return f"I'll open Attention for {advise_clean}"
+            return f"VAXON is investigating {advise_clean} and will report back here"
         return f"I'll open Attention for {advise_clean}"
     for handoff in snapshot.get("handoffs") or []:
         lead_next = _scrub_operator_line(str(handoff.get("lead_next") or ""), max_len=140)

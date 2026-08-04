@@ -56,6 +56,28 @@ class WorkspaceWorkerPromptTests(unittest.TestCase):
         self.assertIn("Confidence: X/10", prompt)
         self.assertNotIn("bare FAILED", prompt.replace("never a bare FAILED", ""))
 
+    def test_integrations_prompt_includes_full_access_tools_clause(self) -> None:
+        with patch(
+            "app.workspace_agents.worker_prompt.build_team_roster_context",
+            return_value="",
+        ):
+            prompt = build_continuous_worker_prompt(
+                workspace_id="workspace_young_eagles_day_care",
+                employee=EmployeeConfig(
+                    name="Sol",
+                    role="integrations",
+                    owns="Document export hooks and EduDash linkage",
+                    schedule="continuous",
+                ),
+            )
+        self.assertIn("Full Access for project Shell", prompt)
+        self.assertIn("verification scripts", prompt)
+        self.assertNotIn("spin on Task/MCP workarounds", prompt.replace(
+            "Do not spin on Task/MCP workarounds for basic ls/node/npm checks.",
+            "",
+        ))
+        self.assertIn("Do not spin on Task/MCP workarounds", prompt)
+
     def test_dashpro_prompt_locks_self_hosted_ci(self) -> None:
         with patch(
             "app.workspace_agents.worker_prompt.build_team_roster_context",

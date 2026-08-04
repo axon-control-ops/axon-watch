@@ -44,7 +44,7 @@ class OperatorDeterministicReportNextMoveTests(unittest.TestCase):
                 del sys.modules[name]
         sys.modules.update(self._saved)
 
-    def test_next_move_preserves_promised_workspace_switch(self) -> None:
+    def test_next_move_preserves_vaxon_attendance(self) -> None:
         from app.kairo.operator_deterministic_report import compose_operator_report
 
         composed = compose_operator_report(
@@ -52,8 +52,8 @@ class OperatorDeterministicReportNextMoveTests(unittest.TestCase):
                 "briefing": {
                     **_MOCK_BRIEFING,
                     "advise": (
-                        "Critical signal in axon-watch needs review; "
-                        "switch there before continuing."
+                        "VAXON is attending the critical signal in axon-watch; "
+                        "keep working here."
                     ),
                 },
                 "fleet": _MOCK_FLEET,
@@ -69,7 +69,7 @@ class OperatorDeterministicReportNextMoveTests(unittest.TestCase):
         )
 
         self.assertEqual(
-            "I'll switch to axon-watch and start that investigation next",
+            "VAXON is investigating axon-watch and will report back here",
             composed["sections"]["next_move"],
         )
 
@@ -81,8 +81,8 @@ class OperatorDeterministicReportNextMoveTests(unittest.TestCase):
                 "briefing": {
                     **_MOCK_BRIEFING,
                     "advise": (
-                        "Critical signal in axon-watch needs review; "
-                        "switch there before continuing."
+                        "VAXON is attending the critical signal in axon-watch; "
+                        "keep working here."
                     ),
                 },
                 "fleet": _MOCK_FLEET,
@@ -107,7 +107,7 @@ class OperatorDeterministicReportNextMoveTests(unittest.TestCase):
         )
 
         self.assertIn("inspect the exact push error", composed["sections"]["next_move"].lower())
-        self.assertNotIn("switch to axon-watch", composed["sections"]["next_move"].lower())
+        self.assertNotIn("attending the signal", composed["sections"]["next_move"].lower())
 
     def test_next_move_uses_non_fast_forward_stderr(self) -> None:
         from app.kairo.operator_deterministic_report import compose_operator_report
@@ -185,8 +185,8 @@ class OperatorDeterministicReportNextMoveTests(unittest.TestCase):
                 "briefing": {
                     **_MOCK_BRIEFING,
                     "advise": (
-                        "Critical signal in axon-watch needs review; "
-                        "switch there before continuing."
+                        "VAXON is attending the critical signal in axon-watch; "
+                        "keep working here."
                     ),
                 },
                 "fleet": _MOCK_FLEET,
@@ -209,6 +209,35 @@ class OperatorDeterministicReportNextMoveTests(unittest.TestCase):
 
         self.assertEqual(
             "I'll open Vault and restore the GitHub probe token next",
+            composed["sections"]["next_move"],
+        )
+
+    def test_next_move_assigns_generic_signal_investigation_to_vaxon(self) -> None:
+        from app.kairo.operator_deterministic_report import compose_operator_report
+
+        composed = compose_operator_report(
+            {
+                "briefing": _MOCK_BRIEFING,
+                "fleet": _MOCK_FLEET,
+                "roster": {"busy": [], "completed": [], "failed": [], "employees": []},
+                "handoffs": [],
+                "top_signals": [
+                    {
+                        "title": "Fast Gate failed",
+                        "summary": "A contract check failed",
+                        "severity": "high",
+                    }
+                ],
+                "active_runs": [],
+                "pending_approvals": 0,
+                "awaiting_engagement_count": 0,
+                "next_safe_actions": [],
+                "fingerprint": "generic-investigation",
+            }
+        )
+
+        self.assertEqual(
+            "VAXON is investigating Fast Gate failed and will report back here",
             composed["sections"]["next_move"],
         )
 

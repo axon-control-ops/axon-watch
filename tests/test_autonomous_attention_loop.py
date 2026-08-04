@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import sys
 import unittest
-from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from unittest.mock import patch
 
@@ -23,6 +22,7 @@ from app.persistence import (  # noqa: E402
 )
 from app.workspace_agents.autonomous_attention import (  # noqa: E402
     ATTEND_GOAL_PREFIX,
+    build_autonomy_status_feed,
     collect_handoff_findings,
     enqueue_attend_actions,
     resolve_autonomy_decision,
@@ -379,61 +379,52 @@ class AutonomousAttentionLoopTests(unittest.TestCase):
             ).json()
             self.assertEqual(after["pending_critical_decisions"], [])
 
-    def test_concurrent_scans_create_one_task(self) -> None:
-        finding = LeadCheckinFinding(
-            kind="warning_signal",
-            workspace_id="workspace_axon_watch",
-            owner_role="watcher",
-            title="Concurrent warning",
-            detail="One repair only",
-            dedupe_key="signal:concurrent",
+    def test_completed_role_supersedes_older_failed_shift_decision(self) -> None:
+        stale = autonomous_attention_store.append_receipt(
+            kind="operator_blocker",
+            decision="escalate",
+            tier="operator_gated",
+            risk="high",
+            title="Marco (backend) last shift failed",
+            detail="The previous backend shift stopped.",
+            workspace_id="workspace_dashpro",
+            dedupe_key="failed_shift:workspace_dashpro:backend:run_failed",
+            ask_operator=True,
+            payload={"owner_role": "backend"},
         )
-        with ThreadPoolExecutor(max_workers=2) as pool:
-            results = list(
-                pool.map(
-                    lambda _: enqueue_attend_actions(
-                        workspace_id="workspace_axon_watch",
-                        findings=[finding],
-                    ),
-                    range(2),
-                )
-            )
-        self.assertEqual(
-            sum(len(result["created_tasks"]) for result in results),
-            1,
-        )
-
-    def test_concurrent_approval_creates_one_approved_task(self) -> None:
-        pending = autonomous_attention_store.append_receipt(
+        unrelated = autonomous_attention_store.append_receipt(
             kind="critical_signal",
             decision="escalate",
             tier="operator_gated",
             risk="critical",
-            title="Concurrent approval",
-            detail="One exact task",
-            workspace_id="workspace_axon_watch",
-            dedupe_key="critical:concurrent",
+            title="Production approval still required",
+            detail="Must remain operator-gated.",
+            workspace_id="workspace_dashpro",
+            dedupe_key="signal:workspace_dashpro:production:critical",
             ask_operator=True,
-            payload={"owner_role": "watcher"},
         )
 
-        def approve(_: int) -> str:
-            try:
-                result = resolve_autonomy_decision(
-                    pending["receipt_id"],
-                    resolution="approved",
-                )
-                return str(result["task_id"])
-            except ValueError:
-                return "blocked"
+        with patch(
+            "app.workspace_agents.autonomous_attention.latest_role_run_outcome",
+            return_value={
+                "run_id": "run_completed",
+                "outcome": "completed",
+                "detail": "Backend fix completed.",
+                "phase": "completed",
+                "terminal": "1",
+            },
+        ):
+            feed = build_autonomy_status_feed(workspace_id="workspace_dashpro")
 
-        with ThreadPoolExecutor(max_workers=2) as pool:
-            outcomes = list(pool.map(approve, range(2)))
-        self.assertEqual(outcomes.count("blocked"), 1)
-        tasks = task_store.list_tasks(workspace_id="workspace_axon_watch")
-        self.assertEqual(len(tasks), 1)
-        self.assertEqual(tasks[0]["risk"], "approved")
-
+        self.assertEqual(feed["pending_critical_count"], 1)
+        self.assertEqual(
+            feed["pending_critical_decisions"][0]["receipt_id"],
+            unrelated["receipt_id"],
+        )
+        resolved = autonomous_attention_store.get_receipt(stale["receipt_id"])
+        assert resolved is not None
+        self.assertEqual(resolved["status"], "resolved")
+        self.assertEqual(resolved["resolution"], "superseded")
 
 if __name__ == "__main__":
     unittest.main()

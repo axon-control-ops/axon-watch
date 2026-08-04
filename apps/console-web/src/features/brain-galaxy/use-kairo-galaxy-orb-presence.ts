@@ -14,6 +14,7 @@ type PresenceShell = {
   } | null;
   runtimeSummary: {
     approvals: { pending_count: number };
+    signals: { open_count: number };
     watch: { connected: boolean };
   } | null;
   runtimeSummaryLoadState: string;
@@ -60,6 +61,10 @@ export function useKairoGalaxyOrbPresence(shell: PresenceShell) {
       pendingApprovals: pendingApprovals.value,
       criticalSignals: critical,
       highSignals: high,
+      openSignals:
+        shell.runtimeSummary?.signals.open_count
+        ?? shell.operatorBriefing?.top_signals.length
+        ?? 0,
       watchConnected: shell.runtimeSummary?.watch.connected ?? false,
       runtimeLoaded: shell.runtimeSummaryLoadState === 'loaded',
       privacyBlocked: shell.operatorPresenceSettings.privacy_mode,

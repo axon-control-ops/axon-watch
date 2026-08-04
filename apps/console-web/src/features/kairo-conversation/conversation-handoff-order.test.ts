@@ -86,6 +86,9 @@ describe('conversation handoff order', () => {
     });
 
     expect(postKairoConverse).toHaveBeenCalledTimes(1);
+    expect(postKairoConverse).toHaveBeenCalledWith(
+      expect.objectContaining({ submission_intent: 'ask' }),
+    );
     expect(handoffSignalToIde).toHaveBeenCalledWith(
       expect.objectContaining({
         signal_id: 'signal_monitor_dashpro_sentry_recent_issues_warning',

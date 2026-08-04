@@ -6,9 +6,9 @@ from datetime import datetime, timezone
 from typing import Any
 from uuid import uuid4
 
-from app.persistence import chat_store
+from app.persistence import chat_store, task_store
 from app.workspace_agents import lead_plan_store
-from app.workspace_agents.lead_text import truncate_text as _truncate
+from app.workspace_agents.lead_vaxon_adhoc import record_ad_hoc_lead_synthesis
 from app.workspace_agents.lead_vaxon_messages import (
     build_ad_hoc_lead_vaxon_message,
     build_lead_synthesis_vaxon_message,
@@ -16,6 +16,8 @@ from app.workspace_agents.lead_vaxon_messages import (
 
 HANDOFF_RECEIPT_KIND = "lead_synthesis_vaxon_posted"
 AD_HOC_TAKEOVER_VAXON_KIND = "lead_takeover_vaxon_posted"
+STALE_ENGAGEMENT_CLOSED_RECEIPT_KIND = "lead_engagement_auto_closed"
+_SETTLED_TASK_STATUSES = frozenset({"completed", "cancelled"})
 
 
 def _utc_now_iso() -> str:
@@ -36,6 +38,58 @@ def _handoff_already_posted(plan_id: str) -> bool:
         str(row.get("kind") or "") == HANDOFF_RECEIPT_KIND
         for row in lead_plan_store.list_receipts(plan_id)
     )
+
+
+def _is_stale_engagement(plan: dict[str, Any]) -> bool:
+    """True only when an engagement state has no operator handoff to review.
+
+    A genuine Lead review remains open even after every specialist task has
+    finished, because its VAXON synthesis is the thing awaiting a decision.
+    Older plans could be marked awaiting without ever posting that synthesis;
+    those are safe to close once their linked work is already settled.
+    """
+    plan_id = str(plan.get("plan_id") or "").strip()
+    if not plan_id or _handoff_already_posted(plan_id):
+        return False
+    links = lead_plan_store.plan_task_links(plan_id)
+    if not links:
+        return False
+    tasks = [task_store.get_task(str(link.get("task_id") or "")) for link in links]
+    if any(task is None for task in tasks):
+        return False
+    return all(
+        str((task or {}).get("status") or "").strip().lower()
+        in _SETTLED_TASK_STATUSES
+        for task in tasks
+    )
+
+
+def reconcile_stale_awaiting_engagement_plans(
+    *, workspace_id: str | None = None,
+) -> list[str]:
+    """Close stale review flags that have no VAXON handoff or remaining work."""
+    closed: list[str] = []
+    for plan in lead_plan_store.list_plans_by_status(
+        "awaiting_engagement",
+        workspace_id=workspace_id,
+    ):
+        if not _is_stale_engagement(plan):
+            continue
+        plan_id = str(plan.get("plan_id") or "").strip()
+        if not plan_id:
+            continue
+        lead_plan_store.set_plan_status(plan_id, "completed")
+        lead_plan_store.append_receipt(
+            plan_id=plan_id,
+            workspace_id=str(plan.get("workspace_id") or ""),
+            kind=STALE_ENGAGEMENT_CLOSED_RECEIPT_KIND,
+            payload={
+                "reason": "all_linked_work_settled_without_vaxon_handoff",
+                "prior_status": "awaiting_engagement",
+            },
+        )
+        closed.append(plan_id)
+    return closed
 
 
 def post_lead_synthesis_to_vaxon(
@@ -149,6 +203,7 @@ def post_lead_synthesis_to_vaxon(
 
 
 def list_awaiting_engagement_plans(*, workspace_id: str | None = None) -> list[dict[str, Any]]:
+    reconcile_stale_awaiting_engagement_plans(workspace_id=workspace_id)
     return lead_plan_store.list_plans_by_status(
         "awaiting_engagement",
         workspace_id=workspace_id,
@@ -158,63 +213,6 @@ def list_awaiting_engagement_plans(*, workspace_id: str | None = None) -> list[d
 def count_awaiting_engagement_plans(*, workspace_id: str | None = None) -> int:
     """Count Lead plans waiting for operator engagement via VAXON."""
     return len(list_awaiting_engagement_plans(workspace_id=workspace_id))
-
-
-def record_ad_hoc_lead_synthesis(
-    *,
-    workspace_id: str,
-    run_id: str,
-    employee_role: str,
-    employee_name: str,
-    phase: str,
-    lead_next: str = "",
-    lead_summary: str = "",
-    lead_thread_id: str | None = None,
-    lead_message_id: str | None = None,
-    blockers: str = "",
-) -> dict[str, Any]:
-    """Persist Lead-verified synthesis fields for an ad-hoc specialist completion."""
-    from app.workspace_agents import lead_adhoc_receipt_store
-
-    cleaned_run = str(run_id or "").strip()
-    workspace = str(workspace_id or "").strip()
-    if not cleaned_run or not workspace:
-        return {"status": "skipped_missing_ids"}
-
-    prior = lead_adhoc_receipt_store.find_receipt_for_run(
-        run_id=cleaned_run,
-        kind=lead_adhoc_receipt_store.KIND_LEAD_SYNTHESIS,
-    )
-    if prior is not None:
-        return {
-            "status": "already_recorded",
-            "receipt_id": prior.get("receipt_id"),
-            "payload": prior.get("payload") or {},
-            "run_id": cleaned_run,
-        }
-
-    payload = {
-        "employee_name": (employee_name or employee_role or "specialist").strip(),
-        "employee_role": (employee_role or "specialist").strip(),
-        "phase": phase if phase in {"completed", "failed"} else (phase or "ended"),
-        "lead_next": _truncate(lead_next, max_len=280),
-        "lead_summary": _truncate(lead_summary, max_len=420),
-        "blockers": _truncate(blockers, max_len=280),
-        "lead_thread_id": lead_thread_id,
-        "lead_message_id": lead_message_id,
-    }
-    receipt = lead_adhoc_receipt_store.append_receipt(
-        workspace_id=workspace,
-        run_id=cleaned_run,
-        kind=lead_adhoc_receipt_store.KIND_LEAD_SYNTHESIS,
-        payload=payload,
-    )
-    return {
-        "status": "recorded",
-        "receipt_id": receipt["receipt_id"],
-        "payload": payload,
-        "run_id": cleaned_run,
-    }
 
 
 def publish_ad_hoc_synthesis_to_vaxon(
@@ -445,6 +443,7 @@ __all__ = [
     "build_ad_hoc_lead_vaxon_message",
     "build_lead_synthesis_vaxon_message",
     "count_awaiting_engagement_plans",
+    "reconcile_stale_awaiting_engagement_plans",
     "list_awaiting_engagement_plans",
     "notify_vaxon_after_lead_shift",
     "post_ad_hoc_lead_takeover_to_vaxon",

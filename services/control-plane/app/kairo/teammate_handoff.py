@@ -7,6 +7,7 @@ from typing import Any
 
 from app.workspace_agents.lead_fan_out import LeadFanOutError, materialize_lead_fan_out
 from app.workspace_agents.lead_task_plan import detect_fan_out_intent
+from app.kairo.operator_input_safety import is_pasted_operational_context
 from app.workspace_agents.teammate_route import (
     dispatch_model_tiebreak,
     route_teammate_decision,
@@ -81,6 +82,11 @@ def build_specialty_task_action(
     task = str(content or "").strip()
     target_workspace_id = str(workspace_id or "").strip()
     if not task or not target_workspace_id:
+        return None
+    # Do not fan out a pasted Lead/run receipt merely because its historical
+    # content mentions task verbs such as "push" or "Start".  A subsequent,
+    # explicit operator instruction can still route work normally.
+    if is_pasted_operational_context(task):
         return None
     # Public tunnel repair is a Connectors / Watch control — never a coding handoff.
     from app.kairo_tunnel_intents import detect_public_tunnel_repair_intent

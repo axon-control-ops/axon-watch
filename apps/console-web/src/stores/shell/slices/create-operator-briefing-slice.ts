@@ -12,6 +12,8 @@ import {
   shouldAutoStartReportTheater,
   shouldStartReportTheaterForBriefing,
 } from '../../../features/report-theater/report-theater-auto-start';
+import { parseChatUiAction } from '../../../lib/chat-ui-action';
+import { maybeTriggerAutoAttendAdvise } from '../../../lib/vaxon-auto-attend-advise';
 import { shouldRequestViewportCompactBriefing } from '../../../lib/viewport-compact';
 import type { BriefingLoadState } from '../types';
 
@@ -109,9 +111,15 @@ export function createOperatorBriefingSlice(input: CreateOperatorBriefingSliceIn
         input.briefingLoadState.value = 'loaded';
         input.applyOperatorDockDefaults();
 
+        const settings =
+          briefing.operator_presence?.settings ?? input.operatorPresenceSettings.value;
+        // Full autonomy: attend the winning Advise workspace without yanking IDE focus.
+        void maybeTriggerAutoAttendAdvise({
+          autonomyMode: settings.autonomy_mode,
+          adviseUiAction: parseChatUiAction(briefing.advise_ui_action ?? null),
+        });
+
         if (!light) {
-          const settings =
-            briefing.operator_presence?.settings ?? input.operatorPresenceSettings.value;
           const briefKey = [
             briefing.advise ?? '',
             briefing.notice ?? '',

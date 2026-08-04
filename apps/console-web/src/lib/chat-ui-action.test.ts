@@ -16,6 +16,7 @@ describe('parseChatUiAction', () => {
       open_file_path: 'README.md',
       layout_mode: undefined,
       focus_attention: false,
+      auto_attend: false,
       signal_id: null,
       cta_label: null,
     });
@@ -29,6 +30,7 @@ describe('parseChatUiAction', () => {
         layout_mode: 'operator',
         focus_attention: true,
         cta_label: 'Switch to Axon Watch & open Attention',
+        auto_attend: true,
       }),
     ).toEqual({
       type: 'switch_workspace',
@@ -38,6 +40,7 @@ describe('parseChatUiAction', () => {
       focus_attention: true,
       signal_id: null,
       cta_label: 'Switch to Axon Watch & open Attention',
+      auto_attend: true,
     });
   });
 

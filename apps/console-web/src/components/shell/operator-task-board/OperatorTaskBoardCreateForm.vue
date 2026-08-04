@@ -21,6 +21,12 @@ const emit = defineEmits<{
 
 <template>
   <form class="operator-task-board__form" data-orb-field @submit.prevent="emit('submit')">
+    <div class="operator-task-board__form-intro">
+      <span class="operator-task-board__field-label">Dispatch work</span>
+      <span class="operator-task-board__form-help">
+        Assign one specialist or fan out a Lead plan; VAXON coordinates the work rather than coding it.
+      </span>
+    </div>
     <label class="operator-task-board__field">
       <span class="operator-task-board__field-label">Goal</span>
       <input

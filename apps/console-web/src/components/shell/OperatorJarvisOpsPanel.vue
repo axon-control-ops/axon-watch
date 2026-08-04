@@ -1,10 +1,27 @@
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, onBeforeUnmount, onMounted } from 'vue';
 
 import { buildJarvisOpsView } from '../../lib/operator-jarvis-ops-view';
 import { useShellStore } from '../../stores/shell';
 
 const shell = useShellStore();
+let fleetTaskRefreshTimer: ReturnType<typeof setInterval> | null = null;
+
+const fleetTasks = computed(() => Object.values(shell.workspaceTasksById).flat());
+const workspaceNamesById = computed(() =>
+  Object.fromEntries(
+    shell.workspaces.map((workspace) => [
+      workspace.workspace_id,
+      workspace.display_name || workspace.workspace_id,
+    ]),
+  ),
+);
+
+async function refreshFleetTasks(): Promise<void> {
+  await Promise.all(
+    shell.workspaces.map((workspace) => shell.loadWorkspaceTasks(workspace.workspace_id)),
+  );
+}
 
 const view = computed(() =>
   buildJarvisOpsView({
@@ -14,6 +31,8 @@ const view = computed(() =>
     ideComposerActivity: shell.ideComposerActivity,
     employees: shell.companyEmployeesFleet,
     agentStreamActive: shell.agentStreamActive,
+    workspaceTasks: fleetTasks.value,
+    workspaceNamesById: workspaceNamesById.value,
   }),
 );
 
@@ -26,16 +45,44 @@ function onCardActivate(kind: string, id: string): void {
     shell.revealTeamRosterForActiveEmployee();
     return;
   }
+  if (kind === 'task') {
+    return;
+  }
   shell.focusMissionControl();
 }
+
+onMounted(() => {
+  void refreshFleetTasks();
+  fleetTaskRefreshTimer = setInterval(() => {
+    void refreshFleetTasks();
+  }, 15_000);
+});
+
+onBeforeUnmount(() => {
+  if (fleetTaskRefreshTimer) {
+    clearInterval(fleetTaskRefreshTimer);
+    fleetTaskRefreshTimer = null;
+  }
+});
 </script>
 
 <template>
-  <div class="jarvis-ops" aria-label="JARVIS operations panel">
+  <div class="jarvis-ops" aria-label="VAXON operations panel">
     <header class="jarvis-ops__header">
-      <p class="jarvis-ops__eyebrow">JARVIS // OPS</p>
+      <p class="jarvis-ops__eyebrow">VAXON // OPS</p>
       <p class="jarvis-ops__headline">{{ view.headline }}</p>
     </header>
+    <section
+      class="jarvis-ops__activity"
+      :data-state="view.activity.state"
+      aria-live="polite"
+    >
+      <span class="jarvis-ops__activity-pulse" aria-hidden="true" />
+      <div>
+        <p class="jarvis-ops__activity-label">{{ view.activity.label }}</p>
+        <p class="jarvis-ops__activity-detail">{{ view.activity.detail }}</p>
+      </div>
+    </section>
     <p v-if="view.cards.length === 0" class="jarvis-ops__empty">
       No live runs, polls, or agent work right now. Terminal remains available on the TERMINAL tab.
     </p>
@@ -92,6 +139,63 @@ function onCardActivate(kind: string, id: string): void {
   font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, Consolas, monospace);
   font-size: 0.86rem;
   letter-spacing: 0.02em;
+}
+
+.jarvis-ops__activity {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.55rem;
+  margin: 0 0 0.75rem;
+  padding: 0.55rem 0.7rem;
+  border: 1px solid rgba(100, 180, 220, 0.25);
+  border-radius: 0.55rem;
+  background: rgba(10, 24, 36, 0.75);
+}
+
+.jarvis-ops__activity[data-state='active'] {
+  border-color: rgba(56, 220, 160, 0.48);
+  background: rgba(10, 48, 40, 0.62);
+}
+
+.jarvis-ops__activity[data-state='queued'] {
+  border-color: rgba(255, 190, 90, 0.4);
+}
+
+.jarvis-ops__activity-pulse {
+  flex: 0 0 auto;
+  width: 0.55rem;
+  height: 0.55rem;
+  margin-top: 0.18rem;
+  border-radius: 999px;
+  background: rgba(140, 190, 210, 0.72);
+}
+
+.jarvis-ops__activity[data-state='active'] .jarvis-ops__activity-pulse {
+  background: #38dca0;
+  box-shadow: 0 0 0 0.22rem rgba(56, 220, 160, 0.16), 0 0 0.8rem rgba(56, 220, 160, 0.55);
+}
+
+.jarvis-ops__activity[data-state='queued'] .jarvis-ops__activity-pulse {
+  background: #f6bd60;
+}
+
+.jarvis-ops__activity-label,
+.jarvis-ops__activity-detail {
+  margin: 0;
+}
+
+.jarvis-ops__activity-label {
+  color: rgba(235, 248, 255, 0.96);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+}
+
+.jarvis-ops__activity-detail {
+  margin-top: 0.18rem;
+  color: rgba(180, 218, 232, 0.78);
+  font-size: 0.68rem;
+  line-height: 1.35;
 }
 
 .jarvis-ops__empty {
