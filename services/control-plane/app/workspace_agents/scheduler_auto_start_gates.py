@@ -9,7 +9,14 @@ from app.workspace_agents.run_outcome import latest_role_run_outcome
 def usage_limit_blocks_auto_start(workspace_id: str, role: str) -> bool:
     """Skip auto-schedule for this role when its last shift failed on usage limits.
 
-    Soft-open when live Cursor usage still shows Auto headroom or on-demand spend.
+    Soft-open when the runtime that *actually failed* still shows headroom.
+    ``is_usage_limit_failure`` matches generic phrasing ("usage limit", "out of
+    usage", ...) that both Cursor and Claude Code can produce, but this used
+    to always consult Cursor's pool regardless of which CLI failed — so a
+    Claude usage-limit failure could never soft-open (Claude never has Cursor
+    headroom) and, worse, could falsely soft-open off leftover Cursor
+    headroom that has nothing to do with the Claude block. Route to the probe
+    for the runtime named in the failure detail instead.
     """
     outcome = latest_role_run_outcome(workspace_id, role)
     if not outcome or str(outcome.get("outcome") or "").strip().lower() != "failed":
@@ -17,15 +24,29 @@ def usage_limit_blocks_auto_start(workspace_id: str, role: str) -> bool:
     detail = str(outcome.get("detail") or "")
     if not is_usage_limit_failure(detail):
         return False
-    try:
-        from app.cli_runtime.cursor_usage_probe import (
-            cursor_usage_allows_agent_retry,
-            probe_cursor_usage,
-        )
 
-        usage = probe_cursor_usage()
-        if cursor_usage_allows_agent_retry(usage):
-            return False
+    lowered = detail.lower()
+    try:
+        if "claude" in lowered:
+            from app.cli_runtime.claude_usage_probe import (
+                claude_usage_allows_agent_retry,
+                probe_claude_usage,
+                record_claude_usage_limit_hit,
+            )
+
+            record_claude_usage_limit_hit(detail)
+            if claude_usage_allows_agent_retry(probe_claude_usage()):
+                return False
+        else:
+            # Cursor remains the default/legacy source of this failure shape;
+            # unknown runtimes fall back to the Cursor pool check too.
+            from app.cli_runtime.cursor_usage_probe import (
+                cursor_usage_allows_agent_retry,
+                probe_cursor_usage,
+            )
+
+            if cursor_usage_allows_agent_retry(probe_cursor_usage()):
+                return False
     except Exception:
         pass
     return True

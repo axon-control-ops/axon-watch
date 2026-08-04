@@ -128,6 +128,12 @@ export function createComposerRuntimePrefsSlice(input: CreateComposerRuntimePref
     }
     writeComposerRuntimePrefs(workspaceId, { runtime_target: runtimeTarget });
     input.composerRuntimePrefsRevision.value += 1;
+    // Server-side pin so continuous/fleet workers (which run headless, with
+    // no browser) dispatch through the same runtime as the operator's picker
+    // instead of silently defaulting to the server's default runtime.
+    void saveWorkspaceComposerPrefs(workspaceId, { runtime_target: runtimeTarget }).catch(
+      () => undefined,
+    );
   }
 
   function setSelectedComposerModel(modelId: string): void {
