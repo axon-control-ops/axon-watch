@@ -47,6 +47,7 @@ defineProps<{
   hasTerminalSnippet: boolean;
   selectionChipLabel: string;
   runtimeDetail: string;
+  runtimeFamilyLabel: string;
   runtimeLabel: string;
   selectedRuntimeSummary: string;
   runtimeTargets: AgentDockComposerRuntimeTarget[];
@@ -253,8 +254,8 @@ function runtimeStatusLine(record: AgentDockComposerRuntimeTarget): string {
         type="button"
         class="agent-dock-composer__tool agent-dock-composer__tool--model"
         :class="{ 'is-active': showModelMenu }"
-        :title="`Current runtime: ${runtimeDetail}`"
-        :aria-label="`Open model picker: ${runtimeLabel}`"
+        :title="`Current model: ${runtimeDetail}`"
+        :aria-label="`Open model picker: ${runtimeFamilyLabel} ${runtimeLabel}`"
         :aria-expanded="showModelMenu"
         @click="emit('toggle-section', 'model')"
       >

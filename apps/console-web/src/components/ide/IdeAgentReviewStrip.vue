@@ -13,6 +13,7 @@ import {
   resolveIdeAgentEditDiffFromThread,
   shouldShowIdeAgentReviewStrip,
 } from '../../lib/ide-agent-center-view';
+import { composerRuntimeFamilyLabel } from '../../lib/cursor-catalog-view';
 import { useEmployeeFailureStripActions } from '../../composables/agent-dock/use-employee-failure-strip-actions';
 import { runContinueActionLabel } from '../../lib/run-lifecycle-ui';
 import { useShellStore } from '../../stores/shell';
@@ -32,6 +33,20 @@ const {
   handleExplain,
   handleOpenTeam,
 } = useEmployeeFailureStripActions(shell);
+
+const runtimeFamilyLabel = computed(() => {
+  const preferred = shell.selectedRuntimeTargetId;
+  const status = shell.runtimeStatus;
+  const records = status ? [...status.local, ...status.cloud] : [];
+  const selected =
+    (preferred ? records.find((row) => row.id === preferred) : null) ??
+    (status?.default_runtime
+      ? records.find((row) => row.id === status.default_runtime)
+      : null) ??
+    records[0] ??
+    null;
+  return composerRuntimeFamilyLabel(selected?.family ?? 'cursor');
+});
 
 const editSummaries = computed(() => {
   // During an active stream, avoid full-transcript rescans — use incremental edit count.
@@ -72,7 +87,7 @@ const reviewReadyCount = computed(
     ).length,
 );
 
-const showReviewStrip = computed(() =>
+const showReviewControls = computed(() =>
   shouldShowIdeAgentReviewStrip({
     layoutMode: shell.layoutMode,
     agentStreamActive: shell.agentStreamActive,
@@ -82,6 +97,11 @@ const showReviewStrip = computed(() =>
     latestAgentTurnFailed: latestIdeAgentTurnFailed(shell.threadMessages),
     employeeFailureActions: showFailureActions.value,
   }) || shell.canResumeIdeAgentRun,
+);
+
+/** Always keep the composer-top strip in IDE so the runtime family chip has a home. */
+const showReviewStrip = computed(
+  () => shell.layoutMode === 'ide' || showReviewControls.value,
 );
 
 const reviewBar = computed(() =>
@@ -165,7 +185,12 @@ function focusReviewFiles(): void {
     aria-label="Agent review controls"
   >
     <div class="ide-agent-review-strip__bar">
+      <span
+        class="ide-agent-review-strip__runtime"
+        :title="`CLI runtime: ${runtimeFamilyLabel}`"
+      >{{ runtimeFamilyLabel }}</span>
       <button
+        v-if="showReviewControls"
         type="button"
         class="ide-agent-review-strip__toggle"
         :class="{ 'ide-agent-review-strip__toggle--disabled': !canExpandFileList }"
@@ -175,7 +200,7 @@ function focusReviewFiles(): void {
       >
         <p class="ide-agent-review-strip__summary">{{ statusLabel }}</p>
       </button>
-      <div class="ide-agent-review-strip__actions">
+      <div v-if="showReviewControls" class="ide-agent-review-strip__actions">
         <button
           v-if="showRetryAction"
           type="button"

@@ -6,6 +6,7 @@ import type {
 } from '../../../api/control-plane';
 import {
   buildCursorCatalogRows,
+  composerRuntimeFamilyLabel,
   cursorComposerRuntimeLabel,
   resolveCursorComposerModel,
   type CursorCatalogRow,
@@ -94,7 +95,7 @@ export function createComposerRuntimePrefsSlice(input: CreateComposerRuntimePref
     }
     const model = selectedComposerModel.value;
     const modelLabel = model === 'auto' ? 'Auto' : model;
-    return `${family} ${scope} · ${modelLabel}`;
+    return `${composerRuntimeFamilyLabel(family)} · ${modelLabel}`;
   });
 
   function setSelectedRuntimeTarget(runtimeTarget: string): void {

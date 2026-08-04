@@ -15,6 +15,7 @@ import {
   cursorModelLabel,
   cursorPrimaryModelRows,
   cursorStaleModelWarning,
+  composerRuntimeFamilyLabel,
   isCursorAutoModel,
   isCursorComposerModel,
   type CursorCatalogRow,
@@ -56,20 +57,6 @@ export function useComposerModelRuntime(
     if (!defaultRuntime) return records[0] ?? null;
     return records.find((record) => record.id === defaultRuntime) ?? null;
   });
-  const runtimeLabel = computed(() => {
-    if (shell.composerRuntimeLabel) {
-      return shell.composerRuntimeLabel;
-    }
-    const target = currentRuntimeTarget.value;
-    if (target) {
-      const scope = target.target_type === 'cloud' ? 'cloud' : 'local';
-      return `${target.family} ${scope}`;
-    }
-    const identity = shell.runtimeSummary?.runtime_identity;
-    if (!identity) return 'Runtime';
-    return identity.model_name;
-  });
-  const runtimeDetail = computed(() => shell.composerRuntimeLabel || runtimeLabel.value);
   const showCursorCatalog = computed(() => {
     const target = currentRuntimeTarget.value;
     return (target?.family ?? 'cursor') === 'cursor';
@@ -78,6 +65,21 @@ export function useComposerModelRuntime(
   const selectedModelLabel = computed(() =>
     cursorModelLabel(selectedModelId.value, shell.cursorCatalogRows),
   );
+  const runtimeFamilyLabel = computed(() => {
+    const target = currentRuntimeTarget.value;
+    if (target?.family) {
+      return composerRuntimeFamilyLabel(target.family);
+    }
+    return 'Runtime';
+  });
+  /** Model chip text — model only (Auto / Composer / …). */
+  const runtimeLabel = computed(() => selectedModelLabel.value);
+  const runtimeDetail = computed(() => {
+    if (shell.composerRuntimeLabel) {
+      return shell.composerRuntimeLabel;
+    }
+    return `${runtimeFamilyLabel.value} · ${selectedModelLabel.value}`;
+  });
   const autoModelRow = computed(() =>
     shell.cursorCatalogRows.find((row) => row.id === 'auto') ?? {
       id: 'auto',
@@ -152,7 +154,7 @@ export function useComposerModelRuntime(
       return 'No runtime selected';
     }
     const status = target.ready ? 'Ready' : runtimeStatusLine(target);
-    return `${target.label} · ${status}`;
+    return `${composerRuntimeFamilyLabel(target.family)} · ${status}`;
   });
   const autoModelEnabled = computed(() => isCursorAutoModel(selectedModelId.value));
   const showAddModelsEntry = computed(
@@ -247,6 +249,7 @@ export function useComposerModelRuntime(
     openAddModelsPanel,
     openVaultSurface,
     runtimeDetail,
+    runtimeFamilyLabel,
     runtimeHint,
     runtimeLabel,
     runtimeStatusLine,

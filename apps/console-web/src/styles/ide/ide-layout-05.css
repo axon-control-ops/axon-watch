@@ -135,6 +135,25 @@
   padding: 0.42rem 0.65rem;
 }
 
+.ide-agent-review-strip__runtime {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  order: -1;
+  min-height: 1.45rem;
+  padding: 0 0.45rem;
+  border: 1px solid rgba(0, 200, 220, 0.45);
+  border-radius: 0.28rem;
+  background: rgba(8, 40, 48, 0.55);
+  color: rgba(165, 243, 252, 0.95);
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  line-height: 1;
+  white-space: nowrap;
+  user-select: none;
+}
+
 .ide-agent-review-strip__toggle {
   flex: 1;
   min-width: 0;

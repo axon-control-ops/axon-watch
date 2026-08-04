@@ -43,6 +43,7 @@ export type AgentDockComposerToolbarSource = {
   hasTerminalSnippet: MaybeRef<boolean>;
   selectionChipLabel: MaybeRef<string>;
   runtimeDetail: MaybeRef<string>;
+  runtimeFamilyLabel: MaybeRef<string>;
   runtimeLabel: MaybeRef<string>;
   selectedRuntimeSummary: MaybeRef<string>;
   runtimeTargets: MaybeRef<AgentDockComposerRuntimeTarget[]>;
@@ -101,6 +102,7 @@ export function useAgentDockComposerToolbarProps(
     hasTerminalSnippet: toValue(composer.hasTerminalSnippet),
     selectionChipLabel: toValue(composer.selectionChipLabel),
     runtimeDetail: toValue(composer.runtimeDetail),
+    runtimeFamilyLabel: toValue(composer.runtimeFamilyLabel),
     runtimeLabel: toValue(composer.runtimeLabel),
     selectedRuntimeSummary: toValue(composer.selectedRuntimeSummary),
     runtimeTargets: toValue(composer.runtimeTargets),
