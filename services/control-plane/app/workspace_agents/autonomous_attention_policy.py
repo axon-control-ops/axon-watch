@@ -84,6 +84,17 @@ _GITHUB_EMAIL_SIGNAL_RE = re.compile(
     r"(?i)signal_email_.*(check-suites|pull_|actions|_github)"
 )
 
+# Investigatory criticals VAXON may auto-dispatch under Full autonomy
+# (no secrets / production mutation — those stay operator-gated).
+_INVESTIGATORY_CRITICAL_RE = re.compile(
+    r"(?i)\b("
+    r"sentry|fast\s*gate|typecheck|workflow|pipeline|check[- ]suite|"
+    r"github\s*actions|android(?:\s+ci|\s+build)?|assembledebug|"
+    r"ci(?:\s|/|-)|monitor|probe|crash|exception|ota|canary|"
+    r"integration\s*test|unit\s*test|lint"
+    r")\b"
+)
+
 _SAFE_FINDING_KINDS = frozenset(
     {
         "failed_shift",
@@ -156,6 +167,16 @@ def is_github_email_ci_noise(*, title: str = "", detail: str = "", dedupe_key: s
     return bool(_GITHUB_EMAIL_SIGNAL_RE.search(blob))
 
 
+def is_investigatory_critical(*, title: str = "", detail: str = "") -> bool:
+    """True when a critical is safe to investigate automatically (CI/Sentry/monitor)."""
+    blob = f"{title}\n{detail}".strip()
+    if not blob:
+        return False
+    if text_looks_dangerous(title, detail):
+        return False
+    return bool(_INVESTIGATORY_CRITICAL_RE.search(blob))
+
+
 def classify_attention_item(
     *,
     kind: str,
@@ -190,6 +211,30 @@ def classify_attention_item(
             ask_operator=False,
         )
 
+    # Secrets / production markers always gate — even for investigatory CI titles.
+    if text_looks_dangerous(blob_title, blob_detail, cleaned_kind):
+        return AutonomyPolicyDecision(
+            tier="operator_gated",
+            decision="escalate",
+            risk="dangerous",
+            reason="dangerous_marker",
+            ask_operator=True,
+        )
+
+    # Critical CI/Sentry/monitor spikes: VAXON investigates without yanking the operator.
+    if (
+        not escalate_only
+        and (cleaned_kind == "critical_signal" or severity_l == "critical")
+        and is_investigatory_critical(title=blob_title, detail=blob_detail)
+    ):
+        return AutonomyPolicyDecision(
+            tier="auto_safe",
+            decision="dispatch",
+            risk="normal",
+            reason="bounded_auto:investigate_critical",
+            ask_operator=False,
+        )
+
     if escalate_only or cleaned_kind in _ESCALATE_FINDING_KINDS:
         return AutonomyPolicyDecision(
             tier="operator_gated",
@@ -205,15 +250,6 @@ def classify_attention_item(
             decision="escalate",
             risk="critical",
             reason="critical_severity",
-            ask_operator=True,
-        )
-
-    if text_looks_dangerous(blob_title, blob_detail, cleaned_kind):
-        return AutonomyPolicyDecision(
-            tier="operator_gated",
-            decision="escalate",
-            risk="dangerous",
-            reason="dangerous_marker",
             ask_operator=True,
         )
 
