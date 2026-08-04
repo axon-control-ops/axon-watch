@@ -2,10 +2,11 @@
 import { computed, onMounted, onUnmounted, ref } from 'vue';
 
 import {
-  openCursorUsageSettings,
+  openRuntimeUsageSettings,
   openWatchConnectors,
 } from '../../composables/useIdeEditorStatusBar';
 import { openOperatorStandup } from '../../features/kairo-conversation/open-operator-standup';
+import { isClaudeUsageStatusBarChip } from '../../lib/claude-usage-view';
 import { isConnectorStatusBarChip } from '../../lib/connector-glance-view';
 import { isCursorUsageStatusBarChip } from '../../lib/cursor-usage-view';
 import { useShellStore } from '../../stores/shell';
@@ -30,12 +31,14 @@ async function onOpenStandup(): Promise<void> {
 }
 
 function isInteractiveCenterChip(id: string): boolean {
-  return isConnectorStatusBarChip(id) || isCursorUsageStatusBarChip(id);
+  return (
+    isConnectorStatusBarChip(id) || isCursorUsageStatusBarChip(id) || isClaudeUsageStatusBarChip(id)
+  );
 }
 
 function onCenterChipClick(id: string): void {
-  if (isCursorUsageStatusBarChip(id)) {
-    openCursorUsageSettings(shell);
+  if (isCursorUsageStatusBarChip(id) || isClaudeUsageStatusBarChip(id)) {
+    openRuntimeUsageSettings(shell);
     return;
   }
   if (!isConnectorStatusBarChip(id)) {
@@ -46,7 +49,7 @@ function onCenterChipClick(id: string): void {
 }
 
 function connectorChipTitle(id: string): string | undefined {
-  if (isCursorUsageStatusBarChip(id)) {
+  if (isCursorUsageStatusBarChip(id) || isClaudeUsageStatusBarChip(id)) {
     return shell.statusBarZones.center.find((item) => item.id === id)?.title;
   }
   if (!isConnectorStatusBarChip(id)) {
@@ -69,10 +72,10 @@ function connectorChipTitle(id: string): string | undefined {
 }
 
 function connectorChipAriaLabel(id: string, label: string): string | undefined {
-  if (isCursorUsageStatusBarChip(id)) {
+  if (isCursorUsageStatusBarChip(id) || isClaudeUsageStatusBarChip(id)) {
     return (
       shell.statusBarZones.center.find((item) => item.id === id)?.ariaLabel ??
-      `${label}. Open Cursor usage settings.`
+      `${label}. Open runtime usage settings.`
     );
   }
   if (!isConnectorStatusBarChip(id)) {
@@ -159,7 +162,7 @@ onUnmounted(() => {
           :class="{
             'status-bar-mockup__chip--brand': item.tone === 'brand',
             'status-bar-mockup__chip--success':
-              item.tone === 'success' && item.id === 'cursor-usage',
+              item.tone === 'success' && (item.id === 'cursor-usage' || item.id === 'claude-usage'),
             'status-bar-mockup__chip--warning':
               item.tone === 'warning' && item.id !== 'watch-offline',
             'status-bar-mockup__chip--connector-glance': item.id === 'connector-glance',
@@ -167,6 +170,7 @@ onUnmounted(() => {
               item.id === 'connector-required-alert',
             'status-bar-mockup__chip--watch-offline': item.id === 'watch-offline',
             'status-bar-mockup__chip--cursor-usage': item.id === 'cursor-usage',
+            'status-bar-mockup__chip--claude-usage': item.id === 'claude-usage',
           }"
           :type="isInteractiveCenterChip(item.id) ? 'button' : undefined"
           :title="connectorChipTitle(item.id) ?? item.title"
