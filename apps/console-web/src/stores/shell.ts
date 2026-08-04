@@ -167,7 +167,7 @@ import {
   streamingThreadIdsFromUiMap,
   workspaceStreamGlobalsFromState,
 } from '../lib/workspace-stream-ui';
-import { listReattachIdeStreamThreadIds, listStaleIdeStreamThreadIds } from '../lib/stale-ide-stream-ui';
+import { listReattachIdeStreamThreadIds } from '../lib/stale-ide-stream-ui';
 import { resolveStreamingAgentMessageId } from '../lib/follow-busy-employee-ide-streams';
 import { composerSubmitBlockReason } from '../lib/composer-submit-block-reason';
 import { rewriteComposerAskOptionAnswer } from '../lib/composer-ask-option-rewrite';
@@ -307,6 +307,7 @@ import { createOperatorFocusSlice } from './shell/slices/create-operator-focus-s
 import { createOperatorPresenceSettingsSlice } from './shell/slices/create-operator-presence-settings-slice';
 import { createOperatorProbesSlice } from './shell/slices/create-operator-probes-slice';
 import { createIdeRunAutoRecoverySlice } from './shell/slices/create-ide-run-auto-recovery-slice';
+import { createRunSurfacesRefreshSlice } from './shell/slices/create-run-surfaces-refresh-slice';
 import { createInboxSignalsSlice } from './shell/slices/create-inbox-signals-slice';
 import { createRuntimeProbesSlice } from './shell/slices/create-runtime-probes-slice';
 import { createRuntimeSummarySlice } from './shell/slices/create-runtime-summary-slice';
@@ -2187,6 +2188,9 @@ export const useShellStore = defineStore('shell', () => {
       threadMessages.value = filterThreadMessagesForSurface(merged, 'ide');
       if (options.clearDraftOnSuccess !== false) {
         ideComposerDraft.value = '';
+        // Persist synchronously: a force-refresh can cancel the debounced watcher
+        // and otherwise restore the pre-submit text from this thread's storage.
+        persistIdeComposerDraft(workspaceId, '', response.thread_id);
       }
       if (isRunLinkedComposerMode(composerMode) && response.run_id) {
         ideAgentRunId.value = response.run_id;
@@ -2420,6 +2424,11 @@ export const useShellStore = defineStore('shell', () => {
     ) {
       enqueueIdeComposerMessage(composerMode, content);
       ideComposerDraft.value = '';
+      persistIdeComposerDraft(
+        currentWorkspace.value?.workspace_id ?? null,
+        '',
+        activeIdeThreadId.value || null,
+      );
       commandMutationError.value = null;
       return true;
     }
@@ -3268,114 +3277,40 @@ export const useShellStore = defineStore('shell', () => {
     dispatchIdeComposerMessage,
   });
 
-  function clearStaleIdeStreamUi(): void {
-    const runPhaseById: Record<string, string | undefined> = {};
-    for (const run of runs.value) {
-      runPhaseById[run.run_id] = run.phase;
-    }
-    const decisionInput = {
-      streamUiByThreadId: workspaceStreamUiById.value,
-      liveSessionThreadIds: chatStreamSessionsByWorkspace.keys(),
-      runPhaseById,
-      runsLoaded: runsLoadState.value === 'loaded',
-    };
-    const reattachThreadIds = listReattachIdeStreamThreadIds(decisionInput);
-    const staleThreadIds = listStaleIdeStreamThreadIds(decisionInput);
-    const workspaceId = currentWorkspace.value?.workspace_id ?? null;
-    const currentThreadIds = new Set(
-      workspaceId
-        ? (ideThreadsByWorkspaceId.value[workspaceId] ?? []).map((thread) => thread.thread_id)
-        : [],
-    );
-    if (workspaceId) {
-      const surfaceThreadId = getWorkspaceSurfaceThreadId(workspaceId, 'ide');
-      if (surfaceThreadId) {
-        currentThreadIds.add(surfaceThreadId);
-      }
-    }
-    for (const threadId of reattachThreadIds) {
-      if (workspaceId && currentThreadIds.has(threadId)) {
-        void reattachIdeChatStream(threadId, workspaceId);
-      }
-    }
-    if (!staleThreadIds.length) {
-      return;
-    }
-    for (const threadId of staleThreadIds) {
-      disconnectChatStreamSession(threadId);
-      setWorkspaceStreamUi(threadId, {
-        active: false,
-        messageId: null,
-        activity: null,
-        ideAgentRunId: null,
-      });
-    }
-  }
-
-  async function refreshRunSurfaces(options?: { light?: boolean; forceFull?: boolean }): Promise<void> {
-    // During an active stream/run, full surface refresh (CLI status + briefing +
-    // fleet + brain) routinely takes 5–8s and trips Chrome "Page Unresponsive".
-    const activeBusy =
-      agentStreamActive.value ||
-      primaryActiveRun.value?.phase === 'executing' ||
-      primaryActiveRun.value?.phase === 'planning' ||
-      primaryActiveRun.value?.phase === 'starting' ||
-      primaryActiveRun.value?.phase === 'queued';
-    const light =
-      options?.forceFull === true
-        ? false
-        : options?.light === true || activeBusy;
-    if (light) {
-      // Live SSE ticks must stay cheap: skip CLI status/summary AND watch inbox
-      // (inbox watch probe regularly hits a ~5s timeout and freezes the console).
-      await loadRuns({ sync: false });
-      clearStaleIdeStreamUi();
-      await autoContinueInterruptedIdeRun();
-      await flushIdeComposerQueueIfIdle();
-      return;
-    }
-    const briefingBackground = briefingLoadState.value === 'loaded';
-    const runtimeBackground = runtimeSummaryLoadState.value === 'loaded';
-    const inboxBackground = inboxLoadState.value === 'loaded';
-    // Soft full refresh: when surfaces are already loaded, only refresh runs +
-    // inbox + history. Avoid stacking cold CLI/briefing probes on every mutation.
-    if (
-      briefingBackground &&
-      runtimeBackground &&
-      inboxBackground &&
-      runtimeStatusLoadState.value === 'loaded'
-    ) {
-      await Promise.all([
-        loadRuns({ sync: false }),
-        loadInbox({ background: true }),
-      ]);
-      clearStaleIdeStreamUi();
-      await loadRunHistory(
-        resolveRunHistoryRunId(workspaceRuns.value, ideAgentRunId.value),
-      );
-      await autoContinueInterruptedIdeRun();
-      await flushIdeComposerQueueIfIdle();
-      return;
-    }
-    await Promise.all([
-      loadRuns(),
-      loadRuntimeStatus(),
-      loadRuntimeSummary({ background: runtimeBackground }),
-      loadInbox({ background: inboxBackground }),
-      loadConnectors({ background: connectorsLoadState.value === 'loaded' }),
-      loadOperatorBriefing({ background: briefingBackground }),
-      loadOperatorFleetHealth({ background: operatorFleetHealthLoadState.value === 'loaded' }),
-      operatorBrainGraphLoadState.value === 'loaded'
-        ? loadOperatorBrainGraph({ background: true })
-        : Promise.resolve(),
-    ]);
-    clearStaleIdeStreamUi();
-    await loadRunHistory(
-      resolveRunHistoryRunId(workspaceRuns.value, ideAgentRunId.value),
-    );
-    await autoContinueInterruptedIdeRun();
-    await flushIdeComposerQueueIfIdle();
-  }
+  const { clearStaleIdeStreamUi, refreshRunSurfaces } = createRunSurfacesRefreshSlice({
+    runs,
+    workspaceStreamUiById,
+    chatStreamSessionsByWorkspace,
+    runsLoadState,
+    currentWorkspace,
+    ideThreadsByWorkspaceId,
+    getWorkspaceSurfaceThreadId,
+    reattachIdeChatStream,
+    disconnectChatStreamSession,
+    setWorkspaceStreamUi,
+    agentStreamActive,
+    primaryActiveRun,
+    loadRuns,
+    autoContinueInterruptedIdeRun,
+    flushIdeComposerQueueIfIdle,
+    briefingLoadState,
+    runtimeSummaryLoadState,
+    inboxLoadState,
+    runtimeStatusLoadState,
+    loadInbox,
+    loadRunHistory,
+    workspaceRuns,
+    ideAgentRunId,
+    loadRuntimeStatus,
+    loadRuntimeSummary,
+    loadConnectors,
+    connectorsLoadState,
+    loadOperatorBriefing,
+    loadOperatorFleetHealth,
+    operatorFleetHealthLoadState,
+    operatorBrainGraphLoadState,
+    loadOperatorBrainGraph,
+  });
 
   async function completeAllReviewReadyRuns(): Promise<void> {
     const workspaceId = currentWorkspace.value?.workspace_id ?? null;

@@ -473,6 +473,7 @@
   display: flex;
   flex-direction: column;
   min-height: 0;
+  overflow: hidden;
 }
 
 .company-roster--ide .company-roster__header,
@@ -498,7 +499,7 @@
 .ide-team-panel__body {
   flex: 1 1 auto;
   min-height: 0;
-  overflow: auto;
+  overflow: hidden;
   display: flex;
   flex-direction: column;
 }
@@ -509,6 +510,20 @@
   margin-top: 0;
   border-top: 0;
   background: transparent;
+  overflow: hidden;
+}
+
+.company-roster--ide .company-roster__dock-host {
+  max-height: 100%;
+  min-height: 0;
+  padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
+  scrollbar-gutter: stable;
+}
+
+.company-roster--ide .agent-persona-dock,
+.console-shell--mockup.console-shell--glass3d .ide-team-panel .agent-persona-dock {
+  /* Override the glass card's 11rem floor when the lower Kairo rail grows. */
+  min-height: 0;
 }
 
 @keyframes company-roster-glow-pulse {

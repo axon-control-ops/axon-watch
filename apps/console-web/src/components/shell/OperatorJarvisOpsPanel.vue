@@ -1,10 +1,27 @@
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, onBeforeUnmount, onMounted } from 'vue';
 
 import { buildJarvisOpsView } from '../../lib/operator-jarvis-ops-view';
 import { useShellStore } from '../../stores/shell';
 
 const shell = useShellStore();
+let fleetTaskRefreshTimer: ReturnType<typeof setInterval> | null = null;
+
+const fleetTasks = computed(() => Object.values(shell.workspaceTasksById).flat());
+const workspaceNamesById = computed(() =>
+  Object.fromEntries(
+    shell.workspaces.map((workspace) => [
+      workspace.workspace_id,
+      workspace.display_name || workspace.workspace_id,
+    ]),
+  ),
+);
+
+async function refreshFleetTasks(): Promise<void> {
+  await Promise.all(
+    shell.workspaces.map((workspace) => shell.loadWorkspaceTasks(workspace.workspace_id)),
+  );
+}
 
 const view = computed(() =>
   buildJarvisOpsView({
@@ -14,6 +31,8 @@ const view = computed(() =>
     ideComposerActivity: shell.ideComposerActivity,
     employees: shell.companyEmployeesFleet,
     agentStreamActive: shell.agentStreamActive,
+    workspaceTasks: fleetTasks.value,
+    workspaceNamesById: workspaceNamesById.value,
   }),
 );
 
@@ -26,8 +45,25 @@ function onCardActivate(kind: string, id: string): void {
     shell.revealTeamRosterForActiveEmployee();
     return;
   }
+  if (kind === 'task') {
+    return;
+  }
   shell.focusMissionControl();
 }
+
+onMounted(() => {
+  void refreshFleetTasks();
+  fleetTaskRefreshTimer = setInterval(() => {
+    void refreshFleetTasks();
+  }, 15_000);
+});
+
+onBeforeUnmount(() => {
+  if (fleetTaskRefreshTimer) {
+    clearInterval(fleetTaskRefreshTimer);
+    fleetTaskRefreshTimer = null;
+  }
+});
 </script>
 
 <template>

@@ -43,4 +43,30 @@ describe('buildJarvisOpsView', () => {
     expect(view.cards.some((card) => card.kind === 'poll')).toBe(true);
     expect(view.cards.some((card) => card.kind === 'agent' && card.title === 'Dana')).toBe(true);
   });
+
+  it('surfaces VAXON tasks without partial-word truncation', () => {
+    const view = buildJarvisOpsView({
+      briefing: null,
+      primaryActiveRun: null,
+      fleetActiveRuns: [],
+      ideComposerActivity: null,
+      employees: [],
+      agentStreamActive: false,
+      workspaceNamesById: { workspace_young_eagles: 'Young Eagles' },
+      workspaceTasks: [{
+        task_id: 'task-1', workspace_id: 'workspace_young_eagles',
+        goal: `${'Complete parent graduation confirmation verification '.repeat(6)}cleanly`,
+        acceptance_criteria: '', risk: 'normal', owner_role: 'lead', dependencies: [],
+        status: 'leased', lease_holder: 'employee-imani', lease_expires_at: null,
+        attempt_budget: 3, attempts_used: 1, terminal_outcome: null, run_id: 'run-1',
+        created_at: '2026-08-04T05:00:00Z', updated_at: '2026-08-04T05:01:00Z',
+      }],
+    });
+
+    const task = view.cards.find((card) => card.kind === 'task');
+    expect(task?.title).toBe('VAXON · lead');
+    expect(task?.meta).toContain('working · Young Eagles');
+    expect(task?.detail).toMatch(/\bparent…$/);
+    expect(task?.detail).not.toContain('confirmati…');
+  });
 });

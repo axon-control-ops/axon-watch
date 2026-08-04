@@ -248,8 +248,12 @@ export function useComposerActions(options: UseComposerActionsOptions) {
         ? rewriteNamedAssignPrompt(submitDraft, namedAssign.employee.name)
         : submitDraft;
 
-    // Never park the prompt on the destination tab — that bled drafts across agents
-    // when submit failed or the operator switched threads mid-flight.
+    // Clear both the visible draft and its origin-thread copy before dispatch.
+    // Waiting for the response let a thread route restore the old prompt after work started.
+    shell.ideComposerDraft = '';
+    if (originThreadId && workspaceId) {
+      persistIdeComposerDraft(workspaceId, '', originThreadId);
+    }
     const submitted = await shell.submitIdeComposer(modeForSubmit, {
       attachmentFiles,
       contentOverride: routedPrompt,
@@ -260,9 +264,6 @@ export function useComposerActions(options: UseComposerActionsOptions) {
       }
       shell.ideComposerDraft = submitDraft;
       return;
-    }
-    if (routed && originThreadId && workspaceId) {
-      persistIdeComposerDraft(workspaceId, '', originThreadId);
     }
     clearSkillAttachments?.();
     recordComposerHistoryIfSent(draft);

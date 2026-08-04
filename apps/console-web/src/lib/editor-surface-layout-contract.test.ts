@@ -347,6 +347,24 @@ describe('IDE editor surface layout contract', () => {
     expect(hintAlert).toMatch(/border:\s*1px solid rgba\(190,\s*80,\s*60,\s*0\.32\)/);
   });
 
+  it('keeps the TEAM header fixed and makes the persona dock the sole vertical scroller', () => {
+    const shell32 = readCss('shell/mockup-shell-32.css');
+    const roster = ruleBlock(shell32, '.company-roster--ide');
+    const teamBody = ruleBlock(shell32, '.ide-team-panel__body');
+    const dock = ruleBlock(shell32, '.company-roster--ide .company-roster__dock-host');
+    const persona = ruleBlock(
+      shell32,
+      '.company-roster--ide .agent-persona-dock,\n.console-shell--mockup.console-shell--glass3d .ide-team-panel .agent-persona-dock',
+    );
+
+    expect(roster).toMatch(/overflow:\s*hidden/);
+    expect(teamBody).toMatch(/overflow:\s*hidden/);
+    expect(dock).toMatch(/max-height:\s*100%/);
+    expect(dock).toMatch(/min-height:\s*0/);
+    expect(dock).toMatch(/scrollbar-gutter:\s*stable/);
+    expect(persona).toMatch(/min-height:\s*0/);
+  });
+
   it('loads composer file attachment styles from the ide-layout aggregator', () => {
     const aggregator = readCss('ide-layout.css');
     expect(aggregator).toMatch(/@import\s+['"]\.\/ide\/ide-layout-07\.css['"]/);

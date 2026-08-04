@@ -26,7 +26,14 @@ def truncate_text(text: str | None, *, max_len: int = 280) -> str:
     cleaned = " ".join(str(text or "").split()).strip()
     if len(cleaned) <= max_len:
         return cleaned
-    return f"{cleaned[: max_len - 1].rstrip()}…"
+    if max_len <= 1:
+        return "…"[:max_len]
+    candidate = cleaned[: max_len - 1].rstrip()
+    # Publish a complete final word, never fragments such as "C…" or "implem…".
+    boundary = candidate.rfind(" ")
+    if boundary > 0:
+        candidate = candidate[:boundary].rstrip(" ,;:-–—")
+    return f"{candidate}…"
 
 
 def strip_confidence_lines(text: str | None) -> str:
