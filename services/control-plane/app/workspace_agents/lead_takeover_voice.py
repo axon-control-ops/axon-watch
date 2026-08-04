@@ -40,6 +40,7 @@ def build_lead_takeover_spoken_line(
     from app.workspace_agents.lead_executive_brief import (
         compress_ask,
         executive_next_step,
+        executive_operator_action,
         plain_outcome,
     )
     from app.workspace_agents.lead_takeover import extract_lead_next
@@ -59,14 +60,15 @@ def build_lead_takeover_spoken_line(
     if outcome:
         parts.append(f"What landed: {outcome}")
     parts.append(
-        executive_next_step(
+        "Next: "
+        + executive_next_step(
             lead_next=lead_next,
             specialist_name=name,
             parent_ask=parent_ask,
             status=status,
         )
     )
-    parts.append("I will keep driving unless you change the order.")
+    parts.append("Your action: " + executive_operator_action(lead_next))
     return " ".join(parts)
 
 

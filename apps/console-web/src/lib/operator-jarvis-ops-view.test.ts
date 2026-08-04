@@ -64,9 +64,38 @@ describe('buildJarvisOpsView', () => {
     });
 
     const task = view.cards.find((card) => card.kind === 'task');
-    expect(task?.title).toBe('VAXON · lead');
-    expect(task?.meta).toContain('working · Young Eagles');
+    expect(task?.title).toBe('VAXON working · lead');
+    expect(task?.meta).toContain('ACTIVE NOW · Young Eagles');
     expect(task?.detail).toMatch(/\bparent…$/);
     expect(task?.detail).not.toContain('confirmati…');
+    expect(view.activity).toEqual({
+      state: 'active',
+      label: 'VAXON ACTIVE · 1 task in progress',
+      detail: 'Working now in Young Eagles',
+    });
+  });
+
+  it('distinguishes queued work from actively running work', () => {
+    const view = buildJarvisOpsView({
+      briefing: null,
+      primaryActiveRun: null,
+      fleetActiveRuns: [],
+      ideComposerActivity: null,
+      employees: [],
+      agentStreamActive: false,
+      workspaceNamesById: { workspace_dashpro: 'DashPro' },
+      workspaceTasks: [{
+        task_id: 'task-queued', workspace_id: 'workspace_dashpro',
+        goal: 'Review parent dashboard status', acceptance_criteria: '',
+        risk: 'normal', owner_role: 'watcher', dependencies: [], status: 'open',
+        lease_holder: null, lease_expires_at: null, attempt_budget: 3,
+        attempts_used: 0, terminal_outcome: null, run_id: null,
+        created_at: '2026-08-04T05:00:00Z', updated_at: '2026-08-04T05:01:00Z',
+      }],
+    });
+
+    expect(view.activity.state).toBe('queued');
+    expect(view.activity.label).toBe('VAXON READY · 1 task queued');
+    expect(view.cards[0]?.meta).toBe('QUEUED NEXT · DashPro');
   });
 });

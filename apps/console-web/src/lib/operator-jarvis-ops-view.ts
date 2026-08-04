@@ -23,6 +23,11 @@ export type JarvisOpsCard = {
 
 export type JarvisOpsView = {
   headline: string;
+  activity: {
+    state: 'active' | 'queued' | 'quiet';
+    label: string;
+    detail: string;
+  };
   cards: JarvisOpsCard[];
 };
 
@@ -97,15 +102,18 @@ export function buildJarvisOpsView(input: BuildJarvisOpsViewInput): JarvisOpsVie
     });
   }
 
-  const activity = input.ideComposerActivity;
-  if (activity?.label?.trim() || input.agentStreamActive) {
-    const live = activity?.liveBodyFull?.trim() || activity?.label?.trim() || 'Agent stream active';
+  const composerActivity = input.ideComposerActivity;
+  if (composerActivity?.label?.trim() || input.agentStreamActive) {
+    const live =
+      composerActivity?.liveBodyFull?.trim()
+      || composerActivity?.label?.trim()
+      || 'Agent stream active';
     cards.push({
       id: 'poll:composer',
       kind: 'poll',
       title: input.agentStreamActive ? 'Agent polling / streaming' : 'Composer activity',
       detail: truncateAtWord(live, 160),
-      meta: activity?.mode ? activity.mode.toUpperCase() : null,
+      meta: composerActivity?.mode ? composerActivity.mode.toUpperCase() : null,
       tone: input.agentStreamActive ? 'info' : 'nominal',
     });
   }
@@ -147,9 +155,9 @@ export function buildJarvisOpsView(input: BuildJarvisOpsViewInput): JarvisOpsVie
     cards.push({
       id: `task:${task.task_id}`,
       kind: 'task',
-      title: `VAXON · ${task.owner_role || 'task'}`,
+      title: `VAXON ${working ? 'working' : 'queued'} · ${task.owner_role || 'task'}`,
       detail: truncateAtWord(task.goal || 'Task goal unavailable', 180),
-      meta: `${working ? 'working' : 'queued'} · ${workspace} · ${task.attempts_used}/${task.attempt_budget} attempts`,
+      meta: `${working ? 'ACTIVE NOW' : 'QUEUED NEXT'} · ${workspace}`,
       tone: working ? 'info' : 'nominal',
     });
   }
@@ -169,6 +177,38 @@ export function buildJarvisOpsView(input: BuildJarvisOpsViewInput): JarvisOpsVie
   const runCount = cards.filter((card) => card.kind === 'run').length;
   const agentCount = cards.filter((card) => card.kind === 'agent').length;
   const taskCount = cards.filter((card) => card.kind === 'task').length;
+  const workingTasks = activeTasks.filter((task) => task.status === 'leased');
+  const queuedTasks = activeTasks.filter((task) => task.status === 'open');
+  const workingWorkspaceNames = Array.from(
+    new Set(
+      workingTasks.map(
+        (task) =>
+          input.workspaceNamesById?.[task.workspace_id]
+          || task.workspace_id.replace(/^workspace_/, ''),
+      ),
+    ),
+  );
+  const opsActivity: JarvisOpsView['activity'] = workingTasks.length
+    ? {
+        state: 'active',
+        label: `VAXON ACTIVE · ${workingTasks.length} task${workingTasks.length === 1 ? '' : 's'} in progress`,
+        detail: `Working now in ${workingWorkspaceNames.join(', ')}${
+          queuedTasks.length
+            ? ` · ${queuedTasks.length} queued next`
+            : ''
+        }`,
+      }
+    : queuedTasks.length
+      ? {
+          state: 'queued',
+          label: `VAXON READY · ${queuedTasks.length} task${queuedTasks.length === 1 ? '' : 's'} queued`,
+          detail: 'Waiting tasks are visible below and will start when their assigned agent is available.',
+        }
+      : {
+          state: 'quiet',
+          label: 'VAXON STANDBY',
+          detail: 'No VAXON-owned task is actively running or queued.',
+        };
   const headline =
     cards.length === 0
       ? 'Mission quiet — no active runs, polls, or agent work'
@@ -176,6 +216,7 @@ export function buildJarvisOpsView(input: BuildJarvisOpsViewInput): JarvisOpsVie
 
   return {
     headline,
+    activity: opsActivity,
     cards: cards.slice(0, 12),
   };
 }

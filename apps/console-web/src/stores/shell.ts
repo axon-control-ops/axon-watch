@@ -158,6 +158,7 @@ import {
 } from '../lib/ide-composer-queue';
 import { isRunLinkedComposerMode, isToolCapableComposerMode } from '../lib/composer-tool-modes';
 import {
+  draftWasAlreadySubmitted,
   persistIdeComposerDraft,
   readStoredIdeComposerDraft,
 } from '../lib/ide-composer-draft-prefs';
@@ -1193,6 +1194,9 @@ export const useShellStore = defineStore('shell', () => {
       threadMessages.value = mapped;
       commandMutationState.value = 'idle';
       commandMutationError.value = null;
+      if (surface === 'ide') {
+        clearRestoredSubmittedIdeComposerDraft(workspaceId, loadedThreadId, mapped);
+      }
     }
     if (surface === 'operator' && currentWorkspace.value?.workspace_id === workspaceId) {
       operatorThreadMessages.value = mapped;
@@ -2039,6 +2043,23 @@ export const useShellStore = defineStore('shell', () => {
     suppressingIdeComposerDraftPersist = true;
     try {
       ideComposerDraft.value = readStoredIdeComposerDraft(workspaceId, threadId);
+    } finally {
+      suppressingIdeComposerDraftPersist = false;
+    }
+  }
+
+  function clearRestoredSubmittedIdeComposerDraft(
+    workspaceId: string,
+    threadId: string,
+    messages: ReadonlyArray<OperatorThreadEntry>,
+  ): void {
+    if (!draftWasAlreadySubmitted(ideComposerDraft.value, messages)) {
+      return;
+    }
+    suppressingIdeComposerDraftPersist = true;
+    try {
+      ideComposerDraft.value = '';
+      persistIdeComposerDraft(workspaceId, '', threadId);
     } finally {
       suppressingIdeComposerDraftPersist = false;
     }

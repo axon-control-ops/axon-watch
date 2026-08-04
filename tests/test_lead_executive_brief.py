@@ -12,6 +12,7 @@ sys.path.insert(0, str(CONTROL_PLANE_ROOT))
 from app.workspace_agents.lead_executive_brief import (  # noqa: E402
     compress_ask,
     executive_next_step,
+    executive_operator_action,
     plain_outcome,
 )
 from app.workspace_agents.lead_text import truncate_text  # noqa: E402
@@ -51,6 +52,44 @@ class LeadExecutiveBriefTests(unittest.TestCase):
         )
         self.assertIn("I will finish the verification", next_step)
         self.assertNotIn("npm run", next_step)
+
+    def test_parent_pop_goal_becomes_plain_executive_language(self) -> None:
+        ask = compress_ask(
+            "Can we check how many parents responded on graduation cards and uploaded POP? "
+            "Also implement chat-sent proof of payment as an upload."
+        )
+        self.assertEqual(
+            "Count parent graduation-card responses and payment proofs, then make "
+            "chat-sent proof visible to parents and centre staff.",
+            ask,
+        )
+
+    def test_internal_watcher_cleanup_never_becomes_operator_work(self) -> None:
+        reply = (
+            "I cleared the failed shift. Root cause was a stale-timeout reap after "
+            "794s idle against the 720s watcher cutoff."
+        )
+        outcome = plain_outcome(reply)
+        self.assertIn("sitting idle too long", outcome)
+        self.assertNotIn("794", outcome)
+        self.assertNotIn("stale", outcome.lower())
+
+        internal_next = (
+            "Accept clearance for dedupe "
+            "failed_shift:workspace_young_eagles_day_care:watcher:run_145d05acc77a"
+        )
+        next_step = executive_next_step(
+            lead_next=internal_next,
+            specialist_name="Ash",
+            parent_ask=(
+                "Count parent graduation-card responses and payment proofs, then make "
+                "chat-sent proof visible to parents and centre staff."
+            ),
+            status="completed",
+        )
+        self.assertIn("verified counts", next_step)
+        self.assertNotIn("dedupe", next_step)
+        self.assertIn("Nothing right now", executive_operator_action(internal_next))
 
 
 if __name__ == "__main__":
