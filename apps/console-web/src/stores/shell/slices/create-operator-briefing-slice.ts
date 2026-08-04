@@ -12,6 +12,7 @@ import {
   shouldAutoStartReportTheater,
   shouldStartReportTheaterForBriefing,
 } from '../../../features/report-theater/report-theater-auto-start';
+import { maybeTriggerAutoAttendAdvise } from '../../../lib/vaxon-auto-attend-advise';
 import { shouldRequestViewportCompactBriefing } from '../../../lib/viewport-compact';
 import type { BriefingLoadState } from '../types';
 
@@ -112,6 +113,10 @@ export function createOperatorBriefingSlice(input: CreateOperatorBriefingSliceIn
         if (!light) {
           const settings =
             briefing.operator_presence?.settings ?? input.operatorPresenceSettings.value;
+          maybeTriggerAutoAttendAdvise({
+            adviseUiAction: briefing.advise_ui_action,
+            autonomyMode: settings.autonomy_mode,
+          });
           const briefKey = [
             briefing.advise ?? '',
             briefing.notice ?? '',

@@ -44,7 +44,7 @@ class OperatorDeterministicReportNextMoveTests(unittest.TestCase):
                 del sys.modules[name]
         sys.modules.update(self._saved)
 
-    def test_next_move_preserves_promised_workspace_switch(self) -> None:
+    def test_next_move_preserves_vaxon_attendance(self) -> None:
         from app.kairo.operator_deterministic_report import compose_operator_report
 
         composed = compose_operator_report(
@@ -52,8 +52,8 @@ class OperatorDeterministicReportNextMoveTests(unittest.TestCase):
                 "briefing": {
                     **_MOCK_BRIEFING,
                     "advise": (
-                        "Critical signal in axon-watch needs review; "
-                        "switch there before continuing."
+                        "VAXON is attending the critical signal in axon-watch; "
+                        "keep working here."
                     ),
                 },
                 "fleet": _MOCK_FLEET,
@@ -69,7 +69,7 @@ class OperatorDeterministicReportNextMoveTests(unittest.TestCase):
         )
 
         self.assertEqual(
-            "I'll switch to axon-watch and start that investigation next",
+            "I'm attending the signal in axon-watch and will report back here",
             composed["sections"]["next_move"],
         )
 
@@ -81,8 +81,8 @@ class OperatorDeterministicReportNextMoveTests(unittest.TestCase):
                 "briefing": {
                     **_MOCK_BRIEFING,
                     "advise": (
-                        "Critical signal in axon-watch needs review; "
-                        "switch there before continuing."
+                        "VAXON is attending the critical signal in axon-watch; "
+                        "keep working here."
                     ),
                 },
                 "fleet": _MOCK_FLEET,
@@ -107,7 +107,7 @@ class OperatorDeterministicReportNextMoveTests(unittest.TestCase):
         )
 
         self.assertIn("inspect the exact push error", composed["sections"]["next_move"].lower())
-        self.assertNotIn("switch to axon-watch", composed["sections"]["next_move"].lower())
+        self.assertNotIn("attending the signal", composed["sections"]["next_move"].lower())
 
     def test_next_move_uses_non_fast_forward_stderr(self) -> None:
         from app.kairo.operator_deterministic_report import compose_operator_report
@@ -185,8 +185,8 @@ class OperatorDeterministicReportNextMoveTests(unittest.TestCase):
                 "briefing": {
                     **_MOCK_BRIEFING,
                     "advise": (
-                        "Critical signal in axon-watch needs review; "
-                        "switch there before continuing."
+                        "VAXON is attending the critical signal in axon-watch; "
+                        "keep working here."
                     ),
                 },
                 "fleet": _MOCK_FLEET,

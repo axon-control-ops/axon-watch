@@ -41,8 +41,8 @@ export function toVaxonDirectiveLine(nextMove: string): string {
       'and start that investigation next',
     )}.`;
   }
-  if (/needs review|need review/i.test(cleaned) && /switch/i.test(cleaned)) {
-    return `I'll switch us there and start that investigation next.`;
+  if (/\bVAXON is attending\b/i.test(cleaned)) {
+    return `I'm attending that signal and will report the outcome here.`;
   }
   if (/github/i.test(cleaned) && (/vault/i.test(cleaned) || /token/i.test(cleaned))) {
     return "I'll open Vault and restore the GitHub probe token next.";
@@ -77,7 +77,7 @@ export function toVaxonActionLabel(action: BriefingAction): string {
   if (action.kind === 'review_signal') {
     const title = action.title?.trim() || 'that signal';
     if (/^review\b/i.test(title)) {
-      return `I'll switch us there and review that signal next`;
+      return `I'll attend that signal and report the outcome here`;
     }
     return `I'll open Attention for ${title}`;
   }

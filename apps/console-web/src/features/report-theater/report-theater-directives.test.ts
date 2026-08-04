@@ -9,12 +9,12 @@ import {
 } from './report-theater-directives';
 
 describe('report-theater-directives', () => {
-  it('rewrites passive next-move copy into VAXON first person', () => {
+  it('keeps VAXON-owned attendance in first person', () => {
     expect(
       toVaxonDirectiveLine(
-        'Critical signal in DashPro needs review; switch there before continuing',
+        'VAXON is attending the critical signal in DashPro; keep working here',
       ),
-    ).toMatch(/^I'll switch us there/i);
+    ).toMatch(/^I'm attending that signal/i);
   });
 
   it('rewrites inspect advise into Attention open', () => {

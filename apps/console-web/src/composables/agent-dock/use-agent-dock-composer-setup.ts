@@ -1,4 +1,4 @@
-import { computed, ref } from 'vue';
+import { computed, nextTick, ref } from 'vue';
 
 import { resizeCommandComposer } from '../../lib/command-composer-autosize';
 import { useKairoConversation } from '../../features/kairo-conversation/use-kairo-conversation';
@@ -19,6 +19,7 @@ import { useComposerModelRuntime } from './use-composer-model-runtime';
 import { useComposerTypeahead } from './use-composer-typeahead';
 import { useComposerWorkspaceSync } from './use-composer-workspace-sync';
 import { readWorkspaceComposerMode } from '../../lib/composer-mode-prefs';
+import { persistIdeComposerDraft } from '../../lib/ide-composer-draft-prefs';
 import { teammateRouteNotice } from '../../lib/teammate-route-notice';
 import { buildAgentDockComposerApi } from './build-agent-dock-composer-api';
 
@@ -320,6 +321,19 @@ export function useAgentDockComposerSetup() {
     void syncTypeaheadFromComposer();
   }
 
+  function clearComposerDraft(): void {
+    composerDraftModel.value = '';
+    if (composerMode.value !== 'kairo') {
+      persistIdeComposerDraft(
+        shell.currentWorkspace?.workspace_id ?? null,
+        '',
+        shell.activeIdeThreadId || null,
+      );
+    }
+    closeTypeahead();
+    void nextTick(syncComposerHeight);
+  }
+
   useComposerWorkspaceSync({
     shell,
     composerMode,
@@ -352,6 +366,7 @@ export function useAgentDockComposerSetup() {
     autoModelRow,
     autoToggleChecked,
     canSubmitComposer,
+    clearComposerDraft,
     closeAddModelsPanel,
     closeComposerImageLightbox,
     composerAccessBanner,

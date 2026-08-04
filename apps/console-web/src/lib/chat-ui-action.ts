@@ -4,6 +4,7 @@ export interface SwitchWorkspaceUiAction {
   open_file_path?: string | null;
   layout_mode?: 'operator' | 'ide';
   focus_attention?: boolean;
+  auto_attend?: boolean;
   signal_id?: string | null;
   cta_label?: string | null;
 }
@@ -61,6 +62,7 @@ export function parseChatUiAction(value: unknown): ChatUiAction | null {
       open_file_path: openFilePath || null,
       layout_mode: layoutMode === 'ide' || layoutMode === 'operator' ? layoutMode : undefined,
       focus_attention: record.focus_attention === true,
+      auto_attend: record.auto_attend === true,
       signal_id: signalId || null,
       cta_label: ctaLabel || null,
     };

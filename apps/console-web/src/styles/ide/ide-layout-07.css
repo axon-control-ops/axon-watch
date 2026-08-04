@@ -203,6 +203,30 @@
   color: rgba(148, 163, 184, 0.72);
 }
 
+.agent-dock-composer__clear {
+  flex: 0 0 auto;
+  width: 1.65rem;
+  height: 1.65rem;
+  padding: 0;
+  border: 1px solid rgba(148, 163, 184, 0.28);
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.56);
+  color: rgba(203, 213, 225, 0.9);
+  font: inherit;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.agent-dock-composer__clear:hover {
+  border-color: rgba(0, 242, 255, 0.5);
+  color: #f8fafc;
+}
+
+.agent-dock-composer__clear:focus-visible {
+  outline: 2px solid rgba(0, 242, 255, 0.7);
+  outline-offset: 2px;
+}
+
 .agent-dock-composer__footer {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;

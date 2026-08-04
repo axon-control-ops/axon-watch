@@ -11,6 +11,7 @@ from app.workspace_agents.lead_checkin_assign import (
     assign_owner_role_for_monitor,
 )
 from app.workspace_agents.lead_team_checkin import collect_workspace_findings
+from app.workspace_agents.autonomous_attention_policy import is_investigatory_critical
 
 
 def collect_signal_findings(
@@ -57,7 +58,12 @@ def collect_signal_findings(
                 title=title,
                 detail=detail or f"{signal_id} severity={severity}",
                 dedupe_key=f"signal:{workspace_id}:{signal_id}:{severity}",
-                escalate_only=severity == "critical",
+                escalate_only=severity == "critical"
+                and not is_investigatory_critical(
+                    kind=kind,
+                    title=title,
+                    detail=detail,
+                ),
             )
         )
     return findings

@@ -115,7 +115,7 @@ class OperatorFleetAdviceTests(unittest.TestCase):
         )
         line = resolve_fleet_briefing_advise(pack=pack)
         self.assertEqual(
-            "Critical signal in axon-local needs review; switch there before continuing.",
+            "VAXON is attending the critical signal in axon-local; keep working here.",
             line,
         )
 
@@ -185,7 +185,6 @@ class OperatorFleetAdviceTests(unittest.TestCase):
         )
         self.assertIn("Vault", line)
         self.assertIn("GH_TOKEN", line)
-        self.assertNotIn("needs review; switch there", line)
 
     def test_generic_github_warning_does_not_invent_token_failure(self) -> None:
         line = build_fleet_coach_line(
@@ -201,7 +200,7 @@ class OperatorFleetAdviceTests(unittest.TestCase):
         )
         self.assertNotIn("GH_TOKEN", line)
         self.assertEqual(
-            "Critical signal in DashPro needs review; switch there before continuing.",
+            "VAXON is attending the critical signal in DashPro; keep working here.",
             line,
         )
 
@@ -260,8 +259,8 @@ class OperatorFleetAdviceTests(unittest.TestCase):
             },
         )
         self.assertEqual(
-            "Handoff to DashPro is open — switch there and finish “Finish DashPro follow-up”."
-            " Pause more axon-watch work until that closes.",
+            "VAXON owns the open handoff in DashPro: “Finish DashPro follow-up”."
+            " Keep working in axon-watch; VAXON will report the outcome here.",
             advise,
         )
         from app.operator_fleet_advice import build_advise_ui_action

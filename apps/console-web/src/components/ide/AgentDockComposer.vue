@@ -95,6 +95,7 @@ const toolbarProps = useAgentDockComposerToolbarProps(composer);
           :typeahead-rows="composer.typeaheadRows.value"
           :typeahead-selected-index="composer.typeaheadSelectedIndex.value"
           @update:draft="composer.updateComposerDraft"
+          @clear-draft="composer.clearComposerDraft"
           @remove-chip="composer.removeChip"
           @open-image="composer.openComposerImage"
           @remove-image="composer.removeComposerImage"
