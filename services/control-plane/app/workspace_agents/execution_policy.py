@@ -27,6 +27,24 @@ class AgentExecutionPolicy:
     trust_policy: str
     execution_access: str
 
+    @property
+    def read_roots(self) -> tuple[str, ...]:
+        """Compatibility name used by filesystem sandbox launchers."""
+
+        return self.read_paths
+
+    @property
+    def writable_roots(self) -> tuple[str, ...]:
+        """Compatibility name used by filesystem sandbox launchers."""
+
+        return self.write_paths
+
+    @property
+    def approved_wrappers(self) -> tuple[str, ...]:
+        """Compatibility name used by command-policy hooks."""
+
+        return self.approved_wrapper_names
+
 
 @dataclass(frozen=True, slots=True)
 class AgentExecutionPolicyOverride:
@@ -56,7 +74,7 @@ _ROLE_DEFAULTS: dict[str, AgentExecutionPolicy] = {
         read_paths=(".",),
         write_paths=("docs/planning", "docs/ops/agent-reports"),
         forbidden_path_globs=(),
-        approved_wrapper_names=("axon-status", "axon-test", "axon-lint"),
+        approved_wrapper_names=("run_contract_unit_tests.sh",),
         approved_command_prefixes=_COMMON_READ_PREFIXES,
         audited_capabilities=("planning_write", "test", "workspace_read"),
         network_mode="none",
@@ -108,7 +126,7 @@ _ROLE_DEFAULTS: dict[str, AgentExecutionPolicy] = {
     ),
     "integrations": AgentExecutionPolicy(
         read_paths=(".",),
-        write_paths=(".github", "config", "scripts", "services", "tests"),
+        write_paths=(".github", "config", "scripts"),
         forbidden_path_globs=(),
         approved_wrapper_names=("axonhealth", "watch-fast-gate.sh"),
         approved_command_prefixes=(*_COMMON_READ_PREFIXES,),
@@ -156,6 +174,8 @@ def parse_execution_policy_override(raw: Any) -> AgentExecutionPolicyOverride | 
     timeout: int | None = None
     if timeout_raw is not None:
         if isinstance(timeout_raw, bool):
+            raise ExecutionPolicyError("timeout_seconds must be a positive integer")
+        if isinstance(timeout_raw, float) and not timeout_raw.is_integer():
             raise ExecutionPolicyError("timeout_seconds must be a positive integer")
         try:
             timeout = int(timeout_raw)

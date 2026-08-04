@@ -125,7 +125,7 @@ def default_policy_root() -> Path:
 def _write_immutable(path: Path, content: bytes, *, executable: bool = False) -> None:
     mode = 0o555 if executable else 0o444
     if path.exists():
-        if not path.is_file() or path.read_bytes() != content:
+        if path.is_symlink() or not path.is_file() or path.read_bytes() != content:
             raise SandboxConfigurationError(
                 f"Immutable sandbox policy collision at {path}."
             )
@@ -174,6 +174,13 @@ def materialize_cursor_hook_policy(
     generated_home = target / "home"
     cursor_dir = generated_home / ".cursor"
     cursor_dir.mkdir(mode=0o700, parents=True, exist_ok=True)
+    if (
+        generated_home.is_symlink()
+        or cursor_dir.is_symlink()
+        or not generated_home.is_dir()
+        or not cursor_dir.is_dir()
+    ):
+        raise SandboxConfigurationError("Sandbox policy contains an unsafe directory.")
 
     hook_source = Path(__file__).with_name("agent_shell_hook.py").read_bytes()
     hooks_path = cursor_dir / "hooks.json"
@@ -295,6 +302,14 @@ def build_bwrap_command(
     material_root = hook_material.root.resolve(strict=True)
     if _is_relative_to(material_root, workspace):
         raise SandboxConfigurationError("Sandbox hook material must remain outside the workspace.")
+    for material_path in (
+        hook_material.hooks_json,
+        hook_material.policy_json,
+        hook_material.hook_script,
+    ):
+        resolved_material_path = material_path.resolve(strict=True)
+        if not _is_relative_to(resolved_material_path, material_root):
+            raise SandboxConfigurationError("Sandbox hook material contains an escaped path.")
     writable_roots = tuple(
         dict.fromkeys(_resolve_workspace_path(workspace, path) for path in policy.writable_roots)
     )
