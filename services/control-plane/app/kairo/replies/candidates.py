@@ -235,7 +235,7 @@ def general_candidates(facts: dict[str, Any], *, followup: bool) -> list[str]:
 
 def school_operations_candidates(facts: dict[str, Any], *, followup: bool) -> list[str]:
     """Useful Ask-mode fallback for centre/school operating-model advice."""
-    workspace = str(facts.get("workspace_label") or "").strip().lower()
+    workspace = str(facts.get("workspace_label") or "").strip().lower().replace("_", " ")
     lead = "Imani" if "young eagles" in workspace else "the school lead"
     return [
         (
