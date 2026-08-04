@@ -349,11 +349,12 @@ describe('IDE editor surface layout contract', () => {
 
   it('keeps the TEAM header fixed and makes the persona dock the sole vertical scroller', () => {
     const shell32 = readCss('shell/mockup-shell-32.css');
+    const teamScroll = readCss('shell/mockup-shell-team-scroll.css');
     const roster = ruleBlock(shell32, '.company-roster--ide');
     const teamBody = ruleBlock(shell32, '.ide-team-panel__body');
-    const dock = ruleBlock(shell32, '.company-roster--ide .company-roster__dock-host');
+    const dock = ruleBlock(teamScroll, '.company-roster--ide .company-roster__dock-host');
     const persona = ruleBlock(
-      shell32,
+      teamScroll,
       '.company-roster--ide .agent-persona-dock,\n.console-shell--mockup.console-shell--glass3d .ide-team-panel .agent-persona-dock',
     );
 
