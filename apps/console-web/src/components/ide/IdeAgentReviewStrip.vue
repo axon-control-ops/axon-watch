@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue';
+import { computed, nextTick, onMounted, onUpdated, ref } from 'vue';
 
 import type { IdeAgentEditSummary } from '../../lib/ide-agent-center-view';
 import {
@@ -20,6 +20,8 @@ import { useShellStore } from '../../stores/shell';
 
 const shell = useShellStore();
 const expanded = ref(false);
+const stripBarRef = ref<HTMLElement | null>(null);
+const runtimeChipRef = ref<HTMLElement | null>(null);
 
 const {
   retrying,
@@ -171,6 +173,54 @@ function focusReviewFiles(): void {
   expanded.value = true;
   openEditPath(first);
 }
+
+function probeRuntimeChipCenter(): void {
+  const bar = stripBarRef.value;
+  const chip = runtimeChipRef.value;
+  if (!bar || !chip) {
+    return;
+  }
+  const barRect = bar.getBoundingClientRect();
+  const chipRect = chip.getBoundingClientRect();
+  const barMid = barRect.left + barRect.width / 2;
+  const chipMid = chipRect.left + chipRect.width / 2;
+  const offsetPx = Math.round(chipMid - barMid);
+  const computedPos = window.getComputedStyle(chip).position;
+  // #region agent log
+  fetch('http://127.0.0.1:7706/ingest/90bcaec2-2b39-4d4a-84b5-157c12735440', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Debug-Session-Id': 'bef50e',
+    },
+    body: JSON.stringify({
+      sessionId: 'bef50e',
+      runId: 'cursor-chip-center',
+      hypothesisId: 'H-CENTER',
+      location: 'IdeAgentReviewStrip.vue:probeRuntimeChipCenter',
+      message: 'runtime chip vs strip midpoint',
+      data: {
+        offsetPx,
+        centered: Math.abs(offsetPx) <= 4,
+        barWidth: Math.round(barRect.width),
+        chipWidth: Math.round(chipRect.width),
+        computedPos,
+        label: runtimeFamilyLabel.value,
+        showControls: showReviewControls.value,
+      },
+      timestamp: Date.now(),
+    }),
+  }).catch(() => {});
+  // #endregion
+}
+
+onMounted(() => {
+  void nextTick(() => probeRuntimeChipCenter());
+});
+
+onUpdated(() => {
+  void nextTick(() => probeRuntimeChipCenter());
+});
 </script>
 
 <template>
@@ -184,7 +234,11 @@ function focusReviewFiles(): void {
     }"
     aria-label="Agent review controls"
   >
-    <div class="ide-agent-review-strip__bar">
+    <div
+      ref="stripBarRef"
+      class="ide-agent-review-strip__bar"
+      style="position: relative; width: 100%; box-sizing: border-box;"
+    >
       <div class="ide-agent-review-strip__side ide-agent-review-strip__side--start">
         <button
           v-if="showReviewControls"
@@ -199,8 +253,16 @@ function focusReviewFiles(): void {
         </button>
       </div>
       <span
+        ref="runtimeChipRef"
         class="ide-agent-review-strip__runtime"
         :title="`CLI runtime: ${runtimeFamilyLabel}`"
+        :style="{
+          position: 'absolute',
+          left: '50%',
+          top: '50%',
+          transform: 'translate(-50%, -50%)',
+          zIndex: 2,
+        }"
       >{{ runtimeFamilyLabel }}</span>
       <div class="ide-agent-review-strip__side ide-agent-review-strip__side--end">
         <div v-if="showReviewControls" class="ide-agent-review-strip__actions">
