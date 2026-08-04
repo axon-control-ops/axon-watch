@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { ComposerMode } from '../../../composables/useAgentDockComposer';
 import { MODE_OPTIONS } from '../../../composables/useAgentDockComposer';
+import type { ClaudeCatalogRow } from '../../../lib/claude-catalog-view';
 import type { CursorCatalogRow } from '../../../lib/cursor-catalog-view';
 import {
   mcpToolDetail,
@@ -23,6 +24,8 @@ defineProps<{
   showAddModelsEntry: boolean;
   showExtraPinnedRows: boolean;
   showModelCatalog: boolean;
+  isClaudeCatalog: boolean;
+  claudeFlatRows: ClaudeCatalogRow[];
   showFallbackCatalogNote: boolean;
   showVaultAction: boolean;
   attachmentChips: AgentDockComposerAttachmentChip[];
@@ -294,7 +297,7 @@ function runtimeStatusLine(record: AgentDockComposerRuntimeTarget): string {
           </button>
         </div>
 
-        <template v-if="showModelCatalog">
+        <template v-if="showModelCatalog && !isClaudeCatalog">
           <p class="agent-dock-composer__menu-caption">Model catalog</p>
           <p class="agent-dock-composer__menu-note agent-dock-composer__menu-note--status">
             {{ cursorCatalogStatus }}

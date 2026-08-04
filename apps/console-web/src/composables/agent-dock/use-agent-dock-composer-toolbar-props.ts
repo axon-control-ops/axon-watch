@@ -20,6 +20,8 @@ export type AgentDockComposerToolbarSource = {
   showAddModelsEntry: MaybeRef<boolean>;
   showExtraPinnedRows: MaybeRef<boolean>;
   showModelCatalog: MaybeRef<boolean>;
+  isClaudeCatalog: MaybeRef<boolean>;
+  claudeFlatRows: MaybeRef<ClaudeCatalogRow[]>;
   showFallbackCatalogNote: MaybeRef<boolean>;
   showVaultAction: MaybeRef<boolean>;
   attachmentChips: MaybeRef<AgentDockComposerAttachmentChip[]>;
@@ -83,6 +85,8 @@ export function useAgentDockComposerToolbarProps(
     showAddModelsEntry: toValue(composer.showAddModelsEntry),
     showExtraPinnedRows: toValue(composer.showExtraPinnedRows),
     showModelCatalog: toValue(composer.showModelCatalog),
+    isClaudeCatalog: toValue(composer.isClaudeCatalog),
+    claudeFlatRows: toValue(composer.claudeFlatRows),
     showFallbackCatalogNote: toValue(composer.showFallbackCatalogNote),
     showVaultAction: toValue(composer.showVaultAction),
     attachmentChips: toValue(composer.attachmentChips),
