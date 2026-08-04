@@ -29,6 +29,7 @@ from app.cli_runtime.cursor_agent import (
 )
 from app.cli_runtime.runtime_auth import (
     claude_dispatch_env,
+    codex_dispatch_env,
     cursor_dispatch_env,
     env_has_api_key,
     env_without_api_keys,
@@ -362,8 +363,15 @@ def dispatch_ide_composer(
     errors: list[str] = []
     ready_run_errors: list[str] = []
     last_ready_runtime_label = ""
+    ordered_candidates = _ordered_candidates_for_dispatch(snapshot, runtime_target)
+    # The model pin travels with the family it was chosen for. Candidates are
+    # already ordered preferred-first, so the first candidate's family is the
+    # one `runtime_model` was picked against — carrying it into a fallback of
+    # a *different* family (e.g. a Cursor model id sent to the Codex CLI) is
+    # what broke fallback dispatch; scope it to same-family candidates only.
+    preferred_family = str(ordered_candidates[0].get("family") or "") if ordered_candidates else ""
 
-    for record in _ordered_candidates_for_dispatch(snapshot, runtime_target):
+    for record in ordered_candidates:
         runtime_id = str(record.get("id") or "")
         if not record.get("ready"):
             errors.append(_runtime_unready_reason(record))
@@ -371,7 +379,8 @@ def dispatch_ide_composer(
         binary = str(record.get("binary") or "")
         family = str(record.get("family") or "")
         target_type = str(record.get("target_type") or "local")
-        model = _effective_cli_model(family, str(runtime_model or ""))
+        candidate_runtime_model = runtime_model if family == preferred_family else ""
+        model = _effective_cli_model(family, str(candidate_runtime_model or ""))
         runtime_label = str(record.get("label") or runtime_id)
         dispatch_env = subprocess_env
         if family == "cursor":
@@ -381,6 +390,11 @@ def dispatch_ide_composer(
             )
         elif family == "claude":
             dispatch_env = claude_dispatch_env(
+                subprocess_env,
+                auth=record.get("auth") if isinstance(record.get("auth"), dict) else None,
+            )
+        elif family == "codex":
+            dispatch_env = codex_dispatch_env(
                 subprocess_env,
                 auth=record.get("auth") if isinstance(record.get("auth"), dict) else None,
             )
