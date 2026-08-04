@@ -36,43 +36,36 @@ def build_lead_takeover_spoken_line(
     lead_name: str = "Lead",
     parent_plan_goal: str | None = None,
 ) -> str:
-    """TTS-friendly Lead takeover — parent ask first, then specialist dig."""
+    """TTS-friendly Lead executive brief — situation, outcome, Lead-owned next move."""
+    from app.workspace_agents.lead_executive_brief import (
+        compress_ask,
+        executive_next_step,
+        plain_outcome,
+    )
+    from app.workspace_agents.lead_takeover import extract_lead_next
+
     name = (employee_name or employee_role or "specialist").strip()
     role = (employee_role or "specialist").strip()
     status = "completed" if phase == "completed" else (phase or "ended")
     lead = (lead_name or "Lead").strip() or "Lead"
-    from app.workspace_agents.lead_takeover import extract_lead_next
-
-    parent_ask = truncate_text(parent_plan_goal, max_len=160)
-    excerpt = truncate_text(strip_confidence_lines(reply_text), max_len=240)
+    ask = compress_ask(parent_plan_goal, max_len=120)
+    outcome = plain_outcome(reply_text)
     lead_next = extract_lead_next(reply_text)
     parts = [f"{lead} here."]
-    if parent_ask:
-        parts.append(f"Parent ask remains: {parent_ask}.")
-    parts.append(f"{name} ({role}) just {status}.")
-    if excerpt:
-        parts.append(f"Specialist report: {excerpt}")
-    if parent_ask:
-        parts.append(
-            f"My read: I still own completing {parent_ask}. "
-            f"{name}'s dig is an input — I will not restart it as the mission."
+    if ask:
+        parts.append(f"Situation: {ask}.")
+    parts.append(f"Update: {name} ({role}) just {status}.")
+    if outcome:
+        parts.append(f"What landed: {outcome}")
+    parts.append(
+        executive_next_step(
+            lead_next=lead_next,
+            specialist_name=name,
+            parent_ask=ask,
+            status=status,
         )
-    elif status == "completed":
-        parts.append(
-            f"My read: {name} finished their slice. I own the handoff — "
-            "cross-team decisions stay with me until you Decide."
-        )
-    else:
-        parts.append(
-            f"My read: {name}'s job {status}. I will triage blockers and reassign if needed."
-        )
-    if lead_next:
-        parts.append(f"Decision needed: {lead_next}")
-    else:
-        parts.append(
-            "Lead next: review their report, confirm any Decide gates, then assign or approve."
-        )
-    parts.append("Open my Lead tab for the full rollup. Ask me what to do next.")
+    )
+    parts.append("Say stop only if you want a different order.")
     return " ".join(parts)
 
 
@@ -106,7 +99,10 @@ def build_lead_synthesis_spoken_line(
         bits.append(bit)
     if bits:
         parts.append("Specialists: " + "; ".join(bits) + ".")
-    parts.append("Open my Lead tab for the full narrative, or ask me what to do next.")
+    parts.append(
+        "Next: I will convert this rollup into the next assignment "
+        "and only escalate a real decision gate to you."
+    )
     return " ".join(parts)
 
 
@@ -126,8 +122,9 @@ def build_lead_shift_spoken_line(
     if summary:
         parts.append(f"Report: {summary}")
     if lead_next:
-        parts.append(f"Lead next: {lead_next}")
-    parts.append("Ask me what to do next.")
+        parts.append(f"Next: {lead_next}")
+    else:
+        parts.append("Next: I will keep owning the plan and only escalate real gates.")
     return " ".join(parts)
 
 

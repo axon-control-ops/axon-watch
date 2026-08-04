@@ -149,65 +149,81 @@ def build_lead_takeover_message(
     task_id: str | None = None,
     parent_plan_goal: str | None = None,
 ) -> str:
+    from app.workspace_agents.lead_executive_brief import (
+        compress_ask,
+        executive_next_step,
+        looks_like_shell_chore,
+        needs_operator_gate,
+        plain_outcome,
+    )
+
     name = (employee_name or employee_role or "specialist").strip()
     role = (employee_role or "specialist").strip()
     status = "completed" if phase == "completed" else (phase or "ended")
-    excerpt = _truncate(_strip_thinking(reply_text or ""), max_len=420)
     lead_next = extract_lead_next(reply_text)
+    parent_ask = compress_ask(parent_plan_goal, max_len=200)
+    landed = plain_outcome(reply_text) or _truncate(outcome, max_len=200)
+    goal_line = _truncate(goal, max_len=200)
+    next_line = executive_next_step(
+        lead_next=lead_next,
+        specialist_name=name,
+        parent_ask=parent_ask,
+        status=status,
+    )
+
     lines = [
-        f"Lead takeover — {name} ({role}) just {status}.",
+        f"Lead takeover — executive brief ({name} / {role} {status}).",
         "",
-        f"Run: {run_id or '(none)'}",
+        "Situation",
     ]
-    if task_id:
-        lines.append(f"Task: {task_id}")
-    if plan_id:
-        lines.append(f"Plan: {plan_id}")
-    parent_ask = _truncate(parent_plan_goal or "", max_len=240)
     if parent_ask:
-        lines.append(f"Parent ask (sole truth): {parent_ask}")
-    goal_line = _truncate(goal, max_len=240)
-    if goal_line and goal_line != parent_ask:
-        lines.append(f"Specialist goal: {goal_line}")
-    elif goal_line and not parent_ask:
-        lines.append(f"Goal: {goal_line}")
-    outcome_line = _truncate(outcome, max_len=200)
-    if outcome_line:
-        lines.append(f"Outcome: {outcome_line}")
-    if excerpt:
-        lines.extend(["", "Specialist report:", excerpt])
-    lines.extend(["", "My read (Lead):"])
+        lines.append(f"- Ask: {parent_ask}")
+    elif goal_line:
+        lines.append(f"- Ask: {goal_line}")
+    else:
+        lines.append("- Ask: specialist slice finished; parent ask not attached.")
+    if goal_line and parent_ask and goal_line != parent_ask:
+        lines.append(f"- Specialist slice: {goal_line}")
+
+    lines.extend(["", "What landed"])
+    if landed:
+        lines.append(f"- {landed}")
+    else:
+        lines.append(f"- {name} {status}; no clean outcome line yet.")
+
+    lines.extend(["", "Still open"])
     if parent_ask:
         lines.append(
-            f"I still own completing: {parent_ask}. "
-            f"{name}'s dig is an input — I will not restart it as the mission."
-        )
-    elif status == "completed":
-        lines.append(
-            f"{name} finished their slice. I own the handoff now — "
-            "cross-team decisions and next assignments stay with me until you Decide."
+            f"- I still own the original ask. {name}'s work is input, not a restart of the mission."
         )
     else:
-        lines.append(
-            f"{name}'s job {status}. I will triage blockers and reassign if needed."
+        lines.append("- Convert this result into the next assignment or a clear ship gate.")
+
+    lines.extend(["", "My next move", f"- {next_line}"])
+    if lead_next and needs_operator_gate(lead_next) and not looks_like_shell_chore(lead_next):
+        lines.extend(
+            [
+                "",
+                "Only if you disagree",
+                f"- Specialist suggested a gate: {lead_next}",
+            ]
         )
-    if lead_next:
-        lines.extend(["", f"Decision needed (from specialist): {lead_next}"])
     else:
         lines.extend(
             [
                 "",
-                "Lead next: review their report, confirm any product Decide gates, "
-                "then assign the next specialist or approve ship.",
+                "Only if you disagree",
+                "- Say stop or change the order — otherwise I keep driving.",
             ]
         )
-    lines.extend(
-        [
-            "",
-            "Open my Lead tab for this rollup. Ask me what to do next.",
-            "Confidence: 8/10",
-        ]
-    )
+
+    # Trace footer (kept for dedupe / receipts; not the spoken dump).
+    lines.extend(["", f"Run: {run_id or '(none)'}"])
+    if task_id:
+        lines.append(f"Task: {task_id}")
+    if plan_id:
+        lines.append(f"Plan: {plan_id}")
+    lines.append("Confidence: 8/10")
     return "\n".join(lines)
 
 

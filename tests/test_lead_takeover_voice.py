@@ -33,9 +33,11 @@ class LeadTakeoverVoiceTests(unittest.TestCase):
         )
         self.assertIn("Dana here", line)
         self.assertIn("Soren (integrations) just completed", line)
-        self.assertIn("Specialist report:", line)
-        self.assertIn("My read:", line)
+        self.assertIn("What landed:", line)
+        self.assertIn("Next:", line)
         self.assertIn("hold OTA", line)
+        self.assertNotIn("Specialist report:", line)
+        self.assertNotIn("Ask me what to do next", line)
         self.assertNotIn("Confidence:", line)
 
     def test_takeover_spoken_line_names_parent_ask_first(self) -> None:
@@ -51,12 +53,13 @@ class LeadTakeoverVoiceTests(unittest.TestCase):
             lead_name="Dana",
             parent_plan_goal="Push OTA to canary",
         )
-        self.assertIn("Parent ask remains: Push OTA to canary", line)
-        self.assertIn("will not restart it as the mission", line)
+        self.assertIn("Situation: Push OTA to canary", line)
+        self.assertIn("Next:", line)
         self.assertLess(
-            line.index("Parent ask remains"),
+            line.index("Situation:"),
             line.index("Cass (watcher) just completed"),
         )
+        self.assertNotIn("Ask me what to do next", line)
         self.assertNotIn("Confidence:", line)
 
     def test_synthesis_spoken_line_lists_specialists(self) -> None:
@@ -91,7 +94,8 @@ class LeadTakeoverVoiceTests(unittest.TestCase):
         )
         self.assertIn("Dana here", line)
         self.assertIn("Lead shift just completed", line)
-        self.assertIn("Lead next:", line)
+        self.assertIn("Next:", line)
+        self.assertNotIn("Ask me what to do next", line)
         self.assertNotIn("Confidence:", line)
 
     @patch("app.live_events.broadcast_spoken_line", return_value=1)
