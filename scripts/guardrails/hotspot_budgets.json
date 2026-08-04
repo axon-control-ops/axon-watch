@@ -107,11 +107,11 @@
       "note": "CLI discovery only; snapshot cache in catalog_snapshot.py; Lead ratchet after under-budget verify"
     },
     "services/control-plane/app/cli_runtime/catalog_snapshot.py": {
-      "max_lines": 228,
+      "max_lines": 230,
       "soft_limit": 350,
       "hard_limit": 500,
       "target": "services/control-plane/app/cli_runtime/catalog/*",
-      "note": "Runtime status snapshot cache and probe assembly"
+      "note": "Runtime status snapshot cache and probe assembly; +2 lines for claude_usage probe wiring"
     },
     "docs/HOW-TO-HANDBOOK.md": {
       "max_lines": 1740,
