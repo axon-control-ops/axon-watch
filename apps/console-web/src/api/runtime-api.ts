@@ -75,6 +75,23 @@ export interface CursorRuntimeStatusSnapshot {
   catalog_source: 'live' | 'fallback' | string;
 }
 
+export interface ClaudeModelRecord {
+  id: string;
+  label: string;
+  description?: string;
+  badge?: string;
+  available?: boolean;
+}
+
+export interface ClaudeRuntimeStatusSnapshot {
+  installed: boolean;
+  binary: string;
+  auth: RuntimeAuthStatus;
+  available_models: ClaudeModelRecord[];
+  claude_models: ClaudeModelRecord[];
+  catalog_source: 'static' | string;
+}
+
 export interface RuntimeMcpToolRecord {
   id: string;
   label: string;
@@ -137,6 +154,18 @@ export async function fetchCursorRuntimeStatus(
     `/api/runtime/cursor/status${query}`,
     {},
     'cursor runtime status request failed',
+    RUNTIME_STATUS_FETCH_TIMEOUT_MS,
+  );
+}
+
+export async function fetchClaudeRuntimeStatus(
+  options: { forceRefresh?: boolean } = {},
+): Promise<ClaudeRuntimeStatusSnapshot> {
+  const query = options.forceRefresh ? '?force_refresh=1' : '';
+  return fetchJson<ClaudeRuntimeStatusSnapshot>(
+    `/api/runtime/claude/status${query}`,
+    {},
+    'claude runtime status request failed',
     RUNTIME_STATUS_FETCH_TIMEOUT_MS,
   );
 }

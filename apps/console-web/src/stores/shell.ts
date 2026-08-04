@@ -300,6 +300,7 @@ import {
 import { createCatalogLoadersSlice } from './shell/slices/create-catalog-loaders-slice';
 import { createComposerRuntimePrefsSlice } from './shell/slices/create-composer-runtime-prefs-slice';
 import { createConnectorsSlice } from './shell/slices/create-connectors-slice';
+import { createClaudeCatalogSlice } from './shell/slices/create-claude-catalog-slice';
 import { createCursorCatalogSlice } from './shell/slices/create-cursor-catalog-slice';
 import { createDockLayoutSlice } from './shell/slices/create-dock-layout-slice';
 import { createIdeWorkbenchChromeSlice } from './shell/slices/create-ide-workbench-chrome-slice';
