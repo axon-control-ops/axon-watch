@@ -211,6 +211,10 @@ def try_lane_b_git_commit_dispatch(
     message = explicit_message or derive_commit_message(
         workspace_id,
         turn_subject=subject_source,
+        # None means "git add -A" (whole tree is genuinely the change); a
+        # concrete list means only those paths are being staged, so the
+        # subject must describe just them, not everything sitting dirty.
+        scoped_paths=stage_paths,
     )
     if not message.strip() or message.strip() == "Update via Axon-X":
         lines.extend(
