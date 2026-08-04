@@ -23,10 +23,6 @@ import {
   writeComposerRuntimePrefs,
 } from '../../../lib/composer-runtime-prefs';
 import {
-  readClaudePickerVisibleModelIds,
-  toggleClaudePickerVisibleModel as toggleClaudePickerVisibleModelPref,
-} from '../../../lib/claude-picker-prefs';
-import {
   readCursorPickerVisibleModelIds,
   toggleCursorPickerVisibleModel as toggleCursorPickerVisibleModelPref,
 } from '../../../lib/cursor-picker-prefs';
@@ -40,7 +36,6 @@ interface CreateComposerRuntimePrefsSliceInput {
   claudeRuntimeStatus: Ref<ClaudeRuntimeStatusSnapshot | null>;
   composerRuntimePrefsRevision: Ref<number>;
   cursorPickerVisibleRevision: Ref<number>;
-  claudePickerVisibleRevision: Ref<number>;
 }
 
 export function createComposerRuntimePrefsSlice(input: CreateComposerRuntimePrefsSliceInput) {
@@ -97,11 +92,6 @@ export function createComposerRuntimePrefsSlice(input: CreateComposerRuntimePref
   const cursorPickerVisibleModelIds = computed(() => {
     input.cursorPickerVisibleRevision.value;
     return readCursorPickerVisibleModelIds();
-  });
-
-  const claudePickerVisibleModelIds = computed(() => {
-    input.claudePickerVisibleRevision.value;
-    return readClaudePickerVisibleModelIds();
   });
 
   const composerRuntimeLabel = computed(() => {
@@ -171,11 +161,6 @@ export function createComposerRuntimePrefsSlice(input: CreateComposerRuntimePref
     input.cursorPickerVisibleRevision.value += 1;
   }
 
-  function toggleClaudePickerVisibleModel(modelId: string): void {
-    toggleClaudePickerVisibleModelPref(modelId, readClaudePickerVisibleModelIds());
-    input.claudePickerVisibleRevision.value += 1;
-  }
-
   return {
     composerRuntimePrefs,
     selectedRuntimeTargetId,
@@ -183,11 +168,9 @@ export function createComposerRuntimePrefsSlice(input: CreateComposerRuntimePref
     cursorCatalogRows,
     claudeCatalogRows,
     cursorPickerVisibleModelIds,
-    claudePickerVisibleModelIds,
     composerRuntimeLabel,
     setSelectedRuntimeTarget,
     setSelectedComposerModel,
     toggleCursorPickerVisibleModel,
-    toggleClaudePickerVisibleModel,
   };
 }

@@ -421,6 +421,33 @@ function runtimeStatusLine(record: AgentDockComposerRuntimeTarget): string {
             </p>
           </template>
         </template>
+        <template v-else-if="isClaudeCatalog">
+          <p class="agent-dock-composer__menu-caption">Claude models</p>
+          <p v-if="cursorAuthLine" class="agent-dock-composer__menu-note agent-dock-composer__menu-note--auth">
+            {{ cursorAuthLine }}
+          </p>
+          <p v-if="modelCatalogLoading" class="agent-dock-composer__menu-note">
+            {{ modelCatalogLoadingLabel }}
+          </p>
+          <p v-else-if="modelCatalogErrorMessage" class="agent-dock-composer__menu-note">
+            {{ modelCatalogErrorMessage }}
+          </p>
+          <button
+            v-for="row in claudeFlatRows"
+            :key="row.id"
+            type="button"
+            class="agent-dock-composer__menu-item"
+            :class="{ 'agent-dock-composer__menu-item--selected': row.id === selectedModelId }"
+            :disabled="!row.available"
+            @click="emit('select-composer-model', row.id)"
+          >
+            <span class="agent-dock-composer__model-label">
+              {{ row.label }}
+              <span v-if="row.badge" class="agent-dock-composer__model-badge">{{ row.badge }}</span>
+            </span>
+            <small>{{ row.description }}</small>
+          </button>
+        </template>
         <p v-else class="agent-dock-composer__menu-note">
           Selected model: {{ selectedModelLabel }}
         </p>

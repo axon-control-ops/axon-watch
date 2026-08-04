@@ -383,7 +383,6 @@ export const useShellStore = defineStore('shell', () => {
   const chatStreamSessionsByWorkspace = new Map<string, ChatStreamSession>();
   const composerRuntimePrefsRevision = ref(0);
   const cursorPickerVisibleRevision = ref(0);
-  const claudePickerVisibleRevision = ref(0);
   const activeRun = ref<RunRecord | null>(null);
   const runs = ref<RunRecord[]>([]);
   const runsLoadState = ref<RunsLoadState>('idle');
@@ -3114,12 +3113,10 @@ export const useShellStore = defineStore('shell', () => {
     cursorCatalogRows,
     claudeCatalogRows,
     cursorPickerVisibleModelIds,
-    claudePickerVisibleModelIds,
     composerRuntimeLabel,
     setSelectedRuntimeTarget,
     setSelectedComposerModel,
     toggleCursorPickerVisibleModel,
-    toggleClaudePickerVisibleModel,
   } = createComposerRuntimePrefsSlice({
     currentWorkspace,
     runtimeStatus,
@@ -3127,7 +3124,6 @@ export const useShellStore = defineStore('shell', () => {
     claudeRuntimeStatus,
     composerRuntimePrefsRevision,
     cursorPickerVisibleRevision,
-    claudePickerVisibleRevision,
   });
 
   const {
@@ -3755,7 +3751,6 @@ export const useShellStore = defineStore('shell', () => {
     claudeCatalogError,
     claudeCatalogLoadState,
     claudeCatalogRows,
-    claudePickerVisibleModelIds,
     claudeRuntimeStatus,
     cursorCatalogError,
     cursorCatalogLoadState,
@@ -3969,7 +3964,6 @@ export const useShellStore = defineStore('shell', () => {
     setLayoutMode,
     setLeftSidebarMode,
     toggleCursorPickerVisibleModel,
-    toggleClaudePickerVisibleModel,
     toggleAgentDock,
     toggleIdeExplorer,
     signalClearError,

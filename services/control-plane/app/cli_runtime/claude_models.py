@@ -25,7 +25,7 @@ CLAUDE_CLI_MODEL_OPTIONS: list[ModelRecord] = [
     {
         "id": "auto",
         "label": "Auto",
-        "description": "Use the Claude Code CLI's own default model unless you pin one below.",
+        "description": "Let Claude Code choose automatically.",
     },
     {
         "id": "sonnet",
