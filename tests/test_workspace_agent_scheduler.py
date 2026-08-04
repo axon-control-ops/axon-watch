@@ -13,10 +13,19 @@ from tests.support.control_plane_db import isolate_control_plane_db
 CONTROL_PLANE_ROOT = Path(__file__).resolve().parents[1] / "services" / "control-plane"
 sys.path.insert(0, str(CONTROL_PLANE_ROOT))
 
-from app.persistence import run_store, task_store, worker_scheduler_settings_store  # noqa: E402
+from app.persistence import (  # noqa: E402
+    autonomous_attention_store,
+    operator_presence_settings_store,
+    run_store,
+    task_store,
+    worker_scheduler_settings_store,
+)
 from app.runs.service import create_run, fail_run, get_run, stop_run  # noqa: E402
 from app.workspace_agents import build_company_roster  # noqa: E402
-from app.workspace_agents.scheduler import run_continuous_worker_tick  # noqa: E402
+from app.workspace_agents.scheduler import (  # noqa: E402
+    run_continuous_worker_tick,
+    run_scheduled_autonomous_attention_scan,
+)
 from app.workspace_agents.status import active_role_run_id, active_role_run_status  # noqa: E402
 
 
@@ -51,6 +60,51 @@ class WorkspaceAgentSchedulerTests(unittest.TestCase):
                 for emp in companies["workspace_dashpro"].employees
             )
         )
+
+    def test_full_autonomy_runs_occasional_attention_scan(self) -> None:
+        expected = {
+            "checked_workspaces": ["workspace_dashpro"],
+            "created_tasks": [],
+        }
+        with (
+            patch(
+                "app.workspace_agents.scheduler.scheduler_enabled",
+                return_value=True,
+            ),
+            patch.object(
+                operator_presence_settings_store,
+                "load_settings",
+                return_value={"autonomy_mode": "full"},
+            ),
+            patch.object(autonomous_attention_store, "get_meta", return_value={}),
+            patch(
+                "app.workspace_agents.autonomous_attention.run_autonomous_attention_scan",
+                return_value=expected,
+            ) as scan,
+        ):
+            result = run_scheduled_autonomous_attention_scan()
+
+        self.assertEqual(expected, result)
+        scan.assert_called_once_with(include_lead_checkin=False)
+
+    def test_non_full_autonomy_does_not_scan(self) -> None:
+        with (
+            patch(
+                "app.workspace_agents.scheduler.scheduler_enabled",
+                return_value=True,
+            ),
+            patch.object(
+                operator_presence_settings_store,
+                "load_settings",
+                return_value={"autonomy_mode": "semi"},
+            ),
+            patch(
+                "app.workspace_agents.autonomous_attention.run_autonomous_attention_scan",
+            ) as scan,
+        ):
+            self.assertIsNone(run_scheduled_autonomous_attention_scan())
+
+        scan.assert_not_called()
 
     def test_create_run_persists_employee_role(self) -> None:
         created = create_run(

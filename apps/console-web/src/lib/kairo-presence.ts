@@ -15,6 +15,7 @@ export function resolveKairoPresenceState(input: {
   pendingApprovals: number;
   criticalSignals: number;
   highSignals: number;
+  openSignals?: number;
   watchConnected: boolean;
   runtimeLoaded: boolean;
 }): KairoPresenceState {
@@ -24,6 +25,10 @@ export function resolveKairoPresenceState(input: {
 
   if (input.pendingApprovals > 0 || input.criticalSignals > 0 || input.highSignals > 0) {
     return 'alerting';
+  }
+
+  if ((input.openSignals ?? 0) > 0) {
+    return 'observing';
   }
 
   if (input.runtimeLoaded && input.watchConnected) {

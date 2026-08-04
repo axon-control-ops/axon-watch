@@ -300,7 +300,7 @@ function approvalExplanation(): OperatorAlertExplanation {
       :show-view-all="variant === 'dock'"
       @toggle="shell.toggleDockSeam('approvals')"
     >
-      <p class="dock-seam__lead">
+      <p v-if="shell.pendingApprovalsCount > 0" class="dock-seam__lead">
         {{ approvalExplanation().what }}
       </p>
       <p v-if="shell.pendingApprovalsCount > 0" class="region-copy">

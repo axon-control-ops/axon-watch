@@ -744,6 +744,7 @@ export const useShellStore = defineStore('shell', () => {
         summary?.approvals.pending_count ?? operatorBriefing.value?.pending_approvals.count ?? 0,
       criticalSignals: summary?.signals.critical_count ?? 0,
       highSignals: summary?.signals.high_count ?? 0,
+      openSignals: summary?.signals.open_count ?? inboxItems.value.length,
       watchConnected: Boolean(summary?.watch.connected),
       runtimeLoaded: Boolean(summary),
     });
