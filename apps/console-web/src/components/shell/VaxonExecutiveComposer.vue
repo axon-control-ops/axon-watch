@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, ref } from 'vue';
+import { computed, nextTick, ref } from 'vue';
 
 import { OPERATOR_PERSONA_NAME } from '../../lib/operator-persona-name';
 import {
@@ -50,28 +50,6 @@ function submit(content?: string, modeValue = mode.value): void {
   const message = content === undefined ? buildVaxonComposerSubmission(raw, modeValue) : raw;
   draft.value = '';
   expanded.value = false;
-  // #region agent log
-  fetch('http://127.0.0.1:7706/ingest/90bcaec2-2b39-4d4a-84b5-157c12735440', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'X-Debug-Session-Id': 'db8bb4',
-    },
-    body: JSON.stringify({
-      sessionId: 'db8bb4',
-      runId: 'vaxon-composer',
-      hypothesisId: 'C5',
-      location: 'VaxonExecutiveComposer.vue:submit',
-      message: 'Executive composer submit',
-      data: {
-        mode: modeValue,
-        submissionIntent: vaxonComposerSubmissionIntent(modeValue),
-        preview: message.slice(0, 64),
-      },
-      timestamp: Date.now(),
-    }),
-  }).catch(() => {});
-  // #endregion
   emit('submit', {
     content: message,
     submissionIntent: vaxonComposerSubmissionIntent(modeValue),
@@ -96,26 +74,6 @@ function handleKeydown(event: KeyboardEvent): void {
   }
 }
 
-onMounted(() => {
-  // #region agent log
-  fetch('http://127.0.0.1:7706/ingest/90bcaec2-2b39-4d4a-84b5-157c12735440', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'X-Debug-Session-Id': 'db8bb4',
-    },
-    body: JSON.stringify({
-      sessionId: 'db8bb4',
-      runId: 'vaxon-composer',
-      hypothesisId: 'C5',
-      location: 'VaxonExecutiveComposer.vue:mount',
-      message: 'Executive Ask/Dispatch composer mounted',
-      data: { defaultMode: mode.value },
-      timestamp: Date.now(),
-    }),
-  }).catch(() => {});
-  // #endregion
-});
 </script>
 
 <template>

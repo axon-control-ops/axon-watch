@@ -159,28 +159,6 @@ async function sendReply({
   if (message === 'yes' || message === 'not now') {
     markTransmissionAskAnswered(spokenLine.value);
   }
-  // #region agent log
-  fetch('http://127.0.0.1:7706/ingest/90bcaec2-2b39-4d4a-84b5-157c12735440', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'X-Debug-Session-Id': 'db8bb4',
-    },
-    body: JSON.stringify({
-      sessionId: 'db8bb4',
-      runId: 'vaxon-composer',
-      hypothesisId: 'C3',
-      location: 'MissionControlLiveOpsPanel.vue:sendReply',
-      message: 'Live Ops executive composer submit',
-      data: {
-        preview: message.slice(0, 48),
-        submissionIntent:
-          message === 'yes' ? 'dispatch' : submissionIntent,
-      },
-      timestamp: Date.now(),
-    }),
-  }).catch(() => {});
-  // #endregion
   // Affirmative Needs-you answers must be allowed to trigger dig-in / handoff.
   const intent =
     message === 'yes' ? 'dispatch' : message === 'not now' ? 'ask' : submissionIntent;

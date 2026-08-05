@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue';
+import { computed, ref } from 'vue';
 
 import AgentDock from '../ide/AgentDock.vue';
 import { useRightDockResize } from '../../composables/useRightDockResize';
@@ -24,56 +24,6 @@ const showLiveOpsDock = computed(
   () => shell.layoutMode === 'operator' && !shell.operatorBrainGalaxyActive,
 );
 
-onMounted(() => {
-  // #region agent log
-  fetch('http://127.0.0.1:7706/ingest/90bcaec2-2b39-4d4a-84b5-157c12735440', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'X-Debug-Session-Id': 'db8bb4',
-    },
-    body: JSON.stringify({
-      sessionId: 'db8bb4',
-      runId: 'vaxon-composer',
-      hypothesisId: 'C1',
-      location: 'RightDock.vue:mount',
-      message: 'Live Ops dock mount state',
-      data: {
-        showLiveOpsDock: showLiveOpsDock.value,
-        layoutMode: shell.layoutMode,
-        brainGalaxy: shell.operatorBrainGalaxyActive,
-        threadCollapsed: shell.dockSeamState('thread')?.collapsed ?? null,
-      },
-      timestamp: Date.now(),
-    }),
-  }).catch(() => {});
-  // #endregion
-});
-
-watch(showLiveOpsDock, (visible) => {
-  // #region agent log
-  fetch('http://127.0.0.1:7706/ingest/90bcaec2-2b39-4d4a-84b5-157c12735440', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'X-Debug-Session-Id': 'db8bb4',
-    },
-    body: JSON.stringify({
-      sessionId: 'db8bb4',
-      runId: 'vaxon-composer',
-      hypothesisId: 'C1',
-      location: 'RightDock.vue:showLiveOpsDock',
-      message: 'Live Ops dock visibility changed',
-      data: {
-        visible,
-        layoutMode: shell.layoutMode,
-        brainGalaxy: shell.operatorBrainGalaxyActive,
-      },
-      timestamp: Date.now(),
-    }),
-  }).catch(() => {});
-  // #endregion
-});
 </script>
 
 <template>

@@ -237,27 +237,9 @@ export function createOperatorFocusSlice(input: CreateOperatorFocusSliceInput) {
    * left an empty cyan frame with no expand chrome.
    */
   function collapseOperatorThreadForBriefing(): void {
-    // #region agent log
-    fetch('http://127.0.0.1:7706/ingest/90bcaec2-2b39-4d4a-84b5-157c12735440', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Debug-Session-Id': 'db8bb4',
-      },
-      body: JSON.stringify({
-        sessionId: 'db8bb4',
-        runId: 'vaxon-composer',
-        hypothesisId: 'C2',
-        location: 'create-operator-focus-slice.ts:collapseOperatorThreadForBriefing',
-        message: 'Briefing focus skipped Live Ops collapse',
-        data: {
-          layoutMode: input.layoutMode.value,
-          threadExpanded: input.expandedDockSeams.value.has('thread'),
-        },
-        timestamp: Date.now(),
-      }),
-    }).catch(() => {});
-    // #endregion
+    // Deliberately a no-op — see the docstring above. Kept as a named call
+    // site rather than inlined so the "why nothing happens here" stays
+    // documented at the call site in focusKairoBriefing() below.
   }
 
   /**
