@@ -168,6 +168,36 @@ class AgentSandboxTests(unittest.TestCase):
         self.assertIn("/run/axon-agent-home/.cursor/hooks.json", command)
         self.assertEqual(["/bin/echo", "ok"], command[-2:])
 
+    def test_symlinked_binary_resolves_to_its_real_target(self) -> None:
+        """npm/nvm-managed CLIs are commonly invoked via a symlink (e.g.
+        ~/.local/bin/cursor-agent -> .../versions/<ver>/cursor-agent).
+        cursor_readonly_paths is computed by resolving that same chain to
+        its real target directory (see sandbox_policy_adapter._runtime_paths)
+        — if the command execs the *unresolved* symlink path instead, bwrap
+        can't find it (only the resolved target was bind-mounted), so every
+        sandboxed run of a symlinked CLI failed with "No such file or
+        directory" before this resolution was added here too.
+        """
+        real_dir = self.home / "real" / "v1"
+        real_dir.mkdir(parents=True)
+        real_binary = real_dir / "tool"
+        real_binary.write_text("#!/bin/sh\necho ok\n", encoding="utf-8")
+        real_binary.chmod(0o755)
+        symlink_binary = self.temp_root / "tool-shim"
+        symlink_binary.symlink_to(real_binary)
+
+        policy = self._policy(cursor_readonly_paths=(str(real_dir),))
+        material = self._material(policy)
+        command = build_bwrap_command(
+            [str(symlink_binary), "--flag"],
+            policy=policy,
+            workspace_root=self.workspace,
+            hook_material=material,
+            bwrap_path="/usr/bin/bwrap",
+            user_home=self.home,
+        )
+        self.assertEqual([str(real_binary), "--flag"], command[-2:])
+
     def test_writable_root_rejects_parent_and_symlink_escapes(self) -> None:
         outside = self.temp_root / "outside"
         outside.mkdir()

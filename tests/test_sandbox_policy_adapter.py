@@ -47,6 +47,34 @@ class SandboxPolicyAdapterTests(unittest.TestCase):
         self.assertNotIn(str(home / ".config"), mounted)
         self.assertNotIn(str(home / ".cursor"), mounted)
 
+    def test_npm_style_bin_layout_also_mounts_package_root(self) -> None:
+        """codex/claude resolve sibling optional/native deps via node_modules
+        walk-up from their own package root, not just their bin/ directory —
+        exposing bin/ alone left codex's own module resolution finding
+        nothing inside the sandbox (regression: reported as "Missing optional
+        dependency @openai/codex-linux-x64" even on a real, working install).
+        """
+        with tempfile.TemporaryDirectory() as directory:
+            home = Path(directory) / "home"
+            package_root = home / ".nvm/versions/node/v20/lib/node_modules/@openai/codex"
+            bin_dir = package_root / "bin"
+            bin_dir.mkdir(parents=True)
+            binary = bin_dir / "codex.js"
+            binary.write_text("#!/usr/bin/env node\n", encoding="utf-8")
+            with patch(
+                "app.cli_runtime.sandbox_policy_adapter.Path.home",
+                return_value=home,
+            ):
+                sandbox = adapt_execution_policy(
+                    role_execution_policy("watcher"),
+                    runtime_binary=str(binary),
+                    include_cursor_auth=False,
+                )
+
+        mounted = set(sandbox.cursor_readonly_paths)
+        self.assertIn(str(bin_dir), mounted)
+        self.assertIn(str(package_root), mounted, "package root must be exposed alongside bin/")
+
     def test_prepare_adds_identity_env_only_when_policy_exists(self) -> None:
         env = {"SAFE": "1"}
         unchanged, sandbox = prepare_execution_sandbox(

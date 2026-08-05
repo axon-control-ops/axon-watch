@@ -319,6 +319,20 @@ def build_bwrap_command(
     cleaned = [str(part) for part in command if str(part)]
     if not cleaned:
         raise SandboxConfigurationError("Sandboxed command cannot be empty.")
+    # The binary is commonly a symlink (npm/nvm-managed CLIs live several
+    # hops deep, e.g. ~/.local/bin/cursor-agent -> .../versions/<ver>/cursor-agent).
+    # cursor_readonly_paths below is computed by resolving that same chain
+    # to its real target directory — if we exec the *unresolved* symlink
+    # path instead, bwrap can't find it (it was never bind-mounted; only its
+    # resolved target was), so every sandboxed run of a symlinked CLI failed
+    # outright. Resolve here too so the exec target always matches what's
+    # actually exposed to the sandbox.
+    binary_path = Path(cleaned[0])
+    if binary_path.is_symlink() or not binary_path.is_absolute():
+        try:
+            cleaned[0] = str(binary_path.resolve(strict=True))
+        except OSError:
+            pass
     _validate_policy(policy)
     bwrap = require_bubblewrap(bwrap_path)
     workspace = _resolve_workspace_root(workspace_root)

@@ -209,6 +209,106 @@ def billing_blocks_auto_start(
     return elapsed < _BILLING_COOLDOWN_SECONDS
 
 
+# Escalating backoff for any repeated failure the gates above don't already
+# recognize (usage limits / billing / runtime auth). Without this, an
+# unclassified failure — a CLI self-update race, a transient recursion bug,
+# any error nobody wrote a specific gate for — gets retried on every 45s
+# scheduler tick indefinitely: the same task fails, gets re-leased 45s later,
+# fails again, forever, burning a full dispatch (and system prompt) each
+# time. 2m -> 5m -> 15m -> 30m, capped, resetting once a shift succeeds.
+_GENERIC_BACKOFF_SCHEDULE_SECONDS = (120.0, 300.0, 900.0, 1800.0)
+
+
+def _generic_retry_cooldown_state_path() -> Path:
+    raw = os.environ.get("AXON_WATCH_STATE_DIR", "./.local/state").strip() or "./.local/state"
+    root = Path(raw).expanduser()
+    if not root.is_absolute():
+        root = (Path.cwd() / root).resolve()
+    return root / "generic-retry-cooldown.json"
+
+
+def _load_generic_retry_cooldown_state(path: Path | None = None) -> dict[str, Any]:
+    target = path or _generic_retry_cooldown_state_path()
+    if not target.is_file():
+        return {}
+    try:
+        payload = json.loads(target.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {}
+    return payload if isinstance(payload, dict) else {}
+
+
+def _save_generic_retry_cooldown_state(state: dict[str, Any], path: Path | None = None) -> None:
+    target = path or _generic_retry_cooldown_state_path()
+    try:
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(json.dumps(state, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    except OSError:
+        logger.exception("could not persist generic retry cooldown state")
+
+
+def generic_repeated_failure_blocks_auto_start(
+    workspace_id: str,
+    role: str,
+    *,
+    now: datetime | None = None,
+    state_path: Path | None = None,
+) -> bool:
+    """Escalating cooldown for failures none of the specific gates recognize.
+
+    Deliberately excludes anything the other gates already classify (they
+    have smarter, sometimes soft-opening logic); this is only the catch-all
+    for everything else, so an unanticipated error class still gets a
+    backoff instead of being retried every tick forever.
+    """
+    key = f"{workspace_id}:{role}"
+    outcome = latest_role_run_outcome(workspace_id, role)
+    if not outcome or str(outcome.get("outcome") or "").strip().lower() != "failed":
+        # A successful (or no-history) shift clears any prior streak, so a
+        # role that recovers and later fails again starts a fresh backoff
+        # instead of inheriting an escalated cooldown from an old streak.
+        state = _load_generic_retry_cooldown_state(state_path)
+        if key in state:
+            del state[key]
+            _save_generic_retry_cooldown_state(state, state_path)
+        return False
+    detail = str(outcome.get("detail") or "")
+    if (
+        is_usage_limit_failure(detail)
+        or is_billing_block_failure(detail)
+        or is_billing_failure(detail)
+        or is_runtime_auth_failure(detail)
+    ):
+        return False
+
+    run_id = str(outcome.get("run_id") or "").strip()
+    current = now or datetime.now(timezone.utc)
+    state = _load_generic_retry_cooldown_state(state_path)
+    entry = state.get(key)
+
+    if not isinstance(entry, dict) or entry.get("run_id") != run_id:
+        prior_streak = int(entry.get("streak") or 0) if isinstance(entry, dict) else 0
+        state[key] = {
+            "run_id": run_id,
+            "first_blocked_at": current.isoformat().replace("+00:00", "Z"),
+            "streak": prior_streak + 1,
+        }
+        _save_generic_retry_cooldown_state(state, state_path)
+        return True
+
+    streak = max(int(entry.get("streak") or 1), 1)
+    cooldown = _GENERIC_BACKOFF_SCHEDULE_SECONDS[
+        min(streak - 1, len(_GENERIC_BACKOFF_SCHEDULE_SECONDS) - 1)
+    ]
+    first_blocked = _parse_iso(str(entry.get("first_blocked_at") or ""))
+    if first_blocked is None:
+        return True
+    if first_blocked.tzinfo is None:
+        first_blocked = first_blocked.replace(tzinfo=timezone.utc)
+    elapsed = (current - first_blocked.astimezone(timezone.utc)).total_seconds()
+    return elapsed < cooldown
+
+
 def continuous_auto_start_skip_reason(workspace_id: str, role: str) -> str | None:
     """Return a skip reason for continuous ticks, or None when the role may start."""
     if usage_limit_blocks_auto_start(workspace_id, role):
@@ -219,4 +319,6 @@ def continuous_auto_start_skip_reason(workspace_id: str, role: str) -> str | Non
         return "billing/credits failure blocked this role's last shift"
     if runtime_auth_blocks_auto_start(workspace_id, role):
         return "runtime auth blocked last shift"
+    if generic_repeated_failure_blocks_auto_start(workspace_id, role):
+        return "repeated unclassified failure blocked this role's last shift (backing off)"
     return None
