@@ -207,9 +207,13 @@ def should_use_vaxon_runtime(
 ) -> bool:
     # Ask mode is a deliberate executive consultation, not a collection of
     # keyword-triggered status templates. It stays read-only at the runtime
-    # boundary; Dispatch is the only mode that may dispatch work.
+    # boundary; Dispatch is the only mode that may dispatch work. Still gate
+    # on the caller's requested tier: status/open questions have a correct,
+    # instant templated answer at "fast", and ignoring that here would force
+    # a real (slow, costly) model call on every Ask turn regardless of what
+    # tier the caller asked for.
     if consultative:
-        return turn_kind in {"open_question", "status_question", "chat"}
+        return turn_kind in {"open_question", "status_question", "chat"} and answer_tier == "deep"
     mode = normalize_voice_routing_mode(voice_routing_mode)
     if turn_kind not in {"open_question", "status_question"}:
         return False

@@ -357,9 +357,11 @@ def converse_turn(
     # evidence, but it must not reach the bounded-command lane without Dispatch.
     if not dispatch_requested and turn_kind == "command":
         turn_kind = "status_question"
-    # Ask is VAXON's consultative COO lane — force deep quality without vocabulary traps.
-    if not dispatch_requested:
-        tier = "deep"
+    # Tier is caller-controlled (see `answer_tier`), not inferred from
+    # turn_kind: the composer client already forces "deep" for every Ask-mode
+    # submission before this call, so overriding it here again only fights
+    # callers that explicitly ask for the fast/template path (direct API
+    # callers, tests) with no quality benefit for the real UI flow.
     # Keep caller use_runtime; voice_routing_mode gates lanes inside the router.
     recent = _recent_turns(session_id)
     consultative_workspace_id = _runtime_workspace_id(
