@@ -56,6 +56,24 @@ class GenericRetryBackoffGateTests(unittest.TestCase):
                 )
             self.assertFalse(blocked, f"should not double-gate an already-classified failure: {detail}")
 
+    def test_shift_continuation_failures_defer_to_their_own_gate(self) -> None:
+        """SIGTERM/OOM/restart/operator-stop are interruptions, not failures —
+        the scheduler must retry them next tick, not escalate a backoff."""
+        for detail in (
+            "Cursor CLI exited with status 143.",
+            "Cursor CLI exited with status 137.",
+            "Run interrupted by control-plane restart.",
+            "Runtime execution stopped by operator before the shift finished.",
+        ):
+            with patch(
+                _PATCH_TARGET,
+                return_value={"run_id": "run_1", "outcome": "failed", "detail": detail},
+            ):
+                blocked = generic_repeated_failure_blocks_auto_start(
+                    "workspace_dashpro", "watcher", state_path=self.state_path
+                )
+            self.assertFalse(blocked, f"should not block a shift-continuation interrupt: {detail}")
+
     def test_unclassified_failure_blocks_and_persists(self) -> None:
         now = datetime.now(timezone.utc)
         with patch(

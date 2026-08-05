@@ -13,6 +13,7 @@ from app.workspace_agents.failure_detail import (
     is_billing_block_failure,
     is_billing_failure,
     is_runtime_auth_failure,
+    is_shift_continuation_failure,
     is_usage_limit_failure,
 )
 from app.workspace_agents.run_outcome import latest_role_run_outcome
@@ -278,6 +279,7 @@ def generic_repeated_failure_blocks_auto_start(
         or is_billing_block_failure(detail)
         or is_billing_failure(detail)
         or is_runtime_auth_failure(detail)
+        or is_shift_continuation_failure(detail)
     ):
         return False
 
