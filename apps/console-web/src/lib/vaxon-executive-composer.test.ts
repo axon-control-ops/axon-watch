@@ -14,11 +14,11 @@ describe('VAXON executive composer', () => {
     expect(vaxonComposerSubmissionIntent('ask')).toBe('ask');
   });
 
-  it('envelopes a mission and marks it as an explicit dispatch', () => {
-    expect(buildVaxonComposerSubmission('Restore the billing flow', 'mission')).toBe(
+  it('envelopes a dispatch mission and marks it as an explicit dispatch', () => {
+    expect(buildVaxonComposerSubmission('Restore the billing flow', 'dispatch')).toBe(
       'Mission:\nRestore the billing flow',
     );
-    expect(vaxonComposerSubmissionIntent('mission')).toBe('dispatch');
+    expect(vaxonComposerSubmissionIntent('dispatch')).toBe('dispatch');
   });
 
   it('uses Enter to send and Shift+Enter to add a mission detail line', () => {

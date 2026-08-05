@@ -23,9 +23,9 @@
    min(..., 100%) keeps narrow viewports from overflowing the topbar. */
 .console-shell--ide .topbar-mockup__grid--ide-interrupt {
   grid-template-columns:
-    minmax(10rem, 0.9fr)
-    minmax(min(21rem, 100%), 1.9fr)
-    minmax(7.5rem, 9rem)
+    auto
+    minmax(min(21rem, 100%), 1fr)
+    auto
     auto;
 }
 

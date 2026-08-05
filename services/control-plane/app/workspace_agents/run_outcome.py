@@ -20,7 +20,14 @@ def _truncate(text: str, limit: int = _MAX_DETAIL) -> str:
     cleaned = " ".join(text.split()).strip()
     if len(cleaned) <= limit:
         return cleaned
-    return cleaned[: max(0, limit - 1)].rstrip() + "…"
+    cut = cleaned[: max(0, limit - 1)]
+    # Prefer breaking on a word boundary so operator-facing detail doesn't end
+    # mid-word (e.g. "unpaid invoic…"). Fall back to the hard cut only when
+    # there's no reasonable break point (one very long token).
+    boundary = cut.rfind(" ")
+    if boundary > limit * 0.6:
+        cut = cut[:boundary]
+    return f"{cut.rstrip()}…"
 
 
 def _run_stamp(run: dict[str, Any]) -> str:

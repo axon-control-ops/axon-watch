@@ -35,8 +35,9 @@ class LaneBAgentTests(unittest.TestCase):
             context_block="ctx",
             execution_tier="executing",
         )
-        self.assertIn("Full Access", executing)
-        self.assertIn("edit files and run commands", executing)
+        self.assertIn("approved execution access", executing)
+        self.assertIn("edit files", executing.lower())
+        self.assertIn("audited commands", executing.lower())
         self.assertIn("Reply in first person", executing)
         self.assertNotIn("consultative", executing.lower())
 

@@ -20,6 +20,7 @@ import {
   stopRun,
 } from '../api/control-plane';
 import type {
+  ClaudeRuntimeStatusSnapshot,
   ConnectorProbeRecord,
   CodexRuntimeStatusSnapshot,
   CursorRuntimeStatusSnapshot,
@@ -301,6 +302,7 @@ import {
 import { createCatalogLoadersSlice } from './shell/slices/create-catalog-loaders-slice';
 import { createComposerRuntimePrefsSlice } from './shell/slices/create-composer-runtime-prefs-slice';
 import { createConnectorsSlice } from './shell/slices/create-connectors-slice';
+import { createClaudeCatalogSlice } from './shell/slices/create-claude-catalog-slice';
 import { createCursorCatalogSlice } from './shell/slices/create-cursor-catalog-slice';
 import { createCodexCatalogSlice } from './shell/slices/create-codex-catalog-slice';
 import { createDockLayoutSlice } from './shell/slices/create-dock-layout-slice';
@@ -327,12 +329,8 @@ import { createWorkspaceStreamUiSlice } from './shell/slices/create-workspace-st
 import { createSignalHandoffSlice } from './shell/slices/create-signal-handoff-slice';
 import { createVoiceOrbPlacementController } from './shell/slices/create-voice-orb-placement-slice';
 import {
-  DEFAULT_DOCK_CONTEXT,
-  DEFAULT_EDITOR_TABS,
   hydrateWorkspaceSurfaceThreadIds,
   type BriefingLoadState,
-  type DockContextDescriptor,
-  type EditorTabDescriptor,
   type InboxLoadState,
   type LayoutMode,
   type RunMutationState,
@@ -361,6 +359,9 @@ export const useShellStore = defineStore('shell', () => {
   const cursorRuntimeStatus = ref<CursorRuntimeStatusSnapshot | null>(null);
   const cursorCatalogLoadState = ref<'idle' | 'loading' | 'loaded' | 'error'>('idle');
   const cursorCatalogError = ref<string | null>(null);
+  const claudeRuntimeStatus = ref<ClaudeRuntimeStatusSnapshot | null>(null);
+  const claudeCatalogLoadState = ref<'idle' | 'loading' | 'loaded' | 'error'>('idle');
+  const claudeCatalogError = ref<string | null>(null);
   const codexRuntimeStatus = ref<CodexRuntimeStatusSnapshot | null>(null);
   const codexCatalogLoadState = ref<'idle' | 'loading' | 'loaded' | 'error'>('idle');
   const codexCatalogError = ref<string | null>(null);
@@ -496,9 +497,6 @@ export const useShellStore = defineStore('shell', () => {
   const fileSaveState = ref<'idle' | 'saving'>('idle');
   const fileSaveError = ref<string | null>(null);
 
-  // UI shell scaffolding is local and intentionally placeholder-only.
-  const editorTabs = ref<EditorTabDescriptor[]>(DEFAULT_EDITOR_TABS);
-  const activeEditorTabId = ref<string>(DEFAULT_EDITOR_TABS[0].id);
   const activeEditorDocumentId = ref<string>('file:README.md');
   const activeWorkspaceFilePath = computed(() => {
     const path = filePathFromDocumentId(activeEditorDocumentId.value);
@@ -511,7 +509,6 @@ export const useShellStore = defineStore('shell', () => {
   const openIdeThreadIdsByWorkspaceId = ref<Record<string, string[]>>(
     readOpenIdeThreadIdsByWorkspace(),
   );
-  const dockContext = ref<DockContextDescriptor>(DEFAULT_DOCK_CONTEXT);
   const expandedDockSeams = ref<Set<DockSeamId>>(new Set());
   const dockThreadSeamTouched = ref(false);
   const briefingSeamEmphasized = ref(false);
@@ -1413,21 +1410,21 @@ export const useShellStore = defineStore('shell', () => {
       ideAgentRunId.value = getWorkspaceStreamUi(threadId).ideAgentRunId;
     }
 
-    if (forceRefresh) {
-      const nextCache = { ...workspaceIdeThreadMessagesById.value };
-      delete nextCache[threadId];
-      workspaceIdeThreadMessagesById.value = nextCache;
-    } else {
-      const cached = workspaceIdeThreadMessagesById.value[threadId];
-      if (cached?.length) {
-        threadMessages.value = cached;
-        commandMutationState.value = 'idle';
-        commandMutationError.value = null;
+    // Continuous-worker / fan-out writes teammate threads out-of-band, so the
+    // cache can be stale — forceRefresh always re-fetches in the background.
+    // It must not evict/blank the cache first though: that turned every
+    // teammate-tab switch into a flash-to-empty-then-reload. Keep showing the
+    // stale transcript (like hydrateWorkspaceIdeChatImpl's initial-load path)
+    // until loadWorkspaceThread's applyLoadedWorkspaceThread lands fresh data.
+    const cached = workspaceIdeThreadMessagesById.value[threadId];
+    if (cached?.length) {
+      threadMessages.value = cached;
+      commandMutationState.value = 'idle';
+      commandMutationError.value = null;
+      if (!forceRefresh) {
         return;
       }
-    }
-
-    if (layoutMode.value === 'ide') {
+    } else if (layoutMode.value === 'ide') {
       threadMessages.value = [];
       commandMutationState.value = 'idle';
       commandMutationError.value = null;
@@ -2573,10 +2570,6 @@ export const useShellStore = defineStore('shell', () => {
     editorSelection.value = selection;
   }
 
-  function setActiveEditorTab(id: string): void {
-    activeEditorTabId.value = id;
-  }
-
   function migrateMarkdownAgentReviewDraft(id: string): boolean {
     if (!isAgentEditReviewDocumentId(id)) {
       return false;
@@ -3111,6 +3104,7 @@ export const useShellStore = defineStore('shell', () => {
     selectedRuntimeTargetId,
     selectedComposerModel,
     cursorCatalogRows,
+    claudeCatalogRows,
     codexCatalogRows,
     cursorPickerVisibleModelIds,
     composerRuntimeLabel,
@@ -3121,6 +3115,7 @@ export const useShellStore = defineStore('shell', () => {
     currentWorkspace,
     runtimeStatus,
     cursorRuntimeStatus,
+    claudeRuntimeStatus,
     codexRuntimeStatus,
     composerRuntimePrefsRevision,
     cursorPickerVisibleRevision,
@@ -3143,6 +3138,18 @@ export const useShellStore = defineStore('shell', () => {
     codexCatalogLoadState,
     codexCatalogError,
     codexCatalogRows,
+  });
+
+  const {
+    loadClaudeCatalog,
+    migrateClaudeComposerModelIfNeeded,
+  } = createClaudeCatalogSlice({
+    claudeRuntimeStatus,
+    claudeCatalogLoadState,
+    claudeCatalogError,
+    claudeCatalogRows,
+    composerRuntimePrefsRevision,
+    currentWorkspaceId: () => currentWorkspace.value?.workspace_id ?? null,
   });
 
   const {
@@ -3699,7 +3706,6 @@ export const useShellStore = defineStore('shell', () => {
   }
 
   return {
-    activeEditorTabId,
     activeEditorDocument,
     activeEditorDocumentId,
     editorSelection,
@@ -3743,6 +3749,10 @@ export const useShellStore = defineStore('shell', () => {
     composerRuntimeLabel,
     composerRuntimePrefs,
     commandSeamHint,
+    claudeCatalogError,
+    claudeCatalogLoadState,
+    claudeCatalogRows,
+    claudeRuntimeStatus,
     cursorCatalogError,
     cursorCatalogLoadState,
     cursorCatalogRows,
@@ -3752,11 +3762,9 @@ export const useShellStore = defineStore('shell', () => {
     codexCatalogLoadState,
     codexCatalogRows,
     codexRuntimeStatus,
-    dockContext,
     dockHeroMode,
     dockSeamLayout,
     dockSeamState,
-    editorTabs,
     inboxError,
     ideAgentLinkedRun,
     ideAgentRunId,
@@ -3855,6 +3863,7 @@ export const useShellStore = defineStore('shell', () => {
     loadOperatorPresenceSettings,
     loadRuns,
     loadCursorCatalog,
+    loadClaudeCatalog,
     loadCodexCatalog,
     loadRuntimeStatus,
     loadRuntimeSummary,
@@ -3944,7 +3953,6 @@ export const useShellStore = defineStore('shell', () => {
     renameActiveWorkspaceFile,
     closeEditorDocument,
     revealEditorLine,
-    setActiveEditorTab,
     setActiveEditorDocument,
     setCurrentWorkspace,
     setDockHeroMode,

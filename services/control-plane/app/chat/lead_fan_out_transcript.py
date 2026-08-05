@@ -61,6 +61,8 @@ def format_lead_fan_out_agent_message(
         else "Specialists queued via Lead fan-out — continuous dispatch owns the starts."
     )
     fence = json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
+    # No trailing Confidence boilerplate: this is a deterministic fan-out
+    # transcript, not an LLM turn — there's no model self-assessment to score.
     lines = [
         opener,
         "",
@@ -69,16 +71,14 @@ def format_lead_fan_out_agent_message(
         ":::",
         "",
         f"— {payload['lead_name']}",
-        "",
-        "Confidence: 8/10",
     ]
     superseded = list(materialize.get("superseded_tasks") or [])
     if superseded:
         lines.insert(
-            -3,
+            -1,
             f"Cleared {len(superseded)} overlapping stale queue task(s) so this handoff can move.",
         )
-        lines.insert(-3, "")
+        lines.insert(-1, "")
     return "\n".join(lines)
 
 

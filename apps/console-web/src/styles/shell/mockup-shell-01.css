@@ -289,9 +289,9 @@ body:has(.console-shell--mockup) {
 .topbar-mockup__grid {
   display: grid;
   grid-template-columns:
-    minmax(22rem, 1.4fr)
-    minmax(140px, auto)
-    minmax(240px, 16rem)
+    auto
+    minmax(0, 1fr)
+    auto
     auto;
   align-items: center;
   gap: 0.65rem;
@@ -302,13 +302,29 @@ body:has(.console-shell--mockup) {
   overflow: visible;
 }
 
+/* No mid-strip content: same tracks; empty spacer still occupies the flex column. */
+.topbar-mockup__grid--no-mid {
+  grid-template-columns:
+    auto
+    minmax(0, 1fr)
+    auto
+    auto;
+}
+
+.topbar-mockup__mid-spacer {
+  min-width: 0;
+  pointer-events: none;
+}
+
 .topbar-mockup__identity-zone {
   display: grid;
-  grid-template-columns: 11.5rem minmax(0, 1fr);
-  align-items: stretch;
+  grid-template-columns: auto;
+  align-items: center;
+  justify-items: start;
   min-width: 0;
-  height: calc(var(--topbar-height) - 0.35rem);
-  margin-top: 0.2rem;
+  height: calc(var(--topbar-height) - 0.5rem);
+  max-height: calc(var(--topbar-height) - 0.5rem);
+  margin: 0;
   border-bottom: 0;
 }
 

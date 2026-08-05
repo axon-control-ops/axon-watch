@@ -29,11 +29,18 @@ class KairoConversationTurnTests(KairoConversationTestCase):
         self,
         *_mocks: object,
     ) -> None:
+        # Command-looking text only seeds a pending confirmation under
+        # explicit Dispatch intent — plain Ask must never set up dispatch-lane
+        # state (see kairo_conversation.py's Ask safety boundary).
         converse_turn(
             content="run npm run verify",
             session_id="yes-session",
+            submission_intent="dispatch",
         )
-        payload = converse_turn(content="yes", session_id="yes-session")
+        # "yes" confirms a pending action — the client marks that as Dispatch.
+        payload = converse_turn(
+            content="yes", session_id="yes-session", submission_intent="dispatch"
+        )
         self.assertEqual("action", payload["turn_kind"])
         action = payload["action"]
         assert isinstance(action, dict)
@@ -72,7 +79,10 @@ class KairoConversationTurnTests(KairoConversationTestCase):
             task='Investigate signal "Sentry spike in DashPro": 3 unresolved issues',
             pending_dig_in="1",
         )
-        payload = converse_turn(content="yes", session_id="dig-in-session")
+        # "yes" confirms a pending action — the client marks that as Dispatch.
+        payload = converse_turn(
+            content="yes", session_id="dig-in-session", submission_intent="dispatch"
+        )
         self.assertEqual("action", payload["turn_kind"])
         action = payload["action"]
         assert isinstance(action, dict)
@@ -128,7 +138,11 @@ class KairoConversationTurnTests(KairoConversationTestCase):
             task='Investigate signal "Axon-X Fast Gate" — Pull failed CI logs',
             pending_dig_in="1",
         )
-        payload = converse_turn(content="Pull the failed logs", session_id="pull-logs-session")
+        payload = converse_turn(
+            content="Pull the failed logs",
+            session_id="pull-logs-session",
+            submission_intent="dispatch",
+        )
         self.assertEqual("action", payload["turn_kind"])
         action = payload["action"]
         assert isinstance(action, dict)
@@ -146,7 +160,12 @@ class KairoConversationTurnTests(KairoConversationTestCase):
         import app.kairo_conversation as kc
 
         kc._remember_entities("briefing-surface-session", pending_briefing_surface="1")
-        payload = converse_turn(content="yes", session_id="briefing-surface-session")
+        # "yes" confirms a pending action — the client marks that as Dispatch.
+        payload = converse_turn(
+            content="yes",
+            session_id="briefing-surface-session",
+            submission_intent="dispatch",
+        )
         self.assertEqual("action", payload["turn_kind"])
         action = payload["action"]
         assert isinstance(action, dict)
@@ -177,7 +196,13 @@ class KairoConversationTurnTests(KairoConversationTestCase):
         self,
         *_mocks: object,
     ) -> None:
-        payload = converse_turn(content="what is the git status?", session_id="test-session")
+        # Command-looking text only reaches the bounded-command lane with
+        # explicit Dispatch intent — plain Ask leaves it a status question.
+        payload = converse_turn(
+            content="what is the git status?",
+            session_id="test-session",
+            submission_intent="dispatch",
+        )
         self.assertEqual("command", payload["turn_kind"])
         self.assertEqual("git status", payload["command_content"])
         self.assertIn("git status", str(payload["reply"]).lower())
@@ -193,7 +218,9 @@ class KairoConversationTurnTests(KairoConversationTestCase):
             content="what needs my attention?",
             session_id="followup-session",
         )
-        payload = converse_turn(content="hand it off", session_id="followup-session")
+        payload = converse_turn(
+            content="hand it off", session_id="followup-session", submission_intent="dispatch"
+        )
         self.assertEqual("action", payload["turn_kind"])
         action = payload["action"]
         assert isinstance(action, dict)

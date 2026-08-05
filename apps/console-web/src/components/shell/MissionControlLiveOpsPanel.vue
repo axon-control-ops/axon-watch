@@ -164,7 +164,10 @@ async function sendReply({
   if (message === 'yes' || message === 'not now') {
     markTransmissionAskAnswered(spokenLine.value);
   }
-  await submitTurn(message, { submissionIntent });
+  // Affirmative Needs-you answers must be allowed to trigger dig-in / handoff.
+  const intent =
+    message === 'yes' ? 'dispatch' : message === 'not now' ? 'ask' : submissionIntent;
+  await submitTurn(message, { submissionIntent: intent });
 }
 
 function toggleMic(): void {
@@ -347,6 +350,7 @@ onUnmounted(() => {
       :pending="pending"
       :mic-live="micLive"
       :mic-supported="speechCapture.supported"
+      :privacy-blocked="shell.operatorPresenceSettings.privacy_mode"
       :focused-workspace-label="focusedWorkspaceLabel"
       @submit="void sendReply($event)"
       @toggle-mic="toggleMic"

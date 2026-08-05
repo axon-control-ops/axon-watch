@@ -17,6 +17,7 @@ from app.cli_runtime.subprocess_runner import (
     raise_if_operator_stopped,
     stream_registered_process,
 )
+from app.cli_runtime.agent_sandbox import AgentSandboxPolicy
 
 logger = logging.getLogger(__name__)
 
@@ -112,6 +113,7 @@ def run_cursor_local(
     on_chunk: Callable[[str, str], None] | None = None,
     trust_policy: str = "operator",
     research_available: bool | None = None,
+    sandbox_policy: AgentSandboxPolicy | None = None,
 ) -> CursorAgentReply:
     # stream-json is the only print format that reliably carries assistant text;
     # `--output-format text` returns an empty body for plan/tool-heavy replies.
@@ -131,6 +133,7 @@ def run_cursor_local(
         on_delta=on_chunk,
     )
     run_cwd = str(workspace_root.resolve()) if workspace_root else None
+    sandbox_kwargs = {"sandbox_policy": sandbox_policy} if sandbox_policy is not None else {}
 
     def handle_raw_chunk(_accumulated_raw: str, raw_line: str) -> None:
         assembler.feed_line(raw_line)
@@ -144,6 +147,7 @@ def run_cursor_local(
                 subprocess_env=subprocess_env,
                 on_chunk=handle_raw_chunk,
                 cwd=run_cwd,
+                **sandbox_kwargs,
             )
         else:
             stdout, stderr, returncode = communicate_registered_process(
@@ -152,6 +156,7 @@ def run_cursor_local(
                 timeout_seconds=timeout_seconds,
                 subprocess_env=subprocess_env,
                 cwd=run_cwd,
+                **sandbox_kwargs,
             )
             for line in stdout.splitlines():
                 assembler.feed_line(line)
@@ -191,6 +196,7 @@ def run_cursor_local_with_recursion_retry(
     run_id: str,
     on_chunk: Callable[[str, str], None] | None,
     trust_policy: str,
+    sandbox_policy: AgentSandboxPolicy | None = None,
 ) -> CursorAgentReply:
     """Run Cursor once, retrying recursion crashes without research MCP."""
     started = time.perf_counter()
@@ -206,6 +212,7 @@ def run_cursor_local_with_recursion_retry(
             run_id=run_id,
             on_chunk=on_chunk,
             trust_policy=trust_policy,
+            sandbox_policy=sandbox_policy,
         )
     except RuntimeError as exc:
         if isinstance(exc, RuntimeProcessStoppedError) or not is_recursion_depth_error(str(exc)):
@@ -230,4 +237,5 @@ def run_cursor_local_with_recursion_retry(
             on_chunk=on_chunk,
             trust_policy=trust_policy,
             research_available=False,
+            sandbox_policy=sandbox_policy,
         )

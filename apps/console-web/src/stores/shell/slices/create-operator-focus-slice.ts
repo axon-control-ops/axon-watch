@@ -231,17 +231,15 @@ export function createOperatorFocusSlice(input: CreateOperatorFocusSliceInput) {
     }
   }
 
+  /**
+   * Briefing emphasis must never hide Mission Control Live Ops.
+   * On operator grid the thread seam *is* the VAXON talk box; collapsing it
+   * left an empty cyan frame with no expand chrome.
+   */
   function collapseOperatorThreadForBriefing(): void {
-    if (input.layoutMode.value === 'ide') {
-      return;
-    }
-    // Thread expanded = in the set. Collapse it so briefing owns the right dock.
-    if (input.expandedDockSeams.value.has('thread')) {
-      input.dockThreadSeamTouched.value = true;
-      const next = new Set(input.expandedDockSeams.value);
-      next.delete('thread');
-      input.expandedDockSeams.value = next;
-    }
+    // Deliberately a no-op — see the docstring above. Kept as a named call
+    // site rather than inlined so the "why nothing happens here" stays
+    // documented at the call site in focusKairoBriefing() below.
   }
 
   /**

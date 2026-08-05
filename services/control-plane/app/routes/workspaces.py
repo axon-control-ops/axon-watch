@@ -140,8 +140,45 @@ def workspace_composer_prefs_put(
     prefs = set_workspace_composer_prefs(
         workspace_id,
         cursor_cli_model=body.cursor_cli_model,
+        runtime_target=body.runtime_target,
     )
     return {"workspace_id": workspace_id, **prefs}
+
+
+@router.get("/api/workspaces/{workspace_id}/sandbox")
+def workspace_sandbox_status(workspace_id: str) -> dict[str, Any]:
+    try:
+        get_workspace_record(workspace_id)
+    except WorkspaceNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    from app.cli_runtime.composer_sandbox import sandbox_status
+
+    return sandbox_status(workspace_id)
+
+
+@router.post("/api/workspaces/{workspace_id}/sandbox/enable")
+def workspace_sandbox_enable(workspace_id: str) -> dict[str, Any]:
+    try:
+        get_workspace_record(workspace_id)
+    except WorkspaceNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    from app.cli_runtime.composer_sandbox import IsolationError, WorkspaceRootError, enable_sandbox
+
+    try:
+        return enable_sandbox(workspace_id)
+    except (IsolationError, WorkspaceRootError) as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.post("/api/workspaces/{workspace_id}/sandbox/disable")
+def workspace_sandbox_disable(workspace_id: str) -> dict[str, Any]:
+    try:
+        get_workspace_record(workspace_id)
+    except WorkspaceNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    from app.cli_runtime.composer_sandbox import disable_sandbox
+
+    return disable_sandbox(workspace_id)
 
 
 @router.get("/api/agents")
@@ -362,6 +399,7 @@ def workspace_terminal_agent_jobs_enqueue(
             stream_to_chat=body.stream_to_chat,
             thread_id=body.thread_id,
             message_id=body.message_id,
+            source_workspace_id=body.source_workspace_id,
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc

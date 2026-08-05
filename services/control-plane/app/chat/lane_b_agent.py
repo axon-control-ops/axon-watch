@@ -10,6 +10,7 @@ from app.cli_runtime.router import dispatch_ide_composer
 from app.chat.lane_b_git_dispatch import try_lane_b_git_commit_dispatch
 from app.research.availability import format_capability_line, research_capability_snapshot
 from app.terminal.workspace_roots import WorkspaceRootError, resolve_workspace_root
+from app.workspace_agents.execution_policy import AgentExecutionPolicy
 from app.workspace_catalog import WorkspaceNotFoundError
 from app.workspace_files import WorkspaceFileError, list_workspace_files
 
@@ -117,6 +118,7 @@ def generate_lane_b_result(
     on_chunk: Callable[[str, str], None] | None = None,
     cursor_trust_policy: str = "operator",
     workspace_root: Path | None = None,
+    execution_policy: AgentExecutionPolicy | None = None,
 ) -> dict[str, object]:
     trimmed = user_prompt.strip()
     if not trimmed:
@@ -152,6 +154,7 @@ def generate_lane_b_result(
                 on_chunk=on_chunk,
                 cursor_trust_policy=cursor_trust_policy,
                 workspace_root=workspace_root,
+                execution_policy=execution_policy,
             )
         except RuntimeError as exc:
             return {
@@ -193,6 +196,7 @@ def generate_lane_b_result(
             on_chunk=on_chunk,
             cursor_trust_policy=cursor_trust_policy,
             workspace_root=workspace_root,
+            execution_policy=execution_policy,
         )
     except RuntimeError as exc:
         return {

@@ -18,6 +18,7 @@ from uuid import uuid4
 from app.cli_runtime.long_running_shell import is_long_running_ship_shell
 from app.cli_runtime.stream_blocks.terminal_blocks import render_axon_job_terminal_fence
 from app.terminal.active_chat_stream import get_active_chat_stream
+from app.terminal.agent_job_access import assert_agent_terminal_job_allowed
 from app.terminal.agent_job_chat import (
     append_live_job_fence_body,
     close_live_job_fence,
@@ -26,6 +27,7 @@ from app.terminal.agent_job_chat import (
 )
 from app.terminal.session_registry import ensure_agent_session, serialize_session
 from app.terminal.session_runtime import ensure_runtime
+from app.terminal.ship_command_guards import assert_ship_command_allowed
 from app.terminal.workspace_roots import WorkspaceRootError, resolve_workspace_root
 
 _MAX_COMMAND_CHARS = 32_768
@@ -259,6 +261,7 @@ def enqueue_agent_terminal_job(
     stream_to_chat: bool | None = None,
     thread_id: str | None = None,
     message_id: str | None = None,
+    source_workspace_id: str | None = None,
 ) -> dict[str, Any]:
     """Ensure agent PTY runtime, write the command, return a chat-friendly receipt."""
     clean_workspace = str(workspace_id or "").strip()
@@ -270,6 +273,17 @@ def enqueue_agent_terminal_job(
         raise ValueError("command is required")
 
     command_text = payload.decode("utf-8", errors="replace").rstrip("\n")
+    assert_ship_command_allowed(
+        workspace_id=clean_workspace,
+        command=command_text,
+        source_workspace_id=source_workspace_id,
+    )
+    assert_agent_terminal_job_allowed(
+        workspace_id=clean_workspace,
+        source_workspace_id=source_workspace_id,
+        run_id=run_id,
+        command=command_text,
+    )
     should_stream = (
         bool(stream_to_chat)
         if stream_to_chat is not None

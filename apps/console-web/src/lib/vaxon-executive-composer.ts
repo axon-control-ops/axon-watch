@@ -1,4 +1,4 @@
-export type VaxonExecutiveComposerMode = 'mission' | 'ask';
+export type VaxonExecutiveComposerMode = 'ask' | 'dispatch';
 
 const MISSION_PREFIX_RE = /^\s*(?:#{1,4}\s*)?mission(?:\s+(?:specification|id|title))?\s*:/i;
 

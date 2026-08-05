@@ -121,8 +121,14 @@ def resolve_stage_plan(
     if mentioned:
         return mentioned, None
 
-    allow_all = bool(_COMMIT_ALL_RE.search(user_prompt)) or continue_prompt is None
-    if allow_all:
+    # The mixed-tree guard below used to only run for "commit … then …"
+    # continuation turns — a plain "commit and push" (the common phrasing,
+    # `continue_prompt is None`) skipped straight to a blind `git add -A`.
+    # That let one task's commit sweep up whatever unrelated, concurrent
+    # agent's dirty files happened to be sitting in the same workspace root
+    # at that moment. Apply the same guard to every commit turn instead.
+    explicit_commit_all = bool(_COMMIT_ALL_RE.search(user_prompt))
+    if explicit_commit_all:
         return None, None
 
     if _mixed_tree_needs_explicit_scope(changed):
@@ -132,7 +138,8 @@ def resolve_stage_plan(
         return [], (
             "Working tree spans multiple areas "
             f"({', '.join(tops[:5])}; {len(changed)} files). "
-            "I will not run a blind `git add -A` on a commit-then turn. "
+            "I will not run a blind `git add -A` when this much is pending — "
+            "some of it may belong to other concurrent work. "
             "Reply with `commit all and then …`, or name paths to stage "
             f"(pending includes: {sample}{more})."
         )
@@ -211,6 +218,10 @@ def try_lane_b_git_commit_dispatch(
     message = explicit_message or derive_commit_message(
         workspace_id,
         turn_subject=subject_source,
+        # None means "git add -A" (whole tree is genuinely the change); a
+        # concrete list means only those paths are being staged, so the
+        # subject must describe just them, not everything sitting dirty.
+        scoped_paths=stage_paths,
     )
     if not message.strip() or message.strip() == "Update via Axon-X":
         lines.extend(

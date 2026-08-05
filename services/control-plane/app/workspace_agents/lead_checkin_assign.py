@@ -6,6 +6,7 @@ from dataclasses import asdict, dataclass
 from typing import Any, Literal
 
 from app.workspace_agents.failure_detail import (
+    is_billing_failure,
     is_operator_stopped_failure,
     is_restart_interrupted_failure,
     is_billing_block_failure,
@@ -74,8 +75,9 @@ def assign_owner_role_for_failed_shift(role: str, detail: str) -> tuple[str, boo
         return "watcher", True
     if (
         is_usage_limit_failure(detail)
-        or is_billing_block_failure(detail)
         or is_runtime_auth_failure(detail)
+        or is_billing_failure(detail)
+        or is_billing_block_failure(detail)
     ):
         return cleaned, True
     if is_restart_interrupted_failure(detail) or is_operator_stopped_failure(detail):

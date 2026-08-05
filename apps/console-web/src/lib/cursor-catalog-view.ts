@@ -258,16 +258,39 @@ export function cursorModelLabel(modelId: string, rows: CursorCatalogRow[]): str
   if (!normalized || normalized === 'auto') {
     return 'Auto';
   }
-  return rows.find((row) => row.id === normalized)?.label ?? normalized;
+  const raw = rows.find((row) => row.id === normalized)?.label ?? normalized;
+  // Family chip already says "Cursor" — drop redundant catalog prefix on the model chip.
+  const stripped = raw.replace(/^Cursor\s+/i, '').trim();
+  return stripped || raw;
 }
 
+/** Short provider name for composer strip — no local/cloud / "CLI" laundry. */
+export function composerRuntimeFamilyLabel(family: string | null | undefined): string {
+  const key = String(family || '').trim().toLowerCase();
+  if (key === 'cursor') {
+    return 'Cursor';
+  }
+  if (key === 'codex') {
+    return 'Codex';
+  }
+  if (key === 'claude') {
+    return 'Claude';
+  }
+  if (!key || key === 'runtime') {
+    return 'Runtime';
+  }
+  return key.charAt(0).toUpperCase() + key.slice(1);
+}
+
+/** Tooltip / detail line: `Cursor · Auto` (not `cursor local · Auto`). */
 export function cursorComposerRuntimeLabel(input: {
   family: string;
   scope: string;
   modelId: string;
   rows: CursorCatalogRow[];
 }): string {
+  const family = composerRuntimeFamilyLabel(input.family);
   const normalized = input.modelId.trim();
   const modelLabel = cursorModelLabel(normalized || CURSOR_PICKER_DEFAULT_MODEL, input.rows);
-  return `${input.family}${input.scope ? ` ${input.scope}` : ''} · ${modelLabel}`;
+  return `${family} · ${modelLabel}`;
 }

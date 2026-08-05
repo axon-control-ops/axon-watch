@@ -110,14 +110,14 @@ def claude_subscription_ready(auth: dict[str, object] | None) -> bool:
 
 
 def codex_subscription_ready(auth: dict[str, object] | None) -> bool:
-    """True when a cached ChatGPT session should beat a Codex API-key overlay."""
+    """True when Codex CLI subscription auth should win over a vault/shell API key."""
     record = auth or {}
     auth_method = str(record.get("auth_method") or "")
-    if auth_method in {"chatgpt", "oauth"}:
+    if auth_method in {"oauth", "chatgpt"}:
         return True
     message = str(record.get("message") or "").lower()
     provider = str(record.get("provider_label") or "").lower()
-    return "chatgpt" in message or provider == "codex"
+    return "subscription" in message or "chatgpt" in message or provider == "codex"
 
 
 def cursor_dispatch_env(
@@ -151,9 +151,9 @@ def codex_dispatch_env(
     *,
     auth: dict[str, object] | None = None,
 ) -> dict[str, str]:
-    """Shape Codex execution env so a valid ChatGPT login wins over a stale key."""
+    """Shape subprocess env for Codex CLI (subscription beats stale API keys)."""
     if not env_has_api_key(env, family="codex"):
         return env
-    if codex_subscription_ready(auth):
+    if codex_subscription_ready(auth) or prefer_subscription_over_process_api_key():
         return env_without_api_keys(env, family="codex")
     return env

@@ -43,6 +43,16 @@ class EffectiveScopeTests(unittest.TestCase):
             ),
         )
 
+    def test_missing_task_scope_can_fail_closed_at_execution_boundary(self) -> None:
+        self.assertEqual(
+            ["__axon_deny_all__"],
+            resolve_effective_allowed_paths(
+                contract_allowed_paths=["apps/", "services/"],
+                task_allowed_paths=[],
+                fail_closed_missing_task=True,
+            ),
+        )
+
     def test_task_scope_intersects_contract(self) -> None:
         effective = resolve_effective_allowed_paths(
             contract_allowed_paths=["apps/", "services/", "scripts/"],

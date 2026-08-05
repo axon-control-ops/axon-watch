@@ -106,6 +106,43 @@ a repair task.
 | Real branch failure | Latest Fast Gate on that branch is **success** (via `gh` or green webhook) |
 | Operator ack | Attention clear / acknowledge resolves Gate 9 CI store rows (not watch-only) |
 
+## Stale CI-infra hint (branch predates a trunk fix)
+
+**Incident:** `worker/run_96147146e311` (dashpro PR #39) burned its whole
+`attempt_budget` on Database SQL Linting without ever touching the real
+cause: its own `.github/workflows/db-lint.yml` still used
+`actions/setup-python@v5`, which cannot resolve a Python build for the
+`dashpro` self-hosted runner's OS and fails before any SQL is even linted.
+`development` had already fixed this (system-Python venv instead of
+`setup-python`) — the branch was just never rebased onto it. No content
+edit on the branch could have made this check pass.
+
+`services/control-plane/app/ci_remediation/staleness.py` now checks for
+exactly this shape before a repair goal is built: if the failing workflow is
+currently **green on the PR's base branch**, and the base branch has commits
+touching CI-infra paths (`.github/workflows/**`, `.sqlfluff`,
+`scripts/check-migration-filenames.sh`, `scripts/workflow/**`, …) that the
+failing head is missing, `build_repair_goal()` appends a hint telling the
+worker to merge the base branch in (fast-forward-safe merge commit, never
+force-push) **before** editing SQL/app content. The check is fail-open — any
+`gh` error, missing PR, or nothing-stale result silently omits the hint, it
+never blocks goal-building.
+
+This is a hint, not a gate: the worker still decides what to do. It exists so
+the worker doesn't have to rediscover "merge trunk first" by trial and error
+across `attempt_budget` tries, the way `worker_96147146e311` did.
+
+Related, separate fix landed from the same investigation: `Database SQL
+Linting` itself was failing on **every** PR touching `supabase/migrations/**`
+regardless of content, because `PG01` (CREATE INDEX CONCURRENTLY) flagged
+pre-existing indexes and the filename checker had no grandfathering for
+legacy names. See dashpro PR #66 — `.sqlfluff` now excludes `PG01` and
+`scripts/check-migration-filenames.sh` grandfathers a small, explicit
+`scripts/migration-filename-legacy-allowlist.txt`. A worker hitting a
+systemic, content-independent lint failure like this should fix the trunk
+config in its own small PR rather than trying to rewrite unrelated legacy
+migrations in its own branch.
+
 ## Enabled workspaces
 
 - Axon-X: `Axon-X Fast Gate`
@@ -118,7 +155,7 @@ with the correct repository and workflow names. No new core code is required.
 ## Local verify
 
 ```bash
-./scripts/dev/python.sh -m unittest tests.test_ci_remediation -v
+./scripts/dev/python.sh -m unittest tests.test_ci_remediation tests.test_ci_remediation_staleness -v
 ```
 
 Manual red-path drill: use a throwaway branch and a deliberate Fast Gate ratchet

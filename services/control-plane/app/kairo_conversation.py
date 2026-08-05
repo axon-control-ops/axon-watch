@@ -118,7 +118,7 @@ def converse_turn(
     context_node_id: str | None = None,
     force_refresh: bool = False,
     attachment_ids: list[str] | None = None,
-    submission_intent: str = "dispatch",
+    submission_intent: str = "ask",
 ) -> dict[str, object]:
     started_at = time.perf_counter()
     raw_content = content.strip()
@@ -315,16 +315,15 @@ def converse_turn(
         )
 
     turn_kind = classify_conversation_turn(trimmed)
-    # Ask is an answer-only capability.  Command-looking text is still useful
-    # evidence (for example, "git status" in a copied receipt), but it must
-    # not reach the bounded-command lane without an explicit Dispatch submit.
+    # Ask is an answer-only capability. Command-looking text is still useful
+    # evidence, but it must not reach the bounded-command lane without Dispatch.
     if not dispatch_requested and turn_kind == "command":
         turn_kind = "status_question"
-    # Ask is VAXON's consultative COO lane. Do not make an operator learn a
-    # vocabulary in order to receive a considered answer; its read-only safety
-    # boundary is submission_intent, not text classification.
-    if not dispatch_requested:
-        tier = "deep"
+    # Tier is caller-controlled (see `answer_tier`), not inferred from
+    # turn_kind: the composer client already forces "deep" for every Ask-mode
+    # submission before this call, so overriding it here again only fights
+    # callers that explicitly ask for the fast/template path (direct API
+    # callers, tests) with no quality benefit for the real UI flow.
     # Keep caller use_runtime; voice_routing_mode gates lanes inside the router.
     recent = _recent_turns(session_id)
     # A fleet-level Ask still needs a concrete workspace for the read-only

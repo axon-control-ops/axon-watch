@@ -167,9 +167,17 @@ def should_use_vaxon_runtime(
 ) -> bool:
     # Ask mode is a deliberate executive consultation, not a collection of
     # keyword-triggered status templates. It stays read-only at the runtime
-    # boundary; Mission is the only mode that may dispatch work.
+    # boundary; Dispatch is the only mode that may dispatch work.
     if consultative:
-        return turn_kind in {"open_question", "status_question", "chat"}
+        # Free-form chat has no templated answer to fall back to, so it always
+        # goes to the model — there's no tier to gate on. Status/open
+        # questions DO have a correct, instant templated answer at "fast", so
+        # ignoring the caller's requested tier there would force a real
+        # (slow, costly) model call on every Ask turn regardless of what tier
+        # was asked for.
+        if turn_kind == "chat":
+            return True
+        return turn_kind in {"open_question", "status_question"} and answer_tier == "deep"
     mode = normalize_voice_routing_mode(voice_routing_mode)
     if turn_kind not in {"open_question", "status_question"}:
         return False
@@ -348,7 +356,15 @@ def route_voice_turn(
         )
 
     if should_use_vaxon_runtime(
-        turn_kind=turn_kind if turn_kind in {"open_question", "status_question"} else "open_question",
+        # Non-consultative (Dispatch) routing only knows open_question/status_question,
+        # so chat/command/action get coerced to open_question there. Consultative
+        # (Ask) mode needs the real turn_kind through — its "chat" branch never
+        # gates on tier, unlike open_question — so only coerce when not consultative.
+        turn_kind=(
+            turn_kind
+            if consultative or turn_kind in {"open_question", "status_question"}
+            else "open_question"
+        ),
         content=content,
         use_runtime=use_runtime,
         answer_tier=answer_tier,

@@ -56,41 +56,43 @@ export function employeeAssignDraft(employee: CompanyEmployeeRecord): string {
 export function employeeRetryDraft(employee: CompanyEmployeeRecord): string {
   const owns = ownsSnippet(employee);
   const detail = normalizeOperatorFailureDetail(employee.last_outcome_detail);
-  const voiceLock =
-    'Speak in first person only — never say you are "acting as" a role, ' +
-    'Lane B, or VAXON, and never refer to yourself by name in the third person.';
+  // No voice/persona steering text here — the backend's employee_persona_prompt.py
+  // already injects "speak in first person, never say you're acting as a role"
+  // guidance server-side for every employee-persona dispatch. Duplicating it here
+  // used to leak an internal instruction into the operator-visible, persisted
+  // chat message.
   if (isShiftContinuationFailure(detail)) {
     return (
       `Continue my interrupted shift on ${owns}. ${SERVER_RESTART_CONTINUATION_PROMPT} ` +
-      `${voiceLock} Summarize what I changed and include receipts.`
+      `Summarize what I changed and include receipts.`
     );
   }
   if (isUsageLimitFailure(employee.last_outcome_detail)) {
     return (
       `A Cursor usage signal blocked my last shift on ${owns}. ` +
       `Auto+Composer or on-demand may still have headroom — check Usage, then ` +
-      `I will retry my bounded continuous shift. ${voiceLock} ` +
+      `I will retry my bounded continuous shift. ` +
       `Summarize what I changed and include receipts.`
     );
   }
   if (isRuntimeAuthProbeFailure(employee.last_outcome_detail)) {
     return (
       `Cursor CLI auth probe timed out on my last shift on ${owns}. After checking ` +
-      `\`cursor agent status\` on the host, I will retry my bounded continuous shift. ${voiceLock} ` +
+      `\`cursor agent status\` on the host, I will retry my bounded continuous shift. ` +
       `Summarize what I changed and include receipts.`
     );
   }
   if (isRuntimeAuthFailure(employee.last_outcome_detail)) {
     return (
       `Runtime auth blocked my last shift on ${owns}. After \`cursor agent login\` ` +
-      `on the host or /vault unlock, I will retry my bounded continuous shift. ${voiceLock} ` +
+      `on the host or /vault unlock, I will retry my bounded continuous shift. ` +
       `Summarize what I changed and include receipts.`
     );
   }
   const errorHint = detail ? ` Last error: ${detail}` : '';
   return (
     `My last continuous shift on ${owns} failed.${errorHint} ` +
-    `Retry that bounded shift now as me. ${voiceLock} ` +
+    `Retry that bounded shift now as me. ` +
     `Summarize what I changed and include receipts.`
   );
 }

@@ -21,6 +21,7 @@ from app.runs.service import (
 )
 from app.terminal.session_registry import ensure_agent_session
 from app.workspace_agents.config_loader import EmployeeConfig
+from app.workspace_agents.execution_policy_runtime import record_execution_policy_receipt, resolve_worker_execution_policy
 from app.workspace_agents.worker_ide_stream import (
     WorkerIdeStream,
     fail_worker_ide_stream,
@@ -38,6 +39,10 @@ from app.workspace_agents.worker_isolation import (
 from app.workspace_agents.worker_prompt import build_continuous_worker_prompt
 from app.workspace_agents.worker_prompt import parse_out_of_scope_guard
 from app.persistence import task_store
+from app.persistence.workspace_composer_prefs_store import (
+    resolve_worker_runtime_model,
+    resolve_worker_runtime_target,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -201,6 +206,10 @@ def dispatch_continuous_worker_run(
             ide_stream = None
         isolation_root = create_worker_isolation(workspace_id=workspace_id, run_id=run_id)
         agent_root = worker_agent_workspace(isolation_root)
+        execution_policy = resolve_worker_execution_policy(
+            employee=employee, task_payload=task, workspace_root=agent_root
+        )
+        record_execution_policy_receipt(run_id, execution_policy)
         append_run_execution_receipt(
             run_id,
             receipt_type="worker_isolation_created",
@@ -216,14 +225,25 @@ def dispatch_continuous_worker_run(
         )
         ensure_agent_session(workspace_id=workspace_id, run_id=run_id)
         context = LaneBContext(workspace_id=workspace_id, composer_mode="agent")
+        # Honor the operator's Agent Dock runtime-target pick — without this,
+        # continuous workers silently ignore it and fall back to the server's
+        # default runtime regardless of what's selected in the composer.
+        runtime_target = resolve_worker_runtime_target(workspace_id)
+        runtime_family = (runtime_target or "cursor_local").split("_", 1)[0]
+        runtime_model = (
+            resolve_worker_runtime_model(workspace_id) if runtime_family == "cursor" else None
+        )
         lane_b_result = generate_lane_b_result(
             context=context,
             user_prompt=prompt,
             run_id=run_id,
-            execution_access="full",
+            runtime_target=runtime_target,
+            runtime_model=runtime_model,
+            execution_access=execution_policy.execution_access,
             on_chunk=_throttled_worker_stream_progress(run_id, ide_stream),
-            cursor_trust_policy="worker",
+            cursor_trust_policy=execution_policy.trust_policy,
             workspace_root=agent_root,
+            execution_policy=execution_policy,
         )
         reply_text = str(lane_b_result.get("content") or "")
         from app.workspace_agents.employee_first_person import (

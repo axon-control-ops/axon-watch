@@ -1,5 +1,7 @@
 import type { RuntimeStatusSnapshot } from '../api/control-plane';
 
+import { composerRuntimeFamilyLabel } from './cursor-catalog-view';
+
 export type AgentDockRuntimeTone = 'ready' | 'partial' | 'missing' | 'loading' | 'error' | 'vault';
 
 export interface AgentDockRuntimeChip {
@@ -75,8 +77,7 @@ export function buildAgentDockRuntimeChip(input: {
     };
   }
 
-  const scope = selected.target_type === 'cloud' ? 'cloud' : 'local';
-  const label = `${selected.family} ${scope}`;
+  const label = composerRuntimeFamilyLabel(selected.family);
   const detail = selected.ready
     ? selected.auth.message || 'Runtime ready'
     : selected.auth.message || vaultHint || 'Runtime needs attention';

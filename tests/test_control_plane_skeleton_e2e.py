@@ -46,7 +46,17 @@ class ControlPlaneSkeletonE2ETests(unittest.TestCase):
         self._watch_server.stop()
         restore_app_modules(self._pre_watch_modules)
 
-    def test_runtime_summary_and_workspaces_render_from_live_apis(self) -> None:
+    @patch(
+        "app.runtime_summary_assembler.default_watch_probe",
+        return_value=(True, "ok", None, "2026-01-01T00:00:00Z"),
+    )
+    def test_runtime_summary_and_workspaces_render_from_live_apis(self, _mock_probe) -> None:
+        # This E2E skeleton test proves control-plane wires to and renders watch's
+        # live API surface — not that a freshly-bootstrapped watch instance's
+        # seed connectors are reachable, which depends on real network egress
+        # unrelated to this wiring (CI runners typically lack it). Watch's own
+        # readiness/connector-health logic has dedicated coverage elsewhere
+        # (test_runtime_summary_assembler.py, test_watch_connectors.py).
         workspaces = self.client.get("/api/workspaces").json()
         summary = self.client.get("/api/runtime/summary").json()
 

@@ -35,7 +35,7 @@ describe('buildAgentDockRuntimeChip', () => {
       },
     });
 
-    expect(chip.label).toBe('Cursor local');
+    expect(chip.label).toBe('Cursor');
     expect(chip.tone).toBe('ready');
     expect(chip.detail).toContain('CLI ready');
   });

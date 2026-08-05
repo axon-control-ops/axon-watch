@@ -1,7 +1,6 @@
 import { computed, onBeforeUnmount } from 'vue';
 
-import { postKairoConverse } from '../../lib/kairo-converse-client';
-import type { KairoConverseSubmissionIntent } from '../../lib/kairo-converse-client';
+import { postKairoConverse, type KairoConverseSubmissionIntent } from '../../lib/kairo-converse-client';
 import { parseChatUiAction } from '../../lib/chat-ui-action';
 import {
   handleKairoComposerHistoryKeydown,
@@ -175,11 +174,11 @@ export function useKairoConversation() {
     const submissionIntent = options?.submissionIntent ?? 'ask';
     lastOperatorPrompt = content;
     recordSharedKairoHistoryEntry(content);
-    // Ask is VAXON's executive consultation lane. Its quality must not depend
-    // on matching a particular question shape: only Mission may dispatch work.
-    const answerTier = pendingFiles.length || submissionIntent === 'ask'
-      ? 'deep'
-      : determineAnswerTier(content);
+    // Ask is VAXON's executive consultation lane. Only Dispatch may route work.
+    const answerTier =
+      pendingFiles.length || submissionIntent === 'ask'
+        ? 'deep'
+        : determineAnswerTier(content);
 
     pending.value = true;
     kairoConversationError.value = null;

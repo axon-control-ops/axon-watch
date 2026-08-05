@@ -13,6 +13,7 @@ class WriteWorkspaceFileRequest(BaseModel):
 
 class WorkspaceComposerPrefsRequest(BaseModel):
     cursor_cli_model: str | None = None
+    runtime_target: str | None = None
 
 
 class RenameWorkspaceFileRequest(BaseModel):
@@ -69,6 +70,7 @@ class CreateTerminalSessionRequest(BaseModel):
 class EnqueueAgentTerminalJobRequest(BaseModel):
     command: str
     run_id: str | None = None
+    source_workspace_id: str | None = None
     stream_to_chat: bool | None = None
     thread_id: str | None = None
     message_id: str | None = None

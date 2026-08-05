@@ -13,6 +13,7 @@ sys.path.insert(0, str(CONTROL_PLANE_ROOT))
 from app.workspace_agents.failure_detail import (  # noqa: E402
     is_agent_session_interrupted_failure,
     is_billing_block_failure,
+    is_billing_failure,
     is_operator_stopped_failure,
     is_restart_interrupted_failure,
     is_runtime_auth_failure,
@@ -62,6 +63,20 @@ class FailureDetailTests(unittest.TestCase):
         self.assertFalse(is_usage_limit_failure("ActionRequiredError"))
         self.assertFalse(is_usage_limit_failure("ActionRequiredError: Please accept the terms"))
         self.assertTrue(is_usage_limit_failure("ActionRequiredError: You're out of usage."))
+
+    def test_billing_failure_detected(self) -> None:
+        self.assertTrue(is_billing_failure("RuntimeError: Credit balance is too low"))
+        self.assertTrue(
+            is_billing_failure(
+                "ActionRequiredError: You have an unpaid invoice Visit "
+                "cursor.com/dashboard and pay your invoice in Stripe to resume requests."
+            )
+        )
+        self.assertFalse(is_billing_failure("verify:contracts — assertion failed"))
+        # Distinct from usage-limit / runtime-auth — billing failures are not
+        # covered by either of those checks, which was the original gap.
+        self.assertFalse(is_usage_limit_failure("Credit balance is too low"))
+        self.assertFalse(is_runtime_auth_failure("Credit balance is too low"))
 
     def test_billing_block_unpaid_invoice_detected(self) -> None:
         wrapped = (

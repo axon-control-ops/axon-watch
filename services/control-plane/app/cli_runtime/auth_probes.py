@@ -210,6 +210,46 @@ def cursor_auth_status(
     return probed
 
 
+def _probe_codex_cli(
+    binary: str,
+    env: dict[str, str],
+    *,
+    vault_posture: dict[str, Any],
+) -> StatusRecord | None:
+    """Run `codex login status`. Returns None only on a probe/timeout error."""
+    try:
+        proc = _run_command_with_timeout_retry([binary, "login", "status"], env=env)
+    except subprocess.TimeoutExpired:
+        return {
+            "logged_in": False,
+            "auth_method": "",
+            "provider_label": "Timed out",
+            "vault_posture": vault_posture.get("posture"),
+            "message": "Codex auth probe timed out. Run `codex login status` manually.",
+        }
+    except Exception:
+        return {
+            "logged_in": False,
+            "auth_method": "",
+            "provider_label": "Probe failed",
+            "vault_posture": vault_posture.get("posture"),
+            "message": "Codex auth probe failed. Run `codex login status` manually.",
+        }
+    raw = (proc.stdout or proc.stderr or "").strip()
+    lowered = raw.lower()
+    if proc.returncode != 0 or not raw:
+        return None
+    method = "chatgpt" if "chatgpt" in lowered else "oauth"
+    return {
+        "logged_in": True,
+        "auth_method": method,
+        "provider_label": "Codex",
+        "account_label": raw.splitlines()[0].strip(),
+        "vault_posture": "ready",
+        "message": "Authenticated with Codex CLI.",
+    }
+
+
 def codex_auth_status(
     binary: str,
     *,
@@ -219,68 +259,23 @@ def codex_auth_status(
 ) -> StatusRecord:
     runtime_env = probe_env or {**os.environ, **env_keys}
     vault_overlay = vault_auth_overlay("codex_local", vault_posture=vault_posture, env_keys=env_keys)
-    if not binary:
-        if vault_overlay:
-            return vault_overlay
-        return {
-            "logged_in": False,
-            "auth_method": "",
-            "provider_label": "Not installed",
-            "vault_posture": vault_posture.get("posture"),
-            "message": "Install Codex CLI to use the automation runtime.",
-        }
-
-    def _probe(env: dict[str, str]) -> StatusRecord:
-        try:
-            proc = _run_command_with_timeout_retry([binary, "login", "status"], env=env)
-        except subprocess.TimeoutExpired:
-            return {
-                "logged_in": False,
-                "auth_method": "",
-                "provider_label": "Timed out",
-                "vault_posture": vault_posture.get("posture"),
-                "message": "Codex auth probe timed out. Run `codex login status` manually.",
-            }
-        except Exception:
-            return {
-                "logged_in": False,
-                "auth_method": "",
-                "provider_label": "Probe failed",
-                "vault_posture": vault_posture.get("posture"),
-                "message": "Codex auth probe failed. Run `codex login status` manually.",
-            }
-        raw = (proc.stdout or proc.stderr or "").strip()
-        lowered = raw.lower()
-        if proc.returncode == 0 and raw:
-            method = "chatgpt" if "chatgpt" in lowered else "oauth"
-            return {
-                "logged_in": True,
-                "auth_method": method,
-                "provider_label": "Codex",
-                "account_label": raw.splitlines()[0].strip(),
-                "vault_posture": "ready",
-                "message": "Authenticated with Codex CLI.",
-            }
-        return {
-            "logged_in": False,
-            "auth_method": "",
-            "provider_label": "Not signed in",
-            "vault_posture": vault_posture.get("posture"),
-            "message": "Codex is installed but not signed in. Run `codex login` or unlock /vault.",
-        }
-
     has_api_key = bool(
-        runtime_env.get("CODEX_API_KEY", "").strip()
-        or runtime_env.get("OPENAI_API_KEY", "").strip()
+        runtime_env.get("CODEX_API_KEY", "").strip() or runtime_env.get("OPENAI_API_KEY", "").strip()
     )
-    if has_api_key:
-        key_source = "vault_api_key" if (
-            env_keys.get("CODEX_API_KEY") or env_keys.get("OPENAI_API_KEY")
-        ) else "api_key"
-        subscription_probe = _probe(env_without_api_keys(runtime_env, family="codex"))
-        if subscription_probe.get("logged_in"):
+
+    if has_api_key and binary:
+        # A logged-in ChatGPT/Codex subscription beats a vault/shell API key
+        # that may be invalid or out of credits — probe with the key stripped
+        # and prefer it if ready (mirrors claude_auth_status).
+        oauth_probe = _probe_codex_cli(
+            binary, env_without_api_keys(runtime_env, family="codex"), vault_posture=vault_posture
+        )
+        if oauth_probe and oauth_probe.get("logged_in"):
+            key_source = "vault_api_key" if (
+                env_keys.get("CODEX_API_KEY") or env_keys.get("OPENAI_API_KEY")
+            ) else "api_key"
             return {
-                **subscription_probe,
+                **oauth_probe,
                 "auth_method": "chatgpt",
                 "provider_label": "Codex / ChatGPT subscription",
                 "message": (
@@ -293,48 +288,18 @@ def codex_auth_status(
                 ),
             }
 
-    probed = _probe(runtime_env)
-    if probed.get("logged_in"):
-        return probed
     if has_api_key:
-        return {
-            "logged_in": True,
-            "auth_method": key_source,
-            "provider_label": "OpenAI API key",
-            "vault_posture": vault_posture.get("posture") if key_source == "vault_api_key" else "ready",
-            "message": "Authenticated via Codex/OpenAI API key"
-            + (" from vault." if key_source == "vault_api_key" else "."),
-        }
-    if vault_overlay and vault_posture.get("unlocked"):
-        return vault_overlay
-    return {
-        "logged_in": False,
-        "auth_method": "",
-        "provider_label": "Not signed in",
-        "vault_posture": vault_posture.get("posture"),
-        "message": "Codex is installed but not signed in. Run `codex login` or unlock /vault.",
-    }
-
-
-def claude_auth_status(
-    binary: str,
-    *,
-    vault_posture: dict[str, Any],
-    env_keys: dict[str, str],
-    probe_env: dict[str, str] | None = None,
-) -> StatusRecord:
-    runtime_env = probe_env or {**os.environ, **env_keys}
-    if runtime_env.get("ANTHROPIC_API_KEY", "").strip():
-        source = "vault_api_key" if env_keys.get("ANTHROPIC_API_KEY") else "api_key"
+        source = "vault_api_key" if (
+            env_keys.get("CODEX_API_KEY") or env_keys.get("OPENAI_API_KEY")
+        ) else "api_key"
         return {
             "logged_in": True,
             "auth_method": source,
-            "provider_label": "Anthropic API key",
+            "provider_label": "OpenAI API key",
             "vault_posture": vault_posture.get("posture") if source == "vault_api_key" else "ready",
-            "message": "Authenticated via ANTHROPIC_API_KEY"
+            "message": "Authenticated via Codex/OpenAI API key"
             + (" from vault." if source == "vault_api_key" else "."),
         }
-    vault_overlay = vault_auth_overlay("claude_local", vault_posture=vault_posture, env_keys=env_keys)
     if vault_overlay and vault_posture.get("unlocked") and not vault_overlay.get("logged_in"):
         if not binary:
             return vault_overlay
@@ -346,12 +311,33 @@ def claude_auth_status(
             "auth_method": "",
             "provider_label": "Not installed",
             "vault_posture": vault_posture.get("posture"),
-            "message": "Install Claude Code CLI to use the Claude runtime.",
+            "message": "Install Codex CLI to use the automation runtime.",
         }
+    probed = _probe_codex_cli(binary, runtime_env, vault_posture=vault_posture)
+    if probed and probed.get("logged_in"):
+        return probed
+    if vault_overlay and vault_posture.get("unlocked"):
+        return vault_overlay
+    return {
+        "logged_in": False,
+        "auth_method": "",
+        "provider_label": "Not signed in",
+        "vault_posture": vault_posture.get("posture"),
+        "message": "Codex is installed but not signed in. Run `codex login` or unlock /vault.",
+    }
+
+
+def _probe_claude_cli(
+    binary: str,
+    env: dict[str, str],
+    *,
+    vault_posture: dict[str, Any],
+) -> StatusRecord | None:
+    """Run `claude auth status --json`. Returns None only on a probe/timeout error."""
     try:
         proc = _run_command_with_timeout_retry(
             [binary, "auth", "status", "--json"],
-            env=runtime_env,
+            env=env,
         )
     except subprocess.TimeoutExpired:
         return {
@@ -381,23 +367,74 @@ def claude_auth_status(
     logged_in = bool(payload.get("loggedIn")) if payload else (
         proc.returncode == 0 and "logged in" in raw.lower()
     )
-    if logged_in:
-        email = str(payload.get("email") or "").strip()
-        org = str(payload.get("orgName") or "").strip()
-        auth_method = str(payload.get("authMethod") or "oauth").strip() or "oauth"
-        account = email or org or (raw.splitlines()[0].strip() if raw else "")
-        subscription = str(payload.get("subscriptionType") or "").strip()
-        message = "Authenticated with Claude Code CLI."
-        if subscription:
-            message = f"Authenticated with Claude {subscription} subscription."
+    if not logged_in:
+        return None
+    email = str(payload.get("email") or "").strip()
+    org = str(payload.get("orgName") or "").strip()
+    auth_method = str(payload.get("authMethod") or "oauth").strip() or "oauth"
+    account = email or org or (raw.splitlines()[0].strip() if raw else "")
+    subscription = str(payload.get("subscriptionType") or "").strip()
+    message = "Authenticated with Claude Code CLI."
+    if subscription:
+        message = f"Authenticated with Claude {subscription} subscription."
+    return {
+        "logged_in": True,
+        "auth_method": auth_method if auth_method != "claude.ai" else "oauth",
+        "provider_label": "Claude",
+        "account_label": account,
+        "vault_posture": "ready",
+        "message": message,
+    }
+
+
+def claude_auth_status(
+    binary: str,
+    *,
+    vault_posture: dict[str, Any],
+    env_keys: dict[str, str],
+    probe_env: dict[str, str] | None = None,
+) -> StatusRecord:
+    runtime_env = probe_env or {**os.environ, **env_keys}
+    vault_overlay = vault_auth_overlay("claude_local", vault_posture=vault_posture, env_keys=env_keys)
+    has_api_key = bool(runtime_env.get("ANTHROPIC_API_KEY", "").strip())
+
+    if has_api_key and binary:
+        # A logged-in subscription beats a vault/shell API key that may be
+        # out of credits — probe with the key stripped and prefer it if ready
+        # (mirrors cursor_auth_status; claude_dispatch_env only strips the key
+        # from the dispatch env when this reports auth_method oauth/claude.ai).
+        oauth_probe = _probe_claude_cli(
+            binary, env_without_api_keys(runtime_env, family="claude"), vault_posture=vault_posture
+        )
+        if oauth_probe and oauth_probe.get("logged_in"):
+            return oauth_probe
+
+    if has_api_key:
+        source = "vault_api_key" if env_keys.get("ANTHROPIC_API_KEY") else "api_key"
         return {
             "logged_in": True,
-            "auth_method": auth_method if auth_method != "claude.ai" else "oauth",
-            "provider_label": "Claude",
-            "account_label": account,
-            "vault_posture": "ready",
-            "message": message,
+            "auth_method": source,
+            "provider_label": "Anthropic API key",
+            "vault_posture": vault_posture.get("posture") if source == "vault_api_key" else "ready",
+            "message": "Authenticated via ANTHROPIC_API_KEY"
+            + (" from vault." if source == "vault_api_key" else "."),
         }
+    if vault_overlay and vault_posture.get("unlocked") and not vault_overlay.get("logged_in"):
+        if not binary:
+            return vault_overlay
+    if not binary:
+        if vault_overlay:
+            return vault_overlay
+        return {
+            "logged_in": False,
+            "auth_method": "",
+            "provider_label": "Not installed",
+            "vault_posture": vault_posture.get("posture"),
+            "message": "Install Claude Code CLI to use the Claude runtime.",
+        }
+    probed = _probe_claude_cli(binary, runtime_env, vault_posture=vault_posture)
+    if probed and probed.get("logged_in"):
+        return probed
     if vault_overlay and vault_posture.get("unlocked"):
         return vault_overlay
     return {

@@ -50,6 +50,18 @@ class AgentTerminalJobsTests(unittest.TestCase):
         self.assertFalse(job.get("stream_to_chat"))
         self.assertEqual(1, len(list_agent_terminal_jobs("workspace_axon_watch")))
 
+    def test_enqueue_rejects_foreign_dashpro_ship_command(self) -> None:
+        from app.terminal.agent_jobs import enqueue_agent_terminal_job
+        from app.terminal.ship_command_guards import ShipCommandGuardError
+
+        with self.assertRaises(ShipCommandGuardError):
+            enqueue_agent_terminal_job(
+                workspace_id="workspace_dashpro",
+                source_workspace_id="workspace_young_eagles_day_care",
+                command="npm run ota:canary",
+                run_id="run_foreign_ship",
+            )
+
     def test_stream_to_chat_tees_pty_chunks_into_open_fence(self) -> None:
         from app.persistence import chat_store
         from app.terminal.active_chat_stream import register_active_chat_stream

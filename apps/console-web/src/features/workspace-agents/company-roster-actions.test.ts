@@ -143,7 +143,11 @@ describe('company-roster-actions', () => {
     expect(employeeRetryDraft(failed)).toMatch(/My last continuous shift on .+ failed/);
     expect(employeeRetryDraft(failed)).not.toMatch(/^I am /);
     expect(employeeRetryDraft(failed)).toContain('vitest: assertion failed');
-    expect(employeeRetryDraft(failed).toLowerCase()).toContain('first person');
+    // First-person/persona voice steering is injected server-side by
+    // employee_persona_prompt.py for every employee dispatch — it must not be
+    // duplicated into this operator-visible, persisted retry message.
+    expect(employeeRetryDraft(failed).toLowerCase()).not.toContain('first person');
+    expect(employeeRetryDraft(failed)).not.toContain('acting as');
     expect(employeeChatDraft(failed, 'retry')).toBe(employeeRetryDraft(failed));
 
     expect(employeeReceiptsDraft(failed)).toContain('run_failed_abc123');

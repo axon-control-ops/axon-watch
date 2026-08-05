@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import logging
-import os
 from collections.abc import Callable
 from pathlib import Path
 
@@ -16,13 +15,14 @@ from app.cli_runtime.catalog import runtime_status_snapshot
 from app.cli_runtime.codex_models import default_codex_model
 from app.cli_runtime.mcp_registry import mcp_tools_for_composer_mode
 from app.cli_runtime.non_cursor_dispatch import run_non_cursor_local
-from app.cli_runtime.recovery import ordered_runtime_candidates
+from app.cli_runtime.runtime_candidates import effective_cli_model, ordered_candidates_for_dispatch
 from app.cli_runtime.runtime_failure import (
     fallback_reply as _fallback_reply,
     runtime_unready_reason as _runtime_unready_reason,
 )
 from app.cli_runtime.sentry_context import sentry_monitor_context
 from app.cli_runtime.subprocess_runner import RuntimeProcessStoppedError
+from app.cli_runtime.sandbox_policy_adapter import prepare_execution_sandbox
 from app.cli_runtime.cursor_agent import (
     CursorAgentReply,
     run_cursor_local,
@@ -48,6 +48,7 @@ from app.cli_runtime.plan_system_prompt import (
     build_plan_system_prompt,
 )
 from app.workspace_agents.critical_review_clause import append_critical_review_clause
+from app.workspace_agents.execution_policy import AgentExecutionPolicy
 from app.research.availability import format_capability_line, research_capability_snapshot
 from app.persistence.operator_presence_settings_store import load_settings
 from app.runs.service import RunNotFoundError, get_run
@@ -131,9 +132,9 @@ def _system_prompt(
                 "Built-in webSearch/webFetch are unavailable in this headless runtime. "
             )
         return append_critical_review_clause(
-            "You are Axon-X Lane B in Agent mode with Full Access. Tool execution is "
-            "allowed: edit files and run commands inside the Project root shown in "
-            "workspace context as needed to complete the request now. Use "
+            "You are Axon-X Lane B in Agent mode with approved execution access. "
+            "Use only the paths and audited commands available in this run. Edit files "
+            "inside the Project root shown in workspace context as needed. Use "
             "workspace-relative paths such as README.md — never edit Cursor metadata "
             "directories. Do the work first, then reply with a short summary "
             f"of what changed. {ask_fence_instruction()}"
@@ -189,23 +190,6 @@ def _cloud_runtime_message(record: dict[str, object]) -> str:
         f"{label} is configured in the catalog, but its execution adapter has not landed yet. "
         "Use the local runtime target or switch the default runtime back to a local CLI."
     )
-def _effective_cli_model(family: str, runtime_model: str) -> str:
-    normalized = str(runtime_model or "").strip()
-    if not normalized or normalized.lower() == "auto":
-        # Codex does not provide Cursor-style Auto routing.  Its config may
-        # contain an obsolete model id, so use the account catalog below.
-        if family == "codex":
-            return ""
-        if family == "cursor":
-            env_key = "AXON_WATCH_CURSOR_MODEL"
-        elif family == "claude":
-            env_key = "AXON_WATCH_CLAUDE_MODEL"
-        else:
-            env_key = "AXON_WATCH_CODEX_MODEL"
-        normalized = str(os.environ.get(env_key, "")).strip()
-    if normalized.lower() == "auto":
-        return ""
-    return normalized
 
 
 def _split_codex_model_selection(model: str) -> tuple[str, str]:
@@ -215,26 +199,6 @@ def _split_codex_model_selection(model: str) -> tuple[str, str]:
     if marker and model_id and effort in {"low", "medium", "high", "xhigh"}:
         return model_id, effort
     return selected, ""
-
-
-def _ordered_candidates_for_dispatch(
-    snapshot: dict[str, object],
-    runtime_target: str | None,
-) -> list[dict[str, object]]:
-    candidates = ordered_runtime_candidates(snapshot)
-    preferred = str(runtime_target or "").strip()
-    if not preferred:
-        return candidates
-    by_id = {str(record.get("id") or ""): record for record in candidates}
-    selected = by_id.get(preferred)
-    if not selected:
-        return candidates
-    ordered = [selected]
-    for record in candidates:
-        runtime_id = str(record.get("id") or "")
-        if runtime_id and runtime_id != preferred:
-            ordered.append(record)
-    return ordered
 
 
 def _run_phase(run_id: str) -> str | None:
@@ -272,6 +236,7 @@ def dispatch_ide_composer(
     on_chunk: Callable[[str, str], None] | None = None,
     cursor_trust_policy: str = "operator",
     workspace_root: Path | None = None,
+    execution_policy: AgentExecutionPolicy | None = None,
 ) -> dict[str, object]:
     def _finish(payload: dict[str, object]) -> dict[str, object]:
         return _attach_dispatch_metadata(payload, composer_mode=composer_mode)
@@ -320,8 +285,15 @@ def dispatch_ide_composer(
     errors: list[str] = []
     ready_run_errors: list[str] = []
     last_ready_runtime_label = ""
+    ordered_candidates = ordered_candidates_for_dispatch(snapshot, runtime_target)
+    # The model pin travels with the family it was chosen for. Candidates are
+    # already ordered preferred-first, so the first candidate's family is the
+    # one `runtime_model` was picked against — carrying it into a fallback of
+    # a *different* family (e.g. a Cursor model id sent to the Codex CLI) is
+    # what broke fallback dispatch; scope it to same-family candidates only.
+    preferred_family = str(ordered_candidates[0].get("family") or "") if ordered_candidates else ""
 
-    for record in _ordered_candidates_for_dispatch(snapshot, runtime_target):
+    for record in ordered_candidates:
         runtime_id = str(record.get("id") or "")
         if not record.get("ready"):
             errors.append(_runtime_unready_reason(record))
@@ -329,7 +301,8 @@ def dispatch_ide_composer(
         binary = str(record.get("binary") or "")
         family = str(record.get("family") or "")
         target_type = str(record.get("target_type") or "local")
-        model = _effective_cli_model(family, str(runtime_model or ""))
+        candidate_runtime_model = runtime_model if family == preferred_family else ""
+        model = effective_cli_model(family, str(candidate_runtime_model or ""))
         reasoning_effort = ""
         runtime_label = str(record.get("label") or runtime_id)
         dispatch_env = subprocess_env
@@ -351,6 +324,14 @@ def dispatch_ide_composer(
             )
             if not model:
                 model = default_codex_model(binary, env=dispatch_env)
+        dispatch_env, sandbox_policy = prepare_execution_sandbox(
+            execution_policy,
+            family=family,
+            runtime_binary=binary,
+            env=dispatch_env,
+            workspace_id=workspace_id,
+            run_id=run_id,
+        )
         try:
             if target_type == "cloud":
                 raise RuntimeError(_cloud_runtime_message(record))
@@ -368,6 +349,7 @@ def dispatch_ide_composer(
                     run_id=run_id,
                     on_chunk=on_chunk,
                     trust_policy=cursor_trust_policy,
+                    sandbox_policy=sandbox_policy,
                 )
                 content = _cursor_reply_content(cursor_reply, approval_notice)
                 return _finish({
@@ -393,6 +375,7 @@ def dispatch_ide_composer(
                     run_id=run_id,
                     on_chunk=on_chunk,
                     approval_notice=approval_notice,
+                    sandbox_policy=sandbox_policy,
                 )
                 return _finish({
                     "content": content,
@@ -446,6 +429,7 @@ def dispatch_ide_composer(
                                 run_id=run_id,
                                 on_chunk=on_chunk,
                                 trust_policy=cursor_trust_policy,
+                                sandbox_policy=sandbox_policy,
                             )
                             content = _cursor_reply_content(cursor_reply, approval_notice)
                         else:
@@ -462,6 +446,7 @@ def dispatch_ide_composer(
                                 run_id=run_id,
                                 on_chunk=on_chunk,
                                 approval_notice=approval_notice,
+                                sandbox_policy=sandbox_policy,
                             )
                         payload = {
                             "content": content,

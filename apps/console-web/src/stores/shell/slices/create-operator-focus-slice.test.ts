@@ -257,4 +257,35 @@ describe('focusLiveOperations', () => {
     expect(expandedDockSeams.value.has('thread')).toBe(true);
     expect(setDockHeroMode).not.toHaveBeenCalled();
   });
+
+  it('never collapses Live Ops when briefing focus is requested', () => {
+    const expandedDockSeams = ref(new Set<string>(['thread']));
+    const dockThreadSeamTouched = ref(false);
+    const layoutMode = ref<'ide' | 'operator'>('operator');
+    const slice = createOperatorFocusSlice({
+      layoutMode,
+      operatorBriefing: ref(null),
+      highlightedSignalId: ref(null),
+      ideAttentionPanelOpen: ref(false),
+      ideBriefingPanelOpen: ref(false),
+      ideExplorerCollapsed: ref(false),
+      signalsSeamEmphasized: ref(false),
+      missionControlEmphasized: ref(false),
+      connectorsEmphasized: ref(false),
+      briefingSeamEmphasized: ref(false),
+      operatorCenterView: ref('grid'),
+      dockHeroMode: ref('command'),
+      expandedDockSeams,
+      dockThreadSeamTouched,
+      setDockHeroMode: vi.fn(),
+      restoreComposerDraft: vi.fn(),
+      setLayoutMode: vi.fn(),
+      setCurrentWorkspace: vi.fn(),
+    } as unknown as Parameters<typeof createOperatorFocusSlice>[0]);
+
+    slice.focusKairoBriefing();
+
+    expect(expandedDockSeams.value.has('thread')).toBe(true);
+    expect(dockThreadSeamTouched.value).toBe(false);
+  });
 });

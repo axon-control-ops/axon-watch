@@ -3,6 +3,7 @@ import { computed, toValue, type MaybeRef } from 'vue';
 import { MODE_OPTIONS, type ComposerMode } from './use-composer-menus';
 import type { AgentDockComposerAttachmentChip } from '../../components/ide/agent-dock/agent-dock-composer-toolbar-types';
 import type { ComposerMcpTool } from '../../lib/composer-mcp-tools-view';
+import type { ClaudeCatalogRow } from '../../lib/claude-catalog-view';
 import type { CursorCatalogRow } from '../../lib/cursor-catalog-view';
 import type { AgentDockComposerRuntimeTarget } from '../../components/ide/agent-dock/agent-dock-composer-toolbar-types';
 
@@ -18,6 +19,10 @@ export type AgentDockComposerToolbarSource = {
   showRuntimeTargetsPanel: MaybeRef<boolean>;
   showAddModelsEntry: MaybeRef<boolean>;
   showExtraPinnedRows: MaybeRef<boolean>;
+  showModelCatalog: MaybeRef<boolean>;
+  isClaudeCatalog: MaybeRef<boolean>;
+  claudeFlatRows: MaybeRef<ClaudeCatalogRow[]>;
+  showFallbackCatalogNote: MaybeRef<boolean>;
   showCursorCatalog: MaybeRef<boolean>;
   showCodexCatalog: MaybeRef<boolean>;
   showVaultAction: MaybeRef<boolean>;
@@ -44,6 +49,7 @@ export type AgentDockComposerToolbarSource = {
   hasTerminalSnippet: MaybeRef<boolean>;
   selectionChipLabel: MaybeRef<string>;
   runtimeDetail: MaybeRef<string>;
+  runtimeFamilyLabel: MaybeRef<string>;
   runtimeLabel: MaybeRef<string>;
   selectedRuntimeSummary: MaybeRef<string>;
   runtimeTargets: MaybeRef<AgentDockComposerRuntimeTarget[]>;
@@ -59,6 +65,9 @@ export type AgentDockComposerToolbarSource = {
   cursorStaleWarning: MaybeRef<string | null>;
   cursorManageRows: MaybeRef<CursorCatalogRow[]>;
   cursorCatalogCount: MaybeRef<string>;
+  modelCatalogLoading: MaybeRef<boolean>;
+  modelCatalogLoadingLabel: MaybeRef<string>;
+  modelCatalogErrorMessage: MaybeRef<string>;
   codexCatalogRows: MaybeRef<CursorCatalogRow[]>;
   codexCatalogStatus: MaybeRef<string>;
   modelSearchQuery: MaybeRef<string>;
@@ -79,6 +88,10 @@ export function useAgentDockComposerToolbarProps(
     showRuntimeTargetsPanel: toValue(composer.showRuntimeTargetsPanel),
     showAddModelsEntry: toValue(composer.showAddModelsEntry),
     showExtraPinnedRows: toValue(composer.showExtraPinnedRows),
+    showModelCatalog: toValue(composer.showModelCatalog),
+    isClaudeCatalog: toValue(composer.isClaudeCatalog),
+    claudeFlatRows: toValue(composer.claudeFlatRows),
+    showFallbackCatalogNote: toValue(composer.showFallbackCatalogNote),
     showCursorCatalog: toValue(composer.showCursorCatalog),
     showCodexCatalog: toValue(composer.showCodexCatalog),
     showVaultAction: toValue(composer.showVaultAction),
@@ -105,6 +118,7 @@ export function useAgentDockComposerToolbarProps(
     hasTerminalSnippet: toValue(composer.hasTerminalSnippet),
     selectionChipLabel: toValue(composer.selectionChipLabel),
     runtimeDetail: toValue(composer.runtimeDetail),
+    runtimeFamilyLabel: toValue(composer.runtimeFamilyLabel),
     runtimeLabel: toValue(composer.runtimeLabel),
     selectedRuntimeSummary: toValue(composer.selectedRuntimeSummary),
     runtimeTargets: toValue(composer.runtimeTargets),
@@ -120,6 +134,9 @@ export function useAgentDockComposerToolbarProps(
     cursorStaleWarning: toValue(composer.cursorStaleWarning) ?? '',
     cursorManageRows: toValue(composer.cursorManageRows),
     cursorCatalogCount: toValue(composer.cursorCatalogCount),
+    modelCatalogLoading: toValue(composer.modelCatalogLoading),
+    modelCatalogLoadingLabel: toValue(composer.modelCatalogLoadingLabel),
+    modelCatalogErrorMessage: toValue(composer.modelCatalogErrorMessage),
     codexCatalogRows: toValue(composer.codexCatalogRows),
     codexCatalogStatus: toValue(composer.codexCatalogStatus),
     modelSearchQuery: toValue(composer.modelSearchQuery),

@@ -13,6 +13,7 @@ const props = defineProps<{
   pending: boolean;
   micLive: boolean;
   micSupported: boolean;
+  privacyBlocked?: boolean;
   focusedWorkspaceLabel: string | null;
 }>();
 
@@ -22,20 +23,23 @@ const emit = defineEmits<{
 }>();
 
 const draft = ref('');
-// Conversation is the safe default. Dispatching work is a deliberate choice
-// made after VAXON and the operator have agreed the mission.
+// Ask is the safe default. Dispatch is a deliberate choice after the mission is clear.
 const mode = ref<VaxonExecutiveComposerMode>('ask');
 const expanded = ref(false);
 const composerInput = ref<HTMLTextAreaElement | null>(null);
 
 const placeholder = computed(() =>
-  mode.value === 'mission'
+  mode.value === 'dispatch'
     ? 'State the objective, success criteria, constraints, or deliverables…'
     : `Ask ${OPERATOR_PERSONA_NAME} for analysis, status, or a recommendation…`,
 );
 
 const submitLabel = computed(() =>
-  mode.value === 'mission' ? 'Dispatch mission' : `Ask ${OPERATOR_PERSONA_NAME}`,
+  mode.value === 'dispatch' ? 'Dispatch' : `Ask ${OPERATOR_PERSONA_NAME}`,
+);
+
+const micDisabled = computed(
+  () => !props.micSupported || props.pending || Boolean(props.privacyBlocked),
 );
 
 function submit(content?: string, modeValue = mode.value): void {
@@ -72,7 +76,11 @@ function handleKeydown(event: KeyboardEvent): void {
 </script>
 
 <template>
-  <div class="mc-live-ops__reply" :class="{ 'mc-live-ops__reply--expanded': expanded }">
+  <div
+    class="mc-live-ops__reply"
+    data-vaxon-composer-reply="true"
+    :class="{ 'mc-live-ops__reply--expanded': expanded }"
+  >
     <form class="mc-live-ops__reply-form" @submit.prevent="submit()">
       <div class="mc-exec-composer__input-row">
         <span class="mc-exec-composer__mark" aria-hidden="true">V</span>
@@ -83,20 +91,22 @@ function handleKeydown(event: KeyboardEvent): void {
           autocomplete="off"
           :placeholder="placeholder"
           :disabled="pending"
-          :aria-label="`${OPERATOR_PERSONA_NAME} mission or question input`"
+          :aria-label="`${OPERATOR_PERSONA_NAME} ask or dispatch input`"
           @keydown="handleKeydown"
         />
         <button
           type="button"
           class="mc-live-ops__mic"
           :data-live="micLive ? 'true' : 'false'"
-          :disabled="!micSupported || pending"
+          :disabled="micDisabled"
           :title="micLive ? 'Stop listening' : 'Speak executive intent'"
           :aria-pressed="micLive"
           @click="emit('toggleMic')"
         >
           <span aria-hidden="true">{{ micLive ? '●' : '◌' }}</span>
-          <span class="mc-exec-composer__sr-only">{{ micLive ? 'Stop listening' : 'Speak executive intent' }}</span>
+          <span class="mc-exec-composer__sr-only">
+            {{ micLive ? 'Stop listening' : 'Speak executive intent' }}
+          </span>
         </button>
         <button type="submit" class="mc-live-ops__send" :disabled="pending || !draft.trim()">
           <span class="mc-exec-composer__send-label">{{ pending ? 'Working…' : submitLabel }}</span>
@@ -120,12 +130,12 @@ function handleKeydown(event: KeyboardEvent): void {
         <button
           type="button"
           class="mc-exec-composer__mode"
-          :data-active="mode === 'mission' ? 'true' : 'false'"
+          :data-active="mode === 'dispatch' ? 'true' : 'false'"
           :disabled="pending"
           title="Dispatch a mission for specialist routing"
-          @click="selectMode('mission')"
+          @click="selectMode('dispatch')"
         >
-          Mission
+          Dispatch
         </button>
       </div>
       <span class="mc-exec-composer__context-copy">
