@@ -254,10 +254,10 @@ def adapt_lane_b_system_prompt_for_employee(
 
     adapted = str(system_prompt or "")
     adapted = adapted.replace(
-        "You are Axon-X Lane B in Agent mode with Full Access.",
+        "You are Axon-X Lane B in Agent mode with approved execution access.",
         (
             "You are the named employee in the Employee persona block "
-            "(Axon-X tooling with Full Access). Reply in first person as that employee."
+            "(Axon-X tooling with approved execution access). Reply in first person as that employee."
         ),
     )
     adapted = adapted.replace(

@@ -56,7 +56,7 @@ def _env_bool(name: str, default: bool) -> bool:
     return value.strip().lower() in {"1", "true", "yes", "on"}
 
 
-def default_watch_probe(timeout_seconds: float = 0.5) -> tuple[bool, str, str | None, str]:
+def default_watch_probe(timeout_seconds: float = 3.0) -> tuple[bool, str, str | None, str]:
     """Probe watch readiness and return connected, status, degraded_reason, last_summary_at.
 
     Uses /internal/watch/readiness rather than /internal/watch/health: health
@@ -65,6 +65,11 @@ def default_watch_probe(timeout_seconds: float = 0.5) -> tuple[bool, str, str | 
     Readiness's own top-level "status" field is likewise a fixed literal, so
     the real signal is dependencies.connectors_required_unavailable — a
     required connector actually being down.
+
+    Readiness does real connector probing under the hood (unlike health's
+    instant liveness ping), so it needs a longer budget — measured ~1s for 6
+    connectors on a cold ephemeral instance; the old 0.5s health-check-era
+    timeout falsely reported "not connected" under normal readiness latency.
     """
     generated_at = _utc_now_iso()
     url = f"{_watch_base_url()}/internal/watch/readiness"
