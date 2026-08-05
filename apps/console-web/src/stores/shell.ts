@@ -1410,21 +1410,21 @@ export const useShellStore = defineStore('shell', () => {
       ideAgentRunId.value = getWorkspaceStreamUi(threadId).ideAgentRunId;
     }
 
-    if (forceRefresh) {
-      const nextCache = { ...workspaceIdeThreadMessagesById.value };
-      delete nextCache[threadId];
-      workspaceIdeThreadMessagesById.value = nextCache;
-    } else {
-      const cached = workspaceIdeThreadMessagesById.value[threadId];
-      if (cached?.length) {
-        threadMessages.value = cached;
-        commandMutationState.value = 'idle';
-        commandMutationError.value = null;
+    // Continuous-worker / fan-out writes teammate threads out-of-band, so the
+    // cache can be stale — forceRefresh always re-fetches in the background.
+    // It must not evict/blank the cache first though: that turned every
+    // teammate-tab switch into a flash-to-empty-then-reload. Keep showing the
+    // stale transcript (like hydrateWorkspaceIdeChatImpl's initial-load path)
+    // until loadWorkspaceThread's applyLoadedWorkspaceThread lands fresh data.
+    const cached = workspaceIdeThreadMessagesById.value[threadId];
+    if (cached?.length) {
+      threadMessages.value = cached;
+      commandMutationState.value = 'idle';
+      commandMutationError.value = null;
+      if (!forceRefresh) {
         return;
       }
-    }
-
-    if (layoutMode.value === 'ide') {
+    } else if (layoutMode.value === 'ide') {
       threadMessages.value = [];
       commandMutationState.value = 'idle';
       commandMutationError.value = null;
