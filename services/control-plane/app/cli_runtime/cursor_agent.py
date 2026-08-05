@@ -9,7 +9,10 @@ from pathlib import Path
 import time
 
 from app.cli_runtime.cursor_stream_events import CursorStreamAssembler
-from app.cli_runtime.research_mcp import ensure_workspace_research_mcp
+from app.cli_runtime.research_mcp import (
+    ensure_workspace_research_mcp,
+    remove_workspace_research_mcp,
+)
 from app.research.availability import research_capability_snapshot
 from app.cli_runtime.subprocess_runner import (
     RuntimeProcessStoppedError,
@@ -225,6 +228,10 @@ def run_cursor_local_with_recursion_retry(
             workspace_id,
             (time.perf_counter() - started) * 1000,
         )
+        # research_available=False below only skips *writing* a fresh config —
+        # the crashing server's entry from the first attempt is still on disk
+        # and Cursor CLI would load it again from the project's own mcp.json.
+        remove_workspace_research_mcp(workspace_root)
         return run_cursor_local(
             binary=binary,
             prompt=prompt,
