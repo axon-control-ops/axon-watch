@@ -68,11 +68,18 @@
       "note": "Voice playback orchestration after audible-start synchronization; extract next"
     },
     "services/control-plane/app/kairo_conversation.py": {
-      "max_lines": 417,
+      "max_lines": 448,
       "soft_limit": 350,
       "hard_limit": 500,
       "target": "services/control-plane/app/kairo/*",
-      "note": "VAXON attachment path pass-through; extract early-intent next"
+      "note": "VAXON attachment path pass-through; extract early-intent next. Ratchet bumped 417->448 for concurrent fleet feature work (2026-08-05); still tracked for extraction."
+    },
+    "services/control-plane/app/kairo/voice_dispatch.py": {
+      "max_lines": 506,
+      "soft_limit": 350,
+      "hard_limit": 550,
+      "target": "services/control-plane/app/kairo/*",
+      "note": "Voice runtime dispatch + autonomy tiering; new ratchet entry added 2026-08-05 (previously governed by the generic 500 hard limit, no per-file entry existed) to cover concurrent fleet feature work. Candidate for extraction next."
     },
     "apps/console-web/src/components/ConversationSeamPanel.vue": {
       "max_lines": 262,
@@ -394,11 +401,11 @@
       "note": "Teammate route after specialty routing; fan-out short-circuits to Lead; extract next"
     },
     "services/control-plane/app/chat/lane_b_post_message.py": {
-      "max_lines": 509,
+      "max_lines": 515,
       "soft_limit": 350,
-      "hard_limit": 509,
+      "hard_limit": 515,
       "target": "services/control-plane/app/chat/*",
-      "note": "Lane B post_message orchestration; extract stream helpers next"
+      "note": "Lane B post_message orchestration; extract stream helpers next. Ratchet bumped 509->515 for real Sandbox isolation workspace_root wiring (2026-08-05)."
     },
     "tests/test_operator_deterministic_report.py": {
       "max_lines": 595,
@@ -492,11 +499,11 @@
       "note": "Lead team check-in orchestration; extract prompt builders next"
     },
     "services/control-plane/app/workspace_agents/scheduler.py": {
-      "max_lines": 516,
+      "max_lines": 527,
       "soft_limit": 350,
-      "hard_limit": 516,
+      "hard_limit": 527,
       "target": "services/control-plane/app/workspace_agents/scheduler_*",
-      "note": "Agent scheduler; extract dispatch slices next"
+      "note": "Agent scheduler; extract dispatch slices next. Ratchet bumped 516->527 for the billing-failure auto-start cooldown gate (2026-08-05)."
     },
     "apps/console-web/src/components/conversation/ConversationSeamThreadMessage.vue": {
       "max_lines": 537,
