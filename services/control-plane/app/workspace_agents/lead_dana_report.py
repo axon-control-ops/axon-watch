@@ -124,7 +124,6 @@ def build_lead_synthesis_dana_message(
             "3) I will keep holding cross-team decisions until you engage.",
             "",
             "Ask me anything about this rollup — I stay with you conversationally.",
-            "Confidence: 8/10",
         ]
     )
     return "\n".join(lines).rstrip() + "\n"

@@ -107,12 +107,10 @@ class LeadDecomposeFastPathTests(unittest.TestCase):
         agent = next(row for row in saved if row["role"] == "agent")
         self.assertIn("decomposed the work", agent["content"])
         self.assertIn(":::lead-fan-out", agent["content"])
-        self.assertIn("Confidence: 8/10", agent["content"])
         self.assertIn("frontend", agent["content"])
         self.assertIn("backend", agent["content"])
         self.assertIn("frontend:", agent["content"].lower())
         self.assertIn("Fleet:", agent["content"])
-        self.assertIn("Confidence: 8/10", agent["content"])
         self.assertEqual("run_lead_handoff", agent["run_id"])
 
     def test_skips_assign_all_intent(self) -> None:
