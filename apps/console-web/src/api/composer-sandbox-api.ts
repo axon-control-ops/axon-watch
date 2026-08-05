@@ -1,0 +1,47 @@
+import { fetchJson } from './client';
+
+/**
+ * Real per-workspace disposable isolation for the Agent Dock composer's
+ * Sandbox toggle — distinct from `/api/safe-improvement/session`, which
+ * gates the separate safe-improvement proposal pipeline and never affected
+ * where composer messages actually dispatched.
+ */
+export type ComposerSandboxStatus = {
+  enabled: boolean;
+  session_enabled: boolean;
+  env_forced: boolean;
+  source: 'off' | 'session' | 'env' | string;
+};
+
+export async function fetchComposerSandboxStatus(
+  workspaceId: string,
+): Promise<ComposerSandboxStatus> {
+  const encoded = encodeURIComponent(workspaceId);
+  return fetchJson<ComposerSandboxStatus>(
+    `/api/workspaces/${encoded}/sandbox`,
+    {},
+    'sandbox session status request failed',
+  );
+}
+
+export async function enableComposerSandbox(
+  workspaceId: string,
+): Promise<ComposerSandboxStatus> {
+  const encoded = encodeURIComponent(workspaceId);
+  return fetchJson<ComposerSandboxStatus>(
+    `/api/workspaces/${encoded}/sandbox/enable`,
+    { method: 'POST' },
+    'enable sandbox session failed',
+  );
+}
+
+export async function disableComposerSandbox(
+  workspaceId: string,
+): Promise<ComposerSandboxStatus> {
+  const encoded = encodeURIComponent(workspaceId);
+  return fetchJson<ComposerSandboxStatus>(
+    `/api/workspaces/${encoded}/sandbox/disable`,
+    { method: 'POST' },
+    'disable sandbox session failed',
+  );
+}

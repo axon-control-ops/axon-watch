@@ -189,6 +189,15 @@ def evaluate_hook_payload(
         return _deny("malformed shell quoting")
     if not tokens:
         return _deny("empty shell command")
+    if any(
+        token.startswith("/")
+        or token == ".."
+        or token.startswith("../")
+        or "/../" in token
+        or token.endswith("/..")
+        for token in tokens[1:]
+    ):
+        return _deny("absolute paths and parent traversal are not allowed")
 
     executable_token = tokens[0]
     executable = os.path.basename(executable_token).lower()

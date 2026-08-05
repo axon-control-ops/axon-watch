@@ -106,6 +106,31 @@ def is_runtime_auth_failure(detail: str | None) -> bool:
     return any(marker in hay for marker in _RUNTIME_AUTH_MARKERS)
 
 
+_BILLING_FAILURE_MARKERS = (
+    "credit balance is too low",
+    "unpaid invoice",
+    "pay your invoice",
+    "insufficient credit",
+    "insufficient funds",
+    "payment required",
+    "billing issue",
+    "billing error",
+)
+
+
+def is_billing_failure(detail: str | None) -> bool:
+    """True when the runtime rejected the request for a billing/credits reason.
+
+    Distinct from is_usage_limit_failure: usage limits reset on their own and
+    are worth soft-open probing (see scheduler_auto_start_gates); a billing
+    block needs the account fixed, so retrying every scheduler tick just
+    burns time re-hitting the same wall. Not something the CLI auth probes
+    catch either (the CLI is authenticated — the account is broke).
+    """
+    hay = f"{detail or ''} {normalize_operator_failure_detail(detail)}".lower()
+    return any(marker in hay for marker in _BILLING_FAILURE_MARKERS)
+
+
 _RESTART_INTERRUPT_MARKERS = (
     "run interrupted by control-plane restart",
     "run cancelled after control-plane restart",

@@ -327,12 +327,8 @@ import { createWorkspaceStreamUiSlice } from './shell/slices/create-workspace-st
 import { createSignalHandoffSlice } from './shell/slices/create-signal-handoff-slice';
 import { createVoiceOrbPlacementController } from './shell/slices/create-voice-orb-placement-slice';
 import {
-  DEFAULT_DOCK_CONTEXT,
-  DEFAULT_EDITOR_TABS,
   hydrateWorkspaceSurfaceThreadIds,
   type BriefingLoadState,
-  type DockContextDescriptor,
-  type EditorTabDescriptor,
   type InboxLoadState,
   type LayoutMode,
   type RunMutationState,
@@ -496,9 +492,6 @@ export const useShellStore = defineStore('shell', () => {
   const fileSaveState = ref<'idle' | 'saving'>('idle');
   const fileSaveError = ref<string | null>(null);
 
-  // UI shell scaffolding is local and intentionally placeholder-only.
-  const editorTabs = ref<EditorTabDescriptor[]>(DEFAULT_EDITOR_TABS);
-  const activeEditorTabId = ref<string>(DEFAULT_EDITOR_TABS[0].id);
   const activeEditorDocumentId = ref<string>('file:README.md');
   const activeWorkspaceFilePath = computed(() => {
     const path = filePathFromDocumentId(activeEditorDocumentId.value);
@@ -511,7 +504,6 @@ export const useShellStore = defineStore('shell', () => {
   const openIdeThreadIdsByWorkspaceId = ref<Record<string, string[]>>(
     readOpenIdeThreadIdsByWorkspace(),
   );
-  const dockContext = ref<DockContextDescriptor>(DEFAULT_DOCK_CONTEXT);
   const expandedDockSeams = ref<Set<DockSeamId>>(new Set());
   const dockThreadSeamTouched = ref(false);
   const briefingSeamEmphasized = ref(false);
@@ -2573,10 +2565,6 @@ export const useShellStore = defineStore('shell', () => {
     editorSelection.value = selection;
   }
 
-  function setActiveEditorTab(id: string): void {
-    activeEditorTabId.value = id;
-  }
-
   function migrateMarkdownAgentReviewDraft(id: string): boolean {
     if (!isAgentEditReviewDocumentId(id)) {
       return false;
@@ -3704,7 +3692,6 @@ export const useShellStore = defineStore('shell', () => {
   }
 
   return {
-    activeEditorTabId,
     activeEditorDocument,
     activeEditorDocumentId,
     editorSelection,
@@ -3757,11 +3744,9 @@ export const useShellStore = defineStore('shell', () => {
     cursorCatalogRows,
     cursorPickerVisibleModelIds,
     cursorRuntimeStatus,
-    dockContext,
     dockHeroMode,
     dockSeamLayout,
     dockSeamState,
-    editorTabs,
     inboxError,
     ideAgentLinkedRun,
     ideAgentRunId,
@@ -3949,7 +3934,6 @@ export const useShellStore = defineStore('shell', () => {
     renameActiveWorkspaceFile,
     closeEditorDocument,
     revealEditorLine,
-    setActiveEditorTab,
     setActiveEditorDocument,
     setCurrentWorkspace,
     setDockHeroMode,

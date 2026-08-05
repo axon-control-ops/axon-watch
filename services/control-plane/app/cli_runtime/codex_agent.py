@@ -6,6 +6,7 @@ import json
 from collections.abc import Callable
 from pathlib import Path
 
+from app.cli_runtime.agent_sandbox import AgentSandboxPolicy
 from app.cli_runtime.subprocess_runner import (
     RuntimeProcessStoppedError,
     communicate_registered_process,
@@ -77,6 +78,7 @@ def run_codex_local(
     subprocess_env: dict[str, str] | None = None,
     run_id: str = "",
     on_chunk: Callable[[str, str], None] | None = None,
+    sandbox_policy: AgentSandboxPolicy | None = None,
 ) -> str:
     command = _build_codex_exec_command(
         binary=binary,
@@ -101,6 +103,8 @@ def run_codex_local(
             command=command,
             timeout_seconds=timeout_seconds,
             subprocess_env=subprocess_env,
+            cwd=str(workspace_root),
+            sandbox_policy=sandbox_policy,
             **({"on_chunk": _emit_codex_chunk} if on_chunk is not None else {}),
         )
     except RuntimeProcessStoppedError:

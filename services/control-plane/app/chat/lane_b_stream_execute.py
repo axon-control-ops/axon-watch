@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass
 from datetime import datetime, timezone
+from pathlib import Path
 
 from app.chat.lane_b_agent import EditorSelectionContext, LaneBContext, generate_lane_b_result
 from app.chat.lane_b_generated_image_actions import (
@@ -69,6 +70,7 @@ class LaneBStreamJob:
     created_at: str
     memory_appendix: str | None = None
     kairo_session_id: str | None = None
+    workspace_root: Path | None = None
 
 
 def _utc_now() -> str:
@@ -331,6 +333,7 @@ def execute_lane_b_stream(job: LaneBStreamJob) -> None:
             runtime_model=job.runtime_model,
             execution_access=job.execution_access,
             on_chunk=on_chunk,
+            workspace_root=job.workspace_root,
         )
         agent_content = str(lane_b_result.get("content") or "")
         speaker_name = employee_name_from_persona_block(job.memory_appendix)

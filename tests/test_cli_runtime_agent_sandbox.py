@@ -42,6 +42,7 @@ class AgentSandboxTests(unittest.TestCase):
         self.workspace.mkdir()
         (self.workspace / "write").mkdir()
         (self.workspace / "readonly").mkdir()
+        (self.workspace / ".env").write_text("TOP_SECRET=value", encoding="utf-8")
         self.home = self.temp_root / "home"
         (self.home / ".cursor").mkdir(parents=True)
         (self.home / ".cursor" / "auth.json").write_text("{}", encoding="utf-8")
@@ -57,6 +58,7 @@ class AgentSandboxTests(unittest.TestCase):
             "approved_wrappers": ("axon-test",),
             "approved_command_prefixes": (("git", "status"), ("pytest", "-q")),
             "cursor_readonly_paths": (str(self.home / ".cursor" / "auth.json"),),
+            "forbidden_path_globs": ("**/.env",),
         }
         values.update(overrides)
         return AgentSandboxPolicy(**values)  # type: ignore[arg-type]
@@ -211,6 +213,10 @@ class AgentSandboxTests(unittest.TestCase):
                     " Path('readonly/denied.txt').write_text('no')\n"
                     "except OSError:\n"
                     " print('DENIED')\n"
+                    "try:\n"
+                    " print('SECRET=' + Path('.env').read_text())\n"
+                    "except OSError:\n"
+                    " print('SECRET_DENIED')\n"
                 ),
             ],
             policy=policy,
@@ -231,6 +237,8 @@ class AgentSandboxTests(unittest.TestCase):
         self.assertEqual("yes", (self.workspace / "write" / "allowed.txt").read_text())
         self.assertFalse((self.workspace / "readonly" / "denied.txt").exists())
         self.assertIn("DENIED", result.stdout)
+        self.assertIn("SECRET_DENIED", result.stdout)
+        self.assertNotIn("TOP_SECRET", result.stdout)
 
 
 class AgentShellHookTests(unittest.TestCase):
@@ -278,6 +286,8 @@ class AgentShellHookTests(unittest.TestCase):
             "git reset --hard",
             "git -C . push origin main",
             "git -c alias.pwn='!sh' pwn",
+            "git diff --no-index /home/edp/.config/Cursor/User/globalStorage/state.vscdb x",
+            "rg token ../secrets",
             "find . -exec axon-test {} ;",
         )
         for command in denied_commands:

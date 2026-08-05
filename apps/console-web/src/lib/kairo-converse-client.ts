@@ -11,6 +11,7 @@ export type KairoConverseTurnKind =
   | 'action';
 export type KairoConverseSource = 'template' | 'model' | 'fallback';
 export type KairoConverseAnswerTier = 'fast' | 'deep';
+export type KairoConverseSubmissionIntent = 'ask' | 'dispatch';
 
 export type KairoConverseAction =
   | {
@@ -102,6 +103,8 @@ export interface KairoConverseRequest {
   context_signal_id?: string;
   context_node_id?: string;
   attachment_ids?: string[];
+  /** Server-enforced permission boundary; omitted clients are Ask-only. */
+  submission_intent?: KairoConverseSubmissionIntent;
 }
 
 export interface KairoConverseReportSections {
@@ -135,6 +138,7 @@ export interface KairoConverseResponse {
   artifacts: KairoConverseArtifact[];
   /** Structured stand-up payload for command-theater overlay. */
   report?: KairoConverseReport | null;
+  submission_intent?: KairoConverseSubmissionIntent;
 }
 
 export async function postKairoConverse(body: KairoConverseRequest): Promise<KairoConverseResponse> {

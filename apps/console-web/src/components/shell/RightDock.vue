@@ -1,8 +1,7 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue';
+import { computed, onMounted, ref, watch } from 'vue';
 
 import AgentDock from '../ide/AgentDock.vue';
-import HudSeamCard from '../HudSeamCard.vue';
 import { useRightDockResize } from '../../composables/useRightDockResize';
 import { useShellStore } from '../../stores/shell';
 import MissionControlLiveOpsPanel from './MissionControlLiveOpsPanel.vue';
@@ -24,6 +23,57 @@ const {
 const showLiveOpsDock = computed(
   () => shell.layoutMode === 'operator' && !shell.operatorBrainGalaxyActive,
 );
+
+onMounted(() => {
+  // #region agent log
+  fetch('http://127.0.0.1:7706/ingest/90bcaec2-2b39-4d4a-84b5-157c12735440', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Debug-Session-Id': 'db8bb4',
+    },
+    body: JSON.stringify({
+      sessionId: 'db8bb4',
+      runId: 'vaxon-composer',
+      hypothesisId: 'C1',
+      location: 'RightDock.vue:mount',
+      message: 'Live Ops dock mount state',
+      data: {
+        showLiveOpsDock: showLiveOpsDock.value,
+        layoutMode: shell.layoutMode,
+        brainGalaxy: shell.operatorBrainGalaxyActive,
+        threadCollapsed: shell.dockSeamState('thread')?.collapsed ?? null,
+      },
+      timestamp: Date.now(),
+    }),
+  }).catch(() => {});
+  // #endregion
+});
+
+watch(showLiveOpsDock, (visible) => {
+  // #region agent log
+  fetch('http://127.0.0.1:7706/ingest/90bcaec2-2b39-4d4a-84b5-157c12735440', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Debug-Session-Id': 'db8bb4',
+    },
+    body: JSON.stringify({
+      sessionId: 'db8bb4',
+      runId: 'vaxon-composer',
+      hypothesisId: 'C1',
+      location: 'RightDock.vue:showLiveOpsDock',
+      message: 'Live Ops dock visibility changed',
+      data: {
+        visible,
+        layoutMode: shell.layoutMode,
+        brainGalaxy: shell.operatorBrainGalaxyActive,
+      },
+      timestamp: Date.now(),
+    }),
+  }).catch(() => {});
+  // #endregion
+});
 </script>
 
 <template>
@@ -53,22 +103,13 @@ const showLiveOpsDock = computed(
       <span class="right-dock__resize-grip" aria-hidden="true" />
     </div>
 
-    <div class="dock-stack__live-ops-frame">
-      <!--
-        Collapsible thread seam kept for dock-behavior contract; chrome is
-        visually suppressed so LIVE OPERATIONS fills the mockup card.
-      -->
-      <HudSeamCard
-        seam-id="dock-seam-thread"
-        title="Live operations"
-        seam-class="dock-seam dock-seam--thread dock-seam--live-ops"
-        :collapsed="shell.dockSeamState('thread')?.collapsed ?? false"
-        compact-summary="VAXON orb · stream · reply"
-        :collapsible="true"
-        @toggle="shell.toggleDockSeam('thread')"
-      >
-        <MissionControlLiveOpsPanel />
-      </HudSeamCard>
+    <!--
+      Intended Mission Control composer: Live Ops is always mounted — never
+      gated behind a collapsible HudSeamCard (collapse hid the talk box with
+      no expand chrome once headers were visually suppressed).
+    -->
+    <div class="dock-stack__live-ops-frame" data-vaxon-composer="live-ops">
+      <MissionControlLiveOpsPanel />
     </div>
   </aside>
 </template>
@@ -100,32 +141,8 @@ const showLiveOpsDock = computed(
   overflow: hidden;
 }
 
-.dock-stack--live-ops-only :deep(.dock-seam--live-ops.hud-seam) {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-  min-height: 0;
-  border: 0;
-  background: transparent;
-  box-shadow: none;
-}
-
-.dock-stack--live-ops-only :deep(.dock-seam--live-ops .hud-seam__header),
-.dock-stack--live-ops-only :deep(.dock-seam--live-ops .hud-seam__corner),
-.dock-stack--live-ops-only :deep(.dock-seam--live-ops .hud-seam__compact) {
-  display: none;
-}
-
-.dock-stack--live-ops-only :deep(.dock-seam--live-ops .hud-seam__body) {
-  display: flex;
-  flex: 1 1 auto;
-  flex-direction: column;
-  min-height: 0;
-  overflow: hidden;
-  padding: 0;
-}
-
 .dock-stack--live-ops-only :deep(.mc-live-ops) {
+  flex: 1 1 auto;
   min-height: 0;
   max-height: 100%;
 }

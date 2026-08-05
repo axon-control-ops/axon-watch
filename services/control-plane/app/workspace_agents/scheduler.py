@@ -21,7 +21,11 @@ from app.runs.service import (
 )
 from app.runs.stale_reconcile import BUSY_EMPLOYEE_PHASES
 from app.workspace_agents.config_loader import EmployeeConfig, load_workspace_agent_configs
-from app.workspace_agents.scheduler_auto_start_gates import runtime_auth_blocks_auto_start, usage_limit_blocks_auto_start
+from app.workspace_agents.scheduler_auto_start_gates import (
+    billing_blocks_auto_start,
+    runtime_auth_blocks_auto_start,
+    usage_limit_blocks_auto_start,
+)
 from app.workspace_agents.scheduler_attention_scan import run_due_attention_scan_and_log
 from app.workspace_agents.scheduler_queued_fan_out import dispatch_queued_lead_fan_out_runs
 from app.workspace_agents.worker_dispatch import dispatch_continuous_worker_run, worker_dispatch_enabled
@@ -373,6 +377,14 @@ def run_continuous_worker_tick(
             if runtime_auth_blocks_auto_start(workspace_id, role):
                 logger.info(
                     "continuous worker tick skipped role=%s workspace=%s: runtime auth blocked last shift",
+                    role,
+                    workspace_id,
+                )
+                continue
+            if billing_blocks_auto_start(workspace_id, role):
+                logger.info(
+                    "continuous worker tick skipped role=%s workspace=%s: "
+                    "billing/credits blocked last shift (cooldown active)",
                     role,
                     workspace_id,
                 )

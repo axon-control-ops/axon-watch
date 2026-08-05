@@ -48,6 +48,25 @@ class LeadAssignmentGuardrailTests(unittest.TestCase):
         self.assertEqual("frontend", role)
         self.assertTrue(escalate)
 
+    def test_billing_failure_escalates_only(self) -> None:
+        # Regression: billing/credit failures used to fall through to the
+        # default (auto-dispatch) branch, so the Lead kept assigning fresh
+        # specialist tasks to retry work that could never succeed until the
+        # account was fixed — burning a full dispatch every cycle.
+        role, escalate = assign_owner_role_for_failed_shift(
+            "backend",
+            "Credit balance is too low",
+        )
+        self.assertEqual("backend", role)
+        self.assertTrue(escalate)
+
+        role, escalate = assign_owner_role_for_failed_shift(
+            "integrations",
+            "ActionRequiredError: You have an unpaid invoice",
+        )
+        self.assertEqual("integrations", role)
+        self.assertTrue(escalate)
+
     def test_crc_failure_reassigns_same_role(self) -> None:
         role, escalate = assign_owner_role_for_failed_shift(
             "watcher",

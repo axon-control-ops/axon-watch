@@ -203,7 +203,13 @@ def should_use_vaxon_runtime(
     use_runtime: bool,
     answer_tier: ConversationAnswerTier,
     voice_routing_mode: VoiceRoutingMode,
+    consultative: bool = False,
 ) -> bool:
+    # Ask mode is a deliberate executive consultation, not a collection of
+    # keyword-triggered status templates. It stays read-only at the runtime
+    # boundary; Dispatch is the only mode that may dispatch work.
+    if consultative:
+        return turn_kind in {"open_question", "status_question", "chat"}
     mode = normalize_voice_routing_mode(voice_routing_mode)
     if turn_kind not in {"open_question", "status_question"}:
         return False
@@ -247,6 +253,8 @@ def route_voice_turn(
     context_signal_id: str | None = None,
     context_node_id: str | None = None,
     preferred_model: str | None = None,
+    allow_actions: bool = True,
+    consultative: bool = False,
 ) -> VoiceDispatchDecision:
     """Route a classified turn into a VAXON lane with autonomy + model receipts."""
     mode = normalize_voice_routing_mode(voice_routing_mode)
@@ -290,7 +298,7 @@ def route_voice_turn(
             },
         )
 
-    if turn_kind == "command":
+    if turn_kind == "command" and allow_actions:
         normalized = expand_command_shortcuts(content)
         requires_confirmation = command_requires_confirmation(normalized)
         tier = resolve_voice_action_tier(normalized)
@@ -321,7 +329,7 @@ def route_voice_turn(
             model_receipt=receipt,
         )
 
-    if turn_kind in {"chat", "open_question"}:
+    if allow_actions and turn_kind in {"chat", "open_question"}:
         specialty_action = build_specialty_task_action(
             content,
             workspace_id=workspace_id,
@@ -355,6 +363,7 @@ def route_voice_turn(
         use_runtime=use_runtime,
         answer_tier=answer_tier,
         voice_routing_mode=mode,
+        consultative=consultative,
     ):
         reply = compose_conversation_reply(
             content=content,
@@ -384,6 +393,7 @@ def route_voice_turn(
         use_runtime=use_runtime,
         answer_tier=answer_tier,
         voice_routing_mode=mode,
+        consultative=consultative,
     ):
         runtime_id, runtime_label, model, attempts = select_vaxon_runtime(
             preferred_model=preferred_model,

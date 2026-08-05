@@ -63,7 +63,14 @@
           "owns": "DashPro priorities; Expo/React Native app UI + parent dashboard + OTA/canary publish; monitor self-hosted CI→PR→main (never reintroduce ubuntu-latest); ensure green builds reach Vercel production; coach upgrades",
           "schedule": "on_demand",
           "primary": true,
-          "azure_voice_id": "en-US-AriaNeural"
+          "azure_voice_id": "en-US-AriaNeural",
+          "execution_policy": {
+            "write_paths": ["docs/ops"],
+            "approved_wrappers": ["axon-agent-terminal-job"],
+            "capabilities": ["planning_write", "workspace_read"],
+            "network_mode": "none",
+            "timeout_seconds": 600
+          }
         },
         {
           "name": "Cass",

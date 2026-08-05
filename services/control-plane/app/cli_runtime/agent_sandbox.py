@@ -5,12 +5,15 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import shlex
 import shutil
 import stat
 import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Sequence
+
+from app.cli_runtime.agent_sandbox_paths import append_hidden_mounts, hidden_workspace_paths
 
 _SANDBOX_HOME = Path("/run/axon-agent-home")
 _SANDBOX_POLICY_ROOT = Path("/run/axon-agent-policy")
@@ -40,6 +43,7 @@ class AgentSandboxPolicy:
     approved_wrappers: tuple[str, ...] = ()
     approved_command_prefixes: tuple[tuple[str, ...], ...] = ()
     cursor_readonly_paths: tuple[str, ...] = ()
+    forbidden_path_globs: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -93,7 +97,24 @@ def _policy_document(policy: AgentSandboxPolicy) -> dict[str, object]:
         "approved_command_prefixes": [
             list(prefix) for prefix in policy.approved_command_prefixes
         ],
+        "forbidden_path_globs": sorted(set(policy.forbidden_path_globs)),
     }
+
+
+def _trusted_wrapper_sources(
+    policy: AgentSandboxPolicy,
+    workspace: Path,
+) -> dict[str, Path]:
+    sources: dict[str, Path] = {}
+    for wrapper in policy.approved_wrappers:
+        installed = shutil.which(wrapper)
+        if not installed:
+            continue
+        source = Path(installed).resolve(strict=True)
+        if _is_relative_to(source, workspace):
+            raise SandboxConfigurationError("Approved wrappers cannot come from the workspace.")
+        sources[wrapper] = source
+    return sources
 
 
 def _hooks_document() -> dict[str, object]:
@@ -186,10 +207,16 @@ def materialize_cursor_hook_policy(
     hooks_path = cursor_dir / "hooks.json"
     policy_path = target / "policy.json"
     hook_path = target / "hook.py"
+    wrapper_dir = target / "bin"
+    wrapper_dir.mkdir(mode=0o700, exist_ok=True)
     _write_immutable(hooks_path, _canonical_json(_hooks_document()))
     _write_immutable(policy_path, policy_bytes)
     _write_immutable(hook_path, hook_source, executable=True)
+    for wrapper, source in _trusted_wrapper_sources(policy, workspace).items():
+        proxy = f"#!/bin/sh\nexec {shlex.quote(str(source))} \"$@\"\n".encode()
+        _write_immutable(wrapper_dir / wrapper, proxy, executable=True)
 
+    wrapper_dir.chmod(0o555)
     cursor_dir.chmod(0o555)
     generated_home.chmod(0o555)
     target.chmod(0o555)
@@ -313,12 +340,17 @@ def build_bwrap_command(
     writable_roots = tuple(
         dict.fromkeys(_resolve_workspace_path(workspace, path) for path in policy.writable_roots)
     )
+    hidden_paths = hidden_workspace_paths(workspace, policy.forbidden_path_globs)
     cursor_paths = tuple(
         dict.fromkeys(
             _resolve_cursor_path(path, user_home=home, workspace=workspace)
             for path in policy.cursor_readonly_paths
         )
     )
+    wrapper_sources = tuple(_trusted_wrapper_sources(policy, workspace).values())
+    cursor_paths = tuple(dict.fromkeys((*cursor_paths, *(
+        source for source in wrapper_sources if _is_relative_to(source, home)
+    ))))
 
     arguments = [
         str(bwrap),
@@ -367,6 +399,7 @@ def build_bwrap_command(
     arguments.extend(["--ro-bind", str(workspace), str(workspace)])
     for writable_root in writable_roots:
         arguments.extend(["--bind", str(writable_root), str(writable_root)])
+    append_hidden_mounts(arguments, hidden_paths)
 
     arguments.extend(
         [
@@ -390,7 +423,7 @@ def build_bwrap_command(
             str(_SANDBOX_HOME),
             "--setenv",
             "PATH",
-            "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+            f"{_SANDBOX_POLICY_ROOT}/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
             "--setenv",
             "TMPDIR",
             "/tmp",

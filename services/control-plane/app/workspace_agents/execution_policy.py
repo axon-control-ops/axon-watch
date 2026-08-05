@@ -68,13 +68,14 @@ _COMMON_READ_PREFIXES = (
     ("git", "log"),
     ("rg",),
 )
+_COMMON_AUDITED_WRAPPERS = ("axon-agent-terminal-job",)
 
 _ROLE_DEFAULTS: dict[str, AgentExecutionPolicy] = {
     "lead": AgentExecutionPolicy(
         read_paths=(".",),
-        write_paths=("docs/planning", "docs/ops/agent-reports"),
+        write_paths=("docs/planning", "docs/ops", "plans"),
         forbidden_path_globs=(),
-        approved_wrapper_names=("run_contract_unit_tests.sh",),
+        approved_wrapper_names=(*_COMMON_AUDITED_WRAPPERS, "run_contract_unit_tests.sh"),
         approved_command_prefixes=_COMMON_READ_PREFIXES,
         audited_capabilities=("planning_write", "test", "workspace_read"),
         network_mode="none",
@@ -86,7 +87,7 @@ _ROLE_DEFAULTS: dict[str, AgentExecutionPolicy] = {
         read_paths=(".",),
         write_paths=(),
         forbidden_path_globs=(),
-        approved_wrapper_names=("axonhealth", "watch-fast-gate.sh"),
+        approved_wrapper_names=(*_COMMON_AUDITED_WRAPPERS, "axonhealth", "watch-fast-gate.sh"),
         approved_command_prefixes=_COMMON_READ_PREFIXES,
         audited_capabilities=("ci_read", "health", "workspace_read"),
         network_mode="audited",
@@ -96,16 +97,10 @@ _ROLE_DEFAULTS: dict[str, AgentExecutionPolicy] = {
     ),
     "frontend": AgentExecutionPolicy(
         read_paths=(".",),
-        write_paths=("apps", "packages", "tests"),
+        write_paths=("apps", "app", "src", "components", "packages", "tests", "__tests__", "locales"),
         forbidden_path_globs=(),
-        approved_wrapper_names=("console-web.sh",),
-        approved_command_prefixes=(
-            *_COMMON_READ_PREFIXES,
-            ("npm", "run", "lint"),
-            ("npm", "run", "typecheck"),
-            ("npm", "run", "test"),
-            ("npm", "run", "build"),
-        ),
+        approved_wrapper_names=(*_COMMON_AUDITED_WRAPPERS, "console-web.sh"),
+        approved_command_prefixes=_COMMON_READ_PREFIXES,
         audited_capabilities=("build", "test", "workspace_read"),
         network_mode="none",
         timeout_seconds=1200,
@@ -114,9 +109,9 @@ _ROLE_DEFAULTS: dict[str, AgentExecutionPolicy] = {
     ),
     "backend": AgentExecutionPolicy(
         read_paths=(".",),
-        write_paths=("services", "packages", "tests"),
+        write_paths=("services", "server", "api", "lib", "supabase", "packages", "tests"),
         forbidden_path_globs=(),
-        approved_wrapper_names=("run_contract_unit_tests.sh",),
+        approved_wrapper_names=(*_COMMON_AUDITED_WRAPPERS, "run_contract_unit_tests.sh"),
         approved_command_prefixes=_COMMON_READ_PREFIXES,
         audited_capabilities=("build", "test", "workspace_read"),
         network_mode="none",
@@ -128,7 +123,7 @@ _ROLE_DEFAULTS: dict[str, AgentExecutionPolicy] = {
         read_paths=(".",),
         write_paths=(".github", "config", "scripts"),
         forbidden_path_globs=(),
-        approved_wrapper_names=("axonhealth", "watch-fast-gate.sh"),
+        approved_wrapper_names=(*_COMMON_AUDITED_WRAPPERS, "axonhealth", "watch-fast-gate.sh"),
         approved_command_prefixes=(*_COMMON_READ_PREFIXES,),
         audited_capabilities=("ci_read", "health", "test", "workspace_read"),
         network_mode="audited",

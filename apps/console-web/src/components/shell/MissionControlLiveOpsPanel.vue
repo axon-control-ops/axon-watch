@@ -31,11 +31,11 @@ import {
   markTransmissionAskAnswered,
 } from '../../lib/vaxon-transmission-reply-state';
 import { useShellStore } from '../../stores/shell';
+import VaxonExecutiveComposer from './VaxonExecutiveComposer.vue';
 
 const shell = useShellStore();
 const { spokenText } = useSpokenUtteranceText();
 const { pending, submitTurn, speechCapture } = useKairoConversation();
-const reply = ref('');
 const autonomyReceipts = ref<AutonomyReceipt[]>([]);
 const autonomyEffective = ref(false);
 let autonomyPoll: ReturnType<typeof setInterval> | null = null;
@@ -145,16 +145,46 @@ const focusedWorkspaceLabel = computed(() => {
   return ws.display_name?.trim() || ws.workspace_id;
 });
 
-async function sendReply(content?: string): Promise<void> {
-  const message = (content ?? reply.value).trim();
+async function sendReply({
+  content,
+  submissionIntent = 'ask',
+}: {
+  content: string;
+  submissionIntent?: 'ask' | 'dispatch';
+}): Promise<void> {
+  const message = content.trim();
   if (!message || pending.value) {
     return;
   }
-  if (content === 'yes' || content === 'not now') {
+  if (message === 'yes' || message === 'not now') {
     markTransmissionAskAnswered(spokenLine.value);
   }
-  reply.value = '';
-  await submitTurn(message);
+  // #region agent log
+  fetch('http://127.0.0.1:7706/ingest/90bcaec2-2b39-4d4a-84b5-157c12735440', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Debug-Session-Id': 'db8bb4',
+    },
+    body: JSON.stringify({
+      sessionId: 'db8bb4',
+      runId: 'vaxon-composer',
+      hypothesisId: 'C3',
+      location: 'MissionControlLiveOpsPanel.vue:sendReply',
+      message: 'Live Ops executive composer submit',
+      data: {
+        preview: message.slice(0, 48),
+        submissionIntent:
+          message === 'yes' ? 'dispatch' : submissionIntent,
+      },
+      timestamp: Date.now(),
+    }),
+  }).catch(() => {});
+  // #endregion
+  // Affirmative Needs-you answers must be allowed to trigger dig-in / handoff.
+  const intent =
+    message === 'yes' ? 'dispatch' : message === 'not now' ? 'ask' : submissionIntent;
+  await submitTurn(message, { submissionIntent: intent });
 }
 
 function toggleMic(): void {
@@ -221,24 +251,24 @@ onUnmounted(() => {
       </p>
     </header>
 
-    <div
-      class="mc-live-ops__orb-stage"
-      :data-speaking="shell.kairoSpeechActive ? 'true' : 'false'"
-      :data-mode="modeChip"
-      :data-autonomy="fullAutonomyActive ? 'armed' : autonomyMode"
-    >
-      <div class="mc-live-ops__orb-visual">
-        <KairoGalaxyOrb placement-mode="embedded" />
-        <div class="mc-live-ops__orb-labels" aria-hidden="true">
-          <p class="mc-live-ops__orb-name">{{ OPERATOR_PERSONA_NAME }}</p>
-          <span class="mc-live-ops__orb-wave" />
-          <p class="mc-live-ops__orb-tagline">{{ OPERATOR_PERSONA_OPS_TAGLINE }}</p>
-        </div>
-        <MissionControlAutonomyControl />
-      </div>
-    </div>
-
     <div class="mc-live-ops__scroll">
+      <div
+        class="mc-live-ops__orb-stage"
+        :data-speaking="shell.kairoSpeechActive ? 'true' : 'false'"
+        :data-mode="modeChip"
+        :data-autonomy="fullAutonomyActive ? 'armed' : autonomyMode"
+      >
+        <div class="mc-live-ops__orb-visual">
+          <KairoGalaxyOrb placement-mode="embedded" />
+          <div class="mc-live-ops__orb-labels" aria-hidden="true">
+            <p class="mc-live-ops__orb-name">{{ OPERATOR_PERSONA_NAME }}</p>
+            <span class="mc-live-ops__orb-wave" />
+            <p class="mc-live-ops__orb-tagline">{{ OPERATOR_PERSONA_OPS_TAGLINE }}</p>
+          </div>
+          <MissionControlAutonomyControl />
+        </div>
+      </div>
+
       <article
         class="mc-transmission"
         :data-mode="transmission.mode"
@@ -256,14 +286,22 @@ onUnmounted(() => {
         >
           {{ transmission.body }}
         </p>
-        <div v-if="asksForReply" class="mc-transmission__actions">
-          <button type="button" :disabled="pending" @click="void sendReply('yes')">
-            {{ affirmCta }}
-          </button>
-          <button type="button" :disabled="pending" @click="void sendReply('not now')">
-            Not now
-          </button>
-        </div>
+          <div v-if="asksForReply" class="mc-transmission__actions">
+            <button
+              type="button"
+              :disabled="pending"
+              @click="void sendReply({ content: 'yes' })"
+            >
+              {{ affirmCta }}
+            </button>
+            <button
+              type="button"
+              :disabled="pending"
+              @click="void sendReply({ content: 'not now' })"
+            >
+              Not now
+            </button>
+          </div>
       </article>
 
       <div class="mc-live-ops__modes" role="status" aria-label="Voice mode">
@@ -314,34 +352,15 @@ onUnmounted(() => {
       </ul>
     </div>
 
-    <div class="mc-live-ops__reply">
-      <form class="mc-live-ops__reply-form" @submit.prevent="void sendReply()">
-        <button
-          type="button"
-          class="mc-live-ops__mic"
-          :data-live="micLive ? 'true' : 'false'"
-          :disabled="!speechCapture.supported || pending"
-          :title="micLive ? 'Stop listening' : 'Talk to VAXON'"
-          :aria-pressed="micLive"
-          @click="toggleMic"
-        >
-          Mic
-        </button>
-        <input
-          v-model="reply"
-          type="text"
-          autocomplete="off"
-          :placeholder="`Talk to ${OPERATOR_PERSONA_NAME}… or REPORT`"
-          :disabled="pending"
-        >
-        <span class="mc-live-ops__wave" aria-hidden="true">
-          <i /><i /><i /><i /><i />
-        </span>
-        <button type="submit" class="mc-live-ops__send" :disabled="pending || !reply.trim()">
-          {{ pending ? '…' : 'Send' }}
-        </button>
-      </form>
-    </div>
+    <VaxonExecutiveComposer
+      :pending="pending"
+      :mic-live="micLive"
+      :mic-supported="speechCapture.supported"
+      :privacy-blocked="shell.operatorPresenceSettings.privacy_mode"
+      :focused-workspace-label="focusedWorkspaceLabel"
+      @submit="void sendReply($event)"
+      @toggle-mic="toggleMic"
+    />
   </section>
 </template>
 

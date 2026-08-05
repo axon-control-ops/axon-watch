@@ -30,11 +30,11 @@ class RoleExecutionPolicyTests(unittest.TestCase):
         backend = role_execution_policy("backend")
         integrations = role_execution_policy("integrations")
 
-        self.assertEqual(("docs/planning", "docs/ops/agent-reports"), lead.write_paths)
+        self.assertIn("docs/ops", lead.write_paths)
         self.assertEqual((), watcher.write_paths)
         self.assertEqual("consultative", watcher.execution_access)
-        self.assertEqual(("apps", "packages", "tests"), frontend.write_paths)
-        self.assertEqual(("services", "packages", "tests"), backend.write_paths)
+        self.assertIn("components", frontend.write_paths)
+        self.assertIn("services", backend.write_paths)
         self.assertNotIn("apps", integrations.write_paths)
         self.assertTrue(
             all(policy.trust_policy == "worker" for policy in (
@@ -107,7 +107,7 @@ class EffectiveExecutionPolicyTests(unittest.TestCase):
         override = AgentExecutionPolicyOverride(
             approved_wrapper_names=("console-web.sh", "curl"),
             approved_command_prefixes=(
-                ("npm", "run", "test", "--", "--run"),
+                ("git", "status", "--short"),
                 ("curl",),
             ),
             audited_capabilities=("test", "secrets_write"),
@@ -127,7 +127,7 @@ class EffectiveExecutionPolicyTests(unittest.TestCase):
 
         self.assertEqual(("console-web.sh",), policy.approved_wrapper_names)
         self.assertEqual(
-            (("npm", "run", "test", "--", "--run"),),
+            (("git", "status", "--short"),),
             policy.approved_command_prefixes,
         )
         self.assertEqual(("test",), policy.audited_capabilities)

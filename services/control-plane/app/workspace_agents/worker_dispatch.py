@@ -21,6 +21,7 @@ from app.runs.service import (
 )
 from app.terminal.session_registry import ensure_agent_session
 from app.workspace_agents.config_loader import EmployeeConfig
+from app.workspace_agents.execution_policy_runtime import record_execution_policy_receipt, resolve_worker_execution_policy
 from app.workspace_agents.worker_ide_stream import (
     WorkerIdeStream,
     fail_worker_ide_stream,
@@ -205,6 +206,10 @@ def dispatch_continuous_worker_run(
             ide_stream = None
         isolation_root = create_worker_isolation(workspace_id=workspace_id, run_id=run_id)
         agent_root = worker_agent_workspace(isolation_root)
+        execution_policy = resolve_worker_execution_policy(
+            employee=employee, task_payload=task, workspace_root=agent_root
+        )
+        record_execution_policy_receipt(run_id, execution_policy)
         append_run_execution_receipt(
             run_id,
             receipt_type="worker_isolation_created",
@@ -234,10 +239,11 @@ def dispatch_continuous_worker_run(
             run_id=run_id,
             runtime_target=runtime_target,
             runtime_model=runtime_model,
-            execution_access="full",
+            execution_access=execution_policy.execution_access,
             on_chunk=_throttled_worker_stream_progress(run_id, ide_stream),
-            cursor_trust_policy="worker",
+            cursor_trust_policy=execution_policy.trust_policy,
             workspace_root=agent_root,
+            execution_policy=execution_policy,
         )
         reply_text = str(lane_b_result.get("content") or "")
         from app.workspace_agents.employee_first_person import (

@@ -1,9 +1,22 @@
-"""Auto-start skip gates for continuous worker ticks (usage + runtime auth)."""
+"""Auto-start skip gates for continuous worker ticks (usage + runtime auth + billing)."""
 
 from __future__ import annotations
 
-from app.workspace_agents.failure_detail import is_runtime_auth_failure, is_usage_limit_failure
+import json
+import logging
+import os
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Any
+
+from app.workspace_agents.failure_detail import (
+    is_billing_failure,
+    is_runtime_auth_failure,
+    is_usage_limit_failure,
+)
 from app.workspace_agents.run_outcome import latest_role_run_outcome
+
+logger = logging.getLogger(__name__)
 
 
 def usage_limit_blocks_auto_start(workspace_id: str, role: str) -> bool:
@@ -90,3 +103,92 @@ def runtime_auth_blocks_auto_start(workspace_id: str, role: str) -> bool:
     except Exception:
         pass
     return True
+
+
+_BILLING_COOLDOWN_SECONDS = 1800.0  # 30 minutes
+
+
+def _billing_cooldown_state_path() -> Path:
+    raw = os.environ.get("AXON_WATCH_STATE_DIR", "./.local/state").strip() or "./.local/state"
+    root = Path(raw).expanduser()
+    if not root.is_absolute():
+        root = (Path.cwd() / root).resolve()
+    return root / "billing-retry-cooldown.json"
+
+
+def _load_billing_cooldown_state(path: Path | None = None) -> dict[str, Any]:
+    target = path or _billing_cooldown_state_path()
+    if not target.is_file():
+        return {}
+    try:
+        payload = json.loads(target.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {}
+    return payload if isinstance(payload, dict) else {}
+
+
+def _save_billing_cooldown_state(state: dict[str, Any], path: Path | None = None) -> None:
+    target = path or _billing_cooldown_state_path()
+    try:
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(json.dumps(state, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    except OSError:
+        logger.exception("could not persist billing retry cooldown state")
+
+
+def _parse_iso(raw: str | None) -> datetime | None:
+    text = str(raw or "").strip()
+    if not text:
+        return None
+    try:
+        return datetime.fromisoformat(text.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+
+
+def billing_blocks_auto_start(
+    workspace_id: str,
+    role: str,
+    *,
+    now: datetime | None = None,
+    state_path: Path | None = None,
+) -> bool:
+    """Skip auto-schedule when the last shift failed on billing/credits.
+
+    Unlike usage limits or auth, there's no cheap probe for "has the account
+    been topped up" — the CLI itself is authenticated, the account is just
+    out of funds. Retrying every 45s scheduler tick just re-hits the same
+    wall indefinitely (the original bug: an unpaid-invoice or out-of-credits
+    role got redispatched, full system prompt and all, forever). Block for a
+    fixed cooldown instead of indefinitely, so it recovers on its own if the
+    operator fixes billing without needing to find and clear a manual flag.
+    """
+    outcome = latest_role_run_outcome(workspace_id, role)
+    if not outcome or str(outcome.get("outcome") or "").strip().lower() != "failed":
+        return False
+    detail = str(outcome.get("detail") or "")
+    if not is_billing_failure(detail):
+        return False
+
+    run_id = str(outcome.get("run_id") or "").strip()
+    key = f"{workspace_id}:{role}"
+    current = now or datetime.now(timezone.utc)
+    state = _load_billing_cooldown_state(state_path)
+    entry = state.get(key)
+
+    if not isinstance(entry, dict) or entry.get("run_id") != run_id:
+        # First time we've seen this particular failed run — start the cooldown.
+        state[key] = {
+            "run_id": run_id,
+            "first_blocked_at": current.isoformat().replace("+00:00", "Z"),
+        }
+        _save_billing_cooldown_state(state, state_path)
+        return True
+
+    first_blocked = _parse_iso(str(entry.get("first_blocked_at") or ""))
+    if first_blocked is None:
+        return True
+    if first_blocked.tzinfo is None:
+        first_blocked = first_blocked.replace(tzinfo=timezone.utc)
+    elapsed = (current - first_blocked.astimezone(timezone.utc)).total_seconds()
+    return elapsed < _BILLING_COOLDOWN_SECONDS

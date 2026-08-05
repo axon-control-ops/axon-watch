@@ -62,6 +62,9 @@ def post_lane_b_message(
         _remember_lane_b_turn,
         _resolve_chat_thread,
     )
+    from app.cli_runtime.composer_sandbox import resolve_sandbox_workspace_root
+
+    sandbox_workspace_root = resolve_sandbox_workspace_root(workspace_id)
 
     try:
         switch_intent = resolve_workspace_switch_intent(content)
@@ -329,6 +332,7 @@ def post_lane_b_message(
             created_at=created_at,
             memory_appendix=memory_appendix,
             kairo_session_id=kairo_session_id,
+            workspace_root=sandbox_workspace_root,
         )
         payload: dict[str, object] = {
             "thread_id": thread_id,
@@ -369,6 +373,7 @@ def post_lane_b_message(
             runtime_target=runtime_target,
             runtime_model=runtime_model,
             execution_access=execution_access,
+            workspace_root=sandbox_workspace_root,
         )
     else:
         lane_b_result = generate_lane_b_result(
@@ -376,6 +381,7 @@ def post_lane_b_message(
             user_prompt=content,
             runtime_target=runtime_target,
             runtime_model=runtime_model,
+            workspace_root=sandbox_workspace_root,
             execution_access=execution_access,
         )
 
