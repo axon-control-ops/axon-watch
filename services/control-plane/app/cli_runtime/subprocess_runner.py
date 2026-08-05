@@ -6,15 +6,35 @@ import os
 import subprocess
 from collections.abc import Callable
 from pathlib import Path
-from typing import Any
 
 from app.cli_runtime.agent_sandbox import AgentSandboxPolicy, wrap_command_in_agent_sandbox
 from app.cli_runtime.process_registry import register, unregister
 from app.cli_runtime.agent_process_scope import wrap_command_in_agent_scope
 
+# Match workspace PTY defaults so headless Cursor/agent shell tools can run
+# ``tput`` / color-aware scripts without ``No value for $TERM``.
+_HEADLESS_TERM = "xterm-256color"
+_HEADLESS_COLORTERM = "truecolor"
+
 
 class RuntimeProcessStoppedError(RuntimeError):
     pass
+
+
+def headless_cli_env(subprocess_env: dict[str, str] | None = None) -> dict[str, str]:
+    """Build env for non-interactive agent CLIs (Cursor/Claude/Codex).
+
+    Control-plane services often inherit a bare systemd environment with no
+    ``TERM``. Agents then fail scripts that call ``tput``, leaving the Team
+    panel in a red "Last job failed" state even when the code work finished.
+    """
+    env = {**(subprocess_env or os.environ)}
+    env["NO_COLOR"] = "1"
+    if not str(env.get("TERM") or "").strip():
+        env["TERM"] = _HEADLESS_TERM
+    if not str(env.get("COLORTERM") or "").strip():
+        env["COLORTERM"] = _HEADLESS_COLORTERM
+    return env
 
 
 def _prepare_command(
@@ -60,7 +80,7 @@ def communicate_registered_process(
     cwd: str | os.PathLike[str] | None = None,
     sandbox_policy: AgentSandboxPolicy | None = None,
 ) -> tuple[str, str, int]:
-    env = {**(subprocess_env or os.environ), "NO_COLOR": "1"}
+    env = headless_cli_env(subprocess_env)
     proc = subprocess.Popen(
         _prepare_command(
             command,
@@ -100,7 +120,7 @@ def stream_registered_process(
     cwd: str | os.PathLike[str] | None = None,
     sandbox_policy: AgentSandboxPolicy | None = None,
 ) -> tuple[str, str, int]:
-    env = {**(subprocess_env or os.environ), "NO_COLOR": "1"}
+    env = headless_cli_env(subprocess_env)
     proc = subprocess.Popen(
         _prepare_command(
             command,

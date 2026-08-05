@@ -59,6 +59,8 @@ def build_lead_takeover_spoken_line(
     else:
         parts.append("Goal: Complete the requested result and verify that it is ready to use.")
     progress = outcome or "no verified result is available yet."
+    if not progress.endswith((".", "!", "?")):
+        progress = f"{progress}."
     parts.append(f"Progress: {name} ({role}) {status}; {progress}")
     parts.append("What remains: The requested result must be verified and ready to use.")
     parts.append(
@@ -71,6 +73,10 @@ def build_lead_takeover_spoken_line(
         )
     )
     parts.append("Your action: " + executive_operator_action(lead_next))
+    # Each part above already ends with terminal punctuation, so joining on a
+    # single space still reads as separate sentences both spoken and on-screen
+    # (this line also drives the visible VAXON transmission text, not just TTS
+    # — see useSpokenUtteranceText.ts).
     return " ".join(parts)
 
 
