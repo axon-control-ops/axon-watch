@@ -72,6 +72,7 @@ export function useComposerDisplayState(options: UseComposerDisplayStateOptions)
     }),
   );
 
+  /** Hide the sticky banner after Resolved/Proceed already submitted the follow-up. */
   function handleDebugReproduceDismiss(): void {
     dismissedDebugReproduceMessageId.value = debugReproduceRequest.value?.messageId ?? null;
   }

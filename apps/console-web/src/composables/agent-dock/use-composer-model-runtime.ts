@@ -28,6 +28,7 @@ import {
 } from '../../lib/cursor-catalog-view';
 import { CURSOR_PICKER_COMPOSER_IDS, CURSOR_PICKER_DEFAULT_MODEL } from '../../lib/cursor-picker-prefs';
 import { composerClaudeAuthLine, composerCursorAuthLine } from '../../lib/runtime-auth-view';
+import { codexModelLabel } from '../../lib/codex-catalog-view';
 import { useShellStore } from '../../stores/shell';
 
 type ShellStore = ReturnType<typeof useShellStore>;
@@ -40,7 +41,7 @@ type UseComposerModelRuntimeOptions = {
 };
 
 /** Only these families have any model picker today — everything else falls back to a plain label. */
-type CatalogFamily = 'cursor' | 'claude';
+type CatalogFamily = 'cursor' | 'claude' | 'codex';
 
 export function useComposerModelRuntime(
   shell: ShellStore,
@@ -66,23 +67,29 @@ export function useComposerModelRuntime(
     return records.find((record) => record.id === defaultRuntime) ?? null;
   });
   /** Cursor stays the default catalog when no target is selected yet — matches prior behavior. */
-  const catalogFamily = computed<CatalogFamily | null>(() => {
+  const catalogFamily = computed<CatalogFamily>(() => {
     const family = currentRuntimeTarget.value?.family ?? 'cursor';
-    if (family === 'cursor') return 'cursor';
     if (family === 'claude') return 'claude';
-    return null;
+    if (family === 'codex') return 'codex';
+    return 'cursor';
   });
   /** Governs the plain "Selected model: X" fallback vs. either real picker below. */
-  const showModelCatalog = computed(() => catalogFamily.value !== null);
+  const showModelCatalog = computed(() => true);
   /** Claude gets a flat list (see claudeFlatRows), not Cursor's curated/pinned/browse tiers. */
   const isClaudeCatalog = computed(() => catalogFamily.value === 'claude');
+  const showCodexCatalog = computed(() => catalogFamily.value === 'codex');
+  const showCursorCatalog = computed(() => catalogFamily.value === 'cursor');
 
   const selectedModelId = computed(() => shell.selectedComposerModel || 'auto');
-  const selectedModelLabel = computed(() =>
-    isClaudeCatalog.value
-      ? claudeModelLabel(selectedModelId.value, shell.claudeCatalogRows)
-      : cursorModelLabel(selectedModelId.value, shell.cursorCatalogRows),
-  );
+  const selectedModelLabel = computed(() => {
+    if (isClaudeCatalog.value) {
+      return claudeModelLabel(selectedModelId.value, shell.claudeCatalogRows);
+    }
+    if (showCodexCatalog.value) {
+      return codexModelLabel(selectedModelId.value, shell.codexCatalogRows);
+    }
+    return cursorModelLabel(selectedModelId.value, shell.cursorCatalogRows);
+  });
   const runtimeFamilyLabel = computed(() => {
     const target = currentRuntimeTarget.value;
     if (target?.family) {
@@ -101,6 +108,19 @@ export function useComposerModelRuntime(
 
   /** Claude's whole picker: every row (Auto included), flat, always visible — no tiers. */
   const claudeFlatRows = computed<ClaudeCatalogRow[]>(() => shell.claudeCatalogRows);
+
+  const codexCatalogStatus = computed(() => {
+    if (shell.codexCatalogLoadState === 'loading') return 'Loading Codex / ChatGPT models…';
+    if (shell.codexCatalogError) return shell.codexCatalogError;
+    if (shell.codexRuntimeStatus?.catalog_source === 'live') {
+      return shell.codexCatalogRows.filter((row) => row.id !== 'auto').length
+        + ' model and reasoning options available to your signed-in Codex account';
+    }
+    return 'Codex model catalog is unavailable. Check the Codex CLI sign-in.';
+  });
+  // Pinia unwraps computed store fields on access. Keep this as a computed ref so
+  // the toolbar receives the rows that arrive after the async catalog request.
+  const codexCatalogRows = computed(() => shell.codexCatalogRows);
 
   const autoModelRow = computed(
     () =>
@@ -290,6 +310,8 @@ export function useComposerModelRuntime(
     cursorCatalogCount,
     cursorCatalogStatus,
     cursorCatalogTotal,
+    codexCatalogRows,
+    codexCatalogStatus,
     cursorManageRows,
     cursorStaleWarning,
     currentRuntimeTarget,
@@ -315,6 +337,8 @@ export function useComposerModelRuntime(
     selectedRuntimeSummary,
     showAddModelsEntry,
     showModelCatalog,
+    showCursorCatalog,
+    showCodexCatalog,
     showExtraPinnedRows,
     showFallbackCatalogNote,
     showVaultAction,

@@ -54,8 +54,8 @@
   position: relative;
   display: flex;
   flex-direction: column;
-  flex: 0 1 auto;
-  min-height: 0;
+  flex: 0 1 38%;
+  min-height: 12rem;
   max-height: min(42vh, 22rem);
   margin: 0.1rem 0 0;
   padding: 0;

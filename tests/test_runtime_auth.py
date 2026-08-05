@@ -7,6 +7,8 @@ CONTROL_PLANE_ROOT = Path(__file__).resolve().parents[1] / "services" / "control
 sys.path.insert(0, str(CONTROL_PLANE_ROOT))
 
 from app.cli_runtime.runtime_auth import (  # noqa: E402
+    codex_dispatch_env,
+    codex_subscription_ready,
     cursor_dispatch_env,
     cursor_subscription_ready,
     env_without_api_keys,
@@ -71,6 +73,14 @@ class RuntimeAuthTests(unittest.TestCase):
             auth={"auth_method": "vault_api_key", "message": "Authenticated via CURSOR_API_KEY"},
         )
         self.assertEqual("sk-valid", kept["CURSOR_API_KEY"])
+
+    def test_codex_subscription_ready_and_dispatch_env(self) -> None:
+        self.assertTrue(codex_subscription_ready({"auth_method": "chatgpt"}))
+        env = {"CODEX_API_KEY": "stale", "OPENAI_API_KEY": "also-stale", "PATH": "/usr/bin"}
+        stripped = codex_dispatch_env(env, auth={"auth_method": "chatgpt"})
+        self.assertNotIn("CODEX_API_KEY", stripped)
+        self.assertNotIn("OPENAI_API_KEY", stripped)
+        self.assertEqual("/usr/bin", stripped["PATH"])
 
 
 if __name__ == "__main__":

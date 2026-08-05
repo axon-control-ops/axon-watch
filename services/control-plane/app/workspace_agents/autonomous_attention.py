@@ -26,6 +26,10 @@ from app.workspace_agents.lead_checkin_assign import (
     LeadCheckinFinding,
 )
 from app.workspace_agents.lead_team_checkin import run_lead_team_checkin
+from app.workspace_agents.autonomous_attention_status import (
+    build_autonomy_status_feed as _build_autonomy_status_feed,
+)
+from app.workspace_agents.run_outcome import latest_role_run_outcome
 
 logger = logging.getLogger(__name__)
 
@@ -209,6 +213,62 @@ def _enqueue_attend_actions(
     return {"created_tasks": created, "escalated": escalated, "skipped": skipped}
 
 
+def _receipt_soft_key(receipt: dict[str, Any]) -> str:
+    soft = autonomous_attention_store.soft_dedupe_key(
+        str(receipt.get("dedupe_key") or "")
+    )
+    if soft:
+        return soft
+    title = str(receipt.get("title") or "").strip().lower()
+    workspace = str(receipt.get("workspace_id") or "").strip().lower()
+    kind = str(receipt.get("kind") or "").strip().lower()
+    if title:
+        return f"{kind}:{workspace}:{title}"
+    return str(receipt.get("receipt_id") or "").strip().lower()
+
+
+def _collapse_pending_decisions(pending: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Keep newest receipt per soft key so VAXON never stacks twin Needs-you cards."""
+    seen: set[str] = set()
+    collapsed: list[dict[str, Any]] = []
+    for row in pending:
+        soft = _receipt_soft_key(row)
+        if soft in seen:
+            continue
+        seen.add(soft)
+        collapsed.append(row)
+    return collapsed
+
+
+def _reject_duplicate_pending(*, primary_id: str, soft_key: str) -> int:
+    """Close stacked twins after the operator acts on one card."""
+    cleared = 0
+    if not soft_key:
+        return cleared
+    for row in autonomous_attention_store.list_pending_decisions(limit=500):
+        twin_id = str(row.get("receipt_id") or "").strip()
+        if not twin_id or twin_id == primary_id:
+            continue
+        if _receipt_soft_key(row) != soft_key:
+            continue
+        try:
+            autonomous_attention_store.begin_decision_resolution(twin_id)
+            autonomous_attention_store.complete_decision_resolution(
+                twin_id,
+                resolution="rejected",
+            )
+            cleared += 1
+        except Exception:
+            logger.warning(
+                "could not auto-clear duplicate autonomy decision %s", twin_id
+            )
+            try:
+                autonomous_attention_store.release_decision_resolution(twin_id)
+            except Exception:
+                pass
+    return cleared
+
+
 def resolve_autonomy_decision(
     receipt_id: str,
     *,
@@ -219,12 +279,17 @@ def resolve_autonomy_decision(
     if choice not in {"approved", "rejected"}:
         raise ValueError("resolution must be approved or rejected")
     receipt = autonomous_attention_store.begin_decision_resolution(receipt_id)
+    soft_key = _receipt_soft_key(receipt)
     if choice == "rejected":
         try:
-            return autonomous_attention_store.complete_decision_resolution(
+            resolved = autonomous_attention_store.complete_decision_resolution(
                 receipt_id,
                 resolution="rejected",
             )
+            cleared = _reject_duplicate_pending(
+                primary_id=receipt_id, soft_key=soft_key
+            )
+            return resolved
         except Exception:
             autonomous_attention_store.release_decision_resolution(receipt_id)
             raise
@@ -257,11 +322,13 @@ def resolve_autonomy_decision(
             approval_receipt_id=receipt_id,
             attempt_budget=1,
         )
-        return autonomous_attention_store.complete_decision_resolution(
+        resolved = autonomous_attention_store.complete_decision_resolution(
             receipt_id,
             resolution="approved",
             task_id=str(task.get("task_id") or "") or None,
         )
+        cleared = _reject_duplicate_pending(primary_id=receipt_id, soft_key=soft_key)
+        return resolved
     except Exception:
         if task is not None:
             try:
@@ -312,6 +379,15 @@ def run_autonomous_attention_scan(
         except Exception:  # noqa: BLE001
             logger.exception("lead check-in during attend scan failed")
             result["lead_checkin"] = {"error": "lead_checkin_failed"}
+
+    # Machine CEO — host pulse + safe allowlisted kills while Full autonomy is on.
+    try:
+        from app.host_context.machine_ceo import run_machine_ceo_tick
+
+        result["machine_ceo"] = run_machine_ceo_tick(auto_kill=True)
+    except Exception:  # noqa: BLE001
+        logger.exception("machine ceo tick during attend scan failed")
+        result["machine_ceo"] = {"error": "machine_ceo_failed"}
 
     for workspace_id in targets:
         workspace = str(workspace_id or "").strip()
@@ -384,76 +460,12 @@ def run_autonomous_attention_scan(
 
 
 def build_autonomy_status_feed(*, workspace_id: str | None = None) -> dict[str, Any]:
-    """Read-only status for Mission Control autonomy control."""
-    from app.persistence import operator_presence_settings_store
-    from app.workspace_agents.fleet_control import build_scheduler_status
-
-    settings = operator_presence_settings_store.load_settings()
-    mode = str(settings.get("autonomy_mode") or "manual").strip().lower()
-    scheduler = build_scheduler_status()
-    scoped_workspace = str(workspace_id or "").strip()
-    receipts = autonomous_attention_store.list_receipts(
-        limit=30,
-        workspace_id=scoped_workspace or None,
+    """Return Mission Control status and repair stale recovered-shift approvals."""
+    return _build_autonomy_status_feed(
+        workspace_id=workspace_id,
+        collapse_pending=_collapse_pending_decisions,
+        latest_outcome=latest_role_run_outcome,
     )
-    for receipt in receipts:
-        task_id = str(receipt.get("task_id") or "").strip()
-        if not task_id:
-            continue
-        task = task_store.get_task(task_id)
-        if task is None:
-            continue
-        payload = receipt.get("payload")
-        if not isinstance(payload, dict):
-            payload = {}
-            receipt["payload"] = payload
-        payload["task_status"] = str(task.get("status") or "")
-        payload["terminal_outcome"] = str(task.get("terminal_outcome") or "")
-    pending = autonomous_attention_store.list_pending_decisions(
-        limit=500,
-        workspace_id=scoped_workspace or None,
-    )
-    last_scan_key = f"last_scan:{scoped_workspace}" if scoped_workspace else "last_scan"
-    last_scan = autonomous_attention_store.get_meta(last_scan_key) or {}
-    return {
-        "autonomy_mode": mode if mode in {"manual", "semi", "full"} else "manual",
-        "autonomous_enabled": mode == "full",
-        "effective_autonomy": mode == "full"
-        and bool(scheduler.get("effective_enabled")),
-        "scheduler": {
-            "effective_enabled": bool(scheduler.get("effective_enabled")),
-            "scheduler_enabled": bool(scheduler.get("scheduler_enabled")),
-            "blocked_by_env": bool(scheduler.get("blocked_by_env")),
-            "env_allowed": bool(scheduler.get("env_allowed")),
-            "executing_count": int(scheduler.get("executing_count") or 0),
-            "hard_killed": bool(scheduler.get("hard_killed")),
-        },
-        "last_scan": last_scan if isinstance(last_scan, dict) else {},
-        "pending_critical_count": len(pending),
-        "pending_critical_decisions": pending[:12],
-        "recent_receipts": receipts[:20],
-        "safety_contract": {
-            "auto_allowed": [
-                "inspect",
-                "retry_idempotent_checks",
-                "route_internal_handoffs",
-                "create_bounded_specialist_tasks",
-                "edit_disposable_worktrees",
-                "run_tests",
-            ],
-            "requires_operator": [
-                "critical_severity_mutation",
-                "secrets_credentials",
-                "destructive_filesystem_git_database",
-                "production_deploy_release",
-                "protected_merge_push",
-                "external_public_communication",
-                "permissions_policy_changes",
-                "approval_gated_runs",
-                "raising_usage_spend_caps",
-            ],
-        },
-    }
 
 
 __all__ = [

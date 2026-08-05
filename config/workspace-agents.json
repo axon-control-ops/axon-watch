@@ -198,7 +198,7 @@
         {
           "name": "Ash",
           "role": "watcher",
-          "owns": "Centre readiness signals and enrolment blockers",
+          "owns": "Centre readiness signals, enrolment blockers, and verified health/CI receipts (Shell/Read allowed)",
           "schedule": "always_on",
           "azure_voice_id": "en-ZA-LukeNeural"
         },
@@ -212,14 +212,14 @@
         {
           "name": "Cole",
           "role": "backend",
-          "owns": "Enrolment data, NPO records, and ops checklists",
+          "owns": "Enrolment data, NPO records, ops checklists, and verified count/query scripts",
           "schedule": "continuous",
           "azure_voice_id": "en-GB-ElliotNeural"
         },
         {
           "name": "Sol",
           "role": "integrations",
-          "owns": "Document export hooks and EduDash linkage notes",
+          "owns": "Document export hooks, EduDash/chat POP delivery wiring, and smoke-script verification",
           "schedule": "continuous",
           "azure_voice_id": "en-GB-HollieNeural"
         }

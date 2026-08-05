@@ -536,13 +536,30 @@
   display: flex;
   flex-direction: column;
   gap: 0.35rem;
-  min-height: 0;
+  min-height: 7.5rem;
   max-height: min(34rem, 62vh);
   padding: 0.45rem 0.55rem 0.55rem;
   border: 1px solid rgba(0, 242, 255, 0.14);
   border-radius: 0.45rem;
   background: rgba(0, 12, 20, 0.42);
   overflow: auto;
+}
+
+.operator-status-radar-panel__run-target {
+  grid-column: 1 / -1;
+  margin: 0 0 0.25rem;
+  color: rgba(170, 220, 235, 0.9);
+  font-family: var(--font-ui);
+  font-size: 0.68rem;
+  line-height: 1.35;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.operator-status-radar-panel__run-target span {
+  color: rgba(140, 190, 205, 0.78);
+  text-transform: lowercase;
 }
 
 .operator-status-radar-panel__attention-head {

@@ -101,7 +101,7 @@
       "target": "apps/console-web/src/components/workbench/*"
     },
     "services/control-plane/app/kairo_conversation_reply.py": {
-      "max_lines": 330,
+      "max_lines": 270,
       "soft_limit": 350,
       "hard_limit": 500,
       "target": "services/control-plane/app/kairo/replies/*"
@@ -234,7 +234,7 @@
       "target": "apps/console-web/src/styles/shell/mockup-shell-13a.css + mockup-shell-13b.css"
     },
     "apps/console-web/src/components/shell/OperatorStatusRadarPanel.vue": {
-      "max_lines": 702,
+      "max_lines": 734,
       "soft_limit": 350,
       "hard_limit": 500,
       "target": "apps/console-web/src/components/shell/operator-status-radar/*",
@@ -443,11 +443,11 @@
       "note": "Autonomy publish path-scope + receipts; gh resolve extracted to gh_cli.py"
     },
     "apps/console-web/src/components/shell/OperatorTaskBoardPanel.vue": {
-      "max_lines": 590,
+      "max_lines": 553,
       "soft_limit": 350,
       "hard_limit": 500,
       "target": "apps/console-web/src/components/shell/operator-task-board/*",
-      "note": "Mission Control Task Board; Start now + Engage review open/dismiss/reopen"
+      "note": "Mission Control Task Board; handoffs extracted to OperatorTaskBoardHandoffs.vue"
     },
     "apps/console-web/src/features/report-theater/report-theater.css": {
       "max_lines": 550,
@@ -520,7 +520,7 @@
       "note": "VAXON orb HUD autonomy controls; split confirm/critical sheets next"
     },
     "apps/console-web/src/styles/shell/mockup-shell-11.css": {
-      "max_lines": 586,
+      "max_lines": 603,
       "soft_limit": 350,
       "hard_limit": 500,
       "target": "apps/console-web/src/styles/shell/*",

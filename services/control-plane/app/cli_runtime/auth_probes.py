@@ -271,7 +271,22 @@ def codex_auth_status(
             binary, env_without_api_keys(runtime_env, family="codex"), vault_posture=vault_posture
         )
         if oauth_probe and oauth_probe.get("logged_in"):
-            return oauth_probe
+            key_source = "vault_api_key" if (
+                env_keys.get("CODEX_API_KEY") or env_keys.get("OPENAI_API_KEY")
+            ) else "api_key"
+            return {
+                **oauth_probe,
+                "auth_method": "chatgpt",
+                "provider_label": "Codex / ChatGPT subscription",
+                "message": (
+                    "Codex ChatGPT subscription is ready. "
+                    + (
+                        "A Codex/OpenAI key is also set in /vault and will be ignored for this session."
+                        if key_source == "vault_api_key"
+                        else "A Codex/OpenAI key is also set in the control-plane environment and will be ignored for this session."
+                    )
+                ),
+            }
 
     if has_api_key:
         source = "vault_api_key" if (

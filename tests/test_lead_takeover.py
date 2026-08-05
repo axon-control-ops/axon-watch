@@ -208,9 +208,12 @@ class LeadTakeoverTests(unittest.TestCase):
         messages = chat_store.list_thread_messages(str(takeover.get("thread_id")))
         agent = next(m for m in messages if m.get("role") == "agent")
         content = str(agent.get("content") or "")
-        self.assertIn("Ask: Push OTA to canary", content)
+        self.assertIn("Goal\n- Push OTA to canary", content)
         self.assertIn("executive brief", content)
         self.assertIn("What I am doing next", content)
+        self.assertIn("Progress", content)
+        self.assertIn("What remains", content)
+        self.assertIn("Your action", content)
         self.assertNotIn("Ask me what to do next", content)
 
     def test_controlling_plan_ignores_completed_plan_id(self) -> None:

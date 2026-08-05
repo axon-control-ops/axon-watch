@@ -12,6 +12,7 @@ sys.path.insert(0, str(CONTROL_PLANE_ROOT))
 
 from app.workspace_agents.failure_detail import (  # noqa: E402
     is_agent_session_interrupted_failure,
+    is_billing_block_failure,
     is_billing_failure,
     is_operator_stopped_failure,
     is_restart_interrupted_failure,
@@ -76,6 +77,24 @@ class FailureDetailTests(unittest.TestCase):
         # covered by either of those checks, which was the original gap.
         self.assertFalse(is_usage_limit_failure("Credit balance is too low"))
         self.assertFalse(is_runtime_auth_failure("Credit balance is too low"))
+
+    def test_billing_block_unpaid_invoice_detected(self) -> None:
+        wrapped = (
+            "Lane B agent fallback reply generated "
+            "(Running as unit: axon-agent-6e26fd5057.scope; invocation ID: "
+            "59f73eb8b8f1487aa9455bf5c83bac00\n"
+            "ActionRequiredError: You have an unpaid invoice Visit "
+            "[cursor.com/dashboard](https://cursor.com/dashboard) and pay your "
+            "invoice in Stripe to resume requests.)"
+        )
+        self.assertTrue(is_billing_block_failure(wrapped))
+        self.assertFalse(is_usage_limit_failure(wrapped))
+        self.assertFalse(is_runtime_auth_failure(wrapped))
+        self.assertFalse(is_billing_block_failure("ActionRequiredError: Please accept the terms"))
+        self.assertFalse(is_billing_block_failure("verify:contracts — assertion failed"))
+        normalized = normalize_operator_failure_detail(wrapped)
+        self.assertIn("unpaid invoice", normalized.lower())
+        self.assertNotIn("Running as unit", normalized)
 
     def test_runtime_auth_detected_after_normalization(self) -> None:
         wrapped = (

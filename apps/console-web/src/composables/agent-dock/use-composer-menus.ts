@@ -168,6 +168,7 @@ export function useComposerMenus(shell: ShellStore, options: UseComposerMenusOpt
         shell.loadRuntimeStatus(),
         shell.loadCursorCatalog(true),
         shell.loadClaudeCatalog(true),
+        shell.loadCodexCatalog(true),
       ]);
     }
     if (openingMode) {

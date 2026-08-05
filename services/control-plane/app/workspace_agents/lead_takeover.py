@@ -162,8 +162,8 @@ def build_lead_takeover_message(
     status = "completed" if phase == "completed" else (phase or "ended")
     lead_next = extract_lead_next(reply_text)
     parent_ask = compress_ask(parent_plan_goal, max_len=220)
-    goal_line = _truncate(goal, max_len=220)
-    landed = plain_outcome(reply_text) or _truncate(outcome, max_len=180)
+    goal_line = compress_ask(goal, max_len=220)
+    landed = plain_outcome(reply_text) or plain_outcome(outcome)
     next_line = executive_next_step(
         lead_next=lead_next,
         specialist_name=name,
@@ -177,11 +177,11 @@ def build_lead_takeover_message(
         "Goal",
     ]
     if parent_ask:
-        lines.append(f"- Ask: {parent_ask}")
+        lines.append(f"- {parent_ask}")
     elif goal_line:
-        lines.append(f"- Ask: {goal_line}")
+        lines.append(f"- {goal_line}")
     else:
-        lines.append("- Ask: no parent goal was attached to this specialist run.")
+        lines.append("- Complete the requested result and verify that it is ready to use.")
     lines.extend(["", "Progress"])
     lines.append(
         f"- {name}: {landed}"

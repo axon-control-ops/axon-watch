@@ -55,12 +55,14 @@ def build_lead_takeover_spoken_line(
     parts = [f"{lead} here."]
     if parent_ask:
         suffix = "" if parent_ask.endswith((".", "!", "?")) else "."
-        parts.append(f"Situation: {parent_ask}{suffix}")
-    parts.append(f"Update: {name} ({role}) {status}.")
-    if outcome:
-        parts.append(f"What landed: {outcome}")
+        parts.append(f"Goal: {parent_ask}{suffix}")
+    else:
+        parts.append("Goal: Complete the requested result and verify that it is ready to use.")
+    progress = outcome or "no verified result is available yet."
+    parts.append(f"Progress: {name} ({role}) {status}; {progress}")
+    parts.append("What remains: The requested result must be verified and ready to use.")
     parts.append(
-        "Next: "
+        "What I am doing next: "
         + executive_next_step(
             lead_next=lead_next,
             specialist_name=name,

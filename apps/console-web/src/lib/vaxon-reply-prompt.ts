@@ -35,7 +35,7 @@ export function vaxonAffirmReplyCta(line: string | null | undefined): string {
   if (spokenLineAsksForRetry(text)) {
     return 'Try again';
   }
-  if (/\bhandoff\b/i.test(text) || /\battending\b/i.test(text)) {
+  if (/\bhandoff\b/i.test(text) || /\bswitch there\b/i.test(text) || /\battending\b/i.test(text)) {
     return 'Yes — attend';
   }
   if (/\bopen attention\b/i.test(text)) {

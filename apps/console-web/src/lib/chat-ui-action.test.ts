@@ -30,6 +30,7 @@ describe('parseChatUiAction', () => {
         layout_mode: 'operator',
         focus_attention: true,
         cta_label: 'Switch to Axon Watch & open Attention',
+        auto_attend: true,
       }),
     ).toEqual({
       type: 'switch_workspace',
@@ -37,9 +38,9 @@ describe('parseChatUiAction', () => {
       open_file_path: null,
       layout_mode: 'operator',
       focus_attention: true,
-      auto_attend: false,
       signal_id: null,
       cta_label: 'Switch to Axon Watch & open Attention',
+      auto_attend: true,
     });
   });
 

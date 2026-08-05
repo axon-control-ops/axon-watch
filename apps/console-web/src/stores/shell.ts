@@ -22,6 +22,7 @@ import {
 import type {
   ClaudeRuntimeStatusSnapshot,
   ConnectorProbeRecord,
+  CodexRuntimeStatusSnapshot,
   CursorRuntimeStatusSnapshot,
   FleetHealthSnapshot,
   RuntimeMcpToolsSnapshot,
@@ -303,6 +304,7 @@ import { createComposerRuntimePrefsSlice } from './shell/slices/create-composer-
 import { createConnectorsSlice } from './shell/slices/create-connectors-slice';
 import { createClaudeCatalogSlice } from './shell/slices/create-claude-catalog-slice';
 import { createCursorCatalogSlice } from './shell/slices/create-cursor-catalog-slice';
+import { createCodexCatalogSlice } from './shell/slices/create-codex-catalog-slice';
 import { createDockLayoutSlice } from './shell/slices/create-dock-layout-slice';
 import { createIdeWorkbenchChromeSlice } from './shell/slices/create-ide-workbench-chrome-slice';
 import { createOperatorBriefingSlice } from './shell/slices/create-operator-briefing-slice';
@@ -360,6 +362,9 @@ export const useShellStore = defineStore('shell', () => {
   const claudeRuntimeStatus = ref<ClaudeRuntimeStatusSnapshot | null>(null);
   const claudeCatalogLoadState = ref<'idle' | 'loading' | 'loaded' | 'error'>('idle');
   const claudeCatalogError = ref<string | null>(null);
+  const codexRuntimeStatus = ref<CodexRuntimeStatusSnapshot | null>(null);
+  const codexCatalogLoadState = ref<'idle' | 'loading' | 'loaded' | 'error'>('idle');
+  const codexCatalogError = ref<string | null>(null);
   const agentStreamActive = ref(false);
   const agentStreamMessageId = ref<string | null>(null);
   type AgentReportEditorLink = {
@@ -3100,6 +3105,7 @@ export const useShellStore = defineStore('shell', () => {
     selectedComposerModel,
     cursorCatalogRows,
     claudeCatalogRows,
+    codexCatalogRows,
     cursorPickerVisibleModelIds,
     composerRuntimeLabel,
     setSelectedRuntimeTarget,
@@ -3110,6 +3116,7 @@ export const useShellStore = defineStore('shell', () => {
     runtimeStatus,
     cursorRuntimeStatus,
     claudeRuntimeStatus,
+    codexRuntimeStatus,
     composerRuntimePrefsRevision,
     cursorPickerVisibleRevision,
   });
@@ -3124,6 +3131,13 @@ export const useShellStore = defineStore('shell', () => {
     cursorCatalogRows,
     composerRuntimePrefsRevision,
     currentWorkspaceId: () => currentWorkspace.value?.workspace_id ?? null,
+  });
+
+  const { loadCodexCatalog } = createCodexCatalogSlice({
+    codexRuntimeStatus,
+    codexCatalogLoadState,
+    codexCatalogError,
+    codexCatalogRows,
   });
 
   const {
@@ -3744,6 +3758,10 @@ export const useShellStore = defineStore('shell', () => {
     cursorCatalogRows,
     cursorPickerVisibleModelIds,
     cursorRuntimeStatus,
+    codexCatalogError,
+    codexCatalogLoadState,
+    codexCatalogRows,
+    codexRuntimeStatus,
     dockHeroMode,
     dockSeamLayout,
     dockSeamState,
@@ -3846,6 +3864,7 @@ export const useShellStore = defineStore('shell', () => {
     loadRuns,
     loadCursorCatalog,
     loadClaudeCatalog,
+    loadCodexCatalog,
     loadRuntimeStatus,
     loadRuntimeSummary,
     loadWorkspaceThread,

@@ -56,18 +56,26 @@ def lead_summary_from_reply(reply_text: str | None) -> str:
     body = strip_thinking(reply_text)
     if not body:
         return ""
+    peeled_changed = ""
     for line in body.splitlines():
         cleaned = line.strip().lstrip("-*• ").strip()
         if not cleaned:
             continue
         lowered = cleaned.lower()
-        if lowered.startswith(("what changed", "verified", "blockers", "confidence:", "lead:")):
+        if lowered.startswith("what changed"):
+            after = re.sub(r"(?i)^what changed\s*[-–—:]?\s*", "", cleaned).strip()
+            if after:
+                peeled_changed = after
+            continue
+        if lowered.startswith(("verified", "blockers", "confidence:", "lead:")):
             continue
         if _CONFIDENCE_LINE_RE.match(cleaned):
             continue
         cleaned = _CONFIDENCE_INLINE_RE.sub("", cleaned).strip()
         if cleaned:
             return truncate_text(cleaned, max_len=280)
+    if peeled_changed:
+        return truncate_text(peeled_changed, max_len=280)
     return truncate_text(strip_confidence_lines(body), max_len=280)
 
 

@@ -1,30 +1,59 @@
+/** Full-autonomy attend for cross-workspace Advise — no operator hunt/switch. */
+
 import { triggerAutonomyScan } from '../api/autonomy-api';
-import { parseChatUiAction } from './chat-ui-action';
+import type { ChatUiAction } from './chat-ui-action';
 
-const triggeredAdviseKeys = new Set<string>();
+const recentlyTriggeredKeys = new Set<string>();
 
-export function maybeTriggerAutoAttendAdvise(input: {
-  adviseUiAction: unknown;
-  autonomyMode: string | null | undefined;
-}): boolean {
-  if (String(input.autonomyMode ?? '').trim().toLowerCase() !== 'full') {
-    return false;
+export function adviseAutoAttendKey(action: ChatUiAction | null | undefined): string | null {
+  if (!action || action.type !== 'switch_workspace' || !action.auto_attend) {
+    return null;
   }
-  const action = parseChatUiAction(input.adviseUiAction);
-  if (action?.type !== 'switch_workspace' || action.auto_attend !== true) {
-    return false;
+  const workspaceId = String(action.workspace_id || '').trim();
+  if (!workspaceId) {
+    return null;
   }
-  const key = `${action.workspace_id}:${action.signal_id ?? 'handoff'}`;
-  if (triggeredAdviseKeys.has(key)) {
-    return false;
-  }
-  triggeredAdviseKeys.add(key);
-  void triggerAutonomyScan().catch(() => {
-    triggeredAdviseKeys.delete(key);
-  });
-  return true;
+  const signalId = String(action.signal_id || '').trim();
+  return `${workspaceId}:${signalId || 'attention'}`;
 }
 
-export function resetAutoAttendAdviseDedupeForTests(): void {
-  triggeredAdviseKeys.clear();
+export function shouldAutoAttendAdvise(input: {
+  autonomyMode: string | null | undefined;
+  adviseUiAction: ChatUiAction | null | undefined;
+}): boolean {
+  const mode = String(input.autonomyMode || '')
+    .trim()
+    .toLowerCase();
+  if (mode !== 'full') {
+    return false;
+  }
+  return Boolean(adviseAutoAttendKey(input.adviseUiAction));
+}
+
+/** Fire a bounded attend scan once per advise key (does not yank the IDE focus). */
+export async function maybeTriggerAutoAttendAdvise(input: {
+  autonomyMode: string | null | undefined;
+  adviseUiAction: ChatUiAction | null | undefined;
+}): Promise<boolean> {
+  if (!shouldAutoAttendAdvise(input)) {
+    return false;
+  }
+  const key = adviseAutoAttendKey(input.adviseUiAction);
+  if (!key || recentlyTriggeredKeys.has(key)) {
+    return false;
+  }
+  recentlyTriggeredKeys.add(key);
+  try {
+    await triggerAutonomyScan();
+    return true;
+  } catch {
+    // Allow a later briefing tick to retry if the scan endpoint rejected.
+    recentlyTriggeredKeys.delete(key);
+    return false;
+  }
+}
+
+/** Test helper — clears dedupe memory between cases. */
+export function resetAutoAttendAdviseMemoryForTests(): void {
+  recentlyTriggeredKeys.clear();
 }

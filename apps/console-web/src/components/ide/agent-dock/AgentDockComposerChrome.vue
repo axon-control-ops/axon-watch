@@ -57,7 +57,7 @@ const emit = defineEmits<{
   confirmSandboxConsent: [];
   closeComposerImageLightbox: [];
   debugReproduceProceed: [messageId: string];
-  debugReproduceDismiss: [];
+  debugReproduceResolved: [messageId: string];
   approveRun: [];
   rejectRun: [];
   undoPlanSoftSwitch: [];
@@ -95,7 +95,7 @@ const emit = defineEmits<{
     :request="debugReproduceRequest"
     :pending="commandMutationPending || agentStreamActive"
     @proceed="emit('debugReproduceProceed', debugReproduceRequest.messageId)"
-    @dismiss="emit('debugReproduceDismiss')"
+    @resolve="emit('debugReproduceResolved', debugReproduceRequest.messageId)"
   />
   <!-- Soft Attention actions live on IdeAgentReviewStrip; no copy-only banner under it. -->
   <AgentDockApprovalBanner

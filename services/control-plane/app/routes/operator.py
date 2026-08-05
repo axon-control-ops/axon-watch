@@ -231,8 +231,13 @@ def kairo_tts(body: KairoTtsRequest) -> dict[str, object]:
         }
 
     voice = str(body.voice or DEFAULT_AZURE_VOICE).strip() or DEFAULT_AZURE_VOICE
+    continuation = bool(body.continuation)
     synthesized = synthesize_azure_speech(
-        trimmed, voice=voice, rate=body.rate, pitch=body.pitch
+        trimmed,
+        voice=voice,
+        rate=body.rate,
+        pitch=body.pitch,
+        continuation=continuation,
     )
     if not synthesized:
         return {
@@ -248,7 +253,9 @@ def kairo_tts(body: KairoTtsRequest) -> dict[str, object]:
         "voice": voice,
         "content_type": content_type,
         "audio_base64": base64.b64encode(audio).decode("ascii"),
-        "leading_audio_guard_ms": leading_audio_guard_ms(trimmed),
+        "leading_audio_guard_ms": leading_audio_guard_ms(
+            trimmed, continuation=continuation
+        ),
     }
 
 

@@ -1,4 +1,4 @@
-"""Auto-start skip gates for continuous worker ticks (usage + runtime auth + billing)."""
+"""Auto-start skip gates for continuous worker ticks (usage + billing + runtime auth)."""
 
 from __future__ import annotations
 
@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Any
 
 from app.workspace_agents.failure_detail import (
+    is_billing_block_failure,
     is_billing_failure,
     is_runtime_auth_failure,
     is_usage_limit_failure,
@@ -63,6 +64,20 @@ def usage_limit_blocks_auto_start(workspace_id: str, role: str) -> bool:
     except Exception:
         pass
     return True
+
+
+def billing_block_blocks_auto_start(workspace_id: str, role: str) -> bool:
+    """Skip auto-schedule when the last shift failed on an unpaid Cursor invoice.
+
+    No soft-open via usage headroom — Stripe invoice holds fail agent starts even
+    when Auto/Composer still look available. Clears once a later role outcome is
+    no longer an unpaid-invoice failure (manual retry after payment).
+    """
+    outcome = latest_role_run_outcome(workspace_id, role)
+    if not outcome or str(outcome.get("outcome") or "").strip().lower() != "failed":
+        return False
+    detail = str(outcome.get("detail") or "")
+    return is_billing_block_failure(detail)
 
 
 def workspace_usage_limit_blocks_auto_start(workspace_id: str, roles: list[str]) -> bool:
@@ -192,3 +207,16 @@ def billing_blocks_auto_start(
         first_blocked = first_blocked.replace(tzinfo=timezone.utc)
     elapsed = (current - first_blocked.astimezone(timezone.utc)).total_seconds()
     return elapsed < _BILLING_COOLDOWN_SECONDS
+
+
+def continuous_auto_start_skip_reason(workspace_id: str, role: str) -> str | None:
+    """Return a skip reason for continuous ticks, or None when the role may start."""
+    if usage_limit_blocks_auto_start(workspace_id, role):
+        return "Cursor usage limits blocked this role's last shift"
+    if billing_block_blocks_auto_start(workspace_id, role):
+        return "Cursor unpaid invoice blocked this role's last shift"
+    if billing_blocks_auto_start(workspace_id, role):
+        return "billing/credits failure blocked this role's last shift"
+    if runtime_auth_blocks_auto_start(workspace_id, role):
+        return "runtime auth blocked last shift"
+    return None

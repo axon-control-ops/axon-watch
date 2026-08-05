@@ -90,6 +90,8 @@ export interface CursorModelRecord {
   description?: string;
   badge?: string;
   available?: boolean;
+  default_reasoning_level?: string;
+  reasoning_levels?: string[];
 }
 
 export interface CursorRuntimeStatusSnapshot {
@@ -116,6 +118,15 @@ export interface ClaudeRuntimeStatusSnapshot {
   available_models: ClaudeModelRecord[];
   claude_models: ClaudeModelRecord[];
   catalog_source: 'static' | string;
+}
+
+export interface CodexRuntimeStatusSnapshot {
+  installed: boolean;
+  binary: string;
+  auth: RuntimeAuthStatus;
+  available_models: CursorModelRecord[];
+  codex_models: CursorModelRecord[];
+  catalog_source: 'live' | 'unavailable' | string;
 }
 
 export interface RuntimeMcpToolRecord {
@@ -192,6 +203,18 @@ export async function fetchClaudeRuntimeStatus(
     `/api/runtime/claude/status${query}`,
     {},
     'claude runtime status request failed',
+    RUNTIME_STATUS_FETCH_TIMEOUT_MS,
+  );
+}
+
+export async function fetchCodexRuntimeStatus(
+  options: { forceRefresh?: boolean } = {},
+): Promise<CodexRuntimeStatusSnapshot> {
+  const query = options.forceRefresh ? '?force_refresh=1' : '';
+  return fetchJson<CodexRuntimeStatusSnapshot>(
+    `/api/runtime/codex/status${query}`,
+    {},
+    'Codex model catalog request failed',
     RUNTIME_STATUS_FETCH_TIMEOUT_MS,
   );
 }

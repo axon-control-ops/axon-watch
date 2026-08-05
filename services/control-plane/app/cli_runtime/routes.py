@@ -8,6 +8,7 @@ from app.cli_runtime.catalog import (
 )
 from app.cli_runtime.claude_models import claude_runtime_snapshot
 from app.cli_runtime.cursor_models import cursor_runtime_snapshot
+from app.cli_runtime.codex_models import codex_runtime_snapshot
 from app.cli_runtime.mcp_registry import runtime_mcp_tools_registry
 from app.cli_runtime.runtime_auth_actions import (
     logout_claude_runtime,
@@ -34,6 +35,10 @@ def get_cursor_runtime_status(*, force_refresh: bool = False) -> dict[str, objec
 
 def get_claude_runtime_status(*, force_refresh: bool = False) -> dict[str, object]:
     return claude_runtime_snapshot(force_refresh=force_refresh)
+
+
+def get_codex_runtime_status(*, force_refresh: bool = False) -> dict[str, object]:
+    return codex_runtime_snapshot(force_refresh=force_refresh)
 
 
 def get_runtime_mcp_tools() -> dict[str, object]:

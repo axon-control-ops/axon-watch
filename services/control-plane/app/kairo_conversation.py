@@ -2,21 +2,15 @@
 
 from __future__ import annotations
 
-import hashlib
-import re
 import time
 from typing import Any, Literal
 
 from app.chat.command_intent import (
     classify_command,
-    command_display_name,
-    command_requires_confirmation,
     expand_command_shortcuts,
     is_question,
-    is_auto_complete_run_summary,
 )
 from app.cli_runtime.router import dispatch_ide_composer
-from app.kairo.context_pack_cache import get_cached_context_pack
 from app.kairo.voice_dispatch import (
     VoiceModelReceipt,
     normalize_voice_routing_mode,
@@ -25,6 +19,11 @@ from app.kairo.voice_dispatch import (
 )
 from app.kairo.voice_autonomy import resolve_voice_action_tier
 from app.kairo_early_intents import maybe_handle_early_converse_intent
+from app.kairo.conversation_classification import (
+    ConversationTurnKind,
+    classify_conversation_turn as _classify_conversation_turn,
+)
+from app.kairo.operator_input_safety import is_pasted_operational_context
 from app.persistence.operator_presence_settings_store import load_settings as load_presence_settings
 from app.kairo.turn_memory import (
     entity_context as _entity_context,
@@ -45,14 +44,8 @@ from app.kairo.conversation_command_ack import command_ack_line, workspace_short
 from app.kairo.conversation_context_pack import build_conversation_context_pack
 from app.kairo.teammate_handoff import enrich_handoff_with_teammate
 from app.kairo.conversation_transcript import log_voice_turn as _log_voice_turn
-from app.kairo_conversation_reply import (
-    build_conversation_facts,
-    compose_conversation_reply,
-    compose_smalltalk_reply,
-    is_open_style_question,
-)
+from app.kairo_conversation_reply import compose_conversation_reply
 from app.kairo_conversation_runtime_context import (
-    OPEN_DETAIL_RE as _OPEN_DETAIL_RE,
     build_runtime_context_block,
     runtime_workspace_id,
 )
@@ -67,27 +60,8 @@ from app.operator_briefing import build_operator_briefing
 from app.operator_brain_graph import build_operator_brain_graph
 from app.operator_fleet_health import build_operator_fleet_health
 from app.operator_persona_stt_aliases import normalize_persona_stt_aliases
-from app.persistence import chat_store
-from app.workspace_project_bindings import get_workspace_project_binding, load_workspace_project_bindings
-ConversationTurnKind = Literal["status_question", "open_question", "command", "chat", "action"]
 ConversationSource = Literal["template", "model", "fallback"]; ConversationAnswerTier = Literal["fast", "deep"]
 _MAX_RUNTIME_VOICE_REPLY_CHARS = 1200
-
-_STATUS_HINT_RE = re.compile(
-    r"\b("
-    r"approval|approvals|attention|on fire|status|briefing|fleet|health|"
-    r"signal|signals|running|active run|what needs|what's wrong|what is wrong|"
-    r"happening|nominal|degraded|waiting|clear"
-    r")\b",
-    re.IGNORECASE,
-)
-_WORKSPACE_ACTIVITY_RE = re.compile(
-    r"(?:\b(check|show|tell me|what|pull up)\b[\w\s,-]*)?"
-    r"\b(workspace|dashpro|axon[\s-]*watch|axon[\s-]*local)\b"
-    r"[\w\s,-]*\b(check|show|what|pull up)?\b[\w\s,-]*"
-    r"\b(just did|doing|latest|recent|activity)\b",
-    re.IGNORECASE,
-)
 def _runtime_workspace_id(*, workspace_id: str | None, pack: dict[str, Any]) -> str:
     return runtime_workspace_id(workspace_id=workspace_id, pack=pack)
 
@@ -116,23 +90,13 @@ def _build_runtime_context_block(
 
 
 def classify_conversation_turn(content: str) -> ConversationTurnKind:
-    trimmed = content.strip()
-    if not trimmed:
-        return "chat"
-    normalized = expand_command_shortcuts(trimmed)
-    intent = classify_command(normalized)
-    if intent != "unsupported":
-        return "command"
-    if is_open_style_question(trimmed):
-        return "open_question"
-    if _WORKSPACE_ACTIVITY_RE.search(trimmed):
-        return "status_question"
-    if _STATUS_HINT_RE.search(trimmed):
-        return "status_question"
-    if is_question(trimmed):
-        return "open_question"
-    return "chat"
-
+    """Classify a turn while retaining the public patch seam used by callers/tests."""
+    return _classify_conversation_turn(
+        content,
+        classify_command_fn=classify_command,
+        expand_command_shortcuts_fn=expand_command_shortcuts,
+        is_question_fn=is_question,
+    )
 
 
 def answer_status_question(content: str, pack: dict[str, Any]) -> str:
@@ -161,8 +125,6 @@ def converse_turn(
     trimmed = normalize_persona_stt_aliases(raw_content)
     if not trimmed:
         raise ValueError("content must not be empty")
-    from app.kairo.operator_input_safety import is_pasted_operational_context
-
     pasted_operational_context = is_pasted_operational_context(trimmed)
     dispatch_requested = str(submission_intent or "").strip().lower() == "dispatch"
     allow_actions = dispatch_requested and not pasted_operational_context
@@ -364,6 +326,9 @@ def converse_turn(
     # callers, tests) with no quality benefit for the real UI flow.
     # Keep caller use_runtime; voice_routing_mode gates lanes inside the router.
     recent = _recent_turns(session_id)
+    # A fleet-level Ask still needs a concrete workspace for the read-only
+    # runtime context. The helper falls back to Axon Watch instead of passing
+    # an empty workspace id into the Lane B context builder.
     consultative_workspace_id = _runtime_workspace_id(
         workspace_id=resolved_workspace_id,
         pack=pack,

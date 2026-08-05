@@ -320,7 +320,7 @@ class OperatorDeterministicReportTests(unittest.TestCase):
         )
 
         self.assertEqual(
-            "I'm attending the signal in axon-watch and will report back here",
+            "VAXON is investigating axon-watch and will report back here",
             composed["sections"]["next_move"],
         )
 

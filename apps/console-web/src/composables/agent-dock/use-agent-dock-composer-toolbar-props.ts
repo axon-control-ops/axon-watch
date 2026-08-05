@@ -23,6 +23,8 @@ export type AgentDockComposerToolbarSource = {
   isClaudeCatalog: MaybeRef<boolean>;
   claudeFlatRows: MaybeRef<ClaudeCatalogRow[]>;
   showFallbackCatalogNote: MaybeRef<boolean>;
+  showCursorCatalog: MaybeRef<boolean>;
+  showCodexCatalog: MaybeRef<boolean>;
   showVaultAction: MaybeRef<boolean>;
   attachmentChips: MaybeRef<AgentDockComposerAttachmentChip[]>;
   composerImages: MaybeRef<unknown[]>;
@@ -66,6 +68,8 @@ export type AgentDockComposerToolbarSource = {
   modelCatalogLoading: MaybeRef<boolean>;
   modelCatalogLoadingLabel: MaybeRef<string>;
   modelCatalogErrorMessage: MaybeRef<string>;
+  codexCatalogRows: MaybeRef<CursorCatalogRow[]>;
+  codexCatalogStatus: MaybeRef<string>;
   modelSearchQuery: MaybeRef<string>;
   runtimeHint: MaybeRef<string>;
   canConvertInstructions: MaybeRef<boolean>;
@@ -88,6 +92,8 @@ export function useAgentDockComposerToolbarProps(
     isClaudeCatalog: toValue(composer.isClaudeCatalog),
     claudeFlatRows: toValue(composer.claudeFlatRows),
     showFallbackCatalogNote: toValue(composer.showFallbackCatalogNote),
+    showCursorCatalog: toValue(composer.showCursorCatalog),
+    showCodexCatalog: toValue(composer.showCodexCatalog),
     showVaultAction: toValue(composer.showVaultAction),
     attachmentChips: toValue(composer.attachmentChips),
     composerImageCount: toValue(composer.composerImages).length,
@@ -131,6 +137,8 @@ export function useAgentDockComposerToolbarProps(
     modelCatalogLoading: toValue(composer.modelCatalogLoading),
     modelCatalogLoadingLabel: toValue(composer.modelCatalogLoadingLabel),
     modelCatalogErrorMessage: toValue(composer.modelCatalogErrorMessage),
+    codexCatalogRows: toValue(composer.codexCatalogRows),
+    codexCatalogStatus: toValue(composer.codexCatalogStatus),
     modelSearchQuery: toValue(composer.modelSearchQuery),
     runtimeHint: toValue(composer.runtimeHint),
     canConvertInstructions: toValue(composer.canConvertInstructions),

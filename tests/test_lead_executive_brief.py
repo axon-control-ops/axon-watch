@@ -13,6 +13,8 @@ from app.workspace_agents.lead_executive_brief import (  # noqa: E402
     compress_ask,
     executive_next_step,
     executive_operator_action,
+    looks_like_shell_chore,
+    needs_operator_gate,
     plain_outcome,
 )
 from app.workspace_agents.lead_text import truncate_text  # noqa: E402
@@ -52,6 +54,25 @@ class LeadExecutiveBriefTests(unittest.TestCase):
         )
         self.assertIn("I will finish the verification", next_step)
         self.assertNotIn("npm run", next_step)
+        self.assertTrue(
+            looks_like_shell_chore(
+                "Run from project root .env present, npm run graduation-card-pop-counts"
+            )
+        )
+
+    def test_real_gate_only_asks_operator_in_action_section(self) -> None:
+        lead_next = "decide when to ship the parent notify campaign"
+        next_step = executive_next_step(
+            lead_next=lead_next,
+            specialist_name="Priya",
+            parent_ask="Ship parent notify",
+            status="completed",
+        )
+        action = executive_operator_action(lead_next)
+        self.assertIn("continue everything that is safe", next_step)
+        self.assertIn("Decision needed", action)
+        self.assertIn("Recommendation", action)
+        self.assertTrue(needs_operator_gate(lead_next))
 
     def test_parent_pop_goal_becomes_plain_executive_language(self) -> None:
         ask = compress_ask(
@@ -90,6 +111,12 @@ class LeadExecutiveBriefTests(unittest.TestCase):
         self.assertIn("verified counts", next_step)
         self.assertNotIn("dedupe", next_step)
         self.assertIn("Nothing right now", executive_operator_action(internal_next))
+
+    def test_non_decision_needs_no_operator_action(self) -> None:
+        action = executive_operator_action("assign the remaining app verification")
+        self.assertIn("Nothing right now", action)
+        self.assertIn("report back here", action)
+        self.assertNotIn("Ask me what to do next", action)
 
 
 if __name__ == "__main__":

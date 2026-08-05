@@ -75,10 +75,17 @@ def build_cursor_agent_command(
         research_available = bool(research_capability_snapshot().get("available"))
     if research_available and workspace_root:
         ensure_workspace_research_mcp(workspace_root)
+    # Shell/Edit need --force in headless Cursor even when Axon shows Full Access.
+    # Gate 2 still withholds --approve-mcps from continuous workers (MCP least-privilege).
+    executing = str(execution_tier or "").strip().lower() == "executing"
+    if executing:
+        command.append("--force")
     if policy != "worker" and research_available:
-        # Cursor CLI rejects audited MCP tools unless --force is set alongside
-        # --approve-mcps in headless dispatch (verified against cursor 3.10.x).
-        command.extend(["--force", "--approve-mcps"])
+        # Cursor CLI rejects audited MCP tools unless --approve-mcps is set
+        # alongside --force in headless operator dispatch (cursor 3.10.x).
+        if "--force" not in command:
+            command.append("--force")
+        command.append("--approve-mcps")
     mode_flag = _cursor_mode_flag(composer_mode, execution_tier)
     if mode_flag:
         command.extend(["--mode", mode_flag])

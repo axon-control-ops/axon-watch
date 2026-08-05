@@ -200,6 +200,8 @@ class KairoTtsRequest(BaseModel):
     voice: str | None = None
     rate: float | None = None
     pitch: float | None = None
+    # Mid-utterance chunks skip the long sink wake-up silence.
+    continuation: bool | None = None
 
 
 class DebugSessionLogRequest(BaseModel):

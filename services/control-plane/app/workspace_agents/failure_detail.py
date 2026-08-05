@@ -43,9 +43,11 @@ def _strip_failure_noise(text: str) -> str:
 
 def _pick_primary_failure_cause(inner: str) -> str:
     raw = str(inner or "")
+    # Cursor unpaid-invoice dumps use newlines between systemd noise and
+    # ActionRequiredError; also split on ';' for older semicolon-joined wrappers.
     parts = [
         _strip_failure_noise(part)
-        for part in raw.split(";")
+        for part in re.split(r"[;\n]+", raw)
     ]
     parts = [part for part in parts if part]
     if not parts:
@@ -55,7 +57,13 @@ def _pick_primary_failure_cause(inner: str) -> str:
 
     def rank(part: str) -> int:
         lowered = part.lower()
-        if "actionrequirederror" in lowered or "out of usage" in lowered or "increase limits" in lowered:
+        if (
+            "unpaid invoice" in lowered
+            or "pay your invoice" in lowered
+            or "actionrequirederror" in lowered
+            or "out of usage" in lowered
+            or "increase limits" in lowered
+        ):
             return 0
         if any(marker in lowered for marker in _RUNTIME_AUTH_MARKERS):
             return 1
@@ -98,6 +106,20 @@ def is_usage_limit_failure(detail: str | None) -> bool:
         or "used 100% of your included" in hay
     )
     return matched
+
+
+def is_billing_block_failure(detail: str | None) -> bool:
+    """True when Cursor blocked the agent runtime for an unpaid invoice / Stripe hold.
+
+    Distinct from usage limits: the account may still show Auto headroom, but
+    agent requests fail immediately until the invoice is paid in the dashboard.
+    """
+    hay = f"{detail or ''} {normalize_operator_failure_detail(detail)}".lower()
+    return (
+        "unpaid invoice" in hay
+        or "pay your invoice" in hay
+        or ("invoice" in hay and "stripe" in hay and "resume requests" in hay)
+    )
 
 
 def is_runtime_auth_failure(detail: str | None) -> bool:

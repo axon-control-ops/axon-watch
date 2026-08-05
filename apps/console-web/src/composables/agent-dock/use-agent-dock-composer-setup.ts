@@ -1,5 +1,4 @@
 import { computed, nextTick, ref } from 'vue';
-
 import { resizeCommandComposer } from '../../lib/command-composer-autosize';
 import { useKairoConversation } from '../../features/kairo-conversation/use-kairo-conversation';
 import { useShellStore } from '../../stores/shell';
@@ -16,7 +15,6 @@ import { readWorkspaceComposerMode } from '../../lib/composer-mode-prefs';
 import { persistIdeComposerDraft } from '../../lib/ide-composer-draft-prefs';
 import { teammateRouteNotice } from '../../lib/teammate-route-notice';
 import { buildAgentDockComposerApi } from './build-agent-dock-composer-api';
-
 export function useAgentDockComposerSetup() {
   const shell = useShellStore();
   const {
@@ -34,7 +32,6 @@ export function useAgentDockComposerSetup() {
   function setInputRef(el: HTMLTextAreaElement | null): void {
     inputRef.value = el;
   }
-
   const defaultComposerMode =
     (shell.runtimeSummary?.runtime_identity.mode_default as ComposerMode) || 'agent';
   const composerMode = ref<ComposerMode>(
@@ -44,7 +41,6 @@ export function useAgentDockComposerSetup() {
       shell.activeIdeThreadId,
     ) ?? defaultComposerMode,
   );
-
   const menus = useComposerMenus(shell, { composerMode });
   const {
     activeMode,
@@ -82,7 +78,6 @@ export function useAgentDockComposerSetup() {
     switchToConsultativeAccess,
     toggleSection,
   } = menus;
-
   const {
     contextWorkspace,
     contextSelection,
@@ -100,7 +95,6 @@ export function useAgentDockComposerSetup() {
     clearSkillAttachments,
     withSkillTokensForSubmit,
   } = useComposerContext(shell);
-
   const images = useComposerImages();
   const {
     composerImages,
@@ -119,7 +113,6 @@ export function useAgentDockComposerSetup() {
     disposeComposerImagesPersistTimer,
     revokeAllComposerImagePreviews,
   } = images;
-
   function attachFilesMedia(): void {
     images.openComposerAttachmentPicker();
     closeMenus();
@@ -164,6 +157,8 @@ export function useAgentDockComposerSetup() {
     cursorCatalogCount,
     cursorCatalogStatus,
     cursorCatalogTotal,
+    codexCatalogRows,
+    codexCatalogStatus,
     cursorManageRows,
     cursorStaleWarning,
     extraPinnedRows,
@@ -187,6 +182,8 @@ export function useAgentDockComposerSetup() {
     selectedRuntimeSummary,
     showAddModelsEntry,
     showModelCatalog,
+    showCursorCatalog,
+    showCodexCatalog,
     showExtraPinnedRows,
     showFallbackCatalogNote,
     showVaultAction,
@@ -246,6 +243,7 @@ export function useAgentDockComposerSetup() {
     handleApproveRun,
     handleComposerKeydown,
     handleDebugReproduceProceed,
+    handleDebugReproduceResolved,
     handleRejectRun,
     handleResumeRun,
     handleSteer,
@@ -398,6 +396,8 @@ export function useAgentDockComposerSetup() {
     cursorCatalogCount,
     cursorCatalogStatus,
     cursorCatalogTotal,
+    codexCatalogRows,
+    codexCatalogStatus,
     cursorManageRows,
     cursorStaleWarning,
     isClaudeCatalog,
@@ -419,6 +419,7 @@ export function useAgentDockComposerSetup() {
     handleComposerPaste,
     handleDebugReproduceDismiss,
     handleDebugReproduceProceed,
+    handleDebugReproduceResolved,
     handleRejectRun,
     handleResumeRun,
     handleSteer,
@@ -477,6 +478,8 @@ export function useAgentDockComposerSetup() {
     showContextMenu,
     showModelCatalog,
     showFallbackCatalogNote,
+    showCursorCatalog,
+    showCodexCatalog,
     showDebugReproduceBanner,
     showExtraPinnedRows,
     showFullAccessConsent,

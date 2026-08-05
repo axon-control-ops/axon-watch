@@ -10,6 +10,11 @@ from app.cli_runtime.recovery import ordered_runtime_candidates
 def effective_cli_model(family: str, runtime_model: str) -> str:
     normalized = str(runtime_model or "").strip()
     if not normalized or normalized.lower() == "auto":
+        # Codex has no Cursor-style Auto routing and its config may hold a
+        # stale model id, so leave it empty here — callers fall back to the
+        # account's live model catalog (see default_codex_model) instead.
+        if family == "codex":
+            return ""
         env_key = {
             "cursor": "AXON_WATCH_CURSOR_MODEL",
             "claude": "AXON_WATCH_CLAUDE_MODEL",

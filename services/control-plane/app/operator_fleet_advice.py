@@ -11,6 +11,7 @@ from collections.abc import Mapping
 
 from app.chat.command_intent import is_auto_complete_run_summary
 from app.workspace_agents.autonomous_attention_policy import is_investigatory_critical
+from app.workspace_agents.lead_text import truncate_text
 
 # Ranking keys (highest first).
 _RANK_PENDING_APPROVAL = 1
@@ -273,58 +274,80 @@ def build_fleet_coach_line(
         ):
             if cross:
                 return (
-                    f"GitHub probe token for {name} is failing — "
-                    "open Vault there and restore GH_TOKEN before continuing."
+                    f"VAXON needs a Vault restore for the {name} GitHub probe "
+                    f"(GH_TOKEN) — keep working here; open Vault when ready."
                 )
             return (
-                f"GitHub probe token is failing — open Vault and restore GH_TOKEN "
-                f"({title})."
+                f"VAXON needs a Vault restore for the GitHub probe (GH_TOKEN) "
+                f"— {title}."
             )
         if "sentry" in title_l:
             if cross:
                 return (
-                    f"VAXON is attending the Sentry alert in {name}; "
-                    "keep working here."
+                    f"VAXON is investigating the Sentry alert in {name} "
+                    "and will report back here; keep working here."
                 )
-            return f"Sentry attention needs review: {title}."
+            return f"VAXON is investigating Sentry and will report back here: {title}."
         if cross:
             return (
-                f"VAXON is attending the critical signal in {name}; keep working here."
+                f"VAXON is investigating the critical signal in {name} "
+                "and will report back here; keep working here."
             )
         if scope_mode == "fleet":
-            return f"Critical signal in {name} needs review: {title}."
-        return f"Critical signal needs review: {title}."
+            return (
+                f"VAXON is investigating the critical signal in {name} "
+                f"and will report back here: {title}."
+            )
+        return f"VAXON is investigating the critical signal and will report back here: {title}."
 
     if kind == "review_ready":
         if cross:
             return (
-                f"VAXON is reviewing the ready run in {name}; keep working here."
+                f"VAXON is reviewing the ready run in {name} and will report back here; "
+                "keep working here."
             )
-        return f"Review the ready run in {name}."
+        return f"VAXON is opening the ready review in {name}."
 
     if kind == "open_handoff":
-        task = str(fact.get("title") or "the listed task").strip() or "the listed task"
-        title_l = task.lower()
+        raw_task = str(fact.get("title") or "the listed task").strip() or "the listed task"
+        # Mega task goals were being spoken verbatim in LIVE TRANSMISSION.
+        task = truncate_text(raw_task, max_len=96)
+        title_l = raw_task.lower()
         auth_hint = ""
         if "401" in title_l or "unauthorized" in title_l or "github api" in title_l:
-            auth_hint = " Fix GitHub credentials there;"
+            auth_hint = " Restore GitHub credentials in Vault first."
+        if (
+            "control-plane" in title_l
+            or "axon watch" in name.lower()
+            or "axon-watch" in name.lower()
+        ):
+            return (
+                f"VAXON owns an open {name} handoff: “{task}”."
+                f"{auth_hint} VAXON will dispatch or close it with evidence and report back here."
+            ).strip()
         if cross and focus_label:
             return (
                 f"VAXON owns the open handoff in {name}: “{task}”."
-                f"{auth_hint} Keep working in {focus_label}; VAXON will report the outcome here."
-            )
+                f"{auth_hint} Keep working in {focus_label}; "
+                "VAXON will report the outcome here."
+            ).strip()
         if cross:
-            base = f"VAXON owns the open handoff in {name}: “{task}”."
-            return f"{base}{auth_hint}".rstrip(";") if auth_hint else base
-        return f"Finish the open handoff ticket in {name}: “{task}”."
+            return (
+                f"VAXON owns the open handoff in {name}: “{task}”."
+                f"{auth_hint} VAXON will report the outcome here."
+            ).strip()
+        return (
+            f"VAXON owns the open handoff in {name}: “{task}”. "
+            "VAXON will report the outcome here."
+        )
 
     if kind == "degraded_runtime":
         if fact.get("watch_connected") is False:
-            return "Check watch connectivity before continuing."
+            return "VAXON is checking watch connectivity and will report back here."
         title = str(fact.get("title") or "").strip()
         if title:
-            return f"Inspect degraded runtime ({title}) before dispatching more work."
-        return "Inspect degraded runtime before dispatching more work."
+            return f"VAXON is investigating the degraded service and will report back here ({title})."
+        return "VAXON is investigating the degraded service and will report back here."
 
     return ""
 
@@ -340,14 +363,15 @@ def build_advise_ui_action(
     kind = str(winner.get("kind") or "").strip()
     target = str(winner.get("workspace_id") or "").strip()
     focused = str(focused_workspace_id or "").strip()
+    label_name = str(winner.get("display_name") or target or "workspace").strip()
     if kind == "open_handoff" and target:
         return {
             "type": "switch_workspace",
             "workspace_id": target,
             "layout_mode": "operator",
             "focus_attention": True,
+            "cta_label": f"VAXON attending {label_name}",
             "auto_attend": True,
-            "cta_label": f"Switch to {winner.get('display_name') or target} & open Attention",
         }
     if kind in {"critical_signal", "pending_approval", "review_ready"} and target:
         action: dict[str, object] = {
@@ -355,7 +379,9 @@ def build_advise_ui_action(
             "workspace_id": target,
             "layout_mode": "operator",
             "focus_attention": True,
-            "cta_label": f"Attend in {winner.get('display_name') or target}",
+            "cta_label": f"VAXON attending {label_name}",
+            # Approvals still need a human yes/no — do not auto-yank for those.
+            "auto_attend": kind != "pending_approval",
         }
         signal_id = str(winner.get("signal_id") or "").strip()
         if signal_id:
@@ -377,7 +403,8 @@ def build_advise_ui_action(
                 "workspace_id": focused,
                 "layout_mode": "operator",
                 "focus_attention": True,
-                "cta_label": "Open Attention",
+                "cta_label": "VAXON attending Attention",
+                "auto_attend": kind != "pending_approval",
             }
         if target:
             return {
@@ -385,7 +412,8 @@ def build_advise_ui_action(
                 "workspace_id": target,
                 "layout_mode": "operator",
                 "focus_attention": True,
-                "cta_label": "Open Attention",
+                "cta_label": "VAXON attending Attention",
+                "auto_attend": kind != "pending_approval",
             }
     return None
 

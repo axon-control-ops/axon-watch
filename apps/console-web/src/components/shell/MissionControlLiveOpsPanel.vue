@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref } from 'vue';
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 
 import {
   fetchAutonomyStatus,
@@ -21,6 +21,7 @@ import { resolveGalaxyPresence } from '../../features/brain-galaxy/galaxy-presen
 import { projectLiveOperationsStream } from '../../features/brain-galaxy/live-operations-stream';
 import { companyBusyEmployeesCount } from '../../features/workspace-agents/company-roster-busy';
 import MissionControlAutonomyControl from './MissionControlAutonomyControl.vue';
+import MissionControlMachineCeoStrip from './MissionControlMachineCeoStrip.vue';
 import { resolveVaxonTransmissionView } from '../../lib/mc-vaxon-transmission-view';
 import {
   vaxonAffirmReplyCta,
@@ -36,6 +37,7 @@ import VaxonExecutiveComposer from './VaxonExecutiveComposer.vue';
 const shell = useShellStore();
 const { spokenText } = useSpokenUtteranceText();
 const { pending, submitTurn, speechCapture } = useKairoConversation();
+const showTransmissionDetail = ref(false);
 const autonomyReceipts = ref<AutonomyReceipt[]>([]);
 const autonomyEffective = ref(false);
 let autonomyPoll: ReturnType<typeof setInterval> | null = null;
@@ -103,6 +105,9 @@ const transmission = computed(() =>
 );
 
 const spokenLine = computed(() => transmission.value.body);
+const transmissionHasDetail = computed(() => transmission.value.detailLines.length > 0);
+
+
 const asksForReply = computed(
   () =>
     vaxonLineAsksForReply(spokenLine.value) &&
@@ -229,24 +234,27 @@ onUnmounted(() => {
       </p>
     </header>
 
-    <div class="mc-live-ops__scroll">
-      <div
-        class="mc-live-ops__orb-stage"
-        :data-speaking="shell.kairoSpeechActive ? 'true' : 'false'"
-        :data-mode="modeChip"
-        :data-autonomy="fullAutonomyActive ? 'armed' : autonomyMode"
-      >
-        <div class="mc-live-ops__orb-visual">
-          <KairoGalaxyOrb placement-mode="embedded" />
-          <div class="mc-live-ops__orb-labels" aria-hidden="true">
-            <p class="mc-live-ops__orb-name">{{ OPERATOR_PERSONA_NAME }}</p>
-            <span class="mc-live-ops__orb-wave" />
-            <p class="mc-live-ops__orb-tagline">{{ OPERATOR_PERSONA_OPS_TAGLINE }}</p>
-          </div>
-          <MissionControlAutonomyControl />
-        </div>
-      </div>
+    <!-- Above the orb so Machine CEO is never buried under Needs-you sheets. -->
+    <MissionControlMachineCeoStrip />
 
+    <div
+      class="mc-live-ops__orb-stage"
+      :data-speaking="shell.kairoSpeechActive ? 'true' : 'false'"
+      :data-mode="modeChip"
+      :data-autonomy="fullAutonomyActive ? 'armed' : autonomyMode"
+    >
+      <div class="mc-live-ops__orb-visual">
+        <KairoGalaxyOrb placement-mode="embedded" />
+        <div class="mc-live-ops__orb-labels" aria-hidden="true">
+          <p class="mc-live-ops__orb-name">{{ OPERATOR_PERSONA_NAME }}</p>
+          <span class="mc-live-ops__orb-wave" />
+          <p class="mc-live-ops__orb-tagline">{{ OPERATOR_PERSONA_OPS_TAGLINE }}</p>
+        </div>
+        <MissionControlAutonomyControl />
+      </div>
+    </div>
+
+    <div class="mc-live-ops__scroll">
       <article
         class="mc-transmission"
         :data-mode="transmission.mode"
@@ -262,24 +270,32 @@ onUnmounted(() => {
           class="mc-transmission__body"
           :data-empty="transmission.empty ? 'true' : 'false'"
         >
-          {{ transmission.body }}
+          {{ transmission.summary }}
         </p>
-          <div v-if="asksForReply" class="mc-transmission__actions">
-            <button
-              type="button"
-              :disabled="pending"
-              @click="void sendReply({ content: 'yes' })"
-            >
-              {{ affirmCta }}
-            </button>
-            <button
-              type="button"
-              :disabled="pending"
-              @click="void sendReply({ content: 'not now' })"
-            >
-              Not now
-            </button>
-          </div>
+        <ul
+          v-if="transmissionHasDetail && showTransmissionDetail"
+          class="mc-transmission__detail"
+        >
+          <li v-for="(line, index) in transmission.detailLines" :key="index">
+            {{ line }}
+          </li>
+        </ul>
+        <button
+          v-if="transmissionHasDetail"
+          type="button"
+          class="mc-transmission__detail-toggle"
+          @click="showTransmissionDetail = !showTransmissionDetail"
+        >
+          {{ showTransmissionDetail ? 'Hide detail' : `Show detail (${transmission.detailLines.length})` }}
+        </button>
+        <div v-if="asksForReply" class="mc-transmission__actions">
+          <button type="button" :disabled="pending" @click="void sendReply({ content: 'yes' })">
+            {{ affirmCta }}
+          </button>
+          <button type="button" :disabled="pending" @click="void sendReply({ content: 'not now' })">
+            Not now
+          </button>
+        </div>
       </article>
 
       <div class="mc-live-ops__modes" role="status" aria-label="Voice mode">

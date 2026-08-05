@@ -220,14 +220,15 @@ def collect_failed_shift_findings(workspace_id: str) -> list[LeadCheckinFinding]
         owner_role, escalate_only = assign_owner_role_for_failed_shift(role, detail)
         run_id = str(outcome.get("run_id") or "").strip() or "unknown"
         name = str(employee.name or role).strip() or role
+        # Soft key omits run_id so the same role failure does not stack Needs-you cards.
         findings.append(
             LeadCheckinFinding(
                 kind="operator_blocker" if escalate_only else "failed_shift",
                 workspace_id=workspace_id,
                 owner_role=owner_role,
                 title=f"{name} ({role}) last shift failed",
-                detail=detail or "failed shift without detail",
-                dedupe_key=f"failed_shift:{workspace_id}:{role}:{run_id}",
+                detail=(detail or "failed shift without detail") + f" [run={run_id}]",
+                dedupe_key=f"failed_shift:{workspace_id}:{role}",
                 escalate_only=escalate_only,
             )
         )

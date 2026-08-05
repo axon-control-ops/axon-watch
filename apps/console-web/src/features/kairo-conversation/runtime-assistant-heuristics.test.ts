@@ -6,6 +6,11 @@ describe('runtime assistant heuristics', () => {
   it('primes the cue for open-ended assistant questions', () => {
     expect(shouldPrimeRuntimeAssistantCue('why is DashPro spiking?')).toBe(true);
     expect(shouldPrimeRuntimeAssistantCue('walk me through what happened')).toBe(true);
+    expect(
+      shouldPrimeRuntimeAssistantCue(
+        'Will Imani be able to help me run the school and prepare parent reports?',
+      ),
+    ).toBe(true);
   });
 
   it('does not prime the cue for fast operator status or command turns', () => {

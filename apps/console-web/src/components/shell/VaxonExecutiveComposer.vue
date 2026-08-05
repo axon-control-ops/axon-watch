@@ -73,7 +73,6 @@ function handleKeydown(event: KeyboardEvent): void {
     submit();
   }
 }
-
 </script>
 
 <template>

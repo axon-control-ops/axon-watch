@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from app.workspace_agents.failure_detail import (
+    is_billing_block_failure,
     is_runtime_auth_failure,
     is_usage_limit_failure,
 )
@@ -24,6 +25,11 @@ def runtime_unready_reason(record: dict[str, object]) -> str:
 def _operator_next_step(reason: str) -> str:
     """Advice must match the real blocker — never default every failure to vault."""
     lowered = reason.lower()
+    if is_billing_block_failure(reason):
+        return (
+            "Pay the unpaid Cursor invoice at cursor.com/dashboard (Stripe), "
+            "then retry. Do not raise usage/spend caps for this."
+        )
     if is_usage_limit_failure(reason):
         return (
             "Check Cursor Usage in Settings → CLI runtime — Auto+Composer may still "
@@ -52,7 +58,7 @@ def fallback_reply(
     next_step = _operator_next_step(reason)
     if failure_phase == "run_error":
         label = (runtime_label or "the selected CLI runtime").strip()
-        if is_usage_limit_failure(reason):
+        if is_billing_block_failure(reason) or is_usage_limit_failure(reason):
             return (
                 f"Lane B ({composer_mode}) could not start on {label}: {reason}. "
                 f"{next_step}"
@@ -60,6 +66,11 @@ def fallback_reply(
         return (
             f"Lane B ({composer_mode}) failed on {label}: {reason}. "
             f"{next_step}"
+        )
+    if is_billing_block_failure(reason):
+        return (
+            f"Lane B ({composer_mode}) could not start — Cursor unpaid invoice blocked the agent: "
+            f"{reason}. {next_step}"
         )
     if is_usage_limit_failure(reason):
         return (

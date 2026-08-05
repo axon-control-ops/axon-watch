@@ -6,48 +6,16 @@ from copy import deepcopy
 from contextlib import contextmanager
 import json
 import os
-import re
 import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from app.persistence import run_store_sqlite
-
-_SECRET_ASSIGNMENT_RE = re.compile(
-    r"(?i)\b([A-Z0-9_]*(?:TOKEN|SECRET|PASSWORD|API_KEY|APIKEY))"
-    r"\s*([:=])\s*([^\s,;]+)"
+from app.persistence.autonomous_attention_decisions import supersede_pending_decision
+from app.persistence.autonomous_attention_redaction import (
+    redact_payload as _redact_payload,
+    redact_text as _redact_text,
 )
-_BEARER_RE = re.compile(r"(?i)\bbearer\s+[A-Za-z0-9._~+/=-]+")
-_KNOWN_TOKEN_RE = re.compile(r"\b(?:gh[pousr]_[A-Za-z0-9]{20,}|sk-[A-Za-z0-9_-]{20,})\b")
-_SENSITIVE_KEY_RE = re.compile(
-    r"(?i)(token|secret|password|api[_-]?key|authorization|credential)"
-)
-
-
-def _redact_text(value: Any) -> str:
-    text = str(value or "")
-    text = _SECRET_ASSIGNMENT_RE.sub(r"\1\2[REDACTED]", text)
-    text = _BEARER_RE.sub("Bearer [REDACTED]", text)
-    return _KNOWN_TOKEN_RE.sub("[REDACTED]", text)
-
-
-def _redact_payload(value: Any) -> Any:
-    if isinstance(value, dict):
-        return {
-            str(key): (
-                "[REDACTED]"
-                if _SENSITIVE_KEY_RE.search(str(key))
-                else _redact_payload(item)
-            )
-            for key, item in value.items()
-        }
-    if isinstance(value, list):
-        return [_redact_payload(item) for item in value]
-    if isinstance(value, tuple):
-        return [_redact_payload(item) for item in value]
-    if isinstance(value, str):
-        return _redact_text(value)
-    return value
 
 _RECEIPT_COLUMNS = (
     "receipt_id",
@@ -442,6 +410,17 @@ def resolve_decision(
         raise
 
 
+def soft_dedupe_key(dedupe_key: str) -> str:
+    """Collapse failed_shift:ws:role:run_id → failed_shift:ws:role for twin suppression."""
+    key = str(dedupe_key or "").strip().lower()
+    if not key:
+        return ""
+    parts = key.split(":")
+    if parts and parts[0] == "failed_shift" and len(parts) >= 3:
+        return f"failed_shift:{parts[1]}:{parts[2]}"
+    return key
+
+
 def has_recent_dedupe_key(
     dedupe_key: str,
     *,
@@ -450,17 +429,18 @@ def has_recent_dedupe_key(
     key = str(dedupe_key or "").strip()
     if not key:
         return False
+    soft = soft_dedupe_key(key)
     pending = list_pending_decisions(limit=500)
-    if any(str(row.get("dedupe_key") or "") == key for row in pending):
+    if any(soft_dedupe_key(str(row.get("dedupe_key") or "")) == soft for row in pending):
         return True
     resolving = list_receipts(limit=500, status="resolving")
-    if any(str(row.get("dedupe_key") or "") == key for row in resolving):
+    if any(soft_dedupe_key(str(row.get("dedupe_key") or "")) == soft for row in resolving):
         return True
     cutoff = datetime.now(timezone.utc) - timedelta(
         seconds=max(1, int(cooldown_seconds))
     )
     for row in list_receipts(limit=500):
-        if str(row.get("dedupe_key") or "") != key:
+        if soft_dedupe_key(str(row.get("dedupe_key") or "")) != soft:
             continue
         raw = str(row.get("resolved_at") or row.get("created_at") or "").replace(
             "Z", "+00:00"
@@ -480,10 +460,12 @@ __all__ = [
     "append_receipt",
     "begin_decision_resolution",
     "complete_decision_resolution",
+    "supersede_pending_decision",
     "ensure_autonomy_receipt_schema",
     "get_receipt",
     "get_meta",
     "has_recent_dedupe_key",
+    "soft_dedupe_key",
     "list_pending_decisions",
     "list_receipts",
     "release_decision_resolution",

@@ -4,9 +4,10 @@ export interface SwitchWorkspaceUiAction {
   open_file_path?: string | null;
   layout_mode?: 'operator' | 'ide';
   focus_attention?: boolean;
-  auto_attend?: boolean;
   signal_id?: string | null;
   cta_label?: string | null;
+  /** When true under Full autonomy, VAXON attends without asking the operator to hunt. */
+  auto_attend?: boolean;
 }
 
 export interface OpenSourceUiAction {

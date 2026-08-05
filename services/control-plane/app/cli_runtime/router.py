@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import logging
-import re
 from collections.abc import Callable
 from pathlib import Path
 
@@ -13,6 +12,7 @@ from app.cli_runtime.approval_gate import (
     resolve_runtime_execution_tier,
 )
 from app.cli_runtime.catalog import runtime_status_snapshot
+from app.cli_runtime.codex_models import default_codex_model
 from app.cli_runtime.mcp_registry import mcp_tools_for_composer_mode
 from app.cli_runtime.non_cursor_dispatch import run_non_cursor_local
 from app.cli_runtime.runtime_candidates import effective_cli_model, ordered_candidates_for_dispatch
@@ -20,6 +20,7 @@ from app.cli_runtime.runtime_failure import (
     fallback_reply as _fallback_reply,
     runtime_unready_reason as _runtime_unready_reason,
 )
+from app.cli_runtime.sentry_context import sentry_monitor_context
 from app.cli_runtime.subprocess_runner import RuntimeProcessStoppedError
 from app.cli_runtime.sandbox_policy_adapter import prepare_execution_sandbox
 from app.cli_runtime.cursor_agent import (
@@ -79,60 +80,11 @@ _INSTRUCTION_TAKING = (
     "quoted commit message when the operator provided one."
 )
 
-_SENTRY_REQUEST_RE = re.compile(r"\bsentry\b", re.IGNORECASE)
-
-
 def _sentry_monitor_context(user_prompt: str) -> str:
-    """Attach bounded, secret-free Watch evidence to Sentry agent requests."""
-    if not _SENTRY_REQUEST_RE.search(user_prompt):
-        return ""
-
-    payload = fetch_watch_monitors(timeout_seconds=2.0)
-    items = payload.get("items") if isinstance(payload, dict) else None
-    record = next(
-        (
-            item
-            for item in (items if isinstance(items, list) else [])
-            if isinstance(item, dict)
-            and str(item.get("check_type") or "") == "sentry_recent_issues"
-        ),
-        None,
+    return sentry_monitor_context(
+        user_prompt,
+        fetch_monitors=fetch_watch_monitors,
     )
-    lines = [
-        "Sentry operating rule: credentials are held by Axon Watch and intentionally "
-        "excluded from workspace subprocess environment variables. Do not inspect .env, "
-        "print tokens, or infer that Sentry access is missing from process.env. Use the "
-        "trusted Axon Watch monitor evidence below.",
-    ]
-    issue_count = 0
-    status = "unavailable"
-    if record:
-        status = str(record.get("status") or "unknown")
-        detail = str(record.get("detail") or "").strip()
-        lines.append(f"Monitor status: {status}. {detail}".strip())
-        issues = record.get("issues")
-        if isinstance(issues, list):
-            issue_count = len(issues)
-            for issue in issues[:5]:
-                if not isinstance(issue, dict):
-                    continue
-                short_id = str(issue.get("short_id") or issue.get("id") or "issue")
-                title = str(issue.get("title") or "Untitled Sentry issue").strip()
-                count = int(issue.get("count") or 0)
-                permalink = str(issue.get("permalink") or "").strip()
-                lines.append(
-                    f"- {short_id}: {title} ({count} events)"
-                    + (f" — {permalink}" if permalink else "")
-                )
-    else:
-        lines.append(
-            "Live monitor evidence is temporarily unavailable. Report that limitation; "
-            "do not claim the Sentry token is absent."
-        )
-
-
-    return "\n".join(lines)
-
 
 def _operator_persona_enabled() -> bool:
     return bool(load_settings().get("operator_persona_enabled", True))
@@ -194,8 +146,6 @@ def _system_prompt(
         f"edited files or ran commands. {ask_fence_instruction()}"
         f"{_INSTRUCTION_TAKING} {research_line} {_REPLY_STYLE}"
     )
-
-
 def _build_prompt(
     *,
     composer_mode: str,
@@ -229,21 +179,26 @@ def _build_prompt(
         f"{sentry_section}\n\n"
         f"Operator request:\n{user_prompt.strip()}"
     )
-
-
 def _resolve_workspace_root(workspace_id: str) -> Path | None:
     try:
         return resolve_workspace_root(workspace_id)
     except WorkspaceRootError:
         return None
-
-
 def _cloud_runtime_message(record: dict[str, object]) -> str:
     label = str(record.get("label") or record.get("id") or "cloud runtime")
     return (
         f"{label} is configured in the catalog, but its execution adapter has not landed yet. "
         "Use the local runtime target or switch the default runtime back to a local CLI."
     )
+
+
+def _split_codex_model_selection(model: str) -> tuple[str, str]:
+    """Decode the UI's model@effort preference into Codex CLI arguments."""
+    selected = str(model or "").strip()
+    model_id, marker, effort = selected.rpartition("@")
+    if marker and model_id and effort in {"low", "medium", "high", "xhigh"}:
+        return model_id, effort
+    return selected, ""
 
 
 def _run_phase(run_id: str) -> str | None:
@@ -348,6 +303,7 @@ def dispatch_ide_composer(
         target_type = str(record.get("target_type") or "local")
         candidate_runtime_model = runtime_model if family == preferred_family else ""
         model = effective_cli_model(family, str(candidate_runtime_model or ""))
+        reasoning_effort = ""
         runtime_label = str(record.get("label") or runtime_id)
         dispatch_env = subprocess_env
         if family == "cursor":
@@ -361,10 +317,13 @@ def dispatch_ide_composer(
                 auth=record.get("auth") if isinstance(record.get("auth"), dict) else None,
             )
         elif family == "codex":
+            model, reasoning_effort = _split_codex_model_selection(model)
             dispatch_env = codex_dispatch_env(
                 subprocess_env,
                 auth=record.get("auth") if isinstance(record.get("auth"), dict) else None,
             )
+            if not model:
+                model = default_codex_model(binary, env=dispatch_env)
         dispatch_env, sandbox_policy = prepare_execution_sandbox(
             execution_policy,
             family=family,
@@ -411,6 +370,7 @@ def dispatch_ide_composer(
                     composer_mode=composer_mode,
                     execution_tier=execution_tier,
                     model=model,
+                    reasoning_effort=reasoning_effort,
                     subprocess_env=dispatch_env,
                     run_id=run_id,
                     on_chunk=on_chunk,
@@ -481,6 +441,7 @@ def dispatch_ide_composer(
                                 composer_mode=composer_mode,
                                 execution_tier=execution_tier,
                                 model=model,
+                                reasoning_effort=reasoning_effort,
                                 subprocess_env=retry_env,
                                 run_id=run_id,
                                 on_chunk=on_chunk,

@@ -28,7 +28,7 @@ class AutonomousAttentionPolicyTests(unittest.TestCase):
         self.assertEqual(decision.tier, "auto_safe")
         self.assertFalse(decision.ask_operator)
 
-    def test_investigatory_critical_signal_is_auto_safe(self) -> None:
+    def test_investigatory_critical_signal_auto_dispatches(self) -> None:
         decision = classify_attention_item(
             kind="critical_signal",
             title="Sentry critical",
@@ -38,6 +38,7 @@ class AutonomousAttentionPolicyTests(unittest.TestCase):
         self.assertEqual(decision.decision, "dispatch")
         self.assertFalse(decision.ask_operator)
         self.assertEqual(decision.risk, "normal")
+        self.assertEqual(decision.reason, "bounded_auto:investigate_critical")
 
     def test_unclassified_critical_signal_stays_operator_gated(self) -> None:
         decision = classify_attention_item(

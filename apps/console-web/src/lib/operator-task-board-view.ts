@@ -153,7 +153,7 @@ function sortNewest(left: WorkspaceTaskRecord, right: WorkspaceTaskRecord): numb
 }
 
 /** Shared plan-chip width so row labels match plan-group chips. */
-const PLAN_CHIP_LABEL_MAX = 28;
+const PLAN_CHIP_LABEL_MAX = 22;
 const TASK_CARD_GOAL_MAX = 96;
 
 /** Compact operator-facing label for plan chips and dependency tags. */
@@ -423,8 +423,11 @@ export function buildOperatorTaskBoardView(
   const planGroups: TaskBoardPlanGroup[] = [];
   const groupedTaskIds = new Set<string>();
   for (const plan of plans) {
-    const planRows = rows.filter((row) => row.planId === plan.plan_id && row.bucket !== 'cancelled');
-    if (!planRows.length) {
+    const allPlanRows = rows.filter((row) => row.planId === plan.plan_id);
+    const planRows = allPlanRows.filter((row) => row.bucket !== 'cancelled');
+    // A valid Lead review can have only completed/cancelled specialist tasks.
+    // Keep it visible until the operator resolves its VAXON handoff.
+    if (!planRows.length && !plan.awaiting_engagement) {
       continue;
     }
     for (const row of planRows) {

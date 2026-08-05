@@ -2,6 +2,7 @@ import { computed, type ComputedRef, type Ref } from 'vue';
 
 import type {
   ClaudeRuntimeStatusSnapshot,
+  CodexRuntimeStatusSnapshot,
   CursorRuntimeStatusSnapshot,
   RuntimeStatusSnapshot,
 } from '../../../api/control-plane';
@@ -13,11 +14,11 @@ import {
 } from '../../../lib/claude-catalog-view';
 import {
   buildCursorCatalogRows,
-  composerRuntimeFamilyLabel,
   cursorComposerRuntimeLabel,
   resolveCursorComposerModel,
   type CursorCatalogRow,
 } from '../../../lib/cursor-catalog-view';
+import { buildCodexCatalogRows, codexModelLabel } from '../../../lib/codex-catalog-view';
 import {
   readComposerRuntimePrefs,
   writeComposerRuntimePrefs,
@@ -34,6 +35,7 @@ interface CreateComposerRuntimePrefsSliceInput {
   runtimeStatus: Ref<RuntimeStatusSnapshot | null>;
   cursorRuntimeStatus: Ref<CursorRuntimeStatusSnapshot | null>;
   claudeRuntimeStatus: Ref<ClaudeRuntimeStatusSnapshot | null>;
+  codexRuntimeStatus: Ref<CodexRuntimeStatusSnapshot | null>;
   composerRuntimePrefsRevision: Ref<number>;
   cursorPickerVisibleRevision: Ref<number>;
 }
@@ -55,6 +57,9 @@ export function createComposerRuntimePrefsSlice(input: CreateComposerRuntimePref
   const cursorCatalogRows: ComputedRef<CursorCatalogRow[]> = computed(() =>
     buildCursorCatalogRows(input.cursorRuntimeStatus.value),
   );
+  const codexCatalogRows: ComputedRef<CursorCatalogRow[]> = computed(() =>
+    buildCodexCatalogRows(input.codexRuntimeStatus.value),
+  );
 
   const claudeCatalogRows: ComputedRef<ClaudeCatalogRow[]> = computed(() =>
     buildClaudeCatalogRows(input.claudeRuntimeStatus.value),
@@ -73,7 +78,11 @@ export function createComposerRuntimePrefsSlice(input: CreateComposerRuntimePref
     ].find((record) => record.id === target);
     const family = targetRecord?.family ?? 'cursor';
     if (family === 'codex') {
-      return prefs.codex_cli_model?.trim() || 'auto';
+      const stored = prefs.codex_cli_model?.trim();
+      if (stored && stored !== 'auto') {
+        return stored;
+      }
+      return codexCatalogRows.value.find((row) => row.available)?.id ?? '';
     }
     if (family === 'claude') {
       const stored = prefs.claude_cli_model?.trim();
@@ -103,8 +112,8 @@ export function createComposerRuntimePrefsSlice(input: CreateComposerRuntimePref
     const family = target?.family ?? 'runtime';
     if (family === 'cursor') {
       return cursorComposerRuntimeLabel({
-        family,
-        scope,
+        family: target?.label || 'Cursor',
+        scope: target?.target_type === 'cloud' ? 'cloud' : '',
         modelId: selectedComposerModel.value,
         rows: cursorCatalogRows.value,
       });
@@ -117,8 +126,10 @@ export function createComposerRuntimePrefsSlice(input: CreateComposerRuntimePref
       });
     }
     const model = selectedComposerModel.value;
-    const modelLabel = model === 'auto' ? 'Auto' : model;
-    return `${composerRuntimeFamilyLabel(family)} · ${modelLabel}`;
+    const modelLabel = family === 'codex'
+      ? codexModelLabel(model, codexCatalogRows.value)
+      : model === 'auto' ? 'Auto' : model;
+    return `${target?.label || family} · ${modelLabel}`;
   });
 
   function setSelectedRuntimeTarget(runtimeTarget: string): void {
@@ -149,7 +160,9 @@ export function createComposerRuntimePrefsSlice(input: CreateComposerRuntimePref
     const family = targetRecord?.family ?? 'cursor';
     const normalized = modelId.trim() || 'auto';
     if (family === 'codex') {
-      writeComposerRuntimePrefs(workspaceId, { codex_cli_model: normalized });
+      writeComposerRuntimePrefs(workspaceId, {
+        codex_cli_model: normalized === 'auto' ? '' : normalized,
+      });
     } else if (family === 'claude') {
       writeComposerRuntimePrefs(workspaceId, { claude_cli_model: normalized });
     } else {
@@ -173,6 +186,7 @@ export function createComposerRuntimePrefsSlice(input: CreateComposerRuntimePref
     selectedComposerModel,
     cursorCatalogRows,
     claudeCatalogRows,
+    codexCatalogRows,
     cursorPickerVisibleModelIds,
     composerRuntimeLabel,
     setSelectedRuntimeTarget,

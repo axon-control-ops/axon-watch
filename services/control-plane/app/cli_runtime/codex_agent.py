@@ -23,6 +23,7 @@ def _build_codex_exec_command(
     composer_mode: str,
     execution_tier: str = "consultative",
     model: str = "",
+    reasoning_effort: str = "",
 ) -> list[str]:
     # Safe-improvement evaluation must pass the disposable isolation root here
     # (see proposal_service.sandbox_agent_workspace), never the live bound project.
@@ -35,6 +36,8 @@ def _build_codex_exec_command(
         command.extend(["--sandbox", "read-only", "-c", 'approval_policy="never"'])
     if model:
         command.extend(["--model", model])
+    if reasoning_effort:
+        command.extend(["-c", f'model_reasoning_effort="{reasoning_effort}"'])
     command.append("--")
     command.append(prompt)
     return command
@@ -74,6 +77,7 @@ def run_codex_local(
     composer_mode: str,
     execution_tier: str = "consultative",
     model: str = "",
+    reasoning_effort: str = "",
     timeout_seconds: int = 90,
     subprocess_env: dict[str, str] | None = None,
     run_id: str = "",
@@ -87,6 +91,7 @@ def run_codex_local(
         composer_mode=composer_mode,
         execution_tier=execution_tier,
         model=model,
+        reasoning_effort=reasoning_effort,
     )
 
     def _emit_codex_chunk(accumulated: str, delta: str) -> None:
