@@ -136,6 +136,7 @@ def _park_under_ship_plan(
     if superseded:
         logger.info("VAXON fleet repair superseded %s prior task(s) for %s (parked)", len(superseded), needle)
 
+    reused_sticky = existing is not None
     if existing is None:
         existing = task_store.create_task(
             workspace_id=workspace_id,
@@ -158,6 +159,32 @@ def _park_under_ship_plan(
     parked = dict(existing)
     parked["parked_under_plan"] = plan_id
     store.attach_task(fingerprint, str(parked.get("task_id") or ""), status="repairing")
+
+    try:
+        from app.workspace_agents import lead_plan_store
+
+        lead_plan_store.append_receipt(
+            plan_id=plan_id,
+            workspace_id=workspace_id,
+            kind="fleet_repair_finding_parked",
+            payload={
+                "task_id": parked.get("task_id"),
+                "fingerprint": fingerprint,
+                "subsystem": event.get("subsystem"),
+                "file_hint": event.get("file_hint"),
+                "occurrence_count": event.get("occurrence_count"),
+                "reused_sticky_lead_task": reused_sticky,
+            },
+        )
+    except Exception as exc:  # noqa: BLE001 — a missing audit receipt must not block parking
+        logger.warning("VAXON fleet repair finding plan receipt failed: %s", exc)
+    try:
+        from app.live_events import broadcast_material_change
+
+        broadcast_material_change(receipt_id=f"fleet_repair_parked_{plan_id}_{fingerprint}")
+    except Exception:  # noqa: BLE001 — live-update push must not block parking
+        pass
+
     logger.info(
         "VAXON fleet repair parked under ship plan %s workspace=%s fingerprint=%s task=%s",
         plan_id, workspace_id, fingerprint, parked.get("task_id"),

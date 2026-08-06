@@ -98,7 +98,13 @@ watch(
         // IDE must stay interactive: skip heavy operator surface refresh while
         // coding/streaming. Operator layout still needs light run refresh.
         if (shell.layoutMode === 'ide') {
-          return;
+          // Runtime summary (watch connectivity, CLI status) must still
+          // self-heal here, or a transient watch outage leaves the WATCH
+          // OFFLINE banner stuck indefinitely — this is the only surface
+          // refresh call left running while the operator stays in IDE mode.
+          // background:true is cheap (dedup'd in-flight, no loading-state
+          // flip) and touches nothing else, so it's safe during streaming.
+          return shell.loadRuntimeSummary({ background: true });
         }
         return shell.refreshRunSurfaces({ light: true });
       },

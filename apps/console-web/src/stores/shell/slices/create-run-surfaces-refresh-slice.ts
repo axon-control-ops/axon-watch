@@ -125,7 +125,14 @@ export function createRunSurfacesRefreshSlice(input: CreateRunSurfacesRefreshSli
     if (light) {
       // Live SSE ticks must stay cheap: skip CLI status/summary AND watch inbox
       // (inbox watch probe regularly hits a ~5s timeout and freezes the console).
-      await input.loadRuns({ sync: false });
+      // loadRuntimeSummary here is the background:true path only (cached,
+      // dedup'd in-flight, no loading-state flip) — it must still run or a
+      // transient watch outage leaves the WATCH OFFLINE banner stuck until
+      // the next full refresh, which may never come during a light-refresh streak.
+      await Promise.all([
+        input.loadRuns({ sync: false }),
+        input.loadRuntimeSummary({ background: true }),
+      ]);
       clearStaleIdeStreamUi();
       await input.autoContinueInterruptedIdeRun();
       await input.flushIdeComposerQueueIfIdle();

@@ -116,6 +116,28 @@ describe('createRunSurfacesRefreshSlice', () => {
     expect(flushIdeComposerQueueIfIdle).toHaveBeenCalledOnce();
   });
 
+  it('still refreshes runtime summary in the background during light refresh', async () => {
+    // Regression: a light-only refresh loop (SSE ticks while a run is
+    // executing, or the IDE-mode refresh path) must not leave watch
+    // connectivity state stale forever — WATCH OFFLINE has to self-heal.
+    runs.value = [makeRun('executing')];
+    const { refreshRunSurfaces } = createSlice();
+
+    await refreshRunSurfaces();
+
+    expect(loadRuntimeSummary).toHaveBeenCalledWith({ background: true });
+  });
+
+  it('still refreshes runtime summary when light is forced explicitly', async () => {
+    const { refreshRunSurfaces } = createSlice();
+
+    await refreshRunSurfaces({ light: true });
+
+    expect(loadRuntimeSummary).toHaveBeenCalledWith({ background: true });
+    expect(loadRuntimeStatus).not.toHaveBeenCalled();
+    expect(loadInbox).not.toHaveBeenCalled();
+  });
+
   it('uses soft full refresh when core surfaces are already loaded', async () => {
     const { refreshRunSurfaces } = createSlice();
 
