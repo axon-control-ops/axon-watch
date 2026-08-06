@@ -6,6 +6,7 @@ import {
   apiUrl,
   CHAT_MESSAGE_FETCH_TIMEOUT_MS,
   controlPlaneBaseUrl,
+  DEFAULT_FETCH_TIMEOUT_MS,
   fetchJson,
   THREAD_HISTORY_FETCH_TIMEOUT_MS,
 } from './client';
@@ -149,6 +150,32 @@ export async function fetchThreadHistory(threadId: string): Promise<ThreadHistor
     {},
     'thread history fetch failed',
     THREAD_HISTORY_FETCH_TIMEOUT_MS,
+  );
+}
+
+export interface SyncThreadExecutionAccessNoticesResponse {
+  thread_id: string;
+  updated: number;
+}
+
+/**
+ * Retroactively rewrites any stored "consultative-only" / "Full Access enabled"
+ * notice in this thread to match the operator's current Full Access toggle.
+ */
+export async function syncThreadExecutionAccessNotices(
+  threadId: string,
+  executionAccess: string,
+): Promise<SyncThreadExecutionAccessNoticesResponse> {
+  const encodedThreadId = encodeURIComponent(threadId);
+  return fetchJson<SyncThreadExecutionAccessNoticesResponse>(
+    `/api/chat/threads/${encodedThreadId}/execution-access-notices`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ execution_access: executionAccess }),
+    },
+    'thread execution-access notice sync failed',
+    DEFAULT_FETCH_TIMEOUT_MS,
   );
 }
 

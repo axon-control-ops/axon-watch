@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   collapseBackToBackThinkingEcho,
   firstSpeakableAgentLiveBlock,
+  flattenLiveLineText,
   isAgentLiveLineTruncated,
   isWaitProgressThinking,
   sanitizeAgentThinkingForOperator,
@@ -114,6 +115,22 @@ describe('collapseBackToBackThinkingEcho', () => {
       'You were clicking the right place. DashPro in the left Workspaces list, or the DASHPRO orb in the middle — those are the intended targets. The detail panel was also telling you that click should open the workspace. What happened instead was only a camera zoom, because that open path was not wired up. I fixed that: clicking a workspace in the list or on the orb now switches into the IDE for that workspace. Until the page reloads with this change, use the IDE tab in the top bar after selecting the workspace.';
     expect(collapseBackToBackThinkingEcho(first + second)).toBe(second);
     expect(sanitizeAgentThinkingForOperator(first + second)).toBe(second);
+  });
+
+  it('skips the expensive per-index scan above the size cap instead of hanging', () => {
+    // Many ". X" sentence boundaries in a row is the worst case for the scan below
+    // the cap — a real ~500K-char thinking block with this shape took ~22 minutes
+    // before the cap was added; this stays well under 4,000 chars past the cap.
+    const sentence = 'The agent kept re-reading the same file over and over again. ';
+    const longText = sentence.repeat(200);
+    expect(longText.length).toBeGreaterThan(4_000);
+
+    const start = performance.now();
+    const result = collapseBackToBackThinkingEcho(longText);
+    const elapsed = performance.now() - start;
+
+    expect(elapsed).toBeLessThan(500);
+    expect(result).toBe(flattenLiveLineText(longText));
   });
 });
 

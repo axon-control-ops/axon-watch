@@ -5,6 +5,7 @@ import {
   approveRun,
   completeRun,
   fetchThreadHistory,
+  syncThreadExecutionAccessNotices,
   fetchWorkspaceChatThread,
   hasWorkspaceChatThread,
   fetchWorkspaceFile,
@@ -2146,12 +2147,24 @@ export const useShellStore = defineStore('shell', () => {
 
     commandMutationState.value = 'submitting';
     commandMutationError.value = null;
-    ideComposerActivity.value = {
-      label: buildIdeComposerActivityLabel(composerMode, agentExecutionAccess.value),
-      mode: composerMode,
-      executionAccess: agentExecutionAccess.value,
-      operatorPrompt: content,
-    };
+    {
+      const target = [
+        ...(runtimeStatus.value?.local ?? []),
+        ...(runtimeStatus.value?.cloud ?? []),
+      ].find((record) => record.id === selectedRuntimeTargetId.value);
+      const family = target?.family ?? 'cursor';
+      const activityLabel = buildIdeComposerActivityLabel(
+        composerMode,
+        agentExecutionAccess.value,
+        family,
+      );
+      ideComposerActivity.value = {
+        label: activityLabel,
+        mode: composerMode,
+        executionAccess: agentExecutionAccess.value,
+        operatorPrompt: content,
+      };
+    }
 
     try {
       const linkedRunId = isRunLinkedComposerMode(composerMode)
@@ -2302,10 +2315,35 @@ export const useShellStore = defineStore('shell', () => {
       clearFullAccessSessionConsent();
       persistAgentExecutionAccess('consultative');
       agentExecutionAccess.value = 'consultative';
+      void syncActiveThreadExecutionAccessNotices('consultative');
       return;
     }
     agentExecutionAccess.value = normalized;
     persistAgentExecutionAccess(normalized);
+    void syncActiveThreadExecutionAccessNotices(normalized);
+  }
+
+  /**
+   * Retroactively flips any "consultative-only" / "Full Access enabled" notice
+   * already in the open thread's history to match the toggle just set — the
+   * operator wants old notices to track the live setting, not stay frozen at
+   * whatever was true when they were written.
+   */
+  async function syncActiveThreadExecutionAccessNotices(
+    executionAccess: AgentExecutionAccess,
+  ): Promise<void> {
+    const threadId = activeThreadId.value;
+    if (!threadId) {
+      return;
+    }
+    try {
+      const result = await syncThreadExecutionAccessNotices(threadId, executionAccess);
+      if (result.updated > 0) {
+        await refreshThreadHistory(threadId);
+      }
+    } catch {
+      // Best-effort cosmetic sync — a failure here shouldn't block the toggle itself.
+    }
   }
 
   function resolveActiveIdeStopRun(): RunRecord | null {
@@ -3113,6 +3151,7 @@ export const useShellStore = defineStore('shell', () => {
     toggleCursorPickerVisibleModel,
   } = createComposerRuntimePrefsSlice({
     currentWorkspace,
+    activeIdeThreadId,
     runtimeStatus,
     cursorRuntimeStatus,
     claudeRuntimeStatus,

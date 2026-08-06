@@ -15,11 +15,12 @@ from app.chat.service import (
     get_chat_thread,
     get_chat_thread_history,
     post_chat_message,
+    sync_thread_execution_access_notices,
 )
 from app.chat.stream_events import chat_thread_stream_response
 from app.cli_runtime.approval_gate import full_access_requested
 from app.persistence import attachment_store, chat_store
-from app.routes.schemas import PostChatMessageRequest
+from app.routes.schemas import PostChatMessageRequest, SyncThreadExecutionAccessRequest
 
 router = APIRouter()
 
@@ -80,11 +81,25 @@ def chat_threads_show(thread_id: str) -> dict[str, object]:
 
 
 @router.get("/api/chat/threads/{thread_id}/history")
-def chat_threads_history(thread_id: str) -> dict[str, object]:
+def chat_threads_history(thread_id: str, limit: int | None = None) -> dict[str, object]:
     try:
+        if limit is not None:
+            return get_chat_thread_history(thread_id, limit=limit)
         return get_chat_thread_history(thread_id)
     except chat_store.ChatThreadNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@router.post("/api/chat/threads/{thread_id}/execution-access-notices")
+def chat_threads_sync_execution_access_notices(
+    thread_id: str,
+    body: SyncThreadExecutionAccessRequest,
+) -> dict[str, object]:
+    try:
+        updated = sync_thread_execution_access_notices(thread_id, body.execution_access)
+    except chat_store.ChatThreadNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    return {"thread_id": thread_id, "updated": updated}
 
 
 @router.post("/api/chat/attachments")

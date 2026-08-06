@@ -79,6 +79,9 @@ def check_posthog_recent_events(
         return "critical", "PostHog API rejected the personal API key"
     if status == 403:
         return "critical", "PostHog API denied project read access"
+    # Transient upstream load (503/429) stays warning — not a credentials or ingest fault.
+    if status in (429, 503):
+        return "warning", f"PostHog API HTTP {status}: {body[:200]}"
     if status != 200:
         return "critical", f"PostHog API HTTP {status}: {body[:200]}"
 

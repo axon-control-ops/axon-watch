@@ -3,8 +3,10 @@ from __future__ import annotations
 import json
 import sys
 import unittest
+from io import BytesIO
 from pathlib import Path
 from unittest.mock import patch
+from urllib.error import HTTPError
 
 WATCH_SERVICE_ROOT = Path(__file__).resolve().parents[1] / "services" / "axon-watch"
 for module_name in list(sys.modules):
@@ -183,6 +185,27 @@ class DashProPostHogMonitorTests(unittest.TestCase):
         assert item is not None
         self.assertEqual("warning", status)
         self.assertEqual("high", item["severity"])
+
+    def test_upstream_503_downgrades_to_warning(self) -> None:
+        def fake_urlopen(req, timeout=0):
+            raise HTTPError(
+                url=req.full_url,
+                code=503,
+                msg="Service Unavailable",
+                hdrs=None,
+                fp=BytesIO(b'{"detail":"Queries are a little too busy"}'),
+            )
+
+        with patch.object(dashpro_posthog, "urlopen", side_effect=fake_urlopen):
+            status, detail = dashpro_posthog.check_posthog_recent_events(
+                env={
+                    "POSTHOG_PERSONAL_API_KEY": "phx_test",
+                    "DASHPRO_POSTHOG_PROJECT_ID": "proj_123",
+                }
+            )
+
+        self.assertEqual("warning", status)
+        self.assertIn("HTTP 503", detail)
 
 
 if __name__ == "__main__":
