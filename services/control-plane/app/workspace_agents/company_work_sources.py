@@ -142,6 +142,26 @@ def run_scheduled_work_sources(*, root: Path | None = None) -> dict[str, Any]:
                 logger.exception("ci_stale_signal_sweep work source failed")
                 results["sources"][source_id] = {"error": "ci_stale_signal_sweep_failed"}
             continue
+        if source_id == "attention_stale_sweep" and "scheduler" in trigger:
+            from app.workspace_agents.autonomous_attention_recovery import (
+                sweep_stale_attention_decisions,
+            )
+
+            try:
+                expired = sweep_stale_attention_decisions(
+                    max_age_hours=float(source.get("max_age_hours") or 24.0),
+                )
+                results["sources"][source_id] = {
+                    "work_source": "attention_stale_sweep",
+                    "expired_count": len(expired),
+                    "expired_receipt_ids": [
+                        str(item.get("receipt_id") or "") for item in expired
+                    ],
+                }
+            except Exception:  # noqa: BLE001
+                logger.exception("attention_stale_sweep work source failed")
+                results["sources"][source_id] = {"error": "attention_stale_sweep_failed"}
+            continue
         if source_id == "fleet_self_heal_detect" and "scheduler" in trigger:
             # VAXON fleet self-heal detect stage — always-on infrastructure
             # health, like ci_remediation/ci_stale_signal_sweep above, not

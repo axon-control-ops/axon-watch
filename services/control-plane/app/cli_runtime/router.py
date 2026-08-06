@@ -284,7 +284,12 @@ def dispatch_ide_composer(
     )
     errors: list[str] = []
     ready_run_errors: list[str] = []
-    last_ready_runtime_label = ""
+    # The FIRST ready candidate attempted, not the last — ordered_candidates
+    # puts an explicit operator selection first, so this is the operator's
+    # actual choice when they made one. Using the last-attempted fallback's
+    # label here previously mislabeled the failure (e.g. "failed on Codex"
+    # when the operator had Cursor selected and Cursor failed first).
+    first_ready_runtime_label = ""
     ordered_candidates = ordered_candidates_for_dispatch(snapshot, runtime_target)
     # The model pin travels with the family it was chosen for. Candidates are
     # already ordered preferred-first, so the first candidate's family is the
@@ -305,6 +310,8 @@ def dispatch_ide_composer(
         model = effective_cli_model(family, str(candidate_runtime_model or ""))
         reasoning_effort = ""
         runtime_label = str(record.get("label") or runtime_id)
+        if not first_ready_runtime_label:
+            first_ready_runtime_label = runtime_label
         dispatch_env = subprocess_env
         if family == "cursor":
             dispatch_env = cursor_dispatch_env(
@@ -473,7 +480,6 @@ def dispatch_ide_composer(
             )
             errors.append(summarized)
             ready_run_errors.append(summarized)
-            last_ready_runtime_label = runtime_label
 
     reason = "; ".join(item for item in errors if item) or "no CLI runtime is installed"
     failure_phase = "run_error" if ready_run_errors else "not_ready"
@@ -487,7 +493,7 @@ def dispatch_ide_composer(
             context_block=context_block,
             reason=reason,
             failure_phase=failure_phase,
-            runtime_label=last_ready_runtime_label,
+            runtime_label=first_ready_runtime_label,
         ),
         "dispatched": False,
         "runtime_id": "",

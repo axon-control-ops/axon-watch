@@ -187,6 +187,37 @@ class CompanyWorkSourceTests(unittest.TestCase):
         self.assertIn("lead_team_checkin", ids)
         self.assertIn("ci_stale_signal_sweep", ids)
         self.assertIn("fleet_self_heal_detect", ids)
+        self.assertIn("attention_stale_sweep", ids)
+
+    def test_run_scheduled_work_sources_dispatches_attention_stale_sweep(self) -> None:
+        with patch(
+            "app.workspace_agents.company_work_sources.list_runs", return_value=[]
+        ), patch(
+            "app.workspace_agents.file_size_patrol.classify_file_size_findings", return_value=[]
+        ), patch(
+            "app.workspace_agents.lead_team_checkin.run_lead_team_checkin",
+            return_value={"work_source": "lead_team_checkin", "created_tasks": []},
+        ), patch(
+            "app.ci_remediation.stale_sweep.sweep_stale_ci_signals",
+            return_value={"work_source": "ci_stale_signal_sweep", "resolved_count": 0},
+        ), patch(
+            "app.fleet_self_heal.detect.scan_fleet_failures"
+        ) as scan_mock, patch(
+            "app.workspace_agents.autonomous_attention_recovery.sweep_stale_attention_decisions"
+        ) as sweep_mock:
+            from app.fleet_self_heal.detect import DetectScanResult
+
+            scan_mock.return_value = DetectScanResult(
+                scanned_runs=0, fleet_infra_observations=0,
+                dispatchable_fingerprints=[], regressed_fingerprints=[],
+                skipped_min_interval=False,
+            )
+            sweep_mock.return_value = [{"receipt_id": "auton-1"}, {"receipt_id": "auton-2"}]
+            result = run_scheduled_work_sources(root=REPO_ROOT)
+        source_result = result["sources"]["attention_stale_sweep"]
+        self.assertEqual(2, source_result["expired_count"])
+        self.assertEqual(["auton-1", "auton-2"], source_result["expired_receipt_ids"])
+        sweep_mock.assert_called_once_with(max_age_hours=24.0)
 
     def test_run_scheduled_work_sources_dispatches_fleet_self_heal_detect(self) -> None:
         with patch(
