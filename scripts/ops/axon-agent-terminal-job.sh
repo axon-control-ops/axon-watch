@@ -91,9 +91,14 @@ fi
 encoded_workspace="$(encode_workspace "${workspace_id}")"
 
 if [[ -n "${status_job_id}" ]]; then
+  auth_args=()
+  if [[ -n "${AXON_WATCH_OPERATOR_TOKEN:-}" ]]; then
+    auth_args=(-H "Authorization: Bearer ${AXON_WATCH_OPERATOR_TOKEN}")
+  fi
   response="$(
     curl -sS \
-      "${cp_base}/api/workspaces/${encoded_workspace}/terminal/agent-jobs/$(encode_workspace "${status_job_id}")"
+      "${cp_base}/api/workspaces/${encoded_workspace}/terminal/agent-jobs/$(encode_workspace "${status_job_id}")" \
+      "${auth_args[@]}"
   )"
   echo "${response}" | jq .
   status="$(echo "${response}" | jq -r '.status // empty')"
@@ -125,10 +130,15 @@ payload="$(
     + (if $source_workspace_id == "" then {} else {source_workspace_id: $source_workspace_id} end)'
 )"
 
+auth_args=()
+if [[ -n "${AXON_WATCH_OPERATOR_TOKEN:-}" ]]; then
+  auth_args=(-H "Authorization: Bearer ${AXON_WATCH_OPERATOR_TOKEN}")
+fi
 response="$(
   curl -sS -X POST \
     "${cp_base}/api/workspaces/${encoded_workspace}/terminal/agent-jobs" \
     -H 'Content-Type: application/json' \
+    "${auth_args[@]}" \
     -d "${payload}"
 )"
 

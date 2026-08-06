@@ -7,6 +7,7 @@ Consultative tiers (Cursor plan / Codex read-only) stay available without approv
 from __future__ import annotations
 
 import os
+import re
 from typing import Literal
 
 ExecutionTier = Literal["consultative", "executing"]
@@ -148,8 +149,45 @@ def consultative_only_notice(
         return blocked
     if not agent_tool_execution_enabled(execution_access):
         mode_label = str(composer_mode or "agent").strip().lower() or "agent"
-        return (
-            f"{mode_label.capitalize()} mode is consultative-only. Enable Full Access in the "
-            "Agent Dock composer to let the agent edit files and run commands."
-        )
+        return _consultative_only_text(mode_label.capitalize())
+    return None
+
+
+def _consultative_only_text(mode_label: str) -> str:
+    return (
+        f"{mode_label} mode is consultative-only. Enable Full Access in the "
+        "Agent Dock composer to let the agent edit files and run commands."
+    )
+
+
+def _full_access_enabled_text(mode_label: str) -> str:
+    return f"{mode_label} mode now has Full Access enabled — the agent can edit files and run commands."
+
+
+_CONSULTATIVE_NOTICE_RE = re.compile(
+    r"^(?P<mode>\w+) mode is consultative-only\. Enable Full Access in the "
+    r"Agent Dock composer to let the agent edit files and run commands\.$"
+)
+_FULL_ACCESS_NOTICE_RE = re.compile(
+    r"^(?P<mode>\w+) mode now has Full Access enabled — the agent can edit "
+    r"files and run commands\.$"
+)
+
+
+def rewritten_execution_access_notice(content: str, *, wants_full: bool) -> str | None:
+    """If ``content`` is exactly one of the two known notice sentences and it no
+    longer matches the operator's current Full Access toggle, return the other
+    form. Returns None when no rewrite is needed (including non-notice content).
+
+    This only swaps the fixed sentence produced by :func:`consultative_only_notice`
+    — chat messages don't retain the composer_mode/run_phase that originally
+    produced it, so this can't recompute the full original decision.
+    """
+    stripped = content.strip()
+    match = _CONSULTATIVE_NOTICE_RE.match(stripped)
+    if match and wants_full:
+        return _full_access_enabled_text(match.group("mode"))
+    match = _FULL_ACCESS_NOTICE_RE.match(stripped)
+    if match and not wants_full:
+        return _consultative_only_text(match.group("mode"))
     return None

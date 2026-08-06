@@ -9,6 +9,13 @@ describe('agent-dock-activity-view', () => {
   it('labels full access agent work distinctly', () => {
     expect(buildIdeComposerActivityLabel('agent', 'full')).toContain('Full Access');
     expect(buildIdeComposerActivityLabel('agent', 'consultative')).not.toContain('Full Access');
+    expect(buildIdeComposerActivityLabel('agent', 'full')).not.toContain('Cursor/Codex');
+    expect(buildIdeComposerActivityLabel('agent', 'full', 'cursor')).toBe(
+      'Full Access — contacting Cursor runtime…',
+    );
+    expect(buildIdeComposerActivityLabel('agent', 'full', 'codex')).toBe(
+      'Full Access — contacting Codex runtime…',
+    );
   });
 
   it('labels debug mode distinctly from agent', () => {

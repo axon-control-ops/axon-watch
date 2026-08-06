@@ -1,5 +1,6 @@
 @import './agent-persona-dock.css';
 @import './agent-persona-handoff.css';
+@import './agent-persona-dock-responsive.css';
 @import './company-roster-alert.css';
 @import './vaxon-roster-voice-dock.css';
 /* Company roster — workspace-as-company employee staffing */

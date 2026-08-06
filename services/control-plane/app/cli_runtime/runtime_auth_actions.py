@@ -13,6 +13,7 @@ from app.cli_runtime.catalog import (
     invalidate_runtime_snapshot_cache,
     runtime_status_snapshot,
 )
+from app.cli_runtime.catalog_discovery import cursor_cli_argv
 from app.cli_runtime.cursor_models import cursor_runtime_snapshot
 
 StatusRecord = dict[str, Any]
@@ -61,17 +62,18 @@ def logout_cursor_runtime() -> StatusRecord:
         return _action_result(
             status="manual_required",
             message="Cursor is authenticated via API key. Remove CURSOR_API_KEY from /vault or the shell env to sign out.",
-            command_preview=f"{binary} agent status",
+            command_preview=" ".join(cursor_cli_argv(binary, "status")),
         )
     if not auth.get("logged_in"):
         return _action_result(
             status="completed",
             message="Cursor CLI is already signed out.",
-            command_preview=f"{binary} agent status",
+            command_preview=" ".join(cursor_cli_argv(binary, "status")),
         )
+    logout_argv = cursor_cli_argv(binary, "logout")
     try:
         proc = subprocess.run(
-            [binary, "agent", "logout"],
+            logout_argv,
             capture_output=True,
             text=True,
             timeout=12,
@@ -80,15 +82,15 @@ def logout_cursor_runtime() -> StatusRecord:
     except subprocess.TimeoutExpired:
         return _action_result(
             status="error",
-            message="Cursor sign-out timed out. Run `cursor agent logout` on the host.",
-            command_preview=f"{binary} agent logout",
+            message=f"Cursor sign-out timed out. Run `{' '.join(logout_argv)}` on the host.",
+            command_preview=" ".join(logout_argv),
         )
     output = (proc.stdout or proc.stderr or "").strip()
     if proc.returncode != 0:
         return _action_result(
             status="error",
             message=output or "Cursor sign-out failed.",
-            command_preview=f"{binary} agent logout",
+            command_preview=" ".join(logout_argv),
             output=output,
         )
     invalidate_runtime_snapshot_cache()
@@ -97,13 +99,13 @@ def logout_cursor_runtime() -> StatusRecord:
         return _action_result(
             status="error",
             message="Cursor sign-out did not clear authentication.",
-            command_preview=f"{binary} agent status",
+            command_preview=" ".join(cursor_cli_argv(binary, "status")),
             output=output,
         )
     return _action_result(
         status="completed",
         message="Cursor CLI signed out.",
-        command_preview=f"{binary} agent status",
+        command_preview=" ".join(cursor_cli_argv(binary, "status")),
         output=output,
     )
 
@@ -185,10 +187,10 @@ def start_cursor_runtime_login() -> StatusRecord:
         return _action_result(
             status="completed",
             message=f"Cursor CLI is already signed in{(': ' + account) if account else ''}.",
-            command_preview=f"{binary} agent status",
+            command_preview=" ".join(cursor_cli_argv(binary, "status")),
             force_refresh=False,
         )
-    command = [binary, "agent", "login"]
+    command = cursor_cli_argv(binary, "login")
     try:
         subprocess.Popen(
             command,

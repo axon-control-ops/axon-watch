@@ -39,6 +39,7 @@
 }
 
 .agent-persona-dock__delivery-links {
+  /* Base spacing; responsive file upgrades this to a grid footer. */
   display: flex;
   flex-wrap: wrap;
   gap: 0.35rem;

@@ -60,6 +60,10 @@ class CreateWorkspaceChatThreadRequest(BaseModel):
     employee_role: str | None = None
 
 
+class SyncThreadExecutionAccessRequest(BaseModel):
+    execution_access: str
+
+
 class CreateTerminalSessionRequest(BaseModel):
     role: str = "operator"
     title: str | None = None
