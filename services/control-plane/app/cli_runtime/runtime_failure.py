@@ -45,6 +45,30 @@ def _operator_next_step(reason: str) -> str:
     return "Check Runtime status, then retry."
 
 
+# Every fallback_reply() branch opens with "Lane B (<mode>) " followed by one
+# of these verbs. The console keys its "this reply is a runtime failure, not an
+# answer" styling off the same shape (see
+# apps/console-web/src/lib/thread-message-view.ts::agentContentLooksLikeRuntimeFallback).
+# A fallback is delivered as an ordinary assistant message, so without this the
+# operator cannot tell a failure from a real answer without reading it closely.
+# tests/test_runtime_fallback_marker_contract.py pins both sides together —
+# if you reword these strings, update the console detector in the same change.
+RUNTIME_FALLBACK_PREFIX = "Lane B ("
+RUNTIME_FALLBACK_VERBS: tuple[str, ...] = (
+    "failed on ",
+    "could not start",
+    "cannot start because",
+)
+
+
+def looks_like_runtime_fallback(content: str) -> bool:
+    """True when text is a fallback_reply() rather than a real agent answer."""
+    text = " ".join(str(content or "").split())
+    if not text.startswith(RUNTIME_FALLBACK_PREFIX):
+        return False
+    return any(verb in text for verb in RUNTIME_FALLBACK_VERBS)
+
+
 def fallback_reply(
     *,
     composer_mode: str,
@@ -83,4 +107,10 @@ def fallback_reply(
     )
 
 
-__all__ = ["fallback_reply", "runtime_unready_reason"]
+__all__ = [
+    "RUNTIME_FALLBACK_PREFIX",
+    "RUNTIME_FALLBACK_VERBS",
+    "fallback_reply",
+    "looks_like_runtime_fallback",
+    "runtime_unready_reason",
+]

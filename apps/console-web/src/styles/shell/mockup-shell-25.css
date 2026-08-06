@@ -144,6 +144,18 @@
   max-height: 12rem;
 }
 
+/* Runtime fallback: the CLI could not run, so this message is a status
+   report rather than an answer. Amber (not the red error treatment) — the
+   turn failed cleanly and is retryable, it is not a crash dump. Without
+   this it renders identically to a real reply and reads as an answer. */
+.conversation-seam__content--runtime-fallback {
+  border-left: 2px solid rgba(255, 196, 92, 0.6);
+  background: rgba(255, 176, 46, 0.09);
+  color: rgba(255, 232, 194, 0.96);
+  white-space: normal;
+  word-break: break-word;
+}
+
 .conversation-seam__role {
   color: var(--accent-brand);
   font-family: var(--font-mono);
