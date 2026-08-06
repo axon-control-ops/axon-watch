@@ -12,6 +12,11 @@ export type LeadPlanTaskLink = {
   task_id: string;
 };
 
+export type LeadPlanVaxonHandoff = {
+  thread_id: string;
+  message_id: string;
+};
+
 export type LeadPlanRecord = {
   plan_id: string;
   workspace_id: string;
@@ -25,6 +30,9 @@ export type LeadPlanRecord = {
   task_links: LeadPlanTaskLink[];
   task_ids: string[];
   awaiting_engagement: boolean;
+  // Only populated by fetchLeadPlan (single-plan detail) — list endpoints
+  // don't pay the per-plan receipt lookup cost.
+  vaxon_handoff?: LeadPlanVaxonHandoff | null;
 };
 
 export type LeadPlansSnapshot = {
