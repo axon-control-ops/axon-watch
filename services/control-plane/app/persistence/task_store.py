@@ -269,6 +269,12 @@ def create_task(
     deps = [str(item).strip() for item in (dependencies or []) if str(item).strip()]
     paths = [str(item).strip() for item in (exclusive_paths or []) if str(item).strip()]
     allowed = [str(item).strip() for item in (allowed_paths or []) if str(item).strip()]
+    if not allowed and owner_role.strip():
+        # Unset scope is fail-closed downstream and would leave the task unable
+        # to write anything at all — see default_write_scope_for_role.
+        from app.workspace_agents.execution_policy import default_write_scope_for_role
+
+        allowed = default_write_scope_for_role(owner_role)
     from app.workspace_agents.autonomous_attention_policy import normalize_task_risk
 
     timestamp = _utc_now_iso()

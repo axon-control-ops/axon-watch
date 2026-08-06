@@ -429,11 +429,11 @@
       "note": "Gate 4 leased-task create_run binding; extract next"
     },
     "services/control-plane/app/persistence/task_store.py": {
-      "max_lines": 826,
+      "max_lines": 832,
       "soft_limit": 350,
       "hard_limit": 500,
       "target": "services/control-plane/app/persistence/*",
-      "note": "Gate 4/5 task ledger + reopen/re-budget + usage-limit attempt refund"
+      "note": "Gate 4/5 task ledger + reopen/re-budget + usage-limit attempt refund. +6 lines default an unset task scope to the owning role's write boundary; the resolution logic itself lives in execution_policy.default_write_scope_for_role to keep it out of this hotspot."
     },
     "services/control-plane/app/workspace_agents/worker_dispatch.py": {
       "max_lines": 504,
