@@ -186,6 +186,34 @@ class CompanyWorkSourceTests(unittest.TestCase):
         self.assertIn("file_size_patrol", ids)
         self.assertIn("lead_team_checkin", ids)
         self.assertIn("ci_stale_signal_sweep", ids)
+        self.assertIn("fleet_self_heal_detect", ids)
+
+    def test_run_scheduled_work_sources_dispatches_fleet_self_heal_detect(self) -> None:
+        with patch(
+            "app.workspace_agents.company_work_sources.list_runs", return_value=[]
+        ), patch(
+            "app.workspace_agents.file_size_patrol.classify_file_size_findings", return_value=[]
+        ), patch(
+            "app.workspace_agents.lead_team_checkin.run_lead_team_checkin",
+            return_value={"work_source": "lead_team_checkin", "created_tasks": []},
+        ), patch(
+            "app.ci_remediation.stale_sweep.sweep_stale_ci_signals",
+            return_value={"work_source": "ci_stale_signal_sweep", "resolved_count": 0},
+        ), patch(
+            "app.fleet_self_heal.detect.scan_fleet_failures"
+        ) as scan_mock:
+            from app.fleet_self_heal.detect import DetectScanResult
+
+            scan_mock.return_value = DetectScanResult(
+                scanned_runs=3, fleet_infra_observations=1,
+                dispatchable_fingerprints=[], regressed_fingerprints=[],
+                skipped_min_interval=False,
+            )
+            result = run_scheduled_work_sources(root=REPO_ROOT)
+        source_result = result["sources"]["fleet_self_heal_detect"]
+        self.assertEqual(3, source_result["scanned_runs"])
+        self.assertEqual(1, source_result["fleet_infra_observations"])
+        scan_mock.assert_called_once_with(window_hours=6.0, min_interval_seconds=300.0)
 
     def test_run_scheduled_work_sources_recovers_orphans(self) -> None:
         created = task_store.create_task(
