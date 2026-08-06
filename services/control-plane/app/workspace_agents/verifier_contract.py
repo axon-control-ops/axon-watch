@@ -180,10 +180,17 @@ def ensure_acceptance_before_publish(
     if has_passing_acceptance_evidence(run_id):
         return None
 
+    from app.workspace_agents.diff_policy import strip_control_plane_owned_paths
+
     root = _resolve_workspace_root(record, workspace_root)
     paths = list(changed_paths) if changed_paths is not None else []
     if not paths and root is not None:
         paths = list_changed_paths(root)
+    # The control plane writes its own bookkeeping (.axon-si/*, the research
+    # MCP config) into the isolation worktree. Counting those as agent-changed
+    # paths failed correct runs — including read-only consultative ones — with
+    # "acceptance=fail · policy=out_of_scope" for files the agent never wrote.
+    paths = strip_control_plane_owned_paths(paths)
 
     task_allowed_paths: list[str] = []
     task_id = str(record.get("task_id") or "").strip()

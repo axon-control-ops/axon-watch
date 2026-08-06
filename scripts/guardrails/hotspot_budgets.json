@@ -443,11 +443,11 @@
       "note": "Continuous worker dispatch; usage-limit attempt refund on finalize"
     },
     "services/control-plane/app/workspace_delivery/publish.py": {
-      "max_lines": 601,
+      "max_lines": 602,
       "soft_limit": 350,
       "hard_limit": 500,
       "target": "services/control-plane/app/workspace_delivery/*",
-      "note": "Autonomy publish path-scope + receipts; gh resolve extracted to gh_cli.py"
+      "note": "Autonomy publish path-scope + receipts; gh resolve extracted to gh_cli.py. +1 line imports the shared is_control_plane_owned_path helper, replacing a duplicated inline '.axon-si/' literal."
     },
     "apps/console-web/src/components/shell/OperatorTaskBoardPanel.vue": {
       "max_lines": 553,
