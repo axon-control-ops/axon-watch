@@ -9,6 +9,7 @@ import {
   summarizeAgentErrorContent,
   systemMessagePreview,
   agentContentLooksLikeErrorDump,
+  agentContentLooksLikeRuntimeFallback,
 } from '../../lib/thread-message-view';
 import { thinkingPreview, agentContentHasTranscriptBlocks } from '../../lib/agent-transcript-blocks';
 import {
@@ -86,6 +87,25 @@ function isStreamingMessage(messageId: string): boolean {
   return shell.agentStreamActive && shell.agentStreamMessageId === messageId;
 }
 
+/** Only the newest shells in a turn get full cards — Lead OTA threads mint dozens. */
+const RECENT_FULL_TERMINAL_CARDS = 6;
+
+function isCompactTerminalCard(messageId: string, segmentIndex: number): boolean {
+  const segments = transcriptSegments(
+    messageId,
+    props.message.content,
+    isStreamingMessage(messageId),
+  );
+  const terminalIndexes = segments
+    .map((segment, index) => (segment.kind === 'terminal' ? index : -1))
+    .filter((index) => index >= 0);
+  if (terminalIndexes.length <= RECENT_FULL_TERMINAL_CARDS) {
+    return false;
+  }
+  const recent = new Set(terminalIndexes.slice(-RECENT_FULL_TERMINAL_CARDS));
+  return !recent.has(segmentIndex);
+}
+
 async function onRegenerate(): Promise<void> {
   if (regenerateDisabled.value) {
     return;
@@ -112,6 +132,10 @@ function shouldShowEditorStub(messageId: string, content: string): boolean {
 
 function isErrorDump(content: string): boolean {
   return agentContentLooksLikeErrorDump(content);
+}
+
+function isRuntimeFallback(content: string): boolean {
+  return agentContentLooksLikeRuntimeFallback(content);
 }
 
 function isErrorExpanded(messageId: string): boolean {
@@ -353,6 +377,7 @@ async function copyTerminalOutput(output: string): Promise<void> {
         :segment="segment"
         :message-id="message.message_id"
         :streaming="isStreamingMessage(message.message_id)"
+        :compact="isCompactTerminalCard(message.message_id, segmentIndex)"
         :terminal-mirror-badge="terminalMirrorBadge"
         :show-terminal-background-control="showTerminalBackgroundControl"
         @reveal="revealTerminalPanel"
@@ -468,6 +493,8 @@ async function copyTerminalOutput(output: string): Promise<void> {
       'conversation-seam__content--streaming-full-access':
         isStreamingMessage(message.message_id) &&
         shell.ideComposerActivity?.executionAccess === 'full',
+      'conversation-seam__content--runtime-fallback':
+        !isStreamingMessage(message.message_id) && isRuntimeFallback(message.content),
     }"
   >{{ message.content }}<span
     v-if="isStreamingMessage(message.message_id)"
