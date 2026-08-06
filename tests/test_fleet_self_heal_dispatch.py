@@ -7,6 +7,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 CONTROL_PLANE_ROOT = Path(__file__).resolve().parents[1] / "services" / "control-plane"
 sys.path.insert(0, str(CONTROL_PLANE_ROOT))
@@ -162,6 +163,42 @@ class DispatchIntegrationTests(unittest.TestCase):
         assert stored is not None
         self.assertEqual("repairing", stored["status"])
         self.assertIsNotNone(stored["task_id"])
+
+    def test_parks_under_active_ship_plan_with_receipt_and_broadcast(self) -> None:
+        from app.persistence import task_store
+        from app.workspace_agents import lead_plan_store
+
+        plan = lead_plan_store.persist_plan(
+            workspace_id="workspace_axon_watch",
+            plan={"goal": "Ship OTA canary for DashPro", "mode": "fan_out"},
+            plan_key_to_task_id={},
+        )
+        event = _sample_event()
+        store.upsert_observation(
+            event["fingerprint"], subsystem=event["subsystem"], file_hint=event["file_hint"],
+            workspace_id="workspace_dashpro", role="backend", run_id="run_1",
+        )
+
+        with mock.patch("app.live_events.broadcast_material_change") as broadcast_mock:
+            parked = create_and_lease_repair_task(config=_CONFIG, event=event, fingerprint=event["fingerprint"])
+
+        self.assertEqual(plan["plan_id"], parked.get("parked_under_plan"))
+        task = task_store.get_task(str(parked.get("task_id") or ""))
+        assert task is not None
+        self.assertEqual("lead", task["owner_role"])
+        self.assertIn("Lead: advance", str(task["goal"]))
+        self.assertIn(event["fingerprint"], str(task["goal"]))
+
+        receipts = lead_plan_store.list_receipts(str(plan["plan_id"]))
+        matching = [r for r in receipts if r.get("kind") == "fleet_repair_finding_parked"]
+        self.assertEqual(1, len(matching))
+        self.assertEqual(event["fingerprint"], matching[0]["payload"]["fingerprint"])
+        self.assertFalse(matching[0]["payload"]["reused_sticky_lead_task"])
+        broadcast_mock.assert_called_once()
+
+        stored_event = store.get_event(event["fingerprint"])
+        assert stored_event is not None
+        self.assertEqual("repairing", stored_event["status"])
 
     def test_dry_run_config_never_dispatches(self) -> None:
         from app.persistence import task_store
