@@ -219,6 +219,19 @@ def build_continuous_worker_prompt(
             "`Authorization: Bearer $AXON_WATCH_OPERATOR_TOKEN` when configured. "
             "Report spoken-ready outcome for the unaware operator. "
         )
+    if "vaxon fleet repair" in goal_l:
+        ci_clause += (
+            " This leased task is a VAXON fleet self-heal repair — the bug is in "
+            "axon-watch's own control-plane code, not this workspace's product code. "
+            "Root-cause it (do not symptom-patch), add a regression test under tests/, "
+            "push to a throwaway branch and open a draft PR, then confirm a green "
+            "Axon-X Fast Gate run on that head before reporting success. "
+            "POST JSON to `http://127.0.0.1:8787/api/fleet-self-heal/report-outcome` "
+            "with fingerprint (from the task goal), success true/false, commit_ref "
+            "(the fix commit sha or PR URL), and detail. Include "
+            "`Authorization: Bearer $AXON_WATCH_OPERATOR_TOKEN` when configured. "
+            "Report spoken-ready outcome for the unaware operator. "
+        )
     memory_clause = (
         " Memory safety: do NOT start DashPro `web:dev` / Expo / Metro / "
         "`typecheck` with large NODE_OPTIONS heaps unless the operator explicitly asked. "

@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import asdict, dataclass
 from typing import Any, Literal
 
+from app.fleet_self_heal.classify import quick_fleet_infra_marker_match
 from app.workspace_agents.failure_detail import (
     is_billing_failure,
     is_operator_stopped_failure,
@@ -78,6 +79,11 @@ def assign_owner_role_for_failed_shift(role: str, detail: str) -> tuple[str, boo
         or is_runtime_auth_failure(detail)
         or is_billing_failure(detail)
         or is_billing_block_failure(detail)
+        # A fleet-infra bug (this workspace's failure, but axon-watch's own
+        # code) is VAXON fleet self-heal's job — dispatching a generic
+        # "investigate and fix" task to this workspace's own specialist would
+        # send them hunting for a bug that isn't in their repo.
+        or quick_fleet_infra_marker_match(detail)
     ):
         return cleaned, True
     if is_restart_interrupted_failure(detail) or is_operator_stopped_failure(detail):

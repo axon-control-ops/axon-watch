@@ -100,6 +100,39 @@ def _merge_ci_remediation_items(
     return out
 
 
+def _merge_fleet_repair_items(
+    projected: dict[str, object],
+) -> dict[str, object]:
+    """Overlay VAXON fleet self-heal signals stored in control-plane onto watch inbox."""
+    try:
+        from app.fleet_self_heal.report import fleet_repair_inbox_items
+    except Exception:  # noqa: BLE001 — inbox must stay available if module fails
+        return projected
+    fleet_items = fleet_repair_inbox_items()
+    if not fleet_items:
+        return projected
+    existing = projected.get("items")
+    items = [row for row in existing if isinstance(row, dict)] if isinstance(existing, list) else []
+    seen = {
+        str(row.get("signal_id") or "").strip()
+        for row in items
+        if str(row.get("signal_id") or "").strip()
+    }
+    merged = list(items)
+    for raw in fleet_items:
+        projected_item = project_inbox_item(raw)
+        signal_id = str(projected_item.get("signal_id") or "").strip()
+        if signal_id and signal_id in seen:
+            continue
+        if signal_id:
+            seen.add(signal_id)
+        merged.insert(0, projected_item)
+    out = dict(projected)
+    out["items"] = merged
+    out["count"] = len(merged)
+    return out
+
+
 def build_inbox_response(
     *,
     inbox_fetcher: WatchInboxFetcher | None = None,
@@ -110,4 +143,5 @@ def build_inbox_response(
         fetcher(),
         allow_empty_unavailable=allow_empty_unavailable,
     )
-    return _merge_ci_remediation_items(projected)
+    projected = _merge_ci_remediation_items(projected)
+    return _merge_fleet_repair_items(projected)

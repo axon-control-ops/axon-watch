@@ -142,6 +142,50 @@ def run_scheduled_work_sources(*, root: Path | None = None) -> dict[str, Any]:
                 logger.exception("ci_stale_signal_sweep work source failed")
                 results["sources"][source_id] = {"error": "ci_stale_signal_sweep_failed"}
             continue
+        if source_id == "fleet_self_heal_detect" and "scheduler" in trigger:
+            # VAXON fleet self-heal detect stage — always-on infrastructure
+            # health, like ci_remediation/ci_stale_signal_sweep above, not
+            # gated by per-workspace autonomy_mode.
+            from app.fleet_self_heal.config import load_fleet_self_heal_config
+            from app.fleet_self_heal.detect import scan_fleet_failures
+            from app.fleet_self_heal.dispatch import dispatch_dispatchable_fingerprints
+            from app.fleet_self_heal.report import reconcile_linked_fleet_repair_outcomes
+
+            try:
+                reconciled = reconcile_linked_fleet_repair_outcomes()
+                result = scan_fleet_failures(
+                    window_hours=(
+                        float(source["window_hours"]) if "window_hours" in source else None
+                    ),
+                    min_interval_seconds=(
+                        float(source["min_interval_seconds"])
+                        if "min_interval_seconds" in source
+                        else None
+                    ),
+                )
+                dispatched: list[dict[str, Any]] = []
+                if result.dispatchable_fingerprints or result.regressed_fingerprints:
+                    dispatched = dispatch_dispatchable_fingerprints(
+                        config=load_fleet_self_heal_config(),
+                        fingerprints=[
+                            *result.dispatchable_fingerprints,
+                            *result.regressed_fingerprints,
+                        ],
+                    )
+                results["sources"][source_id] = {
+                    "work_source": "fleet_self_heal_detect",
+                    "reconciled": reconciled,
+                    "scanned_runs": result.scanned_runs,
+                    "fleet_infra_observations": result.fleet_infra_observations,
+                    "dispatchable_fingerprints": result.dispatchable_fingerprints,
+                    "regressed_fingerprints": result.regressed_fingerprints,
+                    "dispatched_count": len(dispatched),
+                    "skipped_min_interval": result.skipped_min_interval,
+                }
+            except Exception:  # noqa: BLE001 — never block the scheduler tick
+                logger.exception("fleet_self_heal_detect work source failed")
+                results["sources"][source_id] = {"error": "fleet_self_heal_detect_failed"}
+            continue
         if source_id == "autonomous_attention" and "scheduler" in trigger:
             from app.workspace_agents.autonomous_attention import run_autonomous_attention_scan
             from app.persistence import operator_presence_settings_store
