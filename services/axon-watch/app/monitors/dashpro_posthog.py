@@ -62,6 +62,10 @@ def check_posthog_recent_events(
         except HTTPError as exc:
             status = int(exc.code)
             body = exc.read().decode("utf-8", errors="replace")
+            # Retry transient upstream load before surfacing a warning signal.
+            if status in (429, 503) and attempt + 1 < attempts:
+                last_exc = exc
+                continue
             last_exc = None
             break
         except (TimeoutError, URLError, OSError) as exc:

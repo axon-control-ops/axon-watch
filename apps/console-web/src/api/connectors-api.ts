@@ -1,4 +1,4 @@
-import { apiUrl, fetchJson } from './client';
+import { fetchJson, fetchWithTimeout } from './client';
 
 export interface ConnectorProbeRecord {
   connector_id: string;
@@ -80,7 +80,7 @@ export async function fetchTunnelStatus(): Promise<TunnelStatusSnapshot> {
 }
 
 export async function startTunnel(): Promise<TunnelStatusSnapshot> {
-  const response = await fetch(apiUrl('/api/tunnel/start'), { method: 'POST' });
+  const response = await fetchWithTimeout('/api/tunnel/start', { method: 'POST' });
   if (!response.ok) {
     const detail = await response.text();
     throw new Error(detail || `tunnel start failed with status ${response.status}`);
@@ -89,7 +89,7 @@ export async function startTunnel(): Promise<TunnelStatusSnapshot> {
 }
 
 export async function stopTunnel(): Promise<TunnelStatusSnapshot> {
-  const response = await fetch(apiUrl('/api/tunnel/stop'), { method: 'POST' });
+  const response = await fetchWithTimeout('/api/tunnel/stop', { method: 'POST' });
   if (!response.ok) {
     const detail = await response.text();
     throw new Error(detail || `tunnel stop failed with status ${response.status}`);

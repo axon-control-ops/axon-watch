@@ -300,6 +300,20 @@ function finishPlayback(
 ): KairoVoicePlaybackResult {
   recordKairoVoicePlayback(result, message);
   logKairoVoice('playback', { engine: result.engine, reason: result.reason, preview: message.slice(0, 80) });
+  // #region agent log
+  fetch('http://127.0.0.1:7706/ingest/90bcaec2-2b39-4d4a-84b5-157c12735440', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '9e41d8' },
+    body: JSON.stringify({
+      sessionId: '9e41d8',
+      hypothesisId: 'H3_playback_overlap',
+      location: 'kairo-voice-playback.ts:finishPlayback',
+      message: 'playback finished',
+      data: { engine: result.engine, reason: result.reason, textPreview: message.slice(0, 80) },
+      timestamp: Date.now(),
+    }),
+  }).catch(() => {});
+  // #endregion agent log
   return result;
 }
 
@@ -365,6 +379,8 @@ function resolveAzureFallbackReason(response: KairoTtsResponse): string {
  * Play one sanitized line now. Does not interrupt other jobs — the global
  * voice queue (`enqueueKairoSpeech` / `speakKairoLine`) owns serialization.
  */
+let debugPlaybackCallSeq = 0;
+
 export async function playKairoUtteranceNow(
   text: string,
   options: {
@@ -377,6 +393,30 @@ export async function playKairoUtteranceNow(
     onPlaybackStart?: () => void;
   } = {},
 ): Promise<KairoVoicePlaybackResult> {
+  // #region agent log
+  const debugCallId = ++debugPlaybackCallSeq;
+  const debugWasAlreadySpeaking = isKairoVoiceSpeaking();
+  fetch('http://127.0.0.1:7706/ingest/90bcaec2-2b39-4d4a-84b5-157c12735440', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '9e41d8' },
+    body: JSON.stringify({
+      sessionId: '9e41d8',
+      hypothesisId: 'H3_playback_overlap',
+      location: 'kairo-voice-playback.ts:playKairoUtteranceNow:enter',
+      message: debugWasAlreadySpeaking
+        ? 'OVERLAP SUSPECT: new playback starting while another is already active'
+        : 'playback starting (clear)',
+      data: {
+        debugCallId,
+        wasAlreadySpeaking: debugWasAlreadySpeaking,
+        textPreview: text.slice(0, 80),
+        speakerId: options.speaker?.id ?? null,
+        speakerKind: options.speaker?.kind ?? null,
+      },
+      timestamp: Date.now(),
+    }),
+  }).catch(() => {});
+  // #endregion agent log
   const trimmed = sanitizeSpokenReply(text);
   const tuning = resolveSpeechTuning(options);
   const speaker = options.speaker ?? null;

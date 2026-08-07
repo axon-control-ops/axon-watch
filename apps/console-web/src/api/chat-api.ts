@@ -3,11 +3,12 @@ import type { RunRecord } from '../contracts/canonical';
 import type { ChatUiAction } from '../lib/chat-ui-action';
 
 import {
-  apiUrl,
+  ATTACHMENT_UPLOAD_TIMEOUT_MS,
   CHAT_MESSAGE_FETCH_TIMEOUT_MS,
   controlPlaneBaseUrl,
   DEFAULT_FETCH_TIMEOUT_MS,
   fetchJson,
+  fetchWithTimeout,
   THREAD_HISTORY_FETCH_TIMEOUT_MS,
 } from './client';
 import type { TerminalSessionRecord } from './workspace-api';
@@ -201,10 +202,11 @@ export async function uploadChatAttachment(
   formData.append('workspace_id', workspaceId);
   formData.append('file', file, file.name);
 
-  const response = await fetch(apiUrl('/api/chat/attachments'), {
-    method: 'POST',
-    body: formData,
-  });
+  const response = await fetchWithTimeout(
+    '/api/chat/attachments',
+    { method: 'POST', body: formData },
+    ATTACHMENT_UPLOAD_TIMEOUT_MS,
+  );
 
   if (!response.ok) {
     throw new Error(`chat attachment upload failed with status ${response.status}`);

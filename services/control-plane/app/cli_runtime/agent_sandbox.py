@@ -258,15 +258,28 @@ def _resolve_workspace_root(workspace_root: Path) -> Path:
 def _resolve_workspace_path(workspace: Path, configured: str) -> Path:
     raw = Path(configured).expanduser()
     candidate = raw if raw.is_absolute() else workspace / raw
-    try:
-        resolved = candidate.resolve(strict=True)
-    except OSError as exc:
-        raise SandboxConfigurationError(
-            f"Approved writable root does not exist: {configured!r}"
-        ) from exc
+    resolved = candidate.resolve(strict=False)
     if not _is_relative_to(resolved, workspace):
         raise SandboxConfigurationError(
             f"Approved writable root escapes the disposable workspace: {configured!r}"
+        )
+    # Writable roots are role-baseline policy (e.g. "docs/ops"), applied the
+    # same way across every workspace's disposable checkout regardless of
+    # that project's actual directory layout. Requiring the directory to
+    # pre-exist turned an already-approved, already-boundary-checked write
+    # target into a hard dispatch failure for any workspace that simply
+    # hadn't created it yet. Create it instead — this is strictly narrowing
+    # what already passed the escape check above, not expanding access.
+    if not resolved.exists():
+        try:
+            resolved.mkdir(parents=True, exist_ok=True)
+        except OSError as exc:
+            raise SandboxConfigurationError(
+                f"Approved writable root does not exist and could not be created: {configured!r}"
+            ) from exc
+    elif not resolved.is_dir():
+        raise SandboxConfigurationError(
+            f"Approved writable root is not a directory: {configured!r}"
         )
     return resolved
 

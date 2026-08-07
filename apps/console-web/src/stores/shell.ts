@@ -973,11 +973,25 @@ export const useShellStore = defineStore('shell', () => {
 
   watch(
     activeIdeThreadId,
-    (threadId) => {
+    (threadId, previousThreadId) => {
       ideStreamFocusThreadId.value = threadId;
       if (threadId) {
         applyWorkspaceStreamUiToGlobals(threadId);
       }
+      // #region agent log
+      fetch('http://127.0.0.1:7706/ingest/90bcaec2-2b39-4d4a-84b5-157c12735440', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '9e41d8' },
+        body: JSON.stringify({
+          sessionId: '9e41d8',
+          hypothesisId: 'H2_focus_change',
+          location: 'shell.ts:watch(activeIdeThreadId)',
+          message: 'ideStreamFocusThreadId changed',
+          data: { previousThreadId, threadId },
+          timestamp: Date.now(),
+        }),
+      }).catch(() => {});
+      // #endregion agent log
     },
     { immediate: true },
   );
@@ -1753,8 +1767,32 @@ export const useShellStore = defineStore('shell', () => {
       workspaceId: () => workspaceId,
       narration: () => effectiveKairoNarrationLevel.value,
       operatorPresenceSettings: () => operatorPresenceSettings.value,
-      voiceDeliveryAllowed: () =>
-        voiceDeliveryAllowed() && ideStreamFocusThreadId.value === threadId,
+      voiceDeliveryAllowed: () => {
+        const globallyAllowed = voiceDeliveryAllowed();
+        const isFocused = ideStreamFocusThreadId.value === threadId;
+        const result = globallyAllowed && isFocused;
+        // #region agent log
+        fetch('http://127.0.0.1:7706/ingest/90bcaec2-2b39-4d4a-84b5-157c12735440', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '9e41d8' },
+          body: JSON.stringify({
+            sessionId: '9e41d8',
+            hypothesisId: 'H1_focus_gate',
+            location: 'shell.ts:startChatStreamSession:voiceDeliveryAllowed',
+            message: 'per-thread voice gate evaluated',
+            data: {
+              threadId,
+              currentFocusThreadId: ideStreamFocusThreadId.value,
+              globallyAllowed,
+              isFocused,
+              result,
+            },
+            timestamp: Date.now(),
+          }),
+        }).catch(() => {});
+        // #endregion agent log
+        return result;
+      },
       operatorPrompt: () => operatorPrompt,
       fullAccess: () => voiceContext.fullAccess,
       layoutMode: () => layoutMode.value,

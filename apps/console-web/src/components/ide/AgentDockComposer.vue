@@ -147,6 +147,9 @@ const toolbarProps = useAgentDockComposerToolbarProps(composer);
       :command-mutation-error="composer.shell.commandMutationError"
       :run-mutation-error="composer.shell.runMutationError"
       :workspace-selected="Boolean(composer.shell.currentWorkspace)"
+      @dismiss-kairo-conversation-error="composer.kairoConversationError.value = null"
+      @dismiss-command-mutation-error="composer.shell.commandMutationError = null"
+      @dismiss-run-mutation-error="composer.shell.runMutationError = null"
     />
   </form>
 </template>

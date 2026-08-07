@@ -157,6 +157,23 @@ def role_execution_policy(role: str) -> AgentExecutionPolicy:
     return _ROLE_DEFAULTS.get(_normalize_name(role), _FALLBACK_POLICY)
 
 
+def default_write_scope_for_role(role: str) -> list[str]:
+    """Write scope for a task that declared none — the role's own boundary.
+
+    An unset task scope is fail-closed downstream: resolve_effective_policy
+    intersects role write_paths with it, and an empty side yields (), so the
+    run drops to consultative and the sandbox mounts nothing writable. Tasks
+    created without an explicit scope therefore cannot write at all, which
+    silently disables any task whose purpose is to change something.
+
+    Falling back to the role's own write boundary is bounded, not permissive:
+    the same ceiling still applies afterwards, so a role that is read-only by
+    design (watcher) still resolves to no write access.
+    """
+
+    return [str(path).strip() for path in role_execution_policy(role).write_paths if str(path).strip()]
+
+
 def parse_execution_policy_override(raw: Any) -> AgentExecutionPolicyOverride | None:
     """Parse an employee override while preserving omitted-versus-empty fields."""
 
