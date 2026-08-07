@@ -16,6 +16,7 @@ import {
 } from '../../lib/operator-fleet-health-view';
 import { useShellStore } from '../../stores/shell';
 import WorkspaceAddForm from './WorkspaceAddForm.vue';
+import WorkspaceDetailOverlay from './WorkspaceDetailOverlay.vue';
 
 const shell = useShellStore();
 const rootEl = ref<HTMLElement | null>(null);
@@ -77,6 +78,7 @@ const holoSignals = computed<HudHoloSignal[]>(() =>
 
 function selectWorkspace(workspaceId: string): void {
   shell.setCurrentWorkspace(workspaceId);
+  shell.openWorkspaceDetail(workspaceId);
 }
 </script>
 
@@ -186,5 +188,6 @@ function selectWorkspace(workspaceId: string): void {
         </li>
       </ul>
     </HudHoloPanelShell>
+    <WorkspaceDetailOverlay />
   </div>
 </template>

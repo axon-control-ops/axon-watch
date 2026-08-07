@@ -120,6 +120,43 @@ class AgentSandboxTests(unittest.TestCase):
                 policy_root=self.workspace / ".policy",
             )
 
+    def test_wrapper_outside_writable_roots_but_inside_workspace_is_trusted(self) -> None:
+        """Regression: axon-watch's own workspace root IS this repo, so a
+        checked-in wrapper like bin/axon-agent-terminal-job always resolves
+        "inside the workspace" for that one workspace — with no attacker
+        involved, since bin/ isn't in any role's write_paths. Trust it.
+        """
+        unwritable_dir = self.workspace / "bin"
+        unwritable_dir.mkdir()
+        wrapper_path = unwritable_dir / "axon-test"
+        wrapper_path.write_text("#!/bin/sh\necho ok\n", encoding="utf-8")
+        wrapper_path.chmod(0o755)
+
+        with patch(
+            "app.cli_runtime.agent_sandbox.shutil.which",
+            return_value=str(wrapper_path),
+        ):
+            material = self._material()  # writable_roots=("write",) — "bin" is not in it.
+        self.assertIsNotNone(material)
+
+    def test_wrapper_inside_writable_root_is_still_refused(self) -> None:
+        """A wrapper resolving inside a path this role CAN write to is still
+        refused — that is the actual attack this check exists to catch.
+        """
+        writable_dir = self.workspace / "write"
+        wrapper_path = writable_dir / "axon-test"
+        wrapper_path.write_text("#!/bin/sh\necho ok\n", encoding="utf-8")
+        wrapper_path.chmod(0o755)
+
+        with patch(
+            "app.cli_runtime.agent_sandbox.shutil.which",
+            return_value=str(wrapper_path),
+        ):
+            with self.assertRaisesRegex(
+                SandboxConfigurationError, "cannot come from the workspace"
+            ):
+                self._material()
+
     def test_materialized_hook_script_enforces_its_policy(self) -> None:
         material = self._material()
         for command, expected in (

@@ -101,6 +101,29 @@ def _policy_document(policy: AgentSandboxPolicy) -> dict[str, object]:
     }
 
 
+def _wrapper_source_is_agent_writable(source: Path, workspace: Path, policy: AgentSandboxPolicy) -> bool:
+    """True only when this role's own write scope could have planted *source*.
+
+    A wrapper resolving to somewhere inside the workspace tree is not
+    automatically suspect — axon-watch operates on its own repo as a
+    workspace, so a checked-in wrapper like bin/axon-agent-terminal-job will
+    always resolve inside "the workspace" for that one workspace, with no
+    attacker involved. What actually matters is whether the *current role*
+    could have written that file itself; if writable_roots doesn't cover it
+    (e.g. it's under bin/, and no role's write_paths include bin/), this
+    role's own turns could never have tampered with it.
+    """
+    if not policy.writable_roots:
+        return False
+    for root in policy.writable_roots:
+        cleaned = str(root).strip()
+        if not cleaned:
+            continue
+        if _is_relative_to(source, (workspace / cleaned).resolve()):
+            return True
+    return False
+
+
 def _trusted_wrapper_sources(
     policy: AgentSandboxPolicy,
     workspace: Path,
@@ -111,7 +134,7 @@ def _trusted_wrapper_sources(
         if not installed:
             continue
         source = Path(installed).resolve(strict=True)
-        if _is_relative_to(source, workspace):
+        if _wrapper_source_is_agent_writable(source, workspace, policy):
             raise SandboxConfigurationError("Approved wrappers cannot come from the workspace.")
         sources[wrapper] = source
     return sources
