@@ -7,6 +7,7 @@ import { useWorkspaceAgents } from '../../features/workspace-agents/use-workspac
 import { workspaceAgentLabel } from '../../features/workspace-agents/workspace-agent-label';
 import { workspaceIconKind } from '../../lib/mockup-workspace-icons';
 import {
+  visibleWorkspacePickerEntries,
   workspacePickerMetaLabel,
   workspacePickerPrimaryLabel,
 } from '../../lib/workspace-picker-view';
@@ -47,6 +48,10 @@ const currentWorkspaceMeta = computed(() => {
 });
 const currentWorkspaceKind = computed(() =>
   currentWorkspace.value ? workspaceIconKind(currentWorkspace.value.workspace_id) : 'hex',
+);
+
+const visibleWorkspaces = computed(() =>
+  visibleWorkspacePickerEntries(shell.workspaces, currentWorkspaceId.value),
 );
 
 function workspaceRowMeta(workspaceId: string): string {
@@ -144,7 +149,7 @@ onUnmounted(() => {
       aria-label="Workspaces"
     >
       <button
-        v-for="workspace in shell.workspaces"
+        v-for="workspace in visibleWorkspaces"
         :key="workspace.workspace_id"
         type="button"
         role="option"

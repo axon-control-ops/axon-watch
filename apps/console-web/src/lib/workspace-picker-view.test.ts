@@ -4,6 +4,7 @@ import type { WorkspaceRecord } from '../contracts/canonical';
 
 import {
   shortenWorkspacePath,
+  visibleWorkspacePickerEntries,
   workspacePickerMetaLabel,
   workspacePickerPrimaryLabel,
 } from './workspace-picker-view';
@@ -42,5 +43,42 @@ describe('workspace picker view', () => {
     expect(shortenWorkspacePath('/home/edp/axon-nvme/repos/axon-watch')).toBe(
       '/…/repos/axon-watch',
     );
+  });
+
+  describe('visibleWorkspacePickerEntries', () => {
+    const staffed: WorkspaceRecord = { workspace_id: 'workspace_dashpro', has_active_team: true };
+    const unstaffed: WorkspaceRecord = {
+      workspace_id: 'workspace_bkkinnovationhub',
+      has_active_team: false,
+    };
+    const unknown: WorkspaceRecord = { workspace_id: 'workspace_legacy' }; // has_active_team omitted
+
+    it('hides workspaces with has_active_team explicitly false', () => {
+      const result = visibleWorkspacePickerEntries([staffed, unstaffed], null);
+      expect(result.map((w) => w.workspace_id)).toEqual(['workspace_dashpro']);
+    });
+
+    it('keeps workspaces that omit has_active_team (fail open, not hidden by default)', () => {
+      const result = visibleWorkspacePickerEntries([staffed, unknown], null);
+      expect(result.map((w) => w.workspace_id)).toEqual([
+        'workspace_dashpro',
+        'workspace_legacy',
+      ]);
+    });
+
+    it('never hides the currently selected workspace, even if inactive', () => {
+      const result = visibleWorkspacePickerEntries(
+        [staffed, unstaffed],
+        'workspace_bkkinnovationhub',
+      );
+      expect(result.map((w) => w.workspace_id)).toEqual([
+        'workspace_dashpro',
+        'workspace_bkkinnovationhub',
+      ]);
+    });
+
+    it('returns an empty list when every entry is inactive and none is selected', () => {
+      expect(visibleWorkspacePickerEntries([unstaffed], null)).toEqual([]);
+    });
   });
 });

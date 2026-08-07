@@ -5,6 +5,7 @@ import {
   companyBusyEmployeesCount,
   employeeIsActivelyBusy,
   resolveLiveBusyEmployeeIds,
+  resolveReportingEmployeeId,
 } from './company-roster-busy';
 import { employeeIsWorking } from './company-roster-status';
 
@@ -97,5 +98,65 @@ describe('company-roster-busy', () => {
       focusedStreamEmployeeId: 'sipho',
     });
     expect(ids.sort()).toEqual(['amara', 'sipho']);
+  });
+
+  describe('resolveReportingEmployeeId', () => {
+    it('returns the focused thread owner while a stream is active', () => {
+      const result = resolveReportingEmployeeId({
+        agentStreamActive: true,
+        activeThreadEmployeeId: 'dana',
+      });
+      expect(result).toBe('dana');
+    });
+
+    it('returns null when no stream is active, even with a focused thread', () => {
+      const result = resolveReportingEmployeeId({
+        agentStreamActive: false,
+        activeThreadEmployeeId: 'dana',
+      });
+      expect(result).toBeNull();
+    });
+
+    it('falls back to a background-tab streaming thread owner', () => {
+      const result = resolveReportingEmployeeId({
+        agentStreamActive: false,
+        activeThreadEmployeeId: null,
+        streamingThreadIds: ['thread_soren'],
+        threads: [
+          { thread_id: 'thread_dana', employee_id: 'dana' },
+          { thread_id: 'thread_soren', employee_id: 'soren' },
+        ],
+      });
+      expect(result).toBe('soren');
+    });
+
+    it('prefers the focused stream over a background streaming thread', () => {
+      const result = resolveReportingEmployeeId({
+        agentStreamActive: true,
+        activeThreadEmployeeId: 'dana',
+        streamingThreadIds: ['thread_soren'],
+        threads: [{ thread_id: 'thread_soren', employee_id: 'soren' }],
+      });
+      expect(result).toBe('dana');
+    });
+
+    it('returns null when nothing is streaming', () => {
+      const result = resolveReportingEmployeeId({
+        agentStreamActive: false,
+        activeThreadEmployeeId: null,
+        streamingThreadIds: [],
+        threads: [],
+      });
+      expect(result).toBeNull();
+    });
+
+    it('ignores a streaming thread id with no matching thread record', () => {
+      const result = resolveReportingEmployeeId({
+        agentStreamActive: false,
+        streamingThreadIds: ['thread_unknown'],
+        threads: [{ thread_id: 'thread_dana', employee_id: 'dana' }],
+      });
+      expect(result).toBeNull();
+    });
   });
 });
