@@ -31,7 +31,7 @@ const props = defineProps<{
   liveBusy?: boolean;
   handoffWaiting?: boolean;
   /** True while THIS employee's own thread is the one live-streaming right
-   * now — expands the card to own the panel and reveals `transcript`. */
+   * now — reveals `transcript` while the roster stays available. */
   reporting?: boolean;
   /** Full live/latest reply text for this employee's active turn. Only
    * meaningful (and only rendered) while `reporting` is true. */

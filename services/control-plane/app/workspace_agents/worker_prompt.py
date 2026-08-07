@@ -280,6 +280,15 @@ def build_continuous_worker_prompt(
             " Reporting chain: finish with a Lead handoff (what changed, verified, "
             "Blockers / Lead next). Do not escalate straight to the operator — Lead owns that."
         )
+    delivery_clause = (
+        " Delivery discipline: work only in this disposable checkout. Before handoff, "
+        "inspect the exact files you changed and report their paths plus the targeted checks "
+        "you actually ran. Do not run `git add -A`, commit, push, merge, force-push, or "
+        "touch a protected branch yourself. The delivery service independently checks scope "
+        "and secrets, stages only your verified changed paths, then creates the worker-branch "
+        "commit and draft PR. If any changed path is outside the leased task, stop and report "
+        "it as a blocker instead of trying to include or discard it."
+    )
     tools_clause = _role_tools_clause(role)
     return append_critical_review_clause(
         f"{identity} "
@@ -292,6 +301,7 @@ def build_continuous_worker_prompt(
         "Stay inside your role boundary. Never hallucinate outcomes."
         f"{scope_clause}"
         f"{lead_clause}"
+        f"{delivery_clause}"
         f"{tools_clause}"
         f"{ci_clause}"
         f"{memory_clause}"
