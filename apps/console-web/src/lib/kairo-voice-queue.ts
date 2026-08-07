@@ -61,6 +61,27 @@ let nextJobId = 0;
 let activeJob: VoiceJob | null = null;
 let pending: VoiceJob[] = [];
 let pumping = false;
+const debugVoiceRealmId =
+  typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+    ? crypto.randomUUID()
+    : `voice-realm-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+
+function debugTokenOverlap(left: string, right: string): number {
+  const tokens = (text: string) =>
+    new Set(text.toLowerCase().match(/[a-z0-9]{3,}/g) ?? []);
+  const leftTokens = tokens(left);
+  const rightTokens = tokens(right);
+  if (!leftTokens.size || !rightTokens.size) {
+    return 0;
+  }
+  let shared = 0;
+  for (const token of leftTokens) {
+    if (rightTokens.has(token)) {
+      shared += 1;
+    }
+  }
+  return shared / Math.min(leftTokens.size, rightTokens.size);
+}
 
 function sortPending(): void {
   pending.sort((a, b) => {
@@ -127,11 +148,14 @@ async function pump(): Promise<void> {
           location: 'kairo-voice-queue.ts:pump:dequeue',
           message: 'queue job dequeued for playback',
           data: {
+            debugVoiceRealmId,
             jobId: job.id,
             priority: job.priority,
             speakerId: job.speaker?.id ?? null,
             textPreview: job.text.slice(0, 80),
             pendingAfter: pending.length,
+            documentVisibility:
+              typeof document === 'undefined' ? null : document.visibilityState,
           },
           timestamp: Date.now(),
         }),
@@ -225,6 +249,9 @@ export function enqueueKairoSpeech(
       resolve,
       reject,
     };
+    const activeTokenOverlap = activeJob
+      ? debugTokenOverlap(activeJob.text, job.text)
+      : 0;
     // #region agent log
     fetch('http://127.0.0.1:7706/ingest/90bcaec2-2b39-4d4a-84b5-157c12735440', {
       method: 'POST',
@@ -235,12 +262,18 @@ export function enqueueKairoSpeech(
         location: 'kairo-voice-queue.ts:enqueueKairoSpeech',
         message: 'job enqueued',
         data: {
+          debugVoiceRealmId,
           jobId: job.id,
           priority,
           speakerId: job.speaker?.id ?? null,
-          textPreview: job.text.slice(0, 80),
+          textPreview: job.text.slice(0, 180),
           activeJobId: activeJob?.id ?? null,
+          activeSpeakerId: activeJob?.speaker?.id ?? null,
+          activePriority: activeJob?.priority ?? null,
+          activeTokenOverlap,
           pendingBefore: pending.length,
+          documentVisibility:
+            typeof document === 'undefined' ? null : document.visibilityState,
         },
         timestamp: Date.now(),
       }),

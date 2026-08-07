@@ -380,18 +380,25 @@ function resolveAzureFallbackReason(response: KairoTtsResponse): string {
  * voice queue (`enqueueKairoSpeech` / `speakKairoLine`) owns serialization.
  */
 let debugPlaybackCallSeq = 0;
+const debugPlaybackRealmId =
+  typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+    ? crypto.randomUUID()
+    : `playback-realm-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+const KAIRO_CROSS_CONTEXT_PLAYBACK_LOCK = 'axon-kairo-cross-context-playback';
 
-export async function playKairoUtteranceNow(
+type PlayKairoUtteranceOptions = {
+  preferBrowser?: boolean;
+  speechRate?: number;
+  speechPitch?: number;
+  azureVoiceId?: string;
+  speaker?: KairoVoiceSpeaker | null;
+  ttsTimeoutMs?: number;
+  onPlaybackStart?: () => void;
+};
+
+async function playKairoUtteranceNowUnlocked(
   text: string,
-  options: {
-    preferBrowser?: boolean;
-    speechRate?: number;
-    speechPitch?: number;
-    azureVoiceId?: string;
-    speaker?: KairoVoiceSpeaker | null;
-    ttsTimeoutMs?: number;
-    onPlaybackStart?: () => void;
-  } = {},
+  options: PlayKairoUtteranceOptions = {},
 ): Promise<KairoVoicePlaybackResult> {
   // #region agent log
   const debugCallId = ++debugPlaybackCallSeq;
@@ -407,11 +414,14 @@ export async function playKairoUtteranceNow(
         ? 'OVERLAP SUSPECT: new playback starting while another is already active'
         : 'playback starting (clear)',
       data: {
+        debugPlaybackRealmId,
         debugCallId,
         wasAlreadySpeaking: debugWasAlreadySpeaking,
         textPreview: text.slice(0, 80),
         speakerId: options.speaker?.id ?? null,
         speakerKind: options.speaker?.kind ?? null,
+        documentVisibility:
+          typeof document === 'undefined' ? null : document.visibilityState,
       },
       timestamp: Date.now(),
     }),
@@ -525,6 +535,55 @@ export async function playKairoUtteranceNow(
     }
     return speakWithBrowser(trimmed, 'fetch_error', tuning, speaker, notifyPlaybackStart);
   }
+}
+
+export async function playKairoUtteranceNow(
+  text: string,
+  options: PlayKairoUtteranceOptions = {},
+): Promise<KairoVoicePlaybackResult> {
+  const playWhenVisible = async (): Promise<KairoVoicePlaybackResult> => {
+    const visibility =
+      typeof document === 'undefined' ? null : document.visibilityState;
+    // #region agent log
+    fetch('http://127.0.0.1:7706/ingest/90bcaec2-2b39-4d4a-84b5-157c12735440', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '9e41d8' },
+      body: JSON.stringify({
+        sessionId: '9e41d8',
+        runId: 'post-fix',
+        hypothesisId: 'H6_cross_context',
+        location: 'kairo-voice-playback.ts:playKairoUtteranceNow:cross-context-lock',
+        message:
+          visibility === 'hidden'
+            ? 'cross-context playback skipped for hidden document'
+            : 'cross-context playback lock acquired',
+        data: {
+          debugPlaybackRealmId,
+          documentVisibility: visibility,
+          textPreview: text.slice(0, 80),
+        },
+        timestamp: Date.now(),
+      }),
+    }).catch(() => {});
+    // #endregion agent log
+    if (visibility === 'hidden') {
+      return { engine: 'skipped', reason: 'hidden_document' };
+    }
+    return playKairoUtteranceNowUnlocked(text, options);
+  };
+
+  if (
+    typeof navigator === 'undefined' ||
+    !navigator.locks ||
+    typeof navigator.locks.request !== 'function'
+  ) {
+    return playWhenVisible();
+  }
+  return navigator.locks.request(
+    KAIRO_CROSS_CONTEXT_PLAYBACK_LOCK,
+    { mode: 'exclusive' },
+    playWhenVisible,
+  );
 }
 
 /**
