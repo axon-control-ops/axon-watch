@@ -134,15 +134,11 @@ def _prepare_workspace_scratch(workspace: Path, target: Path) -> None:
 
     Claude/Codex may create ``.agents`` in their current project directory.
     The checkout itself is read-only inside Bubblewrap, so Bubblewrap attempts
-    to create that destination and dies before the runtime can answer. For a
-    disposable worker checkout we reserve only the empty host mount point, then
-    bind a private per-run directory over it. Agent writes never land in the
-    checkout or in a later commit.
+    to create that destination and dies before the runtime can answer. We
+    reserve only the empty host mount point, then bind a private per-run
+    directory over it. Agent writes never land in the selected workspace or
+    in a later commit.
     """
-    if not (workspace / ".axon-si").is_dir():
-        raise SandboxConfigurationError(
-            "Agent project scratch requires a disposable worker checkout."
-        )
     destination = workspace / ".agents"
     if destination.exists():
         if destination.is_symlink() or not destination.is_dir():

@@ -149,7 +149,7 @@ class AgentSandboxTests(unittest.TestCase):
         self.assertIn(str(material.workspace_scratch), command)
         self.assertIn(str(self.workspace / ".agents"), command)
 
-    def test_workspace_agents_scratch_refuses_non_disposable_checkout(self) -> None:
+    def test_workspace_agents_scratch_supports_a_selected_ide_workspace(self) -> None:
         ordinary = self.temp_root / "ordinary-workspace"
         ordinary.mkdir()
         material = materialize_cursor_hook_policy(
@@ -158,15 +158,16 @@ class AgentSandboxTests(unittest.TestCase):
             workspace_root=ordinary,
             policy_root=self.policy_root,
         )
-        with self.assertRaisesRegex(SandboxConfigurationError, "disposable worker checkout"):
-            build_bwrap_command(
-                ["/bin/true"],
-                policy=self._policy(),
-                workspace_root=ordinary,
-                hook_material=material,
-                bwrap_path="/usr/bin/bwrap",
-                user_home=self.home,
-            )
+        command = build_bwrap_command(
+            ["/bin/true"],
+            policy=self._policy(),
+            workspace_root=ordinary,
+            hook_material=material,
+            bwrap_path="/usr/bin/bwrap",
+            user_home=self.home,
+        )
+        self.assertTrue((ordinary / ".agents").is_dir())
+        self.assertIn(str(ordinary / ".agents"), command)
 
     def test_policy_material_cannot_be_written_inside_workspace(self) -> None:
         with self.assertRaisesRegex(SandboxConfigurationError, "outside the workspace"):
