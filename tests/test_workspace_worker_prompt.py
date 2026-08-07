@@ -38,6 +38,25 @@ class WorkspaceWorkerPromptTests(unittest.TestCase):
         self.assertIn("Vue shell and IDE polish", prompt)
         self.assertIn("busy-poll", prompt)
 
+    def test_prompt_teaches_safe_worker_delivery(self) -> None:
+        with patch(
+            "app.workspace_agents.worker_prompt.build_team_roster_context",
+            return_value="",
+        ):
+            prompt = build_continuous_worker_prompt(
+                workspace_id="workspace_axon_watch",
+                employee=EmployeeConfig(
+                    name="Reed",
+                    role="backend",
+                    owns="Control-plane APIs and persistence",
+                    schedule="continuous",
+                ),
+            )
+        self.assertIn("Delivery discipline", prompt)
+        self.assertIn("Do not run `git add -A`, commit, push, merge, force-push", prompt)
+        self.assertIn("stages only your verified changed paths", prompt)
+        self.assertIn("outside the leased task", prompt)
+
     def test_backend_prompt_includes_ci_review_clause(self) -> None:
         with patch(
             "app.workspace_agents.worker_prompt.build_team_roster_context",

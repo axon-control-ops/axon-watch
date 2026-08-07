@@ -227,9 +227,9 @@ const selectedEmployee = computed(
   () => employees.value.find((row) => row.employee_id === selectedEmployeeId.value) ?? null,
 );
 
-// True only while the SELECTED teammate's own thread is the one live-streaming — this
-// is what expands their persona-dock card over the roster grid so the operator can
-// read the report, then collapses back once the stream ends.
+// True only while the SELECTED teammate's own thread is the one live-streaming.
+// The dock shows that live report in place; the team header and presence strip remain
+// available so the operator can still see and switch between the rest of the roster.
 const selectedEmployeeIsReporting = computed(
   () =>
     Boolean(selectedEmployee.value) &&
@@ -368,10 +368,9 @@ async function onPresenceSelect(employee: CompanyEmployeeRecord): Promise<void> 
   <section
     v-if="currentWorkspaceId"
     class="company-roster company-roster--ide company-roster--persona-dock"
-    :class="{ 'company-roster--reporting': selectedEmployeeIsReporting }"
     aria-label="Company employees"
   >
-    <header class="company-roster__header" :aria-hidden="selectedEmployeeIsReporting">
+    <header class="company-roster__header">
       <div class="company-roster__header-row">
         <div>
           <p class="company-roster__eyebrow">Company team</p>
@@ -449,8 +448,6 @@ async function onPresenceSelect(employee: CompanyEmployeeRecord): Promise<void> 
       <CompanyPresenceStrip
         ref="presenceStripRef"
         class="company-roster__presence-strip"
-        :class="{ 'company-roster__presence-strip--collapsed': selectedEmployeeIsReporting }"
-        :aria-hidden="selectedEmployeeIsReporting"
         :employees="employees"
         :selected-employee-id="selectedEmployeeId"
         :live-busy-employee-ids="liveBusyEmployeeIds"

@@ -1,38 +1,16 @@
-/* Reporting: the selected teammate's card owns the panel and shows the
- * live transcript, collapsing the roster header/strip to make room. */
-
-.company-roster__header,
-.company-roster__presence-strip {
-  max-height: 12rem;
-  opacity: 1;
-  overflow: hidden;
-  transition:
-    max-height 220ms ease,
-    opacity 160ms ease,
-    margin 220ms ease;
-}
-
-.company-roster--reporting .company-roster__header {
-  max-height: 0;
-  margin-bottom: 0;
-  opacity: 0;
-  pointer-events: none;
-}
-
-.company-roster__presence-strip--collapsed {
-  max-height: 0;
-  opacity: 0;
-  pointer-events: none;
-}
+/* A live report belongs in the selected teammate's card, not in place of the
+ * team roster. Keep the header and presence strip visible so an operator can
+ * retain fleet awareness and switch to another teammate while it streams. */
 
 .agent-persona-dock--reporting {
-  flex: 1 1 auto;
-  height: 100%;
+  flex: 0 1 auto;
+  height: auto;
   min-height: 0;
 }
 
 .agent-persona-dock__transcript {
   flex: 1 1 auto;
+  max-height: min(22rem, 34vh);
   min-height: 4rem;
   overflow-y: auto;
   overscroll-behavior: contain;
@@ -45,11 +23,4 @@
   line-height: 1.5;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .company-roster__header,
-  .company-roster__presence-strip {
-    transition: none;
-  }
 }
