@@ -80,6 +80,11 @@ def list_isolation_changed_paths(isolation_root: Path) -> list[str]:
     return paths
 
 
+def _stage_isolation_paths(isolation_root: Path, paths: list[str]) -> subprocess.CompletedProcess[str]:
+    """Stage only the path set that passed delivery scope and secret review."""
+    return _run(["git", "add", "--", *paths], cwd=isolation_root)
+
+
 def _derive_commit_message(paths: list[str], turn_subject: str | None) -> str:
     text = " ".join(str(turn_subject or "").split()).strip()
     if text and len(text) <= 72 and not text.endswith("?") and text[:1].isupper():
@@ -415,7 +420,11 @@ def publish_worker_isolation(
         )
 
     message = _derive_commit_message(paths, turn_subject)
-    staged = _run(["git", "add", "-A"], cwd=isolation_root)
+    # A worker isolation is already single-run, but still stage the exact
+    # audited delta rather than relying on a blanket add. This keeps the
+    # delivery receipt, scope scan, and commit contents tied to the same list
+    # and makes accidental sidecar/runtime files impossible to sweep in.
+    staged = _stage_isolation_paths(isolation_root, paths)
     if staged.returncode != 0:
         detail = _combined(staged)
         delivery_store.update_delivery(

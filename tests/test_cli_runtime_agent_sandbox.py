@@ -40,6 +40,9 @@ class AgentSandboxTests(unittest.TestCase):
         self.temp_root = Path(tempfile.mkdtemp(prefix="axon-agent-sandbox-test-"))
         self.workspace = self.temp_root / "workspace"
         self.workspace.mkdir()
+        # Bubblewrap reserves .agents only in disposable worker/composer
+        # checkouts; this fixture models that boundary.
+        (self.workspace / ".axon-si").mkdir()
         (self.workspace / "write").mkdir()
         (self.workspace / "readonly").mkdir()
         (self.workspace / ".env").write_text("TOP_SECRET=value", encoding="utf-8")
@@ -110,6 +113,60 @@ class AgentSandboxTests(unittest.TestCase):
         self.assertEqual(0o444, stat.S_IMODE(first.policy_json.stat().st_mode))
         self.assertEqual(0o555, stat.S_IMODE(first.hook_script.stat().st_mode))
         self.assertEqual(0o555, stat.S_IMODE(first.root.stat().st_mode))
+
+    def test_builtin_terminal_wrapper_never_uses_a_workspace_path(self) -> None:
+        workspace_wrapper = self.workspace / "bin" / "axon-agent-terminal-job"
+        workspace_wrapper.parent.mkdir()
+        workspace_wrapper.write_text("#!/bin/sh\necho compromised\n", encoding="utf-8")
+        workspace_wrapper.chmod(0o755)
+        policy = self._policy(approved_wrappers=("axon-agent-terminal-job",))
+
+        with patch(
+            "app.cli_runtime.agent_sandbox.shutil.which",
+            return_value=str(workspace_wrapper),
+        ):
+            material = self._material(policy)
+
+        wrapper = material.root / "bin" / "axon-agent-terminal-job"
+        source = wrapper.read_text(encoding="utf-8")
+        self.assertTrue(wrapper.is_file())
+        self.assertEqual(0o555, stat.S_IMODE(wrapper.stat().st_mode))
+        self.assertNotIn(str(workspace_wrapper), source)
+        self.assertNotIn("compromised", source)
+
+    def test_workspace_agents_scratch_is_private_and_mountable(self) -> None:
+        material = self._material()
+        command = build_bwrap_command(
+            ["/bin/true"],
+            policy=self._policy(),
+            workspace_root=self.workspace,
+            hook_material=material,
+            bwrap_path="/usr/bin/bwrap",
+            user_home=self.home,
+        )
+        self.assertTrue((self.workspace / ".agents").is_dir())
+        self.assertFalse(any((self.workspace / ".agents").iterdir()))
+        self.assertIn(str(material.workspace_scratch), command)
+        self.assertIn(str(self.workspace / ".agents"), command)
+
+    def test_workspace_agents_scratch_refuses_non_disposable_checkout(self) -> None:
+        ordinary = self.temp_root / "ordinary-workspace"
+        ordinary.mkdir()
+        material = materialize_cursor_hook_policy(
+            policy=self._policy(),
+            run_id="run-ordinary-workspace",
+            workspace_root=ordinary,
+            policy_root=self.policy_root,
+        )
+        with self.assertRaisesRegex(SandboxConfigurationError, "disposable worker checkout"):
+            build_bwrap_command(
+                ["/bin/true"],
+                policy=self._policy(),
+                workspace_root=ordinary,
+                hook_material=material,
+                bwrap_path="/usr/bin/bwrap",
+                user_home=self.home,
+            )
 
     def test_policy_material_cannot_be_written_inside_workspace(self) -> None:
         with self.assertRaisesRegex(SandboxConfigurationError, "outside the workspace"):
@@ -325,6 +382,7 @@ class AgentSandboxTests(unittest.TestCase):
                 (
                     "from pathlib import Path\n"
                     "Path('write/allowed.txt').write_text('yes')\n"
+                    "Path('.agents/runtime.txt').write_text('private')\n"
                     "try:\n"
                     " Path('readonly/denied.txt').write_text('no')\n"
                     "except OSError:\n"
@@ -351,6 +409,11 @@ class AgentSandboxTests(unittest.TestCase):
         )
         self.assertEqual(0, result.returncode, result.stderr)
         self.assertEqual("yes", (self.workspace / "write" / "allowed.txt").read_text())
+        self.assertFalse((self.workspace / ".agents" / "runtime.txt").exists())
+        self.assertEqual(
+            "private",
+            (launch.hook_material.workspace_scratch / "runtime.txt").read_text(),
+        )
         self.assertFalse((self.workspace / "readonly" / "denied.txt").exists())
         self.assertIn("DENIED", result.stdout)
         self.assertIn("SECRET_DENIED", result.stdout)
