@@ -165,6 +165,23 @@ class FileSizePatrolTests(unittest.TestCase):
         self.assertIn("lower stale ratchet", created[0]["goal"])
         self.assertEqual([MANIFEST_REL], created[0]["allowed_paths"])
         self.assertEqual("low", created[0]["risk"])
+        self.assertEqual("integrations", created[0]["owner_role"])
+
+    def test_enqueue_routes_code_extractions_to_a_writable_specialist(self) -> None:
+        created = enqueue_file_size_patrol_tasks(
+            workspace_id="workspace_axon_watch",
+            findings=[
+                FileSizePatrolFinding(
+                    kind="extraction",
+                    path="tests/test_lane_b_git_dispatch.py",
+                    lines=518,
+                    budget=500,
+                )
+            ],
+            owner_role="watcher",
+        )
+        self.assertEqual(1, len(created))
+        self.assertEqual("backend", created[0]["owner_role"])
 
     def test_classify_runs_against_real_repo(self) -> None:
         findings = classify_file_size_findings(REPO_ROOT)
