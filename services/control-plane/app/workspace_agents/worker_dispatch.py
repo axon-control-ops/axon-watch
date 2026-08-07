@@ -244,6 +244,7 @@ def dispatch_continuous_worker_run(
             cursor_trust_policy=execution_policy.trust_policy,
             workspace_root=agent_root,
             execution_policy=execution_policy,
+            allow_git_dispatch=False,
         )
         reply_text = str(lane_b_result.get("content") or "")
         from app.workspace_agents.employee_first_person import (

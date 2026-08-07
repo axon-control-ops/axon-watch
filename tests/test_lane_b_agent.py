@@ -182,6 +182,22 @@ class LaneBAgentTests(unittest.TestCase):
         self.assertGreaterEqual(mcp_tools.get("count"), 1)
         mock_dispatch.assert_called_once()
 
+    @patch("app.chat.lane_b_agent.try_lane_b_git_commit_dispatch")
+    @patch(
+        "app.chat.lane_b_agent.dispatch_ide_composer",
+        return_value={"content": "Worker reply", "dispatched": True},
+    )
+    def test_worker_prompt_skips_direct_git_dispatch(self, mock_dispatch, mock_git) -> None:
+        result = generate_lane_b_result(
+            context=LaneBContext(workspace_id="workspace_axon_watch", composer_mode="agent"),
+            user_prompt="Do not commit, push, or merge. End with Confidence: N/10.",
+            execution_access="full",
+            allow_git_dispatch=False,
+        )
+        self.assertEqual("Worker reply", result["content"])
+        mock_git.assert_not_called()
+        mock_dispatch.assert_called_once()
+
 
 if __name__ == "__main__":
     unittest.main()
