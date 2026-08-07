@@ -54,6 +54,7 @@ class CursorHookMaterial:
     policy_json: Path
     hook_script: Path
     workspace_scratch: Path
+    workspace_codex_scratch: Path
 
 
 @dataclass(frozen=True)
@@ -129,17 +130,18 @@ def _builtin_wrapper_source(wrapper: str) -> bytes | None:
     return Path(__file__).with_name("agent_terminal_job_wrapper.py").read_bytes()
 
 
-def _prepare_workspace_scratch(workspace: Path, target: Path) -> None:
+def _prepare_workspace_scratch(workspace: Path, target: Path, name: str) -> None:
     """Reserve an empty mount point for agent-owned ephemeral state.
 
-    Claude/Codex may create ``.agents`` in their current project directory.
+    Agent CLIs may create private state directories in their current project
+    directory, including ``.agents`` and Codex's ``.codex``.
     The checkout itself is read-only inside Bubblewrap, so Bubblewrap attempts
     to create that destination and dies before the runtime can answer. We
     reserve only the empty host mount point, then bind a private per-run
     directory over it. Agent writes never land in the selected workspace or
     in a later commit.
     """
-    destination = workspace / ".agents"
+    destination = workspace / name
     if destination.exists():
         if destination.is_symlink() or not destination.is_dir():
             raise SandboxConfigurationError("Agent project scratch is not a safe directory.")
@@ -244,9 +246,15 @@ def materialize_cursor_hook_policy(
     wrapper_dir = target / "bin"
     scratch_root = target / "scratch"
     workspace_scratch = scratch_root / ".agents"
+    workspace_codex_scratch = scratch_root / ".codex"
     wrapper_dir.mkdir(mode=0o700, exist_ok=True)
     workspace_scratch.mkdir(mode=0o700, parents=True, exist_ok=True)
-    if scratch_root.is_symlink() or workspace_scratch.is_symlink():
+    workspace_codex_scratch.mkdir(mode=0o700, parents=True, exist_ok=True)
+    if (
+        scratch_root.is_symlink()
+        or workspace_scratch.is_symlink()
+        or workspace_codex_scratch.is_symlink()
+    ):
         raise SandboxConfigurationError("Sandbox policy scratch contains an unsafe directory.")
     _write_immutable(hooks_path, _canonical_json(_hooks_document()))
     _write_immutable(policy_path, policy_bytes)
@@ -270,6 +278,7 @@ def materialize_cursor_hook_policy(
         policy_json=policy_path,
         hook_script=hook_path,
         workspace_scratch=workspace_scratch,
+        workspace_codex_scratch=workspace_codex_scratch,
     )
 
 
@@ -409,9 +418,13 @@ def build_bwrap_command(
         if not _is_relative_to(resolved_material_path, material_root):
             raise SandboxConfigurationError("Sandbox hook material contains an escaped path.")
     workspace_scratch = hook_material.workspace_scratch.resolve(strict=True)
-    if not _is_relative_to(workspace_scratch, material_root):
+    workspace_codex_scratch = hook_material.workspace_codex_scratch.resolve(strict=True)
+    if not _is_relative_to(workspace_scratch, material_root) or not _is_relative_to(
+        workspace_codex_scratch, material_root
+    ):
         raise SandboxConfigurationError("Sandbox scratch contains an escaped path.")
-    _prepare_workspace_scratch(workspace, workspace_scratch)
+    _prepare_workspace_scratch(workspace, workspace_scratch, ".agents")
+    _prepare_workspace_scratch(workspace, workspace_codex_scratch, ".codex")
     writable_roots = tuple(
         dict.fromkeys(_resolve_workspace_path(workspace, path) for path in policy.writable_roots)
     )
@@ -475,6 +488,7 @@ def build_bwrap_command(
     for writable_root in writable_roots:
         arguments.extend(["--bind", str(writable_root), str(writable_root)])
     arguments.extend(["--bind", str(workspace_scratch), str(workspace / ".agents")])
+    arguments.extend(["--bind", str(workspace_codex_scratch), str(workspace / ".codex")])
     append_hidden_mounts(arguments, hidden_paths)
 
     arguments.extend(

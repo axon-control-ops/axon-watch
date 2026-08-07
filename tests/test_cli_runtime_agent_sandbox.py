@@ -146,8 +146,12 @@ class AgentSandboxTests(unittest.TestCase):
         )
         self.assertTrue((self.workspace / ".agents").is_dir())
         self.assertFalse(any((self.workspace / ".agents").iterdir()))
+        self.assertTrue((self.workspace / ".codex").is_dir())
+        self.assertFalse(any((self.workspace / ".codex").iterdir()))
         self.assertIn(str(material.workspace_scratch), command)
+        self.assertIn(str(material.workspace_codex_scratch), command)
         self.assertIn(str(self.workspace / ".agents"), command)
+        self.assertIn(str(self.workspace / ".codex"), command)
 
     def test_workspace_agents_scratch_supports_a_selected_ide_workspace(self) -> None:
         ordinary = self.temp_root / "ordinary-workspace"
@@ -167,7 +171,9 @@ class AgentSandboxTests(unittest.TestCase):
             user_home=self.home,
         )
         self.assertTrue((ordinary / ".agents").is_dir())
+        self.assertTrue((ordinary / ".codex").is_dir())
         self.assertIn(str(ordinary / ".agents"), command)
+        self.assertIn(str(ordinary / ".codex"), command)
 
     def test_policy_material_cannot_be_written_inside_workspace(self) -> None:
         with self.assertRaisesRegex(SandboxConfigurationError, "outside the workspace"):
@@ -347,6 +353,7 @@ class AgentSandboxTests(unittest.TestCase):
                     "from pathlib import Path\n"
                     "Path('write/allowed.txt').write_text('yes')\n"
                     "Path('.agents/runtime.txt').write_text('private')\n"
+                    "Path('.codex/runtime.txt').write_text('private')\n"
                     "try:\n"
                     " Path('readonly/denied.txt').write_text('no')\n"
                     "except OSError:\n"
@@ -377,6 +384,11 @@ class AgentSandboxTests(unittest.TestCase):
         self.assertEqual(
             "private",
             (launch.hook_material.workspace_scratch / "runtime.txt").read_text(),
+        )
+        self.assertFalse((self.workspace / ".codex" / "runtime.txt").exists())
+        self.assertEqual(
+            "private",
+            (launch.hook_material.workspace_codex_scratch / "runtime.txt").read_text(),
         )
         self.assertFalse((self.workspace / "readonly" / "denied.txt").exists())
         self.assertIn("DENIED", result.stdout)
