@@ -74,6 +74,38 @@ class Gate4TaskLedgerTests(unittest.TestCase):
         self.assertIsNone(again["lease_holder"])
         self.assertIsNone(again["run_id"])
 
+    def test_restart_interruption_reopens_exact_run_and_refunds_attempt(self) -> None:
+        created = task_store.create_task(
+            workspace_id="workspace_axon_watch",
+            goal="Restart-safe worker lease",
+            owner_role="backend",
+            attempt_budget=2,
+        )
+        leased = task_store.lease_task(
+            created["task_id"],
+            lease_holder="employee-workspace_axon_watch-backend",
+            run_id="run_restart_interrupted",
+        )
+        self.assertEqual(1, leased["attempts_used"])
+
+        self.assertEqual([], task_store.reopen_orphaned_leased_tasks(
+            terminal_run_ids=["run_different"], refund_attempts=True
+        ))
+        still_leased = task_store.get_task(created["task_id"])
+        assert still_leased is not None
+        self.assertEqual("leased", still_leased["status"])
+
+        recovered = task_store.reopen_orphaned_leased_tasks(
+            terminal_run_ids=["run_restart_interrupted"], refund_attempts=True
+        )
+        self.assertEqual(1, len(recovered))
+        released = task_store.get_task(created["task_id"])
+        assert released is not None
+        self.assertEqual("open", released["status"])
+        self.assertEqual(0, released["attempts_used"])
+        self.assertIsNone(released["lease_holder"])
+        self.assertIsNone(released["run_id"])
+
     def test_lease_contention_only_one_winner(self) -> None:
         created = task_store.create_task(
             workspace_id="workspace_dashpro",

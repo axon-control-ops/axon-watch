@@ -685,9 +685,9 @@ def reopen_orphaned_leased_tasks(
     *,
     terminal_run_ids: Iterable[str],
     terminal_outcome: str = "run terminal; lease recovered",
+    refund_attempts: bool = False,
 ) -> list[dict[str, Any]]:
     """Reopen leased tasks whose bound run already reached a terminal phase.
-
     Prevents canceled/failed/paused worker runs from leaving leased zombies that
     block claim_open_task_for_role until the lease TTL expires.
     """
@@ -722,12 +722,13 @@ def reopen_orphaned_leased_tasks(
                 SET status = 'open',
                     lease_holder = NULL,
                     lease_expires_at = NULL,
+                    attempts_used = MAX(0, attempts_used - ?),
                     run_id = NULL,
                     terminal_outcome = ?,
                     updated_at = ?
                 WHERE task_id = ? AND status = 'leased'
                 """,
-                (outcome, updated_at, record["task_id"]),
+                (int(refund_attempts), outcome, updated_at, record["task_id"]),
             )
             if connection.total_changes:
                 recovered.append(
@@ -736,6 +737,7 @@ def reopen_orphaned_leased_tasks(
                         "status": "open",
                         "lease_holder": None,
                         "lease_expires_at": None,
+                        "attempts_used": max(0, int(record["attempts_used"]) - int(refund_attempts)),
                         "run_id": None,
                         "terminal_outcome": outcome,
                         "updated_at": updated_at,
@@ -743,7 +745,6 @@ def reopen_orphaned_leased_tasks(
                 )
         connection.commit()
     return recovered
-
 
 def cancel_tasks_matching_goal_prefix(
     *,
@@ -829,4 +830,3 @@ def claim_open_task_for_role(
         except TaskLedgerError:
             continue
     return None
-
