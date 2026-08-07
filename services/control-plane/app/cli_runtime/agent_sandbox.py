@@ -316,13 +316,16 @@ def _resolve_workspace_path(workspace: Path, configured: str) -> Path:
         raise SandboxConfigurationError(
             f"Approved writable root escapes the disposable workspace: {configured!r}"
         )
-    # Writable roots are role-baseline policy (e.g. "docs/ops"), applied the
-    # same way across every workspace's disposable checkout regardless of
-    # that project's actual directory layout. Requiring the directory to
-    # pre-exist turned an already-approved, already-boundary-checked write
-    # target into a hard dispatch failure for any workspace that simply
-    # hadn't created it yet. Create it instead — this is strictly narrowing
-    # what already passed the escape check above, not expanding access.
+    # Writable roots are usually role-baseline directories (e.g. "docs/ops"),
+    # but a leased task may narrow authority to one existing file. The latter
+    # is safe to bind directly over the read-only workspace and must not be
+    # rejected merely because it is not a directory.
+    if resolved.exists() and resolved.is_file():
+        return resolved
+    # Role-baseline directories are applied across every workspace's
+    # disposable checkout. Requiring one to pre-exist turned an approved,
+    # boundary-checked target into a hard dispatch failure. Create a missing
+    # directory instead — this narrows no existing authority.
     if not resolved.exists():
         try:
             resolved.mkdir(parents=True, exist_ok=True)
