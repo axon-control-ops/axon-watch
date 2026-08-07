@@ -85,7 +85,7 @@ def run_scheduled_work_sources(*, root: Path | None = None) -> dict[str, Any]:
                 str(source.get("workspace_id") or "workspace_axon_watch").strip()
                 or "workspace_axon_watch"
             )
-            owner_role = str(source.get("owner_role") or "watcher").strip() or "watcher"
+            owner_role = str(source.get("owner_role") or "auto").strip() or "auto"
             max_new = int(source.get("max_new_tasks_per_tick") or 1)
             try:
                 results["sources"][source_id] = run_file_size_patrol(

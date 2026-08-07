@@ -18,7 +18,7 @@
       "label": "Proactive file-size hygiene",
       "enabled": true,
       "trigger": "scheduler_tick",
-      "owner_role": "watcher",
+      "owner_role": "auto",
       "workspace_id": "workspace_axon_watch",
       "max_new_tasks_per_tick": 1,
       "task_goal_prefix": "File-size patrol:"

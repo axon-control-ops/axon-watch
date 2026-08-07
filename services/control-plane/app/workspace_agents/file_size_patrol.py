@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 
 MANIFEST_REL = "scripts/guardrails/hotspot_budgets.json"
 PATROL_GOAL_PREFIX = "File-size patrol:"
-DEFAULT_OWNER_ROLE = "watcher"
+DEFAULT_OWNER_ROLE = "auto"
 DEFAULT_MAX_NEW_TASKS = 1
 
 PatrolKind = Literal["stale_manifest", "extraction"]
@@ -205,6 +205,30 @@ def _build_task_payload(finding: FileSizePatrolFinding) -> dict[str, Any]:
     }
 
 
+def _owner_for_finding(finding: FileSizePatrolFinding, requested_role: str) -> str:
+    """Route repair work to a role that has a matching write boundary.
+
+    Watchers detect hygiene regressions but are intentionally consultative. They
+    must not receive tasks whose acceptance criteria require editing a file.
+    An explicit specialist choice remains available for installations with a
+    custom staffing model; ``auto`` and the legacy ``watcher`` setting route by
+    the affected path.
+    """
+    requested = str(requested_role or "").strip().lower()
+    if requested not in {"", "auto", "watcher"}:
+        return requested
+    if finding.kind == "stale_manifest":
+        return "integrations"
+    path = finding.path.lstrip("./")
+    if path.startswith("apps/console-web/"):
+        return "frontend"
+    if path.startswith((".github/", "config/", "scripts/")):
+        return "integrations"
+    if path.startswith(("docs/planning/", "docs/ops/", "plans/")):
+        return "lead"
+    return "backend"
+
+
 def enqueue_file_size_patrol_tasks(
     *,
     workspace_id: str,
@@ -239,7 +263,7 @@ def enqueue_file_size_patrol_tasks(
                 goal=payload["goal"],
                 acceptance_criteria=payload["acceptance_criteria"],
                 risk=payload["risk"],
-                owner_role=owner_role,
+                owner_role=_owner_for_finding(finding, owner_role),
                 allowed_paths=payload["allowed_paths"],
                 exclusive_paths=payload["exclusive_paths"],
                 attempt_budget=2,
