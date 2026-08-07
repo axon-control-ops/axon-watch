@@ -2,23 +2,13 @@
 
 **The master operator, teaching, debugging, and upgrade manual for Axon-X.**
 
-This handbook is the **single front door** for working with **Axon-X** (`axon-watch`).
-It is written for operators, reviewers, developers, and agents — in plain language first,
-with copy-paste snippets, source pointers, and debugging steps when things go wrong.
+This handbook is the **single front door** for working with **Axon-X** (`axon-watch`). It is written for operators, reviewers, developers, and agents — in plain language first, with copy-paste snippets, source pointers, and debugging steps when things go wrong.
 
-Use it to:
-
-- **Operate** the console day-to-day (`:4173`)
-- **Teach** someone else how Axon-X works
-- **Understand** the codebase without reading every file
-- **Verify** changes before merge
-- **Upgrade** the stack after pulls or dependency changes
-- **Debug** when the UI, API, or tests misbehave
+Use it to operate the console, teach Axon-X, understand the codebase, verify and merge changes, upgrade the stack, and debug the UI, API, or tests.
 
 **Last verified:** 2026-07-29 — IDE Soft Attention actions (**Try again** / **Explain** / **Open team**) live on the agent review strip with **Review N files**; **Try again** hides after a successful shift. Claude Code CLI is a local runtime target. After every push: `./scripts/ops/watch-fast-gate.sh`.
 
-**PDF (Desktop):** After every edit to this handbook or `docs/how-to/*.md`, rebuild:
-`./scripts/docs/build-howto-handbook-pdf.sh` → `~/Desktop/Axon-X-How-To-Handbook.pdf`
+**PDF (Desktop):** After every edit to this handbook or `docs/how-to/*.md`, rebuild: `./scripts/docs/build-howto-handbook-pdf.sh` → `~/Desktop/Axon-X-How-To-Handbook.pdf`
 
 **Production URL:** http://127.0.0.1:4173 — [`docs/PRODUCTION_OPERATOR_SURFACE.md`](PRODUCTION_OPERATOR_SURFACE.md)
 
@@ -35,6 +25,7 @@ Use it to:
 3.66. [Recent operator features](how-to/recent-operator-features.md) — task board, concurrent tabs, galaxy labels, Lead planner, CI watch
 3.67. [Auto-loop status & credits](how-to/auto-loop-and-credits.md) — are we autonomous yet? Cursor / API budget for multi-project
 3.68. [Company hierarchy & Lead check-in](how-to/company-hierarchy-and-lead-checkin.md) — VAXON attend loop + AUTONOMOUS ON safety matrix
+3.69. [Stuck agent recovery & School Operations Phase 1](how-to/agent-recovery-and-school-operations.md) — restart decisions, VAXON's recovery contract, and daily homework approval
 3.7. [VAXON Desktop](#vaxon-desktop) — packaged Linux install
 4. [Teaching Axon-X](#teaching-axon-x-to-someone-else) — explain it to others
 5. [Codebase in plain English](#codebase-in-plain-english) — what happens under the hood
@@ -62,6 +53,7 @@ Use it to:
 | **Developer** | [Codebase in plain English](#codebase-in-plain-english) | [Source index](#source-index), [Common working patterns](#common-working-patterns) |
 | **Integrator / merge** | [CI, merge, and worker agents](how-to/ci-merge-and-worker-agents.md) | [`docs/CI_GATES.md`](CI_GATES.md), `./scripts/ops/watch-fast-gate.sh` |
 | **Autonomy / remote host** | [Auto-loop status & credits](how-to/auto-loop-and-credits.md) | [Autonomy gates & service identity](how-to/autonomy-gates-and-service-identity.md), [Recent operator features](how-to/recent-operator-features.md) |
+| **Stuck agent / school operator** | [Stuck agent recovery & School Operations Phase 1](how-to/agent-recovery-and-school-operations.md) | [Debugging playbook](#debugging-playbook), [Company hierarchy & Lead check-in](how-to/company-hierarchy-and-lead-checkin.md) |
 | **Debugger** | [Debugging playbook](#debugging-playbook) | [Troubleshooting](#troubleshooting) |
 | **Upgrader** | [Upgrading & updating](#upgrading-and-updating) | `./scripts/ops/sync_planning_mirror_to_axon_local.py` |
 
@@ -1213,6 +1205,11 @@ Avoid:
 ## Troubleshooting
 
 ## Debugging playbook
+
+For failed employee agents, first use the cause-specific recovery table in
+[Stuck agent recovery & School Operations Phase 1](how-to/agent-recovery-and-school-operations.md).
+In particular, do not restart a healthy control plane just to clear a failed
+card: a restart interrupts in-flight shifts.
 
 Use this order when something breaks:
 

@@ -41,11 +41,25 @@ class RunStartupReconcileTests(unittest.TestCase):
         self.assertEqual(get_run(run_id)["phase"], "failed")
 
     def test_reconcile_cancels_executing_employee_runs_and_opens_role_gate(self) -> None:
+        from app.persistence import task_store
+
+        task = task_store.create_task(
+            workspace_id="workspace_role_restart",
+            goal="Restart-safe backend shift",
+            owner_role="backend",
+            attempt_budget=1,
+        )
+        leased = task_store.lease_task(
+            str(task["task_id"]),
+            lease_holder="employee-workspace_role_restart-backend",
+        )
         record = create_run(
             workspace_id="workspace_role_restart",
             mode="agent",
             summary="Control Plane: continuous worker shift",
             employee_role="backend",
+            task_id=str(leased["task_id"]),
+            require_leased_task=True,
         )
         run_id = str(record["run_id"])
         self.assertEqual("executing", get_run(run_id)["phase"])
@@ -59,6 +73,11 @@ class RunStartupReconcileTests(unittest.TestCase):
         history = run_store.list_history(get_run(run_id)["history_ref"])
         summaries = [str(item.get("receipt", {}).get("summary") or "") for item in history]
         self.assertTrue(any("Continuous worker dispatch lost" in summary for summary in summaries))
+        reopened = task_store.get_task(str(task["task_id"]))
+        assert reopened is not None
+        self.assertEqual("open", reopened["status"])
+        self.assertEqual(0, reopened["attempts_used"])
+        self.assertEqual("control-plane restart; lease released without consuming an attempt", reopened["terminal_outcome"])
 
     def test_reconcile_leaves_review_ready_runs_alone(self) -> None:
         record = create_run(
