@@ -215,6 +215,55 @@ class AgentSandboxTests(unittest.TestCase):
                         user_home=self.home,
                     )
 
+    def test_missing_writable_root_is_created_instead_of_failing_dispatch(self) -> None:
+        """Role-baseline writable roots (e.g. "docs/ops") are the same for every
+        workspace regardless of that project's actual directory layout — a
+        workspace that simply hadn't created the directory yet used to fail
+        every dispatch outright. It's an already-approved write target, so
+        create it rather than treating "not created yet" as fatal.
+        """
+        material = self._material(self._policy(writable_roots=("docs/ops",)))
+        self.assertFalse((self.workspace / "docs" / "ops").exists())
+        command = build_bwrap_command(
+            ["/bin/true"],
+            policy=self._policy(writable_roots=("docs/ops",)),
+            workspace_root=self.workspace,
+            hook_material=material,
+            bwrap_path="/usr/bin/bwrap",
+            user_home=self.home,
+        )
+        self.assertTrue((self.workspace / "docs" / "ops").is_dir())
+        self.assertIn(str(self.workspace / "docs" / "ops"), command)
+
+    def test_writable_root_rejects_missing_escape_without_creating_it(self) -> None:
+        material = self._material()
+        outside = self.temp_root / "outside-missing"
+        self.assertFalse(outside.exists())
+        with self.assertRaisesRegex(SandboxConfigurationError, "escapes"):
+            build_bwrap_command(
+                ["/bin/true"],
+                policy=self._policy(writable_roots=("../outside-missing",)),
+                workspace_root=self.workspace,
+                hook_material=material,
+                bwrap_path="/usr/bin/bwrap",
+                user_home=self.home,
+            )
+        self.assertFalse(outside.exists())
+
+    def test_writable_root_pointing_at_a_file_still_fails_closed(self) -> None:
+        (self.workspace / "docs").mkdir()
+        (self.workspace / "docs" / "ops").write_text("not a directory", encoding="utf-8")
+        material = self._material(self._policy(writable_roots=("docs/ops",)))
+        with self.assertRaisesRegex(SandboxConfigurationError, "not a directory"):
+            build_bwrap_command(
+                ["/bin/true"],
+                policy=self._policy(writable_roots=("docs/ops",)),
+                workspace_root=self.workspace,
+                hook_material=material,
+                bwrap_path="/usr/bin/bwrap",
+                user_home=self.home,
+            )
+
     def test_cursor_mount_cannot_shadow_run_hooks(self) -> None:
         material = self._material()
         with self.assertRaisesRegex(SandboxConfigurationError, "shadow"):

@@ -8,7 +8,25 @@ from app.cli_runtime.agent_sandbox import AgentSandboxPolicy
 from app.workspace_agents.execution_policy import AgentExecutionPolicy
 
 
-def _runtime_paths(binary: str, *, include_cursor_auth: bool) -> tuple[str, ...]:
+# Every runtime family persists its subscription/OAuth session in its own
+# dotfile under $HOME. The sandbox rewrites HOME (see _SANDBOX_HOME in
+# agent_sandbox.py), so unless that file is bind-mounted in too, a CLI that's
+# fully logged in on the host sees no credentials at all inside the sandbox
+# and fails every dispatch with "not logged in" — this was previously scoped
+# to cursor only, so claude/codex sandboxed dispatch always failed auth
+# regardless of host login state.
+_AUTH_PATH_CANDIDATES: dict[str, tuple[str, ...]] = {
+    "cursor": (
+        ".cursor/cli-config.json",
+        ".cursor/agent-cli-state.json",
+        ".config/cursor/auth.json",
+    ),
+    "claude": (".claude/.credentials.json",),
+    "codex": (".codex/auth.json",),
+}
+
+
+def _runtime_paths(binary: str, *, family: str) -> tuple[str, ...]:
     executable = Path(binary).expanduser().resolve(strict=True)
     home = Path.home().resolve()
     paths: list[Path] = [executable.parent]
@@ -21,14 +39,10 @@ def _runtime_paths(binary: str, *, include_cursor_auth: bool) -> tuple[str, ...]
         # codex's own error handling reports as "Missing optional dependency"
         # even though the real, unsandboxed install has it.
         paths.append(executable.parent.parent)
-    if include_cursor_auth:
-        for candidate in (
-            home / ".cursor" / "cli-config.json",
-            home / ".cursor" / "agent-cli-state.json",
-            home / ".config" / "cursor" / "auth.json",
-        ):
-            if candidate.is_file():
-                paths.append(candidate)
+    for relative in _AUTH_PATH_CANDIDATES.get(family, ()):
+        candidate = home / relative
+        if candidate.is_file():
+            paths.append(candidate)
     return tuple(str(path) for path in paths)
 
 
@@ -36,17 +50,14 @@ def adapt_execution_policy(
     policy: AgentExecutionPolicy,
     *,
     runtime_binary: str,
-    include_cursor_auth: bool = False,
+    family: str = "",
 ) -> AgentSandboxPolicy:
     return AgentSandboxPolicy(
         writable_roots=policy.write_paths,
         approved_wrappers=policy.approved_wrapper_names,
         approved_command_prefixes=policy.approved_command_prefixes,
         forbidden_path_globs=policy.forbidden_path_globs,
-        cursor_readonly_paths=_runtime_paths(
-            runtime_binary,
-            include_cursor_auth=include_cursor_auth,
-        ),
+        cursor_readonly_paths=_runtime_paths(runtime_binary, family=family),
     )
 
 
@@ -80,7 +91,7 @@ def prepare_execution_sandbox(
         adapt_execution_policy(
             policy,
             runtime_binary=runtime_binary,
-            include_cursor_auth=family == "cursor",
+            family=family,
         ),
     )
 

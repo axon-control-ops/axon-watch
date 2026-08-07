@@ -62,6 +62,10 @@ def check_posthog_recent_events(
         except HTTPError as exc:
             status = int(exc.code)
             body = exc.read().decode("utf-8", errors="replace")
+            # Retry transient upstream load before surfacing a warning signal.
+            if status in (429, 503) and attempt + 1 < attempts:
+                last_exc = exc
+                continue
             last_exc = None
             break
         except (TimeoutError, URLError, OSError) as exc:
@@ -79,6 +83,9 @@ def check_posthog_recent_events(
         return "critical", "PostHog API rejected the personal API key"
     if status == 403:
         return "critical", "PostHog API denied project read access"
+    # Transient upstream load (503/429) stays warning — not a credentials or ingest fault.
+    if status in (429, 503):
+        return "warning", f"PostHog API HTTP {status}: {body[:200]}"
     if status != 200:
         return "critical", f"PostHog API HTTP {status}: {body[:200]}"
 

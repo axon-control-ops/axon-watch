@@ -79,14 +79,26 @@ function familyTitle(family: RuntimeFamily): string {
   return 'Codex CLI';
 }
 
-function familyLoginCommand(family: RuntimeFamily): string {
-  if (family === 'cursor') return 'cursor agent login';
+function familyLoginCommand(family: RuntimeFamily, binary = ''): string {
+  if (family === 'cursor') {
+    const name = binary.trim().split('/').pop()?.toLowerCase() ?? '';
+    if (name === 'cursor-agent' || name.startsWith('cursor-agent.')) {
+      return 'cursor-agent login';
+    }
+    return 'cursor agent login';
+  }
   if (family === 'claude') return 'claude auth login';
   return 'codex login';
 }
 
-function familyStatusCommand(family: RuntimeFamily): string {
-  if (family === 'cursor') return 'cursor agent status';
+function familyStatusCommand(family: RuntimeFamily, binary = ''): string {
+  if (family === 'cursor') {
+    const name = binary.trim().split('/').pop()?.toLowerCase() ?? '';
+    if (name === 'cursor-agent' || name.startsWith('cursor-agent.')) {
+      return 'cursor-agent status';
+    }
+    return 'cursor agent status';
+  }
   if (family === 'claude') return 'claude auth status';
   return 'codex login status';
 }
@@ -98,8 +110,9 @@ function buildCard(family: RuntimeFamily, target: RuntimeTargetRecord | null): R
   const managedByVault =
     auth?.auth_method === 'vault_api_key' || auth?.auth_method === 'api_key';
   const title = familyTitle(family);
-  const loginCommand = familyLoginCommand(family);
-  const statusCommand = familyStatusCommand(family);
+  const binary = target?.binary ?? '';
+  const loginCommand = familyLoginCommand(family, binary);
+  const statusCommand = familyStatusCommand(family, binary);
 
   let statusTone: RuntimeCard['statusTone'] = 'muted';
   let statusLabel = 'Not installed';

@@ -1,4 +1,4 @@
-import { apiUrl, postJson } from './client';
+import { fetchWithTimeout, postJson } from './client';
 
 export type SentryResolveResult = {
   ok: boolean;
@@ -65,7 +65,7 @@ export async function resolveSentryIssue(
     return { ok: false, reason: 'missing_issue_id' };
   }
 
-  const response = await fetch(apiUrl(`/api/sentry/issues/${encodeURIComponent(normalized)}/resolve`), {
+  const response = await fetchWithTimeout(`/api/sentry/issues/${encodeURIComponent(normalized)}/resolve`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -109,7 +109,7 @@ export async function attendSentryIssue(
     return { ok: false, reason: 'missing_issue_id' };
   }
 
-  const response = await fetch(apiUrl(`/api/sentry/issues/${encodeURIComponent(normalized)}/attend`), {
+  const response = await fetchWithTimeout(`/api/sentry/issues/${encodeURIComponent(normalized)}/attend`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({

@@ -65,6 +65,31 @@ class AzureSttModuleTests(unittest.TestCase):
         self.assertEqual(result.transcript, "VAXON briefing status")
         self.assertAlmostEqual(result.confidence or 0.0, 0.91)
 
+    @patch("app.azure_stt.time.sleep")
+    @patch("app.azure_stt.urllib.request.urlopen")
+    @patch(
+        "app.azure_stt.resolve_azure_speech_credentials",
+        return_value=("abc1234567890123456789012345678", "southafricanorth"),
+    )
+    def test_remote_disconnected_is_retried_then_falls_back_to_none(
+        self, _mock_creds, mock_urlopen, mock_sleep
+    ) -> None:
+        """Regression: Azure closing the connection mid-response raised
+        http.client.RemoteDisconnected, which urllib does NOT wrap into
+        URLError — it escaped transcribe_azure_stt entirely and crashed the
+        /api/kairo/stt route with an unhandled 500 instead of the graceful
+        None -> browser-fallback contract every other failure mode already had.
+        """
+        import http.client
+
+        mock_urlopen.side_effect = http.client.RemoteDisconnected(
+            "Remote end closed connection without response"
+        )
+        result = transcribe_azure_stt(b"audio", filename="capture.ogg", mime_type="audio/ogg")
+        self.assertIsNone(result)
+        self.assertEqual(mock_urlopen.call_count, 2)
+        mock_sleep.assert_called_once()
+
     def test_availability_payload_reports_limits(self) -> None:
         payload = stt_availability_payload()
         self.assertIn("available", payload)

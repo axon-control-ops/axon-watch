@@ -21,6 +21,16 @@ const ACTING_AS_PERSONA_SENTENCE_RE =
 const THINKING_ECHO_MIN = 40;
 /** Near-duplicate paragraphs (typos / glued words) still count as an echo. */
 const THINKING_ECHO_SIMILARITY = 0.82;
+/**
+ * Above this, skip the per-index sentence-boundary scan below — it calls
+ * tryPair() (itself O(n)) at every ". X" boundary, so cost grows worse than
+ * quadratically with length. A real streamed-echo glitch duplicates a
+ * sentence or two; a multi-KB "thinking" block is not what this is for.
+ * Measured against a real 500K-char thinking block: 2K chars ~23ms, 16K
+ * chars ~1s, the full block ~22 minutes — this cap keeps the worst case
+ * bounded to a few tens of ms.
+ */
+const THINKING_ECHO_SCAN_MAX = 4_000;
 
 export function flattenLiveLineText(text: string): string {
   return text.replace(/\s+/g, ' ').trim();
@@ -98,6 +108,10 @@ export function collapseBackToBackThinkingEcho(text: string, minLength = THINKIN
     if (flattened.slice(0, half) === flattened.slice(half)) {
       return flattened.slice(0, half);
     }
+  }
+
+  if (flattened.length > THINKING_ECHO_SCAN_MAX) {
+    return flattened;
   }
 
   const tryPair = (left: string, right: string): string | null => {

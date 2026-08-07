@@ -117,6 +117,26 @@ async function pump(): Promise<void> {
         break;
       }
       activeJob = job;
+      // #region agent log
+      fetch('http://127.0.0.1:7706/ingest/90bcaec2-2b39-4d4a-84b5-157c12735440', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '9e41d8' },
+        body: JSON.stringify({
+          sessionId: '9e41d8',
+          hypothesisId: 'H3_playback_overlap',
+          location: 'kairo-voice-queue.ts:pump:dequeue',
+          message: 'queue job dequeued for playback',
+          data: {
+            jobId: job.id,
+            priority: job.priority,
+            speakerId: job.speaker?.id ?? null,
+            textPreview: job.text.slice(0, 80),
+            pendingAfter: pending.length,
+          },
+          timestamp: Date.now(),
+        }),
+      }).catch(() => {});
+      // #endregion agent log
       try {
         const result = await playKairoUtteranceNow(job.text, {
           preferBrowser: job.preferBrowser,
@@ -205,6 +225,27 @@ export function enqueueKairoSpeech(
       resolve,
       reject,
     };
+    // #region agent log
+    fetch('http://127.0.0.1:7706/ingest/90bcaec2-2b39-4d4a-84b5-157c12735440', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '9e41d8' },
+      body: JSON.stringify({
+        sessionId: '9e41d8',
+        hypothesisId: 'H3_playback_overlap',
+        location: 'kairo-voice-queue.ts:enqueueKairoSpeech',
+        message: 'job enqueued',
+        data: {
+          jobId: job.id,
+          priority,
+          speakerId: job.speaker?.id ?? null,
+          textPreview: job.text.slice(0, 80),
+          activeJobId: activeJob?.id ?? null,
+          pendingBefore: pending.length,
+        },
+        timestamp: Date.now(),
+      }),
+    }).catch(() => {});
+    // #endregion agent log
     if (priority === 'interrupt') {
       flushKairoSpeechQueue('preempted_by_interrupt');
       void stopKairoPlayback();

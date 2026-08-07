@@ -13,6 +13,7 @@ from tests.support.control_plane_db import isolate_control_plane_db
 CONTROL_PLANE_ROOT = Path(__file__).resolve().parents[1] / "services" / "control-plane"
 sys.path.insert(0, str(CONTROL_PLANE_ROOT))
 
+from app.auth.rate_limit import reset_rate_limit_state_for_tests  # noqa: E402
 from app.main import app  # noqa: E402
 from app.kairo.turn_memory import clear_memory_for_tests, remember_entities, remember_turn  # noqa: E402
 from app.persistence import chat_store  # noqa: E402
@@ -161,6 +162,121 @@ class ControlPlaneChatTests(unittest.TestCase):
     def test_get_missing_thread_returns_404(self) -> None:
         response = self.client.get("/api/chat/threads/thread_missing/history")
         self.assertEqual(404, response.status_code)
+
+    def test_sync_execution_access_notices_rewrites_stored_message(self) -> None:
+        thread = chat_store.create_thread(
+            workspace_id="workspace_alpha",
+            run_id=None,
+            thread_kind="ide",
+            created_at="2026-08-06T10:00:00Z",
+        )
+        chat_store.save_message(
+            {
+                "message_id": "message_agent_notice",
+                "thread_id": thread["thread_id"],
+                "workspace_id": "workspace_alpha",
+                "run_id": "",
+                "role": "agent",
+                "content": (
+                    "Agent mode is consultative-only. Enable Full Access in the "
+                    "Agent Dock composer to let the agent edit files and run commands."
+                ),
+                "created_at": "2026-08-06T10:00:01Z",
+            }
+        )
+        # An unrelated message must be left untouched.
+        chat_store.save_message(
+            {
+                "message_id": "message_agent_unrelated",
+                "thread_id": thread["thread_id"],
+                "workspace_id": "workspace_alpha",
+                "run_id": "",
+                "role": "agent",
+                "content": "Ran the test suite, all green.",
+                "created_at": "2026-08-06T10:00:02Z",
+            }
+        )
+
+        response = self.client.post(
+            f"/api/chat/threads/{thread['thread_id']}/execution-access-notices",
+            json={"execution_access": "full"},
+        )
+        self.assertEqual(200, response.status_code)
+        self.assertEqual(1, response.json()["updated"])
+
+        history = self.client.get(f"/api/chat/threads/{thread['thread_id']}/history").json()
+        contents = {item["message_id"]: item["content"] for item in history["items"]}
+        self.assertEqual(
+            "Agent mode now has Full Access enabled — the agent can edit files and run commands.",
+            contents["message_agent_notice"],
+        )
+        self.assertEqual("Ran the test suite, all green.", contents["message_agent_unrelated"])
+
+        # Flipping back to consultative rewrites it the other way.
+        back = self.client.post(
+            f"/api/chat/threads/{thread['thread_id']}/execution-access-notices",
+            json={"execution_access": "consultative"},
+        )
+        self.assertEqual(1, back.json()["updated"])
+        history_2 = self.client.get(f"/api/chat/threads/{thread['thread_id']}/history").json()
+        contents_2 = {item["message_id"]: item["content"] for item in history_2["items"]}
+        self.assertEqual(
+            "Agent mode is consultative-only. Enable Full Access in the "
+            "Agent Dock composer to let the agent edit files and run commands.",
+            contents_2["message_agent_notice"],
+        )
+
+    def test_sync_execution_access_notices_missing_thread_returns_404(self) -> None:
+        response = self.client.post(
+            "/api/chat/threads/thread_missing/execution-access-notices",
+            json={"execution_access": "full"},
+        )
+        self.assertEqual(404, response.status_code)
+
+    def test_history_caps_long_running_thread_by_default(self) -> None:
+        # 151 posts exceeds the mutating-API rate limit's default (120/min) window;
+        # lift it for this test's bursty traffic and reset shared state after so it
+        # can't leak into other tests.
+        reset_rate_limit_state_for_tests()
+        self.addCleanup(reset_rate_limit_state_for_tests)
+        rate_limit_env = patch.dict(
+            os.environ,
+            {"AXON_WATCH_MUTATING_RATE_LIMIT_PER_MINUTE": "10000"},
+            clear=False,
+        )
+        rate_limit_env.start()
+        self.addCleanup(rate_limit_env.stop)
+
+        created = self.client.post(
+            "/api/chat/messages",
+            json={"workspace_id": "workspace_alpha", "content": "seed"},
+        ).json()
+        thread_id = created["thread_id"]
+        for index in range(150):
+            self.client.post(
+                "/api/chat/messages",
+                json={
+                    "workspace_id": "workspace_alpha",
+                    "content": f"followup {index}",
+                    "thread_id": thread_id,
+                },
+            )
+        # Seed thread posts 3 messages/turn (operator+system+agent); 151 turns = 453.
+        full_history = self.client.get(f"/api/chat/threads/{thread_id}/history").json()
+        self.assertGreater(full_history["total_count"], 80)
+        self.assertEqual(80, full_history["count"])
+        self.assertEqual(80, len(full_history["items"]))
+        # Capped response keeps the *tail* (most recent) messages: each posted
+        # turn writes operator/system/agent, so the last turn's operator
+        # message sits three slots from the end.
+        self.assertEqual("operator", full_history["items"][-3]["role"])
+        self.assertEqual("followup 149", full_history["items"][-3]["content"])
+
+        uncapped = self.client.get(
+            f"/api/chat/threads/{thread_id}/history", params={"limit": 0}
+        ).json()
+        self.assertEqual(full_history["total_count"], uncapped["count"])
+        self.assertEqual(full_history["total_count"], uncapped["total_count"])
 
     def test_get_workspace_chat_thread_returns_latest_operator_thread(self) -> None:
         first = self.client.post(

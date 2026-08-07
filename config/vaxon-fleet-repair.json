@@ -2,7 +2,7 @@
   "schema_version": 1,
   "description": "VAXON fleet self-heal: detect/classify/dispatch/verify/prevent for axon-watch's own agent-fleet operational failures (sandbox, dispatch, runtime-adapter bugs) — not gated by per-workspace autonomy_mode, always-on like Gate 9 CI remediation.",
   "enabled": true,
-  "dispatch_enabled": false,
+  "dispatch_enabled": true,
   "target_workspace_id": "workspace_axon_watch",
   "defaults": {
     "owner_role": "watcher",

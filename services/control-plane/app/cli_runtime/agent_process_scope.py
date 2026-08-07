@@ -97,6 +97,14 @@ def wrap_command_in_agent_scope(command: list[str]) -> list[str]:
         "--user",
         "--scope",
         "--collect",
+        # Without --quiet, systemd-run prints "Running scope as unit: ...;
+        # invocation ID: ..." to stderr before the wrapped command even
+        # starts. When the CLI itself then fails without any parseable error
+        # of its own, callers fall back to this stderr text as "the reason it
+        # failed" — surfacing systemd plumbing instead of (or masking) the
+        # real cause. Silence it so a genuine empty-stderr failure reads as
+        # "exited with status N" rather than an unrelated scope/invocation ID.
+        "--quiet",
         f"--unit={unit}",
         f"--property=MemoryMax={memory_max}",
         f"--property=MemoryHigh={memory_high}",

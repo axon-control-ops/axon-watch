@@ -7,6 +7,7 @@ import os
 import subprocess
 from typing import Any
 
+from app.cli_runtime.catalog_discovery import cursor_cli_argv
 from app.cli_runtime.runtime_auth import env_without_api_keys
 
 StatusRecord = dict[str, Any]
@@ -117,33 +118,37 @@ def cursor_auth_status(
         }
 
     def _probe(env: dict[str, str]) -> StatusRecord:
+        status_argv = cursor_cli_argv(binary, "status")
         try:
-            proc = _run_command_with_timeout_retry([binary, "agent", "status"], env=env)
+            proc = _run_command_with_timeout_retry(status_argv, env=env)
         except subprocess.TimeoutExpired:
+            preview = " ".join(status_argv)
             return {
                 "logged_in": False,
                 "auth_method": "",
                 "provider_label": "Timed out",
                 "vault_posture": vault_posture.get("posture"),
-                "message": "Cursor auth probe timed out. Run `cursor agent status` manually.",
+                "message": f"Cursor auth probe timed out. Run `{preview}` manually.",
             }
         except Exception:
+            preview = " ".join(status_argv)
             return {
                 "logged_in": False,
                 "auth_method": "",
                 "provider_label": "Probe failed",
                 "vault_posture": vault_posture.get("posture"),
-                "message": "Cursor auth probe failed. Run `cursor agent status` manually.",
+                "message": f"Cursor auth probe failed. Run `{preview}` manually.",
             }
         raw = (proc.stdout or proc.stderr or "").strip()
         lowered = raw.lower()
+        login_hint = " ".join(cursor_cli_argv(binary, "login"))
         if "not logged in" in lowered or "authentication required" in lowered:
             return {
                 "logged_in": False,
                 "auth_method": "",
                 "provider_label": "Not signed in",
                 "vault_posture": vault_posture.get("posture"),
-                "message": "Cursor is installed but not signed in. Run `cursor agent login` or unlock /vault.",
+                "message": f"Cursor is installed but not signed in. Run `{login_hint}` or unlock /vault.",
             }
         if proc.returncode == 0 and raw:
             return {
@@ -159,7 +164,7 @@ def cursor_auth_status(
             "auth_method": "",
             "provider_label": "Not signed in",
             "vault_posture": vault_posture.get("posture"),
-            "message": "Cursor is installed but not signed in. Run `cursor agent login` or unlock /vault.",
+            "message": f"Cursor is installed but not signed in. Run `{login_hint}` or unlock /vault.",
         }
 
     has_api_key = bool(runtime_env.get("CURSOR_API_KEY", "").strip())
@@ -202,7 +207,7 @@ def cursor_auth_status(
             "vault_posture": vault_posture.get("posture"),
             "message": (
                 "CURSOR_API_KEY is set but Cursor CLI is not signed in. "
-                "Fix the vault secret, clear shell env, or run `cursor agent login`."
+                f"Fix the vault secret, clear shell env, or run `{' '.join(cursor_cli_argv(binary, 'login'))}`."
             ),
         }
     if vault_overlay and vault_posture.get("unlocked") and vault_overlay.get("logged_in"):

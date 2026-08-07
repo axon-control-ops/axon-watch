@@ -21,7 +21,7 @@ function vaultLockedHint(status: RuntimeStatusSnapshot | null): string | null {
     return null;
   }
   if (posture === 'missing_keys') {
-    return status?.vault_runtime?.hint || 'Sign in with Cursor/Codex CLI on the host or add keys in /vault.';
+    return status?.vault_runtime?.hint || 'Sign in with Cursor, Claude, or Codex CLI on the host or add keys in /vault.';
   }
   return null;
 }
@@ -140,5 +140,5 @@ export function runtimeVaultHint(status: RuntimeStatusSnapshot | null): string {
     status?.local.find((record) => record.id === status.default_runtime) ??
     status?.local[0] ??
     null;
-  return target?.auth.message || 'Unlock /vault or sign in to Cursor/Codex locally.';
+  return target?.auth.message || 'Unlock /vault or sign in to a local CLI runtime.';
 }
