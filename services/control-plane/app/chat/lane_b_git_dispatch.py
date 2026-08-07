@@ -16,6 +16,7 @@ from app.chat.workspace_git import (
 )
 from app.cli_runtime.approval_gate import full_access_requested
 from app.plain_text_to_instructions import prompt_requests_git_actions
+from app.workspace_agents.execution_policy import AgentExecutionPolicy
 
 _COMMIT_INTENT_RE = re.compile(
     r"\b(?:commit(?:\s+(?:these|my|the|all))?(?:\s+changes?)?(?:\s+and\s+push)?"
@@ -151,6 +152,7 @@ def try_lane_b_git_commit_dispatch(
     workspace_id: str,
     user_prompt: str,
     execution_access: str | None,
+    execution_policy: AgentExecutionPolicy | None = None,
 ) -> dict[str, object] | None:
     if not full_access_requested(execution_access):
         return None
@@ -158,6 +160,28 @@ def try_lane_b_git_commit_dispatch(
         return None
     if not prompt_requests_git_actions(user_prompt):
         return None
+
+    # execution_access above is the OPERATOR's own Full Access toggle — it says
+    # nothing about which employee's thread this turn is dispatched under. A
+    # chat message that lands in a consultative-only role's thread (e.g.
+    # watcher: write_paths=(), execution_access="consultative") must not run a
+    # real `git add`/`commit`/`push` just because the operator's own toggle is
+    # on; that role is never allowed to write, regardless of who is asking.
+    if execution_policy is not None and execution_policy.execution_access != "full":
+        return {
+            "content": (
+                "This teammate's role is consultative-only and has no write scope "
+                "— I can't run git add/commit/push here regardless of Full Access. "
+                "Ask a role with write access (Lead/Frontend/Backend/Integrations) "
+                "to make this commit, or do it from a thread bound to one of those roles."
+            ),
+            "dispatched": False,
+            "continue_prompt": None,
+            "execution_tier": "executing",
+            "runtime_id": "workspace_git",
+            "runtime_label": "workspace git",
+            "reason": "role execution_access is not full",
+        }
 
     continue_prompt = split_commit_then_remainder(user_prompt)
     subject_source = continue_prompt or user_prompt

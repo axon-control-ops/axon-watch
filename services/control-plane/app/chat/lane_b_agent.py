@@ -135,6 +135,7 @@ def generate_lane_b_result(
         workspace_id=context.workspace_id,
         user_prompt=trimmed,
         execution_access=execution_access,
+        execution_policy=execution_policy,
     )
     if git_result is not None:
         continue_prompt = str(git_result.get("continue_prompt") or "").strip()

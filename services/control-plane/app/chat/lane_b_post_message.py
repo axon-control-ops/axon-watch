@@ -26,6 +26,7 @@ from app.cli_runtime.approval_gate import is_run_linked_composer_mode, is_tool_c
 from app.persistence import chat_store
 from app.plans.service import maybe_attach_plan_artifact
 from app.terminal.session_registry import ensure_agent_session, serialize_session
+from app.workspace_agents.execution_policy import role_execution_policy
 from app.workspace_agents.employee_persona_prompt import build_employee_persona_appendix
 from app.workspace_agents.employee_first_person import (
     employee_name_from_persona_block,
@@ -139,6 +140,12 @@ def post_lane_b_message(
         for item in chat_store.list_thread_messages(thread_id)
     ]
     thread_employee_role = str(early_thread.get("employee_role") or "").strip()
+    # Role baseline this thread is bound to, independent of the operator's own
+    # Full Access toggle — a message landing in a consultative-only role's
+    # thread must not inherit the operator's own write access.
+    thread_execution_policy = (
+        role_execution_policy(thread_employee_role) if thread_employee_role else None
+    )
     lead_name = employee_name_from_persona_block(employee_persona or "") or "Lead"
     bind_lane_b_attachments = lambda message_id: _bind_message_attachments(
         attachment_ids=attachment_ids,
@@ -333,6 +340,7 @@ def post_lane_b_message(
             memory_appendix=memory_appendix,
             kairo_session_id=kairo_session_id,
             workspace_root=sandbox_workspace_root,
+            execution_policy=thread_execution_policy,
         )
         payload: dict[str, object] = {
             "thread_id": thread_id,
@@ -374,6 +382,7 @@ def post_lane_b_message(
             runtime_model=runtime_model,
             execution_access=execution_access,
             workspace_root=sandbox_workspace_root,
+            execution_policy=thread_execution_policy,
         )
     else:
         lane_b_result = generate_lane_b_result(
@@ -383,6 +392,7 @@ def post_lane_b_message(
             runtime_model=runtime_model,
             workspace_root=sandbox_workspace_root,
             execution_access=execution_access,
+            execution_policy=thread_execution_policy,
         )
 
     agent_content = str(lane_b_result.get("content") or "")

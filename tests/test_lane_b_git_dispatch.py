@@ -16,6 +16,7 @@ from app.chat.lane_b_git_dispatch import (  # noqa: E402
 )
 from app.chat.workspace_git import derive_commit_message, git_commit, git_status, git_working_tree_is_clean  # noqa: E402
 from app.chat.lane_b_agent import LaneBContext, generate_lane_b_result  # noqa: E402
+from app.workspace_agents.execution_policy import role_execution_policy  # noqa: E402
 
 
 class WorkspaceGitTests(unittest.TestCase):
@@ -363,6 +364,79 @@ class LaneBGitDispatchTests(unittest.TestCase):
             self.assertIn("Ship notes", str(payload["content"]))
             self.assertIn(":::terminal", str(payload["content"]))
             self.assertIsNone(payload.get("continue_prompt"))
+
+    def test_consultative_role_thread_refuses_commit_even_with_operator_full_access(self) -> None:
+        """Regression: an operator message that lands in a watcher thread (write_paths=(),
+        execution_access="consultative") must not inherit the operator's own Full Access
+        toggle and run a real git add/commit/push. Reproduces the 2026-08-07 DashPro
+        incident where a "From the sandbox..." instruction meant for the Lead landed in
+        Cass (watcher)'s thread and still committed + pushed to the remote.
+        """
+        with tempfile.TemporaryDirectory() as tempdir:
+            root = Path(tempdir) / "workspace_alpha"
+            root.mkdir()
+            subprocess.run(["git", "init"], cwd=root, capture_output=True, check=False)
+            subprocess.run(
+                ["git", "config", "user.email", "test@example.com"],
+                cwd=root,
+                capture_output=True,
+                check=False,
+            )
+            subprocess.run(
+                ["git", "config", "user.name", "Axon Test"],
+                cwd=root,
+                capture_output=True,
+                check=False,
+            )
+            (root / "notes.txt").write_text("hello\n", encoding="utf-8")
+
+            with patch.dict("os.environ", {"AXON_WATCH_WORKSPACE_ROOT": tempdir}, clear=False):
+                payload = try_lane_b_git_commit_dispatch(
+                    workspace_id="workspace_alpha",
+                    user_prompt='commit these changes with message "Ship notes" and push',
+                    execution_access="full",
+                    execution_policy=role_execution_policy("watcher"),
+                )
+                status_after = git_status("workspace_alpha")
+
+            self.assertIsNotNone(payload)
+            assert payload is not None
+            self.assertFalse(payload["dispatched"])
+            self.assertIn("consultative-only", str(payload["content"]))
+            # The whole point: nothing was actually staged/committed.
+            self.assertIn("notes.txt", status_after.output)
+
+    def test_lead_role_thread_still_commits_with_operator_full_access(self) -> None:
+        """A role whose baseline execution_access is "full" (e.g. lead) is unaffected."""
+        with tempfile.TemporaryDirectory() as tempdir:
+            root = Path(tempdir) / "workspace_alpha"
+            root.mkdir()
+            subprocess.run(["git", "init"], cwd=root, capture_output=True, check=False)
+            subprocess.run(
+                ["git", "config", "user.email", "test@example.com"],
+                cwd=root,
+                capture_output=True,
+                check=False,
+            )
+            subprocess.run(
+                ["git", "config", "user.name", "Axon Test"],
+                cwd=root,
+                capture_output=True,
+                check=False,
+            )
+            (root / "notes.txt").write_text("hello\n", encoding="utf-8")
+
+            with patch.dict("os.environ", {"AXON_WATCH_WORKSPACE_ROOT": tempdir}, clear=False):
+                payload = try_lane_b_git_commit_dispatch(
+                    workspace_id="workspace_alpha",
+                    user_prompt='commit these changes with message "Ship notes"',
+                    execution_access="full",
+                    execution_policy=role_execution_policy("lead"),
+                )
+
+            self.assertIsNotNone(payload)
+            assert payload is not None
+            self.assertTrue(payload["dispatched"])
 
     def test_requires_explicit_message_when_generic_fallback_would_be_used(self) -> None:
         with tempfile.TemporaryDirectory() as tempdir:

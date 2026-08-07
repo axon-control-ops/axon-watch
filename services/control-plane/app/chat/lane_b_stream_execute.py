@@ -24,6 +24,7 @@ from app.chat.progress_milestones import (
 from app.plans.service import maybe_attach_plan_artifact
 from app.kairo.turn_memory import remember_turn
 from app.persistence import chat_store
+from app.workspace_agents.execution_policy import AgentExecutionPolicy
 from app.runs.service import (
     RunLifecycleError,
     RunNotFoundError,
@@ -71,6 +72,10 @@ class LaneBStreamJob:
     memory_appendix: str | None = None
     kairo_session_id: str | None = None
     workspace_root: Path | None = None
+    # Role baseline for the thread this turn is dispatched under — independent
+    # of the operator's own execution_access toggle above; see
+    # try_lane_b_git_commit_dispatch for why both are needed.
+    execution_policy: AgentExecutionPolicy | None = None
 
 
 def _utc_now() -> str:
@@ -334,6 +339,7 @@ def execute_lane_b_stream(job: LaneBStreamJob) -> None:
             execution_access=job.execution_access,
             on_chunk=on_chunk,
             workspace_root=job.workspace_root,
+            execution_policy=job.execution_policy,
         )
         agent_content = str(lane_b_result.get("content") or "")
         speaker_name = employee_name_from_persona_block(job.memory_appendix)
