@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, nextTick, ref, watch } from 'vue';
 
 import type { CompanyEmployeeRecord } from '../../contracts/canonical';
 import { buildEmployeeAvatar } from '../../features/workspace-agents/employee-avatar';
@@ -30,6 +30,12 @@ const props = defineProps<{
   controlBusy: boolean;
   liveBusy?: boolean;
   handoffWaiting?: boolean;
+  /** True while THIS employee's own thread is the one live-streaming right
+   * now — expands the card to own the panel and reveals `transcript`. */
+  reporting?: boolean;
+  /** Full live/latest reply text for this employee's active turn. Only
+   * meaningful (and only rendered) while `reporting` is true. */
+  transcript?: string;
 }>();
 
 const emit = defineEmits<{
@@ -81,12 +87,33 @@ const receiptsAction = computed(() =>
 const displayActions = computed(() =>
   employeeDockDisplayActions(props.actions, props.employee),
 );
+
+const transcriptRef = ref<HTMLElement | null>(null);
+
+// Follow the stream: keep the newest text in view as it grows, matching the
+// terminal/chat convention rather than leaving the operator scrolled to the
+// top of a card that's still filling in.
+watch(
+  () => props.transcript,
+  () => {
+    void nextTick(() => {
+      const target = transcriptRef.value;
+      if (!target) {
+        return;
+      }
+      target.scrollTop = target.scrollHeight;
+    });
+  },
+);
 </script>
 
 <template>
   <article
     class="agent-persona-dock"
-    :class="{ 'agent-persona-dock--interrupted': interruptedShift }"
+    :class="{
+      'agent-persona-dock--interrupted': interruptedShift,
+      'agent-persona-dock--reporting': reporting,
+    }"
     :data-presence="avatar.presence"
     :data-role="employee.role"
     :aria-label="`${employee.name} agent dock`"
@@ -171,6 +198,14 @@ const displayActions = computed(() =>
     >
       {{ liveBeat }}
     </p>
+
+    <div
+      v-if="reporting && transcript"
+      ref="transcriptRef"
+      class="agent-persona-dock__transcript"
+      aria-label="Live report transcript"
+      aria-live="polite"
+    >{{ transcript }}</div>
 
     <div
       v-if="deliveryLinks"
