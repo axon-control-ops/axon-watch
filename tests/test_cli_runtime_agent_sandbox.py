@@ -314,19 +314,20 @@ class AgentSandboxTests(unittest.TestCase):
             )
         self.assertFalse(outside.exists())
 
-    def test_writable_root_pointing_at_a_file_still_fails_closed(self) -> None:
+    def test_writable_root_can_narrow_to_an_existing_file(self) -> None:
         (self.workspace / "docs").mkdir()
-        (self.workspace / "docs" / "ops").write_text("not a directory", encoding="utf-8")
+        target = self.workspace / "docs" / "ops"
+        target.write_text("before", encoding="utf-8")
         material = self._material(self._policy(writable_roots=("docs/ops",)))
-        with self.assertRaisesRegex(SandboxConfigurationError, "not a directory"):
-            build_bwrap_command(
-                ["/bin/true"],
-                policy=self._policy(writable_roots=("docs/ops",)),
-                workspace_root=self.workspace,
-                hook_material=material,
-                bwrap_path="/usr/bin/bwrap",
-                user_home=self.home,
-            )
+        command = build_bwrap_command(
+            ["/bin/true"],
+            policy=self._policy(writable_roots=("docs/ops",)),
+            workspace_root=self.workspace,
+            hook_material=material,
+            bwrap_path="/usr/bin/bwrap",
+            user_home=self.home,
+        )
+        self.assertIn(str(target), command)
 
     def test_cursor_mount_cannot_shadow_run_hooks(self) -> None:
         material = self._material()
