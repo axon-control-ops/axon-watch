@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   incomingHandoffHeadline,
+  incomingHandoffNextStep,
   mapWorkspaceHandoffRows,
 } from './workspace-handoff-board-view';
 
@@ -103,5 +104,31 @@ describe('workspace-handoff-board-view', () => {
         direction: 'incoming',
       }),
     ).toBe('From smoke · frontend');
+  });
+
+  it('dedupes twin handoffs that share direction, peer, and task body', () => {
+    const rows = mapWorkspaceHandoffRows(
+      [
+        {
+          handoff_id: 'handoff-a',
+          source_workspace_id: 'workspace_smoke',
+          target_workspace_id: 'workspace_alpha',
+          task: 'CI failed on main: Merge origin/fix/teacher-birthday-events-ui',
+          status: 'routed',
+          routed_role: 'lead',
+        },
+        {
+          handoff_id: 'handoff-b',
+          source_workspace_id: 'workspace_smoke',
+          target_workspace_id: 'workspace_alpha',
+          task: 'CI failed on main: Merge origin/fix/teacher-birthday-events-ui',
+          status: 'routed',
+          routed_role: 'lead',
+        },
+      ],
+      'workspace_alpha',
+    );
+    expect(rows).toHaveLength(1);
+    expect(incomingHandoffNextStep(rows[0]!)).toBe('Review handoff');
   });
 });

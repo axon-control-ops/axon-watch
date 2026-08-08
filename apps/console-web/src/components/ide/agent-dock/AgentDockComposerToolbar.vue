@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { ComposerMode } from '../../../composables/useAgentDockComposer';
 import { MODE_OPTIONS } from '../../../composables/useAgentDockComposer';
+import type { ClaudeCatalogRow } from '../../../lib/claude-catalog-view';
 import type { CursorCatalogRow } from '../../../lib/cursor-catalog-view';
 import {
   mcpToolDetail,
@@ -22,7 +23,12 @@ defineProps<{
   showRuntimeTargetsPanel: boolean;
   showAddModelsEntry: boolean;
   showExtraPinnedRows: boolean;
+  showModelCatalog: boolean;
+  isClaudeCatalog: boolean;
+  claudeFlatRows: ClaudeCatalogRow[];
+  showFallbackCatalogNote: boolean;
   showCursorCatalog: boolean;
+  showCodexCatalog: boolean;
   showVaultAction: boolean;
   attachmentChips: AgentDockComposerAttachmentChip[];
   composerImageCount: number;
@@ -47,6 +53,7 @@ defineProps<{
   hasTerminalSnippet: boolean;
   selectionChipLabel: string;
   runtimeDetail: string;
+  runtimeFamilyLabel: string;
   runtimeLabel: string;
   selectedRuntimeSummary: string;
   runtimeTargets: AgentDockComposerRuntimeTarget[];
@@ -62,6 +69,11 @@ defineProps<{
   cursorStaleWarning: string;
   cursorManageRows: CursorCatalogRow[];
   cursorCatalogCount: string;
+  modelCatalogLoading: boolean;
+  modelCatalogLoadingLabel: string;
+  modelCatalogErrorMessage: string;
+  codexCatalogRows: CursorCatalogRow[];
+  codexCatalogStatus: string;
   modelSearchQuery: string;
   runtimeHint: string;
   canConvertInstructions?: boolean;
@@ -253,8 +265,8 @@ function runtimeStatusLine(record: AgentDockComposerRuntimeTarget): string {
         type="button"
         class="agent-dock-composer__tool agent-dock-composer__tool--model"
         :class="{ 'is-active': showModelMenu }"
-        :title="`Current runtime: ${runtimeDetail}`"
-        :aria-label="`Open model picker: ${runtimeLabel}`"
+        :title="`Current model: ${runtimeDetail}`"
+        :aria-label="`Open model picker: ${runtimeFamilyLabel} ${runtimeLabel}`"
         :aria-expanded="showModelMenu"
         @click="emit('toggle-section', 'model')"
       >
@@ -289,7 +301,7 @@ function runtimeStatusLine(record: AgentDockComposerRuntimeTarget): string {
           </button>
         </div>
 
-        <template v-if="showCursorCatalog">
+        <template v-if="showModelCatalog && showCursorCatalog">
           <p class="agent-dock-composer__menu-caption">Model catalog</p>
           <p class="agent-dock-composer__menu-note agent-dock-composer__menu-note--status">
             {{ cursorCatalogStatus }}
@@ -297,11 +309,11 @@ function runtimeStatusLine(record: AgentDockComposerRuntimeTarget): string {
           <p v-if="cursorAuthLine" class="agent-dock-composer__menu-note agent-dock-composer__menu-note--auth">
             {{ cursorAuthLine }}
           </p>
-          <p v-if="shell.cursorCatalogLoadState === 'loading'" class="agent-dock-composer__menu-note">
-            Loading Cursor models…
+          <p v-if="modelCatalogLoading" class="agent-dock-composer__menu-note">
+            {{ modelCatalogLoadingLabel }}
           </p>
-          <p v-else-if="shell.cursorCatalogError" class="agent-dock-composer__menu-note">
-            {{ shell.cursorCatalogError }}
+          <p v-else-if="modelCatalogErrorMessage" class="agent-dock-composer__menu-note">
+            {{ modelCatalogErrorMessage }}
           </p>
 
           <template v-if="!showAddModelsPanel">
@@ -366,7 +378,7 @@ function runtimeStatusLine(record: AgentDockComposerRuntimeTarget): string {
             <p v-if="cursorStaleWarning" class="agent-dock-composer__menu-note agent-dock-composer__menu-note--warning">
               {{ cursorStaleWarning }}
             </p>
-            <p v-if="shell.cursorRuntimeStatus?.catalog_source === 'fallback'" class="agent-dock-composer__menu-note">
+            <p v-if="showFallbackCatalogNote" class="agent-dock-composer__menu-note">
               Live catalog unavailable — showing curated fallback models.
             </p>
           </template>
@@ -412,6 +424,66 @@ function runtimeStatusLine(record: AgentDockComposerRuntimeTarget): string {
               No models match your search.
             </p>
           </template>
+        </template>
+        <template v-else-if="isClaudeCatalog">
+          <p class="agent-dock-composer__menu-caption">Claude models</p>
+          <p v-if="cursorAuthLine" class="agent-dock-composer__menu-note agent-dock-composer__menu-note--auth">
+            {{ cursorAuthLine }}
+          </p>
+          <p v-if="modelCatalogLoading" class="agent-dock-composer__menu-note">
+            {{ modelCatalogLoadingLabel }}
+          </p>
+          <p v-else-if="modelCatalogErrorMessage" class="agent-dock-composer__menu-note">
+            {{ modelCatalogErrorMessage }}
+          </p>
+          <button
+            v-for="row in claudeFlatRows"
+            :key="row.id"
+            type="button"
+            class="agent-dock-composer__menu-item"
+            :class="{ 'agent-dock-composer__menu-item--selected': row.id === selectedModelId }"
+            :disabled="!row.available"
+            @click="emit('select-composer-model', row.id)"
+          >
+            <span class="agent-dock-composer__model-label">
+              {{ row.label }}
+              <span v-if="row.badge" class="agent-dock-composer__model-badge">{{ row.badge }}</span>
+            </span>
+            <small>{{ row.description }}</small>
+          </button>
+        </template>
+        <template v-else-if="showCodexCatalog">
+          <p class="agent-dock-composer__menu-caption">Codex / ChatGPT models</p>
+          <p class="agent-dock-composer__menu-note agent-dock-composer__menu-note--status">
+            {{ codexCatalogStatus }}
+          </p>
+          <p v-if="shell.codexCatalogLoadState === 'loading'" class="agent-dock-composer__menu-note">
+            Loading models available to your signed-in Codex account…
+          </p>
+          <p v-else-if="shell.codexCatalogError" class="agent-dock-composer__menu-note">
+            {{ shell.codexCatalogError }}
+          </p>
+          <button
+            v-for="row in codexCatalogRows"
+            :key="row.id"
+            type="button"
+            class="agent-dock-composer__menu-item"
+            :class="{ 'agent-dock-composer__menu-item--selected': row.id === selectedModelId }"
+            :disabled="!row.available"
+            @click="emit('select-composer-model', row.id)"
+          >
+            <span class="agent-dock-composer__model-label">
+              {{ row.label }}
+              <span v-if="row.badge" class="agent-dock-composer__model-badge">{{ row.badge }}</span>
+            </span>
+            <small>{{ row.description }}</small>
+          </button>
+          <p
+            v-if="shell.codexCatalogLoadState === 'loaded' && codexCatalogRows.length === 0"
+            class="agent-dock-composer__menu-note agent-dock-composer__menu-note--warning"
+          >
+            No selectable models were returned. Confirm Codex is signed in with the intended ChatGPT account.
+          </p>
         </template>
         <p v-else class="agent-dock-composer__menu-note">
           Selected model: {{ selectedModelLabel }}

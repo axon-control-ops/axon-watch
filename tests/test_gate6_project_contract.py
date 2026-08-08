@@ -113,6 +113,10 @@ class Gate6VerifierCheckEvalTests(unittest.TestCase):
                 "test": ["echo test"],
             },
         }
+        # Acceptance now fails closed on scope when a task carries no explicit
+        # write scope, so these calls declare one covering the changed path
+        # (mirrors a real worker task's allowed_paths).
+        task_scope = ["apps/console-web/src"]
         failed = evaluate_acceptance(
             contract=contract,
             check_results={
@@ -120,6 +124,7 @@ class Gate6VerifierCheckEvalTests(unittest.TestCase):
                 "test": {"passed": False, "output_excerpt": "boom"},
             },
             changed_paths=["apps/console-web/src/App.vue"],
+            task_allowed_paths=task_scope,
         )
         self.assertFalse(failed.passed)
         self.assertIn("failed_checks=test", failed.summary)
@@ -131,6 +136,7 @@ class Gate6VerifierCheckEvalTests(unittest.TestCase):
                 "test": {"passed": True, "output_excerpt": "ok"},
             },
             changed_paths=["apps/console-web/src/App.vue"],
+            task_allowed_paths=task_scope,
             path_to_text={
                 "apps/console-web/src/App.vue": "ak=AKIAIOSFODNN7EXAMPLE12",
             },
@@ -145,6 +151,7 @@ class Gate6VerifierCheckEvalTests(unittest.TestCase):
                 "test": {"passed": True, "output_excerpt": "ok"},
             },
             changed_paths=["apps/console-web/src/App.vue"],
+            task_allowed_paths=task_scope,
             path_to_text={"apps/console-web/src/App.vue": "export const ok = true"},
         )
         self.assertTrue(passed.passed)

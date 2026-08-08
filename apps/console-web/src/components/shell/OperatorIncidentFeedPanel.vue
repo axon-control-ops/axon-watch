@@ -54,7 +54,6 @@ function focusSignal(signalId: string): void {
             </span>
           </button>
           <div v-if="item.source === 'signal'" class="operator-incident-feed__handoff-card">
-            <p class="operator-incident-feed__handoff-label">Investigate in IDE</p>
             <HandoffToIdeButton
               :signal-id="item.id"
               :workspace-id="item.workspaceId"

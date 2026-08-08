@@ -129,9 +129,10 @@ def _already_posted_takeover(thread_id: str, run_id: str) -> bool:
         if str(message.get("role") or "") != "agent":
             continue
         content = str(message.get("content") or "")
-        if needle in content and "Lead takeover" in content:
+        is_lead_brief = "Lead takeover" in content or "Lead executive brief" in content
+        if needle in content and is_lead_brief:
             return True
-        if str(message.get("run_id") or "").strip() == cleaned_run and "Lead takeover" in content:
+        if str(message.get("run_id") or "").strip() == cleaned_run and is_lead_brief:
             return True
     return False
 
@@ -149,63 +150,60 @@ def build_lead_takeover_message(
     task_id: str | None = None,
     parent_plan_goal: str | None = None,
 ) -> str:
+    from app.workspace_agents.lead_executive_brief import (
+        compress_ask,
+        executive_next_step,
+        executive_operator_action,
+        plain_outcome,
+    )
+
     name = (employee_name or employee_role or "specialist").strip()
     role = (employee_role or "specialist").strip()
     status = "completed" if phase == "completed" else (phase or "ended")
-    excerpt = _truncate(_strip_thinking(reply_text or ""), max_len=420)
     lead_next = extract_lead_next(reply_text)
+    parent_ask = compress_ask(parent_plan_goal, max_len=220)
+    goal_line = compress_ask(goal, max_len=220)
+    landed = plain_outcome(reply_text) or plain_outcome(outcome)
+    next_line = executive_next_step(
+        lead_next=lead_next,
+        specialist_name=name,
+        parent_ask=parent_ask,
+        status=status,
+    )
+    operator_action = executive_operator_action(lead_next)
     lines = [
-        f"Lead takeover — {name} ({role}) just {status}.",
+        "Lead executive brief",
         "",
-        f"Run: {run_id or '(none)'}",
+        "Goal",
     ]
-    if task_id:
-        lines.append(f"Task: {task_id}")
-    if plan_id:
-        lines.append(f"Plan: {plan_id}")
-    parent_ask = _truncate(parent_plan_goal or "", max_len=240)
     if parent_ask:
-        lines.append(f"Parent ask (sole truth): {parent_ask}")
-    goal_line = _truncate(goal, max_len=240)
-    if goal_line and goal_line != parent_ask:
-        lines.append(f"Specialist goal: {goal_line}")
-    elif goal_line and not parent_ask:
-        lines.append(f"Goal: {goal_line}")
-    outcome_line = _truncate(outcome, max_len=200)
-    if outcome_line:
-        lines.append(f"Outcome: {outcome_line}")
-    if excerpt:
-        lines.extend(["", "Specialist report:", excerpt])
-    lines.extend(["", "My read (Lead):"])
+        lines.append(f"- {parent_ask}")
+    elif goal_line:
+        lines.append(f"- {goal_line}")
+    else:
+        lines.append("- Complete the requested result and verify that it is ready to use.")
+    lines.extend(["", "Progress"])
+    lines.append(
+        f"- {name}: {landed}"
+        if landed
+        else f"- {name}'s check {status}; no verified result is available yet."
+    )
+    lines.extend(["", "What remains"])
     if parent_ask:
         lines.append(
-            f"I still own completing: {parent_ask}. "
-            f"{name}'s dig is an input — I will not restart it as the mission."
-        )
-    elif status == "completed":
-        lines.append(
-            f"{name} finished their slice. I own the handoff now — "
-            "cross-team decisions and next assignments stay with me until you Decide."
+            "- The original goal is still open until the requested result is verified "
+            "and ready to use."
         )
     else:
-        lines.append(
-            f"{name}'s job {status}. I will triage blockers and reassign if needed."
-        )
-    if lead_next:
-        lines.extend(["", f"Decision needed (from specialist): {lead_next}"])
-    else:
-        lines.extend(
-            [
-                "",
-                "Lead next: review their report, confirm any product Decide gates, "
-                "then assign the next specialist or approve ship.",
-            ]
-        )
+        lines.append("- I will turn this result into the next assignment or a clear decision.")
     lines.extend(
         [
             "",
-            "Open my Lead tab for this rollup. Ask me what to do next.",
-            "Confidence: 8/10",
+            "What I am doing next",
+            f"- {next_line}",
+            "",
+            "Your action",
+            f"- {operator_action}",
         ]
     )
     return "\n".join(lines)

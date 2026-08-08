@@ -32,6 +32,22 @@ def _employee_for_role(workspace_id: str, role: str) -> EmployeeConfig | None:
     return None
 
 
+def _stale_ci_infra_hint_for(classified: dict[str, str]) -> str | None:
+    try:
+        from app.ci_remediation.staleness import stale_ci_infra_hint
+
+        repo = f"{classified.get('github_owner', '')}/{classified.get('github_repo', '')}"
+        return stale_ci_infra_hint(
+            repo=repo,
+            workflow_name=classified.get("workflow_name") or "",
+            head_branch=classified.get("head_branch") or "",
+            head_sha=classified.get("head_sha") or "",
+        )
+    except Exception:  # noqa: BLE001 — a hint must never block goal-building
+        logger.exception("stale ci-infra hint lookup failed for %s", classified.get("head_branch"))
+        return None
+
+
 def build_repair_goal(
     classified: dict[str, str],
     binding: CiRemediationBinding,
@@ -42,7 +58,7 @@ def build_repair_goal(
     branch = classified.get("head_branch") or "unknown-branch"
     run_url = classified.get("html_url") or ""
     failing = classified.get("failing_step") or "unknown failing step"
-    return (
+    goal = (
         f"CI repair: {workflow} failed on {branch}. "
         f"Failing step hint: {failing}. "
         f"Checkout the exact failing head `{classified.get('head_sha') or 'HEAD'}` "
@@ -54,6 +70,10 @@ def build_repair_goal(
         f"Source run: {run_url or classified['run_id']}. "
         f"CI remediation dedupe_key: {dedupe_key}."
     )
+    stale_hint = _stale_ci_infra_hint_for(classified)
+    if stale_hint:
+        goal = f"{goal} {stale_hint}"
+    return goal
 
 
 def build_acceptance(classified: dict[str, str], binding: CiRemediationBinding) -> str:

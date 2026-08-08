@@ -42,6 +42,13 @@ class HostPauseRequest(BaseModel):
     paused: bool = True
 
 
+class MachineKillRequest(BaseModel):
+    pid: int
+    force: bool = False
+    # When True, only allowlisted junk under Full autonomy may be killed.
+    auto: bool = False
+
+
 class ReminderCreateRequest(BaseModel):
     workspace_id: str = ""
     scope: str = "personal"
@@ -63,6 +70,44 @@ class ReminderPatchRequest(BaseModel):
     dismiss_reason: str | None = None
     title: str | None = None
     content: str | None = None
+
+
+@router.get("/api/host/machine/pulse")
+def host_machine_pulse() -> dict[str, Any]:
+    """VAXON Machine CEO — memory/load + top RSS processes on this host."""
+    from app.host_context.machine_pulse import build_machine_pulse
+
+    return build_machine_pulse()
+
+
+@router.post("/api/host/machine/ceo-tick")
+def host_machine_ceo_tick(auto_kill: bool = Query(default=True)) -> dict[str, Any]:
+    """Run Machine CEO under Full autonomy (inventory + optional safe kills)."""
+    from app.host_context.machine_ceo import run_machine_ceo_tick
+
+    return run_machine_ceo_tick(auto_kill=auto_kill)
+
+
+@router.post("/api/host/machine/kill")
+def host_machine_kill(body: MachineKillRequest) -> dict[str, Any]:
+    """Kill a host process (protected PIDs always blocked)."""
+    from app.host_context.machine_ceo import kill_process
+
+    result = kill_process(
+        int(body.pid),
+        require_auto_eligible=bool(body.auto),
+        force=bool(body.force),
+        reason="auto" if body.auto else "operator_request",
+    )
+    if not result.get("ok") and result.get("reason") in {
+        "protected",
+        "autonomy_not_full",
+        "not_auto_killable",
+    }:
+        raise HTTPException(status_code=403, detail=str(result.get("reason")))
+    if not result.get("ok") and str(result.get("reason") or "").startswith("not_found"):
+        raise HTTPException(status_code=404, detail=str(result.get("reason")))
+    return result
 
 
 @router.get("/api/host/capabilities")

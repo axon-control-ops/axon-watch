@@ -99,6 +99,8 @@ function softenSymbolsForSpeech(text: string): string {
   out = out.replace(/\b(\d{1,2}):(\d{2})\b/g, '$1\uE000$2');
   out = out.replace(/:/g, ', ');
   out = out.replace(/\uE000/g, ':');
+  // Em-dashes became long SSML breaks — prefer a light comma for manager pacing.
+  out = out.replace(/\s*[—–]\s*/g, ', ');
   out = out.replace(/[<>{}[\]()`~^]/g, ' ');
   out = out.replace(/\s+,/g, ',').replace(/,\s*,+/g, ',');
   return out.replace(/\s+/g, ' ').trim();

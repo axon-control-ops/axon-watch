@@ -243,10 +243,10 @@ class EmployeePersonaPromptTests(unittest.TestCase):
             employee_id="employee-workspace_axon_watch-integrations-4",
             employee_role="integrations",
         )
-        original = "You are Axon-X Lane B in Agent mode with Full Access. Tool execution is allowed."
+        original = "You are Axon-X Lane B in Agent mode with approved execution access. Tool execution is allowed."
         adapted = adapt_lane_b_system_prompt_for_employee(original, appendix)
         self.assertIn("named employee in the Employee persona block", adapted)
-        self.assertNotIn("You are Axon-X Lane B in Agent mode with Full Access.", adapted)
+        self.assertNotIn("You are Axon-X Lane B in Agent mode with approved execution access.", adapted)
         self.assertIn("Do not identify as VAXON", adapted)
         self.assertIn("first person", adapted)
         unchanged = adapt_lane_b_system_prompt_for_employee(original, "no persona here")
@@ -275,7 +275,7 @@ class EmployeePersonaPromptTests(unittest.TestCase):
         self.assertIn("You are Quinn", prompt)
         self.assertIn("named employee in the Employee persona block", prompt)
         self.assertNotIn(
-            "You are Axon-X Lane B in Agent mode with Full Access.",
+            "You are Axon-X Lane B in Agent mode with approved execution access.",
             prompt,
         )
         persona_at = prompt.index(EMPLOYEE_PERSONA_MARKER)

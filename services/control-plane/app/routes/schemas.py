@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel
 
@@ -13,6 +13,7 @@ class WriteWorkspaceFileRequest(BaseModel):
 
 class WorkspaceComposerPrefsRequest(BaseModel):
     cursor_cli_model: str | None = None
+    runtime_target: str | None = None
 
 
 class RenameWorkspaceFileRequest(BaseModel):
@@ -69,6 +70,7 @@ class CreateTerminalSessionRequest(BaseModel):
 class EnqueueAgentTerminalJobRequest(BaseModel):
     command: str
     run_id: str | None = None
+    source_workspace_id: str | None = None
     stream_to_chat: bool | None = None
     thread_id: str | None = None
     message_id: str | None = None
@@ -188,6 +190,9 @@ class KairoConverseRequest(BaseModel):
     context_signal_id: str = ""
     context_node_id: str = ""
     attachment_ids: list[str] | None = None
+    # Secure default for current and stale clients: text is an Ask unless the
+    # client deliberately declares the Dispatch action.
+    submission_intent: Literal["ask", "dispatch"] = "ask"
 
 
 class KairoTtsRequest(BaseModel):
@@ -195,6 +200,8 @@ class KairoTtsRequest(BaseModel):
     voice: str | None = None
     rate: float | None = None
     pitch: float | None = None
+    # Mid-utterance chunks skip the long sink wake-up silence.
+    continuation: bool | None = None
 
 
 class DebugSessionLogRequest(BaseModel):

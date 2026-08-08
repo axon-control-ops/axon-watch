@@ -34,15 +34,35 @@ const feedError = ref<string | null>(null);
 const resolvingId = ref<string | null>(null);
 let feedTimer: ReturnType<typeof setInterval> | null = null;
 
+function softDecisionKey(item: AutonomyReceipt): string {
+  const raw = String(item.dedupe_key || '').trim().toLowerCase();
+  const parts = raw.split(':');
+  if (parts[0] === 'failed_shift' && parts.length >= 3) {
+    return `failed_shift:${parts[1]}:${parts[2]}`;
+  }
+  const title = String(item.title || item.kind || '').trim().toLowerCase();
+  const workspace = String(item.workspace_id || '').trim().toLowerCase();
+  return title ? `${workspace}:${title}` : raw || item.receipt_id;
+}
+
 const pendingCritical = computed<AutonomyReceipt[]>(() => {
   const workspaceId = shell.currentWorkspace?.workspace_id?.trim();
-  return (feed.value?.pending_critical_decisions ?? []).filter(
+  const scoped = (feed.value?.pending_critical_decisions ?? []).filter(
     (item) => !workspaceId || !item.workspace_id || item.workspace_id === workspaceId,
   );
+  const seen = new Set<string>();
+  const collapsed: AutonomyReceipt[] = [];
+  for (const item of scoped) {
+    const key = softDecisionKey(item);
+    if (seen.has(key)) {
+      continue;
+    }
+    seen.add(key);
+    collapsed.push(item);
+  }
+  return collapsed;
 });
-const pendingCriticalTotal = computed(
-  () => feed.value?.pending_critical_count ?? pendingCritical.value.length,
-);
+const pendingCriticalTotal = computed(() => pendingCritical.value.length);
 
 const workerStateLabel = computed(() => {
   if (!status.value) {
@@ -257,7 +277,7 @@ onUnmounted(() => {
 
     <div v-if="pendingCritical.length" class="orb-hud__sheet orb-hud__sheet--critical">
       <ul aria-label="Needs your decision">
-        <li v-for="item in pendingCritical.slice(0, 2)" :key="item.receipt_id">
+        <li v-for="item in pendingCritical.slice(0, 1)" :key="item.receipt_id">
           <strong>Needs you</strong>
           <span>{{ item.title || item.kind }}</span>
           <div class="orb-hud__sheet-actions">
@@ -279,8 +299,8 @@ onUnmounted(() => {
           </div>
         </li>
       </ul>
-      <p v-if="pendingCriticalTotal > 2" class="orb-hud__whisper" data-tone="warn">
-        +{{ pendingCriticalTotal - 2 }} more
+      <p v-if="pendingCriticalTotal > 1" class="orb-hud__whisper" data-tone="warn">
+        +{{ pendingCriticalTotal - 1 }} more distinct
       </p>
     </div>
   </section>
@@ -603,77 +623,5 @@ onUnmounted(() => {
   color: rgba(210, 255, 230, 0.98) !important;
   background: rgba(10, 40, 28, 0.55) !important;
 }
-
-@keyframes orb-hud-arc-breathe {
-  0%,
-  100% {
-    opacity: 0.55;
-    transform: scaleX(0.98);
-  }
-  50% {
-    opacity: 1;
-    transform: scaleX(1);
-  }
-}
-
-@keyframes orb-hud-scan {
-  0% {
-    transform: translateX(-18%);
-    opacity: 0.25;
-  }
-  50% {
-    opacity: 1;
-  }
-  100% {
-    transform: translateX(18%);
-    opacity: 0.25;
-  }
-}
-
-@keyframes orb-hud-armed {
-  0%,
-  100% {
-    box-shadow:
-      inset 0 0 0 1px rgba(140, 255, 210, 0.12),
-      0 0 0.85rem rgba(40, 255, 170, 0.2);
-  }
-  50% {
-    box-shadow:
-      inset 0 0 0 1px rgba(160, 255, 220, 0.22),
-      0 0 1.35rem rgba(50, 255, 180, 0.38);
-  }
-}
-
-@keyframes orb-hud-pulse {
-  0%,
-  100% {
-    transform: scale(0.9);
-    opacity: 0.7;
-  }
-  50% {
-    transform: scale(1.15);
-    opacity: 1;
-  }
-}
-
-@keyframes orb-hud-sheet-in {
-  from {
-    opacity: 0;
-    transform: translateY(0.35rem) scale(0.98);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .orb-hud__arc,
-  .orb-hud__arc::after,
-  .orb-hud__chip--prime[data-on='true'],
-  .orb-hud__telemetry-pulse[data-tone='running'],
-  .orb-hud__sheet {
-    animation: none;
-  }
-}
 </style>
+<style scoped src="./mission-control-autonomy-motion.css"></style>

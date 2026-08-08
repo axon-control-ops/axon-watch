@@ -10,6 +10,13 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$ROOT"
 
+# This is the webhook fallback — it must not silently no-op just because
+# systemd's user-manager environment hasn't picked up a desktop session's
+# PATH yet (observed: "gh: command not found" for several cycles after a
+# fresh login before session environment propagated). Ensure user-local CLIs
+# are visible regardless of ambient PATH (mirrors run-service.sh).
+export PATH="${HOME}/.local/bin:/usr/local/bin:${PATH}"
+
 env_file="${AXON_WATCH_DEPLOYMENT_ENV:-${HOME}/.config/axon-watch/deployment.env}"
 if [[ ! -f "$env_file" && -f /etc/axon-watch/deployment.env ]]; then
   env_file=/etc/axon-watch/deployment.env

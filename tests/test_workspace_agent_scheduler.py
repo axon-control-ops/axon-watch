@@ -13,7 +13,11 @@ from tests.support.control_plane_db import isolate_control_plane_db
 CONTROL_PLANE_ROOT = Path(__file__).resolve().parents[1] / "services" / "control-plane"
 sys.path.insert(0, str(CONTROL_PLANE_ROOT))
 
-from app.persistence import run_store, task_store, worker_scheduler_settings_store  # noqa: E402
+from app.persistence import (  # noqa: E402
+    run_store,
+    task_store,
+    worker_scheduler_settings_store,
+)
 from app.runs.service import create_run, fail_run, get_run, stop_run  # noqa: E402
 from app.workspace_agents import build_company_roster  # noqa: E402
 from app.workspace_agents.scheduler import run_continuous_worker_tick  # noqa: E402

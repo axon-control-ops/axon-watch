@@ -114,6 +114,8 @@ def _soften_symbols_for_speech(text: str) -> str:
     text = re.sub(r"\b(\d{1,2}):(\d{2})\b", rf"\1{_clock_mark}\2", text)
     text = text.replace(":", ", ")
     text = text.replace(_clock_mark, ":")
+    # Em-dashes become long SSML breaks — prefer a light comma for manager pacing.
+    text = re.sub(r"\s*[—–]\s*", ", ", text)
     text = re.sub(r"[<>{}[\]()`~^]", " ", text)
     text = re.sub(r"\s+,", ",", text)
     text = re.sub(r",\s*,+", ",", text)

@@ -6,6 +6,7 @@ import json
 from collections.abc import Callable
 from pathlib import Path
 
+from app.cli_runtime.agent_sandbox import AgentSandboxPolicy
 from app.cli_runtime.subprocess_runner import (
     RuntimeProcessStoppedError,
     communicate_registered_process,
@@ -167,6 +168,7 @@ def run_claude_local(
     subprocess_env: dict[str, str] | None = None,
     run_id: str = "",
     on_chunk: Callable[[str, str], None] | None = None,
+    sandbox_policy: AgentSandboxPolicy | None = None,
 ) -> str:
     command = build_claude_agent_command(
         binary=binary,
@@ -192,6 +194,7 @@ def run_claude_local(
             timeout_seconds=timeout_seconds,
             subprocess_env=subprocess_env,
             cwd=run_cwd,
+            sandbox_policy=sandbox_policy,
             **({"on_chunk": _emit_claude_chunk} if on_chunk is not None else {}),
         )
     except RuntimeProcessStoppedError:

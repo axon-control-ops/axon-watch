@@ -32,6 +32,47 @@ def _prior_failure_clause(*, workspace_id: str, role: str) -> str:
     )
 
 
+def _role_tools_clause(role: str) -> str:
+    """Tell specialists which tools they should use — Full Access means Shell/Edit/Read."""
+    cleaned = str(role or "").strip().lower()
+    shared = (
+        " Tools: this shift has Full Access for project Shell, Read, Edit, and Grep. "
+        "Use them to verify — do not invent counts or claim done without a command receipt. "
+        "If Shell fails once, retry once with a shorter command; then report the exact error. "
+        "Do not spin on Task/MCP workarounds for basic ls/node/npm checks. "
+    )
+    if cleaned == "watcher":
+        return (
+            shared
+            + "Watcher focus: health probes, signal receipts, and CI/gate status checks "
+            "via short shell/read — not product feature builds. "
+        )
+    if cleaned == "integrations":
+        return (
+            shared
+            + "Integrations focus: connector/export/linkage wiring plus verification scripts "
+            "(node/npm smoke) with receipts before handoff. "
+        )
+    if cleaned == "backend":
+        return (
+            shared
+            + "Backend focus: data/API/scripts with verified query or script output — "
+            "not UI layout work. "
+        )
+    if cleaned == "frontend":
+        return (
+            shared
+            + "Frontend focus: UI/files edits with targeted checks; avoid heavy servers "
+            "unless the leased goal requires them. "
+        )
+    if cleaned == "lead":
+        return (
+            " Tools: prefer Read/ Grep for receipts and specialist reports; "
+            "delegate Shell-heavy verification to specialists unless you must confirm a gate. "
+        )
+    return shared
+
+
 def _task_scope_anchors(*parts: str, limit: int = 8) -> list[str]:
     anchors: list[str] = []
     seen: set[str] = set()
@@ -178,6 +219,19 @@ def build_continuous_worker_prompt(
             "`Authorization: Bearer $AXON_WATCH_OPERATOR_TOKEN` when configured. "
             "Report spoken-ready outcome for the unaware operator. "
         )
+    if "vaxon fleet repair" in goal_l:
+        ci_clause += (
+            " This leased task is a VAXON fleet self-heal repair — the bug is in "
+            "axon-watch's own control-plane code, not this workspace's product code. "
+            "Root-cause it (do not symptom-patch), add a regression test under tests/, "
+            "push to a throwaway branch and open a draft PR, then confirm a green "
+            "Axon-X Fast Gate run on that head before reporting success. "
+            "POST JSON to `http://127.0.0.1:8787/api/fleet-self-heal/report-outcome` "
+            "with fingerprint (from the task goal), success true/false, commit_ref "
+            "(the fix commit sha or PR URL), and detail. Include "
+            "`Authorization: Bearer $AXON_WATCH_OPERATOR_TOKEN` when configured. "
+            "Report spoken-ready outcome for the unaware operator. "
+        )
     memory_clause = (
         " Memory safety: do NOT start DashPro `web:dev` / Expo / Metro / "
         "`typecheck` with large NODE_OPTIONS heaps unless the operator explicitly asked. "
@@ -226,6 +280,7 @@ def build_continuous_worker_prompt(
             " Reporting chain: finish with a Lead handoff (what changed, verified, "
             "Blockers / Lead next). Do not escalate straight to the operator — Lead owns that."
         )
+    tools_clause = _role_tools_clause(role)
     return append_critical_review_clause(
         f"{identity} "
         f"This is a bounded continuous shift ({schedule}) for leased task {task_id}. "
@@ -237,6 +292,7 @@ def build_continuous_worker_prompt(
         "Stay inside your role boundary. Never hallucinate outcomes."
         f"{scope_clause}"
         f"{lead_clause}"
+        f"{tools_clause}"
         f"{ci_clause}"
         f"{memory_clause}"
         " If a step fails, say what failed and why (command, assertion, import, CI step) — "

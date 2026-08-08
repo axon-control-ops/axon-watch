@@ -1,0 +1,9 @@
+[Unit]
+Description=Rebuild Axon-X Console after a local development merge
+After=network.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=%h/axon-nvme/repos/axon-watch
+ExecStart=/bin/bash -lc 'npm run build -w @axon-watch/console-web'
+ExecStartPost=/usr/bin/systemctl --user restart console-web.service

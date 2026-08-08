@@ -71,6 +71,26 @@ describe('operator-signal-count', () => {
     );
   });
 
+  it('falls back to briefing tops when inbox is loaded but empty', () => {
+    expect(
+      resolveAttentionSignalCount({
+        inboxItems: [],
+        inboxLoadState: 'loaded',
+        runtimeSummaryOpenCount: 0,
+        workspaceId: 'workspace_dashpro',
+        briefingTopSignals: [
+          {
+            signal_id: 'signal_monitor_dashpro_sentry_recent_issues_critical',
+            title: 'DashPro Sentry critical',
+            status: 'open',
+            severity: 'critical',
+            workspace_id: 'workspace_dashpro',
+          },
+        ],
+      }),
+    ).toBe(1);
+  });
+
   it('prefers loaded inbox counts over stale runtime summary values', () => {
     expect(
       resolveOperatorSignalCount({

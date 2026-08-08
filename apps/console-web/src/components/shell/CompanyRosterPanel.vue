@@ -22,15 +22,14 @@ import {
   firstFailedRosterEmployee,
   pickDefaultRosterEmployee,
   resolveLiveBusyEmployeeIds,
+  resolveReportingEmployeeId,
 } from '../../features/workspace-agents/company-roster-view';
 import {
   markIntroSpokenToday,
   resolveTalkSpeakMode,
 } from '../../features/workspace-agents/company-roster-intro-prefs';
-import { resolveEmployeeManualHandoff } from '../../features/workspace-agents/employee-manual-handoff';
 import {
   employeeComposerOpenPayload,
-  employeeQuickActions,
   type TeamMemberChatKind,
   type TeamMemberQuickAction,
   type TeamMemberSurfaceAction,
@@ -42,6 +41,7 @@ import { employeeVoiceSpeaker } from '../../lib/kairo-voice-utterance';
 import { runEmployeeShiftRetry } from '../../lib/run-employee-shift-retry';
 import { navigateToSettingsSection } from '../../lib/settings-section-route';
 import { useCompanyRosterControlActions } from '../../composables/use-company-roster-control-actions';
+import { useCompanyRosterQuickActionState } from '../../composables/use-company-roster-quick-action-state';
 import { useShellStore } from '../../stores/shell';
 
 const shell = useShellStore();
@@ -179,20 +179,24 @@ const headline = computed(() =>
   ),
 );
 
-const liveBusyEmployeeIds = computed(() => {
-  const focusedStreamEmployeeId = shell.agentStreamActive
+// Shared by liveBusyEmployeeIds and selectedEmployeeIsReporting below —
+// both need "whose thread is focused while a stream is active".
+const focusedStreamEmployeeId = computed(() =>
+  shell.agentStreamActive
     ? shell.activeIdeThread?.employee_id?.trim() ||
       shell.activeIdeEmployeeRecord?.employee_id?.trim() ||
       null
-    : null;
-  const ids = resolveLiveBusyEmployeeIds({
+    : null,
+);
+
+const liveBusyEmployeeIds = computed(() =>
+  resolveLiveBusyEmployeeIds({
     employees: employees.value,
     streamingThreadIds: shell.streamingIdeThreadIds,
     threads: shell.ideThreadsForCurrentWorkspace,
-    focusedStreamEmployeeId,
-  });
-  return ids;
-});
+    focusedStreamEmployeeId: focusedStreamEmployeeId.value,
+  }),
+);
 
 const hasFailedEmployees = computed(() =>
   companyHasFailedEmployees(employees.value, liveBusyEmployeeIds.value),
@@ -223,33 +227,25 @@ const selectedEmployee = computed(
   () => employees.value.find((row) => row.employee_id === selectedEmployeeId.value) ?? null,
 );
 
-const selectedActions = computed(() =>
-  selectedEmployee.value
-    ? employeeQuickActions(selectedEmployee.value, {
-        autonomyMode: shell.operatorPresenceSettings.autonomy_mode,
-        tasks: shell.workspaceTasksForCurrentWorkspace,
-        runs: shell.runs,
-        liveBusy: liveBusyEmployeeIds.value.includes(selectedEmployee.value.employee_id),
-      })
-    : [],
+// True only while the SELECTED teammate's own thread is the one live-streaming — this
+// is what expands their persona-dock card over the roster grid so the operator can
+// read the report, then collapses back once the stream ends.
+const selectedEmployeeIsReporting = computed(
+  () =>
+    Boolean(selectedEmployee.value) &&
+    resolveReportingEmployeeId({
+      agentStreamActive: shell.agentStreamActive,
+      activeThreadEmployeeId: focusedStreamEmployeeId.value,
+      streamingThreadIds: shell.streamingIdeThreadIds,
+      threads: shell.ideThreadsForCurrentWorkspace,
+    }) === selectedEmployee.value?.employee_id,
 );
 
-const handoffWaitingEmployeeIds = computed(() => {
-  const mode = shell.operatorPresenceSettings.autonomy_mode;
-  const tasks = shell.workspaceTasksForCurrentWorkspace;
-  const runs = shell.runs;
-  const liveBusy = new Set(liveBusyEmployeeIds.value);
-  return employees.value
-    .filter((employee) =>
-      resolveEmployeeManualHandoff({
-        employee,
-        autonomyMode: mode,
-        tasks,
-        runs,
-        liveBusy: liveBusy.has(employee.employee_id),
-      }).waiting,
-    )
-    .map((employee) => employee.employee_id);
+const { selectedActions, handoffWaitingEmployeeIds } = useCompanyRosterQuickActionState({
+  shell,
+  employees,
+  selectedEmployee,
+  liveBusyEmployeeIds,
 });
 
 function selectEmployee(employee: CompanyEmployeeRecord): void {
@@ -372,9 +368,10 @@ async function onPresenceSelect(employee: CompanyEmployeeRecord): Promise<void> 
   <section
     v-if="currentWorkspaceId"
     class="company-roster company-roster--ide company-roster--persona-dock"
+    :class="{ 'company-roster--reporting': selectedEmployeeIsReporting }"
     aria-label="Company employees"
   >
-    <header class="company-roster__header">
+    <header class="company-roster__header" :aria-hidden="selectedEmployeeIsReporting">
       <div class="company-roster__header-row">
         <div>
           <p class="company-roster__eyebrow">Company team</p>
@@ -451,6 +448,9 @@ async function onPresenceSelect(employee: CompanyEmployeeRecord): Promise<void> 
 
       <CompanyPresenceStrip
         ref="presenceStripRef"
+        class="company-roster__presence-strip"
+        :class="{ 'company-roster__presence-strip--collapsed': selectedEmployeeIsReporting }"
+        :aria-hidden="selectedEmployeeIsReporting"
         :employees="employees"
         :selected-employee-id="selectedEmployeeId"
         :live-busy-employee-ids="liveBusyEmployeeIds"
@@ -476,6 +476,8 @@ async function onPresenceSelect(employee: CompanyEmployeeRecord): Promise<void> 
           :control-busy="controlBusyId === selectedEmployee.employee_id"
           :live-busy="liveBusyEmployeeIds.includes(selectedEmployee.employee_id)"
           :handoff-waiting="handoffWaitingEmployeeIds.includes(selectedEmployee.employee_id)"
+          :reporting="selectedEmployeeIsReporting"
+          :transcript="selectedEmployeeIsReporting ? shell.latestWorkspaceAgentOutput ?? '' : ''"
           @talk="void startChat(selectedEmployee, 'talk')"
           @action="onQuickAction(selectedEmployee, $event)"
         />

@@ -12,6 +12,7 @@ from typing import Any
 from app.safe_improvement.isolated_executor import read_baseline_metadata
 from app.workspace_agents.diff_policy import (
     evaluate_changed_paths,
+    is_control_plane_owned_path,
     resolve_effective_allowed_paths,
     scan_text_for_secrets,
 )
@@ -74,7 +75,7 @@ def list_isolation_changed_paths(isolation_root: Path) -> list[str]:
             continue
         for line in (result.stdout or "").splitlines():
             cleaned = line.strip()
-            if cleaned and cleaned not in paths and not cleaned.startswith(".axon-si/"):
+            if cleaned and cleaned not in paths and not is_control_plane_owned_path(cleaned):
                 paths.append(cleaned)
     return paths
 

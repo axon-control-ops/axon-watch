@@ -3,8 +3,6 @@
 from __future__ import annotations
 
 import logging
-import os
-import re
 from collections.abc import Callable
 from pathlib import Path
 
@@ -14,14 +12,17 @@ from app.cli_runtime.approval_gate import (
     resolve_runtime_execution_tier,
 )
 from app.cli_runtime.catalog import runtime_status_snapshot
+from app.cli_runtime.codex_models import default_codex_model
 from app.cli_runtime.mcp_registry import mcp_tools_for_composer_mode
 from app.cli_runtime.non_cursor_dispatch import run_non_cursor_local
-from app.cli_runtime.recovery import ordered_runtime_candidates
+from app.cli_runtime.runtime_candidates import effective_cli_model, ordered_candidates_for_dispatch
 from app.cli_runtime.runtime_failure import (
     fallback_reply as _fallback_reply,
     runtime_unready_reason as _runtime_unready_reason,
 )
+from app.cli_runtime.sentry_context import sentry_monitor_context
 from app.cli_runtime.subprocess_runner import RuntimeProcessStoppedError
+from app.cli_runtime.sandbox_policy_adapter import prepare_execution_sandbox
 from app.cli_runtime.cursor_agent import (
     CursorAgentReply,
     run_cursor_local,
@@ -29,6 +30,7 @@ from app.cli_runtime.cursor_agent import (
 )
 from app.cli_runtime.runtime_auth import (
     claude_dispatch_env,
+    codex_dispatch_env,
     cursor_dispatch_env,
     env_has_api_key,
     env_without_api_keys,
@@ -46,6 +48,7 @@ from app.cli_runtime.plan_system_prompt import (
     build_plan_system_prompt,
 )
 from app.workspace_agents.critical_review_clause import append_critical_review_clause
+from app.workspace_agents.execution_policy import AgentExecutionPolicy
 from app.research.availability import format_capability_line, research_capability_snapshot
 from app.persistence.operator_presence_settings_store import load_settings
 from app.runs.service import RunNotFoundError, get_run
@@ -77,60 +80,11 @@ _INSTRUCTION_TAKING = (
     "quoted commit message when the operator provided one."
 )
 
-_SENTRY_REQUEST_RE = re.compile(r"\bsentry\b", re.IGNORECASE)
-
-
 def _sentry_monitor_context(user_prompt: str) -> str:
-    """Attach bounded, secret-free Watch evidence to Sentry agent requests."""
-    if not _SENTRY_REQUEST_RE.search(user_prompt):
-        return ""
-
-    payload = fetch_watch_monitors(timeout_seconds=2.0)
-    items = payload.get("items") if isinstance(payload, dict) else None
-    record = next(
-        (
-            item
-            for item in (items if isinstance(items, list) else [])
-            if isinstance(item, dict)
-            and str(item.get("check_type") or "") == "sentry_recent_issues"
-        ),
-        None,
+    return sentry_monitor_context(
+        user_prompt,
+        fetch_monitors=fetch_watch_monitors,
     )
-    lines = [
-        "Sentry operating rule: credentials are held by Axon Watch and intentionally "
-        "excluded from workspace subprocess environment variables. Do not inspect .env, "
-        "print tokens, or infer that Sentry access is missing from process.env. Use the "
-        "trusted Axon Watch monitor evidence below.",
-    ]
-    issue_count = 0
-    status = "unavailable"
-    if record:
-        status = str(record.get("status") or "unknown")
-        detail = str(record.get("detail") or "").strip()
-        lines.append(f"Monitor status: {status}. {detail}".strip())
-        issues = record.get("issues")
-        if isinstance(issues, list):
-            issue_count = len(issues)
-            for issue in issues[:5]:
-                if not isinstance(issue, dict):
-                    continue
-                short_id = str(issue.get("short_id") or issue.get("id") or "issue")
-                title = str(issue.get("title") or "Untitled Sentry issue").strip()
-                count = int(issue.get("count") or 0)
-                permalink = str(issue.get("permalink") or "").strip()
-                lines.append(
-                    f"- {short_id}: {title} ({count} events)"
-                    + (f" — {permalink}" if permalink else "")
-                )
-    else:
-        lines.append(
-            "Live monitor evidence is temporarily unavailable. Report that limitation; "
-            "do not claim the Sentry token is absent."
-        )
-
-
-    return "\n".join(lines)
-
 
 def _operator_persona_enabled() -> bool:
     return bool(load_settings().get("operator_persona_enabled", True))
@@ -178,9 +132,9 @@ def _system_prompt(
                 "Built-in webSearch/webFetch are unavailable in this headless runtime. "
             )
         return append_critical_review_clause(
-            "You are Axon-X Lane B in Agent mode with Full Access. Tool execution is "
-            "allowed: edit files and run commands inside the Project root shown in "
-            "workspace context as needed to complete the request now. Use "
+            "You are Axon-X Lane B in Agent mode with approved execution access. "
+            "Use only the paths and audited commands available in this run. Edit files "
+            "inside the Project root shown in workspace context as needed. Use "
             "workspace-relative paths such as README.md — never edit Cursor metadata "
             "directories. Do the work first, then reply with a short summary "
             f"of what changed. {ask_fence_instruction()}"
@@ -192,8 +146,6 @@ def _system_prompt(
         f"edited files or ran commands. {ask_fence_instruction()}"
         f"{_INSTRUCTION_TAKING} {research_line} {_REPLY_STYLE}"
     )
-
-
 def _build_prompt(
     *,
     composer_mode: str,
@@ -227,15 +179,11 @@ def _build_prompt(
         f"{sentry_section}\n\n"
         f"Operator request:\n{user_prompt.strip()}"
     )
-
-
 def _resolve_workspace_root(workspace_id: str) -> Path | None:
     try:
         return resolve_workspace_root(workspace_id)
     except WorkspaceRootError:
         return None
-
-
 def _cloud_runtime_message(record: dict[str, object]) -> str:
     label = str(record.get("label") or record.get("id") or "cloud runtime")
     return (
@@ -244,39 +192,13 @@ def _cloud_runtime_message(record: dict[str, object]) -> str:
     )
 
 
-def _effective_cli_model(family: str, runtime_model: str) -> str:
-    normalized = str(runtime_model or "").strip()
-    if not normalized or normalized.lower() == "auto":
-        if family == "cursor":
-            env_key = "AXON_WATCH_CURSOR_MODEL"
-        elif family == "claude":
-            env_key = "AXON_WATCH_CLAUDE_MODEL"
-        else:
-            env_key = "AXON_WATCH_CODEX_MODEL"
-        normalized = str(os.environ.get(env_key, "")).strip()
-    if normalized.lower() == "auto":
-        return ""
-    return normalized
-
-
-def _ordered_candidates_for_dispatch(
-    snapshot: dict[str, object],
-    runtime_target: str | None,
-) -> list[dict[str, object]]:
-    candidates = ordered_runtime_candidates(snapshot)
-    preferred = str(runtime_target or "").strip()
-    if not preferred:
-        return candidates
-    by_id = {str(record.get("id") or ""): record for record in candidates}
-    selected = by_id.get(preferred)
-    if not selected:
-        return candidates
-    ordered = [selected]
-    for record in candidates:
-        runtime_id = str(record.get("id") or "")
-        if runtime_id and runtime_id != preferred:
-            ordered.append(record)
-    return ordered
+def _split_codex_model_selection(model: str) -> tuple[str, str]:
+    """Decode the UI's model@effort preference into Codex CLI arguments."""
+    selected = str(model or "").strip()
+    model_id, marker, effort = selected.rpartition("@")
+    if marker and model_id and effort in {"low", "medium", "high", "xhigh"}:
+        return model_id, effort
+    return selected, ""
 
 
 def _run_phase(run_id: str) -> str | None:
@@ -314,6 +236,7 @@ def dispatch_ide_composer(
     on_chunk: Callable[[str, str], None] | None = None,
     cursor_trust_policy: str = "operator",
     workspace_root: Path | None = None,
+    execution_policy: AgentExecutionPolicy | None = None,
 ) -> dict[str, object]:
     def _finish(payload: dict[str, object]) -> dict[str, object]:
         return _attach_dispatch_metadata(payload, composer_mode=composer_mode)
@@ -361,9 +284,21 @@ def dispatch_ide_composer(
     )
     errors: list[str] = []
     ready_run_errors: list[str] = []
-    last_ready_runtime_label = ""
+    # The FIRST ready candidate attempted, not the last — ordered_candidates
+    # puts an explicit operator selection first, so this is the operator's
+    # actual choice when they made one. Using the last-attempted fallback's
+    # label here previously mislabeled the failure (e.g. "failed on Codex"
+    # when the operator had Cursor selected and Cursor failed first).
+    first_ready_runtime_label = ""
+    ordered_candidates = ordered_candidates_for_dispatch(snapshot, runtime_target)
+    # The model pin travels with the family it was chosen for. Candidates are
+    # already ordered preferred-first, so the first candidate's family is the
+    # one `runtime_model` was picked against — carrying it into a fallback of
+    # a *different* family (e.g. a Cursor model id sent to the Codex CLI) is
+    # what broke fallback dispatch; scope it to same-family candidates only.
+    preferred_family = str(ordered_candidates[0].get("family") or "") if ordered_candidates else ""
 
-    for record in _ordered_candidates_for_dispatch(snapshot, runtime_target):
+    for record in ordered_candidates:
         runtime_id = str(record.get("id") or "")
         if not record.get("ready"):
             errors.append(_runtime_unready_reason(record))
@@ -371,8 +306,12 @@ def dispatch_ide_composer(
         binary = str(record.get("binary") or "")
         family = str(record.get("family") or "")
         target_type = str(record.get("target_type") or "local")
-        model = _effective_cli_model(family, str(runtime_model or ""))
+        candidate_runtime_model = runtime_model if family == preferred_family else ""
+        model = effective_cli_model(family, str(candidate_runtime_model or ""))
+        reasoning_effort = ""
         runtime_label = str(record.get("label") or runtime_id)
+        if not first_ready_runtime_label:
+            first_ready_runtime_label = runtime_label
         dispatch_env = subprocess_env
         if family == "cursor":
             dispatch_env = cursor_dispatch_env(
@@ -384,6 +323,22 @@ def dispatch_ide_composer(
                 subprocess_env,
                 auth=record.get("auth") if isinstance(record.get("auth"), dict) else None,
             )
+        elif family == "codex":
+            model, reasoning_effort = _split_codex_model_selection(model)
+            dispatch_env = codex_dispatch_env(
+                subprocess_env,
+                auth=record.get("auth") if isinstance(record.get("auth"), dict) else None,
+            )
+            if not model:
+                model = default_codex_model(binary, env=dispatch_env)
+        dispatch_env, sandbox_policy = prepare_execution_sandbox(
+            execution_policy,
+            family=family,
+            runtime_binary=binary,
+            env=dispatch_env,
+            workspace_id=workspace_id,
+            run_id=run_id,
+        )
         try:
             if target_type == "cloud":
                 raise RuntimeError(_cloud_runtime_message(record))
@@ -401,6 +356,7 @@ def dispatch_ide_composer(
                     run_id=run_id,
                     on_chunk=on_chunk,
                     trust_policy=cursor_trust_policy,
+                    sandbox_policy=sandbox_policy,
                 )
                 content = _cursor_reply_content(cursor_reply, approval_notice)
                 return _finish({
@@ -421,10 +377,12 @@ def dispatch_ide_composer(
                     composer_mode=composer_mode,
                     execution_tier=execution_tier,
                     model=model,
+                    reasoning_effort=reasoning_effort,
                     subprocess_env=dispatch_env,
                     run_id=run_id,
                     on_chunk=on_chunk,
                     approval_notice=approval_notice,
+                    sandbox_policy=sandbox_policy,
                 )
                 return _finish({
                     "content": content,
@@ -478,6 +436,7 @@ def dispatch_ide_composer(
                                 run_id=run_id,
                                 on_chunk=on_chunk,
                                 trust_policy=cursor_trust_policy,
+                                sandbox_policy=sandbox_policy,
                             )
                             content = _cursor_reply_content(cursor_reply, approval_notice)
                         else:
@@ -489,10 +448,12 @@ def dispatch_ide_composer(
                                 composer_mode=composer_mode,
                                 execution_tier=execution_tier,
                                 model=model,
+                                reasoning_effort=reasoning_effort,
                                 subprocess_env=retry_env,
                                 run_id=run_id,
                                 on_chunk=on_chunk,
                                 approval_notice=approval_notice,
+                                sandbox_policy=sandbox_policy,
                             )
                         payload = {
                             "content": content,
@@ -519,7 +480,6 @@ def dispatch_ide_composer(
             )
             errors.append(summarized)
             ready_run_errors.append(summarized)
-            last_ready_runtime_label = runtime_label
 
     reason = "; ".join(item for item in errors if item) or "no CLI runtime is installed"
     failure_phase = "run_error" if ready_run_errors else "not_ready"
@@ -533,7 +493,7 @@ def dispatch_ide_composer(
             context_block=context_block,
             reason=reason,
             failure_phase=failure_phase,
-            runtime_label=last_ready_runtime_label,
+            runtime_label=first_ready_runtime_label,
         ),
         "dispatched": False,
         "runtime_id": "",

@@ -15,6 +15,7 @@ set -euo pipefail
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cp_base="${AXON_WATCH_CONTROL_PLANE_URL:-http://127.0.0.1:8787}"
 workspace_id="${AXON_WATCH_WORKSPACE_ID:-}"
+source_workspace_id="${AXON_AGENT_SOURCE_WORKSPACE_ID:-${AXON_WATCH_WORKSPACE_ID:-}}"
 stream_to_chat="true"
 run_id="${AXON_WATCH_RUN_ID:-}"
 status_job_id=""
@@ -115,11 +116,13 @@ payload="$(
     --arg command "${command}" \
     --argjson stream "${stream_to_chat}" \
     --arg run_id "${run_id}" \
+    --arg source_workspace_id "${source_workspace_id}" \
     '{
       command: $command,
       stream_to_chat: $stream
     }
-    + (if $run_id == "" then {} else {run_id: $run_id} end)'
+    + (if $run_id == "" then {} else {run_id: $run_id} end)
+    + (if $source_workspace_id == "" then {} else {source_workspace_id: $source_workspace_id} end)'
 )"
 
 response="$(

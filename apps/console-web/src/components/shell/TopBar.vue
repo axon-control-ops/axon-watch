@@ -46,6 +46,9 @@ const showIdeInterruptTopbar = computed(
       pendingApprovalsCount: shell.pendingApprovalsCount,
     }),
 );
+const topbarHasNoMid = computed(
+  () => !showIdeInterruptTopbar.value && shell.topbarChips.length === 0,
+);
 
 function openSurface(surface: AppSurface): void {
   navigateToAppSurface(surface);
@@ -64,7 +67,10 @@ async function openStandup(): Promise<void> {
   <header class="region region-topbar topbar-mockup">
     <div
       class="topbar-mockup__grid"
-      :class="{ 'topbar-mockup__grid--ide-interrupt': showIdeInterruptTopbar }"
+      :class="{
+        'topbar-mockup__grid--ide-interrupt': showIdeInterruptTopbar,
+        'topbar-mockup__grid--no-mid': topbarHasNoMid,
+      }"
     >
       <div class="topbar-mockup__identity-zone">
         <div class="topbar-mockup__brand">
@@ -87,6 +93,11 @@ async function openStandup(): Promise<void> {
           {{ chip.label }}
         </span>
       </div>
+      <div
+        v-else
+        class="topbar-mockup__mid-spacer"
+        aria-hidden="true"
+      />
 
       <div class="topbar-mockup__kairo-slot">
         <KairoPresenceBar

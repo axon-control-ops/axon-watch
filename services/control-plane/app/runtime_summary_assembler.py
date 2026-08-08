@@ -56,10 +56,23 @@ def _env_bool(name: str, default: bool) -> bool:
     return value.strip().lower() in {"1", "true", "yes", "on"}
 
 
-def default_watch_probe(timeout_seconds: float = 0.5) -> tuple[bool, str, str | None, str]:
-    """Probe watch liveness and return connected, status, degraded_reason, last_summary_at."""
+def default_watch_probe(timeout_seconds: float = 3.0) -> tuple[bool, str, str | None, str]:
+    """Probe watch readiness and return connected, status, degraded_reason, last_summary_at.
+
+    Uses /internal/watch/readiness rather than /internal/watch/health: health
+    unconditionally returns status="ok" whenever the HTTP server is up, which
+    only proves the process is alive, not that watch is actually usable.
+    Readiness's own top-level "status" field is likewise a fixed literal, so
+    the real signal is dependencies.connectors_required_unavailable — a
+    required connector actually being down.
+
+    Readiness does real connector probing under the hood (unlike health's
+    instant liveness ping), so it needs a longer budget — measured ~1s for 6
+    connectors on a cold ephemeral instance; the old 0.5s health-check-era
+    timeout falsely reported "not connected" under normal readiness latency.
+    """
     generated_at = _utc_now_iso()
-    url = f"{_watch_base_url()}/internal/watch/health"
+    url = f"{_watch_base_url()}/internal/watch/readiness"
 
     try:
         request = Request(url, headers={"Accept": "application/json"})
@@ -68,13 +81,24 @@ def default_watch_probe(timeout_seconds: float = 0.5) -> tuple[bool, str, str | 
     except (URLError, TimeoutError, OSError) as exc:
         return False, "unavailable", format_probe_failure(exc, url), generated_at
     except (json.JSONDecodeError, ValueError):
-        return False, "unavailable", "watch health returned invalid response", generated_at
+        return False, "unavailable", "watch readiness returned invalid response", generated_at
+
+    dependencies = body.get("dependencies")
+    dependencies = dependencies if isinstance(dependencies, dict) else {}
+    try:
+        required_unavailable = int(dependencies.get("connectors_required_unavailable") or 0)
+    except (TypeError, ValueError):
+        required_unavailable = 0
+    if required_unavailable > 0:
+        return (
+            False,
+            "degraded",
+            f"{required_unavailable} required connector(s) unavailable",
+            generated_at,
+        )
 
     status = str(body.get("status", "unknown"))
-    if status == "ok":
-        return True, status, None, generated_at
-
-    return False, status, "watch health returned non-ok status", generated_at
+    return True, status, None, generated_at
 
 
 def _runtime_identity(*, allow_stale: bool = False) -> dict[str, object]:

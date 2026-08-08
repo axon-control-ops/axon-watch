@@ -1,4 +1,9 @@
-import type { CursorRuntimeStatusSnapshot, RuntimeAuthStatus, RuntimeTargetRecord } from '../api/control-plane';
+import type {
+  ClaudeRuntimeStatusSnapshot,
+  CursorRuntimeStatusSnapshot,
+  RuntimeAuthStatus,
+  RuntimeTargetRecord,
+} from '../api/control-plane';
 
 import type { VaultConsumerRecord } from './vault-surface-view';
 
@@ -78,6 +83,36 @@ export function composerCursorAuthLine(input: {
   }
   if (method === 'vault_locked') {
     return 'Unlock /vault to inject provider keys, or run `cursor agent login` on the host.';
+  }
+  const message = String(auth.message ?? '').trim();
+  return message || 'Not authenticated';
+}
+
+export function composerClaudeAuthLine(input: {
+  target: RuntimeTargetRecord | null;
+  claudeSnapshot: ClaudeRuntimeStatusSnapshot | null;
+}): string {
+  const auth = input.claudeSnapshot?.auth ?? input.target?.auth;
+  if (!auth) {
+    return 'Sign in with `claude auth login` on the host, or add ANTHROPIC_API_KEY in /vault for headless use.';
+  }
+  const account = runtimeAuthAccountLabel(auth);
+  const method = runtimeAuthMethodLabel(auth.auth_method);
+  if (auth.logged_in) {
+    if (account && account.includes('@')) {
+      return method ? `${method} · ${account}` : account;
+    }
+    const message = String(auth.message ?? '').trim();
+    if (message) {
+      return message;
+    }
+    if (account && method) {
+      return `${method} · ${account}`;
+    }
+    return method || 'Authenticated';
+  }
+  if (method === 'vault_locked') {
+    return 'Unlock /vault to inject provider keys, or run `claude auth login` on the host.';
   }
   const message = String(auth.message ?? '').trim();
   return message || 'Not authenticated';

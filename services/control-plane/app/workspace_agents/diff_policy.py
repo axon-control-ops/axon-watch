@@ -16,6 +16,45 @@ SECRET_PATTERNS: tuple[re.Pattern[str], ...] = (
 )
 
 
+# Paths the control plane writes into an agent's isolation worktree itself,
+# before/around the agent's own work. They are Axon bookkeeping, never agent
+# work product, so they must not count as "changed paths" when Gate 6 decides
+# whether the agent stayed inside its allowed scope — otherwise a correct
+# (even read-only, consultative) run fails acceptance for files it never
+# touched. workspace_delivery/publish.py already excludes `.axon-si/` from
+# what it publishes for the same reason; this is the same rule applied at the
+# scope-evaluation step, which had been missing it.
+#
+# Scoped deliberately narrowly: `.cursor/mcp.json` only (written by
+# cli_runtime/research_mcp.py::ensure_workspace_research_mcp), NOT all of
+# `.cursor/` — an agent editing other Cursor config is still in scope and
+# must still be policed.
+CONTROL_PLANE_OWNED_PATH_PREFIXES: tuple[str, ...] = (".axon-si/",)
+CONTROL_PLANE_OWNED_PATHS: frozenset[str] = frozenset(
+    {".axon-si", ".cursor/mcp.json"}
+)
+
+
+def is_control_plane_owned_path(path: str) -> bool:
+    """True when the control plane, not the agent, authored this path."""
+    # NB: removeprefix, not lstrip("./") — lstrip strips any of those
+    # *characters*, which would turn ".axon-si/x" into "axon-si/x" and never
+    # match a dotted prefix.
+    normalized = str(path or "").strip().removeprefix("./").rstrip("/")
+    if not normalized:
+        return False
+    if normalized in CONTROL_PLANE_OWNED_PATHS:
+        return True
+    return any(
+        normalized.startswith(prefix) for prefix in CONTROL_PLANE_OWNED_PATH_PREFIXES
+    )
+
+
+def strip_control_plane_owned_paths(paths: Iterable[str]) -> list[str]:
+    """Drop control-plane-authored bookkeeping from a changed-path list."""
+    return [path for path in paths if not is_control_plane_owned_path(path)]
+
+
 @dataclass(frozen=True)
 class DiffPolicyFinding:
     code: str
@@ -54,15 +93,20 @@ def resolve_effective_allowed_paths(
     *,
     contract_allowed_paths: Iterable[str] | None = None,
     task_allowed_paths: Iterable[str] | None = None,
+    fail_closed_missing_task: bool = False,
 ) -> list[str]:
     """Intersect repo contract scope with per-task write scope.
 
     Missing task scope falls back to the contract (or empty = unrestricted by
-    path allowlist). When both are present, a path must satisfy both prefixes.
+    path allowlist) for legacy/read-only callers. Enforcement boundaries can set
+    ``fail_closed_missing_task`` so an unscoped task receives no write access.
+    When both scopes are present, a path must satisfy both prefixes.
     """
     contract = normalize_path_prefixes(contract_allowed_paths or [])
     task = normalize_path_prefixes(task_allowed_paths or [])
     if not task:
+        if fail_closed_missing_task:
+            return ["__axon_deny_all__"]
         return contract
     if not contract:
         return task

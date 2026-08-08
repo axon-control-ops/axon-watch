@@ -1,10 +1,10 @@
 import { computed, type Ref, ref } from 'vue';
 
 import {
-  disableSandboxSession,
-  enableSandboxSession,
-  fetchSandboxSessionStatus,
-} from '../../api/safe-improvement-api';
+  disableComposerSandbox,
+  enableComposerSandbox,
+  fetchComposerSandboxStatus,
+} from '../../api/composer-sandbox-api';
 import {
   agentExecutionAccessHint,
   agentExecutionAccessLabel,
@@ -122,8 +122,12 @@ export function useComposerMenus(shell: ShellStore, options: UseComposerMenusOpt
   });
 
   async function refreshSandboxSession(): Promise<void> {
+    const workspaceId = shell.currentWorkspace?.workspace_id;
+    if (!workspaceId) {
+      return;
+    }
     try {
-      const status = await fetchSandboxSessionStatus();
+      const status = await fetchComposerSandboxStatus(workspaceId);
       sandboxSessionEnabled.value = status.enabled;
       sandboxEnvForced.value = status.env_forced;
       sandboxSessionError.value = '';
@@ -160,7 +164,12 @@ export function useComposerMenus(shell: ShellStore, options: UseComposerMenusOpt
       void shell.loadRuntimeMcpTools();
     }
     if (openingModel) {
-      void Promise.all([shell.loadRuntimeStatus(), shell.loadCursorCatalog(true)]);
+      void Promise.all([
+        shell.loadRuntimeStatus(),
+        shell.loadCursorCatalog(true),
+        shell.loadClaudeCatalog(true),
+        shell.loadCodexCatalog(true),
+      ]);
     }
     if (openingMode) {
       void refreshSandboxSession();
@@ -224,10 +233,15 @@ export function useComposerMenus(shell: ShellStore, options: UseComposerMenusOpt
     if (!sandboxConsentChecked.value || sandboxSessionPending.value) {
       return;
     }
+    const workspaceId = shell.currentWorkspace?.workspace_id;
+    if (!workspaceId) {
+      sandboxSessionError.value = 'No workspace is open — cannot enable Sandbox.';
+      return;
+    }
     sandboxSessionPending.value = true;
     sandboxSessionError.value = '';
     try {
-      const status = await enableSandboxSession();
+      const status = await enableComposerSandbox(workspaceId);
       sandboxSessionEnabled.value = status.enabled;
       sandboxEnvForced.value = status.env_forced;
       showSandboxConsent.value = false;
@@ -244,10 +258,14 @@ export function useComposerMenus(shell: ShellStore, options: UseComposerMenusOpt
     if (sandboxEnvForced.value || sandboxSessionPending.value) {
       return;
     }
+    const workspaceId = shell.currentWorkspace?.workspace_id;
+    if (!workspaceId) {
+      return;
+    }
     sandboxSessionPending.value = true;
     sandboxSessionError.value = '';
     try {
-      const status = await disableSandboxSession();
+      const status = await disableComposerSandbox(workspaceId);
       sandboxSessionEnabled.value = status.enabled;
       sandboxEnvForced.value = status.env_forced;
       showModeMenu.value = false;

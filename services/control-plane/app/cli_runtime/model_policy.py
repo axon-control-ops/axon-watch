@@ -72,7 +72,10 @@ def resolve_cli_model_for_dispatch(
     # Operator / interactive Agent Dock — existing env fallback.
     normalized = explicit
     if is_cursor_auto_model(normalized):
-        env_key = "AXON_WATCH_CURSOR_MODEL" if family_key == "cursor" else "AXON_WATCH_CODEX_MODEL"
+        env_key = {
+            "cursor": "AXON_WATCH_CURSOR_MODEL",
+            "claude": "AXON_WATCH_CLAUDE_MODEL",
+        }.get(family_key, "AXON_WATCH_CODEX_MODEL")
         normalized = normalize_model_id(os.environ.get(env_key, ""))
     if is_cursor_auto_model(normalized):
         return ""

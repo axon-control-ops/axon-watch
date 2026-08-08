@@ -32,8 +32,8 @@ export {
   employeeIsActivelyBusy,
   employeeIsLeadLikeRole,
   resolveLiveBusyEmployeeIds,
+  resolveReportingEmployeeId,
 } from './company-roster-busy';
-
 export {
   employeeSpeakLine,
   type EmployeeTalkSpeakMode,

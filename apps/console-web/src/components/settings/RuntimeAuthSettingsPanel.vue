@@ -17,6 +17,7 @@ import {
   runtimeAuthSummary,
 } from '../../lib/runtime-auth-view';
 import { useShellStore } from '../../stores/shell';
+import ClaudeUsageCard from './ClaudeUsageCard.vue';
 import CursorUsageCard from './CursorUsageCard.vue';
 
 type RuntimeFamily = 'cursor' | 'claude' | 'codex';
@@ -239,6 +240,12 @@ onMounted(() => {
       v-if="!isLoading"
       class="runtime-auth-settings__usage"
       :usage="shell.runtimeStatus?.cursor_usage"
+    />
+
+    <ClaudeUsageCard
+      v-if="!isLoading"
+      class="runtime-auth-settings__usage"
+      :usage="shell.runtimeStatus?.claude_usage"
     />
 
     <div v-if="!isLoading" class="runtime-auth-settings__grid">

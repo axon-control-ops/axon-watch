@@ -18,6 +18,38 @@ from app.cli_runtime.cursor_agent import (  # noqa: E402
 from app.cli_runtime.router import _fallback_reply, dispatch_ide_composer  # noqa: E402
 
 
+def _snapshot_cursor_and_codex_ready() -> dict[str, object]:
+    """Both candidates ready — needed to exercise the fallback-through-multiple
+    runtimes path (a single-ready-candidate fixture can't distinguish "first
+    attempted" from "last attempted", since they're the same candidate)."""
+    return {
+        "default_runtime": "cursor_local",
+        "local": [
+            {
+                "id": "cursor_local",
+                "family": "cursor",
+                "label": "Cursor CLI (local)",
+                "binary": "cursor",
+                "ready": True,
+                "available": True,
+                "target_type": "local",
+                "auth": {"logged_in": True},
+            },
+            {
+                "id": "codex_local",
+                "family": "codex",
+                "label": "Codex CLI (local)",
+                "binary": "codex",
+                "ready": True,
+                "available": True,
+                "target_type": "local",
+                "auth": {"logged_in": True},
+            },
+        ],
+        "cloud": [],
+    }
+
+
 def _snapshot_cursor_ready() -> dict[str, object]:
     return {
         "default_runtime": "cursor_local",
@@ -116,6 +148,24 @@ class FallbackReplyTests(unittest.TestCase):
         self.assertNotIn("/vault", reply.lower())
         self.assertIn("Check Cursor Usage", reply)
 
+    def test_unpaid_invoice_run_error_points_to_dashboard(self) -> None:
+        reply = _fallback_reply(
+            composer_mode="agent",
+            user_prompt="continue",
+            context_block="ctx",
+            reason=(
+                "ActionRequiredError: You have an unpaid invoice Visit "
+                "cursor.com/dashboard and pay your invoice in Stripe to resume requests."
+            ),
+            failure_phase="run_error",
+            runtime_label="Cursor CLI (local)",
+        )
+        self.assertIn("could not start", reply.lower())
+        self.assertIn("unpaid invoice", reply.lower())
+        self.assertIn("cursor.com/dashboard", reply.lower())
+        self.assertNotIn("/vault", reply.lower())
+        self.assertNotIn("Check Cursor Usage", reply)
+
 
 class DispatchRecursionRecoveryTests(unittest.TestCase):
     def test_recursion_retries_once_without_research_mcp(self) -> None:
@@ -202,6 +252,53 @@ class DispatchRecursionRecoveryTests(unittest.TestCase):
         reason = str(result.get("reason") or "")
         self.assertIn("maximum recursion depth exceeded", reason)
         self.assertNotIn("Codex CLI (local) unavailable", reason)
+
+    def test_failure_headline_names_the_operators_selection_not_the_last_fallback(self) -> None:
+        # Regression: an operator with Cursor explicitly selected, where
+        # Cursor fails and the router silently falls back to Codex which
+        # ALSO fails, must not headline the failure as "failed on Codex" —
+        # that mislabels the operator's actual selection with whatever
+        # runtime happened to be tried last in the fallback chain.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            with (
+                patch(
+                    "app.cli_runtime.router.runtime_status_snapshot",
+                    return_value=_snapshot_cursor_and_codex_ready(),
+                ),
+                patch(
+                    "app.cli_runtime.router._resolve_workspace_root",
+                    return_value=root,
+                ),
+                patch(
+                    "app.cli_runtime.router.ensure_workspace_research_mcp",
+                    return_value=True,
+                ),
+                patch(
+                    "app.cli_runtime.cursor_agent.run_cursor_local",
+                    side_effect=RuntimeError("Cursor is installed but not signed in."),
+                ),
+                patch(
+                    "app.cli_runtime.router.run_non_cursor_local",
+                    side_effect=RuntimeError("Codex/OpenAI API key was rejected."),
+                ),
+            ):
+                result = dispatch_ide_composer(
+                    workspace_id="workspace_dashpro",
+                    composer_mode="ask",
+                    user_prompt="What about DashPro errors and OTA?",
+                    context_block="ctx",
+                    runtime_target="cursor_local",
+                )
+
+        self.assertFalse(result.get("dispatched"))
+        content = str(result.get("content") or "")
+        self.assertIn("failed on Cursor CLI (local)", content)
+        self.assertNotIn("failed on Codex CLI (local)", content)
+        # Both failure reasons must still be present, just not as the headline.
+        reason = str(result.get("reason") or "")
+        self.assertIn("not signed in", reason)
+        self.assertIn("API key was rejected", reason)
 
 
 if __name__ == "__main__":

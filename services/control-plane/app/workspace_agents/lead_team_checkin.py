@@ -18,7 +18,6 @@ from uuid import uuid4
 
 from app.persistence import chat_store, task_store
 from app.workspace_agents.config_loader import load_workspace_agent_configs
-from app.workspace_agents.failure_detail import normalize_operator_failure_detail
 from app.workspace_agents.lead_checkin_assign import (
     ASSIGN_GOAL_PREFIX,
     ATTEND_GOAL_PREFIX,
@@ -175,20 +174,18 @@ def _post_lead_checkin_message(
     for index, finding in enumerate(findings[:12], start=1):
         flag = "ESCALATE" if finding.escalate_only else f"→ {finding.owner_role}"
         lines.append(f"{index}. [{finding.kind}] {finding.title} ({flag})")
+        # finding.detail already went through normalize_operator_failure_detail +
+        # word-boundary truncation upstream (run_outcome.latest_role_run_outcome) —
+        # do not re-normalize or re-truncate it here.
         if finding.detail:
-            detail = " ".join(finding.detail.split())
-            if len(detail) > 180:
-                detail = f"{detail[:179].rstrip()}…"
-            lines.append(f"   {detail}")
+            lines.append(f"   {finding.detail}")
     if not findings:
         lines.append("No failed shifts or degraded third-party signals this pass.")
-    lines.extend(
-        [
-            "",
-            "Hierarchy: You → VAXON → Lead → specialist → Lead rollup → VAXON → Decide.",
-            "Confidence: 8/10",
-        ]
-    )
+    # No trailing "Hierarchy" / "Confidence" boilerplate: this is a deterministic
+    # status message, not an LLM turn — there's no model self-assessment to score,
+    # and the org-chart line is unparsed narration repeated on every check-in with
+    # no reader value (see app.kairo_conversation_runtime_context for the actual
+    # functional hierarchy line, which feeds VAXON's own reasoning context instead).
     message_id = f"message_system_{uuid4().hex}"
     chat_store.save_message(
         {
@@ -217,18 +214,21 @@ def collect_failed_shift_findings(workspace_id: str) -> list[LeadCheckinFinding]
         outcome = latest_role_run_outcome(workspace_id, role)
         if not outcome or str(outcome.get("outcome") or "").strip().lower() != "failed":
             continue
-        detail = normalize_operator_failure_detail(str(outcome.get("detail") or ""))
+        # latest_role_run_outcome already ran normalize_operator_failure_detail +
+        # truncation — re-normalizing here was redundant work on already-clean text.
+        detail = str(outcome.get("detail") or "")
         owner_role, escalate_only = assign_owner_role_for_failed_shift(role, detail)
         run_id = str(outcome.get("run_id") or "").strip() or "unknown"
         name = str(employee.name or role).strip() or role
+        # Soft key omits run_id so the same role failure does not stack Needs-you cards.
         findings.append(
             LeadCheckinFinding(
                 kind="operator_blocker" if escalate_only else "failed_shift",
                 workspace_id=workspace_id,
                 owner_role=owner_role,
                 title=f"{name} ({role}) last shift failed",
-                detail=detail or "failed shift without detail",
-                dedupe_key=f"failed_shift:{workspace_id}:{role}:{run_id}",
+                detail=(detail or "failed shift without detail") + f" [run={run_id}]",
+                dedupe_key=f"failed_shift:{workspace_id}:{role}",
                 escalate_only=escalate_only,
             )
         )

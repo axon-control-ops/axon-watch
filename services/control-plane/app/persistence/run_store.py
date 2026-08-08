@@ -152,6 +152,17 @@ def list_runs() -> list[dict[str, Any]]:
     return [_row_to_record(row) for row in rows]
 
 
+def list_failed_runs_since(since_iso: str) -> list[dict[str, Any]]:
+    """Failed runs updated at/after ``since_iso``, using idx_runs_phase / idx_runs_updated_at."""
+    with _managed_connection() as connection:
+        rows = connection.execute(
+            "SELECT * FROM runs WHERE phase = 'failed' AND updated_at >= ? "
+            "ORDER BY updated_at ASC, run_id ASC",
+            (since_iso,),
+        ).fetchall()
+    return [_row_to_record(row) for row in rows]
+
+
 def delete_run(run_id: str) -> bool:
     """Remove one run and its history. Returns False when the run does not exist."""
     cleaned = str(run_id or "").strip()

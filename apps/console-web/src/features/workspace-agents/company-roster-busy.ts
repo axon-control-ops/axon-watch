@@ -46,6 +46,43 @@ export function companyBusyEmployeesCount(
   return companyBusyEmployees(employees).length;
 }
 
+export type ReportingEmployeeResolutionInput = {
+  agentStreamActive: boolean;
+  /** Employee owning the currently-focused IDE thread, when a stream is live. */
+  activeThreadEmployeeId?: string | null;
+  /** Thread ids with an active IDE chat stream (including background tabs). */
+  streamingThreadIds?: readonly string[] | null;
+  threads?: readonly { thread_id: string; employee_id?: string | null }[] | null;
+};
+
+/**
+ * The single employee (if any) whose thread has live text streaming in right
+ * now — narrower than "busy" (which also covers queued/mid-shift-but-quiet
+ * work). This is the signal that expands that teammate's persona-dock card
+ * over the roster grid so the operator can read the report without the
+ * roster competing for space, then collapses back once the stream ends.
+ */
+export function resolveReportingEmployeeId(
+  input: ReportingEmployeeResolutionInput,
+): string | null {
+  const focused = input.activeThreadEmployeeId?.trim();
+  if (input.agentStreamActive && focused) {
+    return focused;
+  }
+  const streaming = new Set(
+    (input.streamingThreadIds ?? []).map((id) => id.trim()).filter(Boolean),
+  );
+  if (streaming.size && input.threads?.length) {
+    for (const thread of input.threads) {
+      const employeeId = thread.employee_id?.trim();
+      if (streaming.has(thread.thread_id) && employeeId) {
+        return employeeId;
+      }
+    }
+  }
+  return null;
+}
+
 export type LiveBusyEmployeeResolutionInput = {
   employees: readonly CompanyEmployeeRecord[] | null | undefined;
   /** Thread ids with an active IDE chat stream (including background tabs). */

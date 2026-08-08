@@ -231,8 +231,13 @@ def kairo_tts(body: KairoTtsRequest) -> dict[str, object]:
         }
 
     voice = str(body.voice or DEFAULT_AZURE_VOICE).strip() or DEFAULT_AZURE_VOICE
+    continuation = bool(body.continuation)
     synthesized = synthesize_azure_speech(
-        trimmed, voice=voice, rate=body.rate, pitch=body.pitch
+        trimmed,
+        voice=voice,
+        rate=body.rate,
+        pitch=body.pitch,
+        continuation=continuation,
     )
     if not synthesized:
         return {
@@ -248,7 +253,9 @@ def kairo_tts(body: KairoTtsRequest) -> dict[str, object]:
         "voice": voice,
         "content_type": content_type,
         "audio_base64": base64.b64encode(audio).decode("ascii"),
-        "leading_audio_guard_ms": leading_audio_guard_ms(trimmed),
+        "leading_audio_guard_ms": leading_audio_guard_ms(
+            trimmed, continuation=continuation
+        ),
     }
 
 
@@ -362,6 +369,7 @@ def kairo_converse(
             context_node_id=body.context_node_id or None,
             force_refresh=refresh,
             attachment_ids=attachment_ids,
+            submission_intent=body.submission_intent,
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
@@ -373,6 +381,27 @@ def dev_trigger_spoken_briefing() -> dict[str, object]:
     return {"ok": True, "subscribers": delivered}
 
 
+@router.get("/api/dev/debug-session-log")
+def dev_debug_session_log_read(
+    workspace_id: str = "",
+    limit: int = 80,
+) -> dict[str, object]:
+    """Read recent Debug Mode NDJSON lines for the IDE thread log panel."""
+    from app.debug_session_log import (
+        read_debug_session_log_lines,
+        resolve_debug_session_log_path,
+    )
+
+    path = resolve_debug_session_log_path(workspace_id)
+    entries = read_debug_session_log_lines(workspace_id=workspace_id, limit=limit)
+    return {
+        "ok": True,
+        "path": str(path),
+        "count": len(entries),
+        "entries": entries,
+    }
+
+
 @router.post("/api/dev/debug-session-log")
 def dev_debug_session_log(body: DebugSessionLogRequest) -> dict[str, object]:
     """Append one NDJSON evidence line for Debug-mode instrumentation."""
@@ -380,28 +409,17 @@ def dev_debug_session_log(body: DebugSessionLogRequest) -> dict[str, object]:
         raise HTTPException(status_code=404, detail="Not found")
 
     import json
-    from pathlib import Path
+    import time
 
-    from app.terminal.workspace_roots import WorkspaceRootError, resolve_workspace_root
+    from app.debug_session_log import resolve_debug_session_log_path
 
-    workspace_root: Path | None = None
-    workspace_id = (body.workspace_id or "").strip() or "workspace_axon_watch"
-    try:
-        workspace_root = resolve_workspace_root(workspace_id)
-    except WorkspaceRootError:
-        workspace_root = None
-    if workspace_root is None:
-        workspace_root = Path(__file__).resolve().parents[4]
-
-    axon_dir = workspace_root / ".axon"
-    axon_dir.mkdir(parents=True, exist_ok=True)
-    log_path = axon_dir / "debug-session.ndjson"
+    log_path = resolve_debug_session_log_path(body.workspace_id)
     payload = {
         "hypothesisId": body.hypothesisId,
         "location": body.location,
         "message": body.message,
         "data": body.data or {},
-        "timestamp": body.timestamp if body.timestamp is not None else __import__("time").time() * 1000,
+        "timestamp": body.timestamp if body.timestamp is not None else time.time() * 1000,
     }
     with log_path.open("a", encoding="utf-8") as handle:
         handle.write(json.dumps(payload, ensure_ascii=True) + "\n")

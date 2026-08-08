@@ -56,6 +56,26 @@ export function agentContentLooksLikeErrorDump(content: string): boolean {
   return false;
 }
 
+// A runtime fallback ("the CLI could not run") is delivered as an ordinary
+// assistant message, so it renders identically to a real answer and an
+// operator has to read it closely to notice nothing actually ran. This keys
+// off the exact shape services/control-plane/app/cli_runtime/runtime_failure.py
+// ::fallback_reply always produces; tests/test_runtime_fallback_marker_contract.py
+// pins the two sides together, so reword one and that test fails.
+const RUNTIME_FALLBACK_PREFIX = 'Lane B (';
+const RUNTIME_FALLBACK_VERBS = ['failed on ', 'could not start', 'cannot start because'];
+
+export function agentContentLooksLikeRuntimeFallback(content: string): boolean {
+  const text = String(content || '')
+    .split(/\s+/)
+    .join(' ')
+    .trim();
+  if (!text.startsWith(RUNTIME_FALLBACK_PREFIX)) {
+    return false;
+  }
+  return RUNTIME_FALLBACK_VERBS.some((verb) => text.includes(verb));
+}
+
 export function summarizeAgentErrorContent(content: string): string {
   const trimmed = content.trim();
   if (!trimmed) {

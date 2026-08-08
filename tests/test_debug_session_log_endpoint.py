@@ -61,6 +61,40 @@ class DebugSessionLogEndpointTests(unittest.TestCase):
         self.assertEqual("H2", payload["hypothesisId"])
         self.assertEqual({"count": 1}, payload["data"])
 
+    def test_debug_log_read_returns_recent_entries(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir, patch(
+            "app.terminal.workspace_roots.resolve_workspace_root",
+            return_value=Path(temp_dir),
+        ):
+            axon_dir = Path(temp_dir) / ".axon"
+            axon_dir.mkdir(parents=True, exist_ok=True)
+            log_path = axon_dir / "debug-session.ndjson"
+            log_path.write_text(
+                json.dumps(
+                    {
+                        "hypothesisId": "H3",
+                        "location": "thread",
+                        "message": "visible in panel",
+                        "data": {},
+                        "timestamp": 1,
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            response = self.client.get(
+                "/api/dev/debug-session-log",
+                params={"workspace_id": "workspace_alpha", "limit": 10},
+            )
+
+        self.assertEqual(200, response.status_code)
+        body = response.json()
+        self.assertTrue(body["ok"])
+        self.assertEqual(1, body["count"])
+        self.assertEqual("H3", body["entries"][0]["hypothesisId"])
+        self.assertEqual("visible in panel", body["entries"][0]["message"])
+
 
 if __name__ == "__main__":
     unittest.main()

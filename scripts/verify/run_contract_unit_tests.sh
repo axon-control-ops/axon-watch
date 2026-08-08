@@ -110,6 +110,7 @@ main_tests=(
   tests.test_voice_dispatch
   tests.test_command_shortcuts
   tests.test_kairo_conversation_turns
+  tests.test_kairo_conversation_runtime_turns
   tests.test_conversation_transcript
   tests.test_voice_transcript_store
   tests.test_debug_session_log_endpoint

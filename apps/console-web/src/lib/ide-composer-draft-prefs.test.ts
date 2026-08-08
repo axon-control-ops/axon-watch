@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
+  draftWasAlreadySubmitted,
   persistIdeComposerDraft,
   readStoredIdeComposerDraft,
 } from './ide-composer-draft-prefs';
@@ -86,5 +87,20 @@ describe('ide composer draft prefs', () => {
       string
     >;
     expect(raw).toEqual({});
+  });
+
+  it('recognizes an already-submitted prompt without deleting a different draft', () => {
+    const messages = [
+      { role: 'operator', content: 'Count parent responses and uploaded proofs.' },
+      { role: 'agent', content: 'I am checking that now.' },
+    ];
+
+    expect(
+      draftWasAlreadySubmitted(
+        '  Count parent responses   and uploaded proofs. ',
+        messages,
+      ),
+    ).toBe(true);
+    expect(draftWasAlreadySubmitted('Add a new follow-up request.', messages)).toBe(false);
   });
 });

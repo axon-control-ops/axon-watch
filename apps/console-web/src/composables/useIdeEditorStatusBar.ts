@@ -202,8 +202,8 @@ export function openIdeTeam(shell: ShellStore): void {
   shell.focusIdeSidebarView('team');
 }
 
-/** Open Settings → CLI runtime for Cursor usage pools. */
-export function openCursorUsageSettings(shell: ShellStore): void {
+/** Open Settings → CLI runtime for Cursor/Claude usage cards. */
+export function openRuntimeUsageSettings(shell: ShellStore): void {
   if (shell.runtimeStatusLoadState === 'idle') {
     void shell.loadRuntimeStatus();
   }

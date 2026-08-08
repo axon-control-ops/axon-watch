@@ -20,7 +20,9 @@ import {
   stopRun,
 } from '../api/control-plane';
 import type {
+  ClaudeRuntimeStatusSnapshot,
   ConnectorProbeRecord,
+  CodexRuntimeStatusSnapshot,
   CursorRuntimeStatusSnapshot,
   FleetHealthSnapshot,
   RuntimeMcpToolsSnapshot,
@@ -158,6 +160,7 @@ import {
 } from '../lib/ide-composer-queue';
 import { isRunLinkedComposerMode, isToolCapableComposerMode } from '../lib/composer-tool-modes';
 import {
+  draftWasAlreadySubmitted,
   persistIdeComposerDraft,
   readStoredIdeComposerDraft,
 } from '../lib/ide-composer-draft-prefs';
@@ -167,7 +170,7 @@ import {
   streamingThreadIdsFromUiMap,
   workspaceStreamGlobalsFromState,
 } from '../lib/workspace-stream-ui';
-import { listReattachIdeStreamThreadIds, listStaleIdeStreamThreadIds } from '../lib/stale-ide-stream-ui';
+import { listReattachIdeStreamThreadIds } from '../lib/stale-ide-stream-ui';
 import { resolveStreamingAgentMessageId } from '../lib/follow-busy-employee-ide-streams';
 import { composerSubmitBlockReason } from '../lib/composer-submit-block-reason';
 import { rewriteComposerAskOptionAnswer } from '../lib/composer-ask-option-rewrite';
@@ -299,7 +302,9 @@ import {
 import { createCatalogLoadersSlice } from './shell/slices/create-catalog-loaders-slice';
 import { createComposerRuntimePrefsSlice } from './shell/slices/create-composer-runtime-prefs-slice';
 import { createConnectorsSlice } from './shell/slices/create-connectors-slice';
+import { createClaudeCatalogSlice } from './shell/slices/create-claude-catalog-slice';
 import { createCursorCatalogSlice } from './shell/slices/create-cursor-catalog-slice';
+import { createCodexCatalogSlice } from './shell/slices/create-codex-catalog-slice';
 import { createDockLayoutSlice } from './shell/slices/create-dock-layout-slice';
 import { createIdeWorkbenchChromeSlice } from './shell/slices/create-ide-workbench-chrome-slice';
 import { createOperatorBriefingSlice } from './shell/slices/create-operator-briefing-slice';
@@ -307,6 +312,7 @@ import { createOperatorFocusSlice } from './shell/slices/create-operator-focus-s
 import { createOperatorPresenceSettingsSlice } from './shell/slices/create-operator-presence-settings-slice';
 import { createOperatorProbesSlice } from './shell/slices/create-operator-probes-slice';
 import { createIdeRunAutoRecoverySlice } from './shell/slices/create-ide-run-auto-recovery-slice';
+import { createRunSurfacesRefreshSlice } from './shell/slices/create-run-surfaces-refresh-slice';
 import { createInboxSignalsSlice } from './shell/slices/create-inbox-signals-slice';
 import { createRuntimeProbesSlice } from './shell/slices/create-runtime-probes-slice';
 import { createRuntimeSummarySlice } from './shell/slices/create-runtime-summary-slice';
@@ -323,12 +329,8 @@ import { createWorkspaceStreamUiSlice } from './shell/slices/create-workspace-st
 import { createSignalHandoffSlice } from './shell/slices/create-signal-handoff-slice';
 import { createVoiceOrbPlacementController } from './shell/slices/create-voice-orb-placement-slice';
 import {
-  DEFAULT_DOCK_CONTEXT,
-  DEFAULT_EDITOR_TABS,
   hydrateWorkspaceSurfaceThreadIds,
   type BriefingLoadState,
-  type DockContextDescriptor,
-  type EditorTabDescriptor,
   type InboxLoadState,
   type LayoutMode,
   type RunMutationState,
@@ -357,6 +359,12 @@ export const useShellStore = defineStore('shell', () => {
   const cursorRuntimeStatus = ref<CursorRuntimeStatusSnapshot | null>(null);
   const cursorCatalogLoadState = ref<'idle' | 'loading' | 'loaded' | 'error'>('idle');
   const cursorCatalogError = ref<string | null>(null);
+  const claudeRuntimeStatus = ref<ClaudeRuntimeStatusSnapshot | null>(null);
+  const claudeCatalogLoadState = ref<'idle' | 'loading' | 'loaded' | 'error'>('idle');
+  const claudeCatalogError = ref<string | null>(null);
+  const codexRuntimeStatus = ref<CodexRuntimeStatusSnapshot | null>(null);
+  const codexCatalogLoadState = ref<'idle' | 'loading' | 'loaded' | 'error'>('idle');
+  const codexCatalogError = ref<string | null>(null);
   const agentStreamActive = ref(false);
   const agentStreamMessageId = ref<string | null>(null);
   type AgentReportEditorLink = {
@@ -489,9 +497,6 @@ export const useShellStore = defineStore('shell', () => {
   const fileSaveState = ref<'idle' | 'saving'>('idle');
   const fileSaveError = ref<string | null>(null);
 
-  // UI shell scaffolding is local and intentionally placeholder-only.
-  const editorTabs = ref<EditorTabDescriptor[]>(DEFAULT_EDITOR_TABS);
-  const activeEditorTabId = ref<string>(DEFAULT_EDITOR_TABS[0].id);
   const activeEditorDocumentId = ref<string>('file:README.md');
   const activeWorkspaceFilePath = computed(() => {
     const path = filePathFromDocumentId(activeEditorDocumentId.value);
@@ -504,7 +509,6 @@ export const useShellStore = defineStore('shell', () => {
   const openIdeThreadIdsByWorkspaceId = ref<Record<string, string[]>>(
     readOpenIdeThreadIdsByWorkspace(),
   );
-  const dockContext = ref<DockContextDescriptor>(DEFAULT_DOCK_CONTEXT);
   const expandedDockSeams = ref<Set<DockSeamId>>(new Set());
   const dockThreadSeamTouched = ref(false);
   const briefingSeamEmphasized = ref(false);
@@ -742,6 +746,7 @@ export const useShellStore = defineStore('shell', () => {
         summary?.approvals.pending_count ?? operatorBriefing.value?.pending_approvals.count ?? 0,
       criticalSignals: summary?.signals.critical_count ?? 0,
       highSignals: summary?.signals.high_count ?? 0,
+      openSignals: summary?.signals.open_count ?? inboxItems.value.length,
       watchConnected: Boolean(summary?.watch.connected),
       runtimeLoaded: Boolean(summary),
     });
@@ -1192,6 +1197,9 @@ export const useShellStore = defineStore('shell', () => {
       threadMessages.value = mapped;
       commandMutationState.value = 'idle';
       commandMutationError.value = null;
+      if (surface === 'ide') {
+        clearRestoredSubmittedIdeComposerDraft(workspaceId, loadedThreadId, mapped);
+      }
     }
     if (surface === 'operator' && currentWorkspace.value?.workspace_id === workspaceId) {
       operatorThreadMessages.value = mapped;
@@ -1402,21 +1410,21 @@ export const useShellStore = defineStore('shell', () => {
       ideAgentRunId.value = getWorkspaceStreamUi(threadId).ideAgentRunId;
     }
 
-    if (forceRefresh) {
-      const nextCache = { ...workspaceIdeThreadMessagesById.value };
-      delete nextCache[threadId];
-      workspaceIdeThreadMessagesById.value = nextCache;
-    } else {
-      const cached = workspaceIdeThreadMessagesById.value[threadId];
-      if (cached?.length) {
-        threadMessages.value = cached;
-        commandMutationState.value = 'idle';
-        commandMutationError.value = null;
+    // Continuous-worker / fan-out writes teammate threads out-of-band, so the
+    // cache can be stale — forceRefresh always re-fetches in the background.
+    // It must not evict/blank the cache first though: that turned every
+    // teammate-tab switch into a flash-to-empty-then-reload. Keep showing the
+    // stale transcript (like hydrateWorkspaceIdeChatImpl's initial-load path)
+    // until loadWorkspaceThread's applyLoadedWorkspaceThread lands fresh data.
+    const cached = workspaceIdeThreadMessagesById.value[threadId];
+    if (cached?.length) {
+      threadMessages.value = cached;
+      commandMutationState.value = 'idle';
+      commandMutationError.value = null;
+      if (!forceRefresh) {
         return;
       }
-    }
-
-    if (layoutMode.value === 'ide') {
+    } else if (layoutMode.value === 'ide') {
       threadMessages.value = [];
       commandMutationState.value = 'idle';
       commandMutationError.value = null;
@@ -2043,6 +2051,23 @@ export const useShellStore = defineStore('shell', () => {
     }
   }
 
+  function clearRestoredSubmittedIdeComposerDraft(
+    workspaceId: string,
+    threadId: string,
+    messages: ReadonlyArray<OperatorThreadEntry>,
+  ): void {
+    if (!draftWasAlreadySubmitted(ideComposerDraft.value, messages)) {
+      return;
+    }
+    suppressingIdeComposerDraftPersist = true;
+    try {
+      ideComposerDraft.value = '';
+      persistIdeComposerDraft(workspaceId, '', threadId);
+    } finally {
+      suppressingIdeComposerDraftPersist = false;
+    }
+  }
+
   function flushIdeComposerDraft(threadIdOverride?: string | null): void {
     if (typeof window === 'undefined') {
       return;
@@ -2187,6 +2212,9 @@ export const useShellStore = defineStore('shell', () => {
       threadMessages.value = filterThreadMessagesForSurface(merged, 'ide');
       if (options.clearDraftOnSuccess !== false) {
         ideComposerDraft.value = '';
+        // Persist synchronously: a force-refresh can cancel the debounced watcher
+        // and otherwise restore the pre-submit text from this thread's storage.
+        persistIdeComposerDraft(workspaceId, '', response.thread_id);
       }
       if (isRunLinkedComposerMode(composerMode) && response.run_id) {
         ideAgentRunId.value = response.run_id;
@@ -2420,6 +2448,11 @@ export const useShellStore = defineStore('shell', () => {
     ) {
       enqueueIdeComposerMessage(composerMode, content);
       ideComposerDraft.value = '';
+      persistIdeComposerDraft(
+        currentWorkspace.value?.workspace_id ?? null,
+        '',
+        activeIdeThreadId.value || null,
+      );
       commandMutationError.value = null;
       return true;
     }
@@ -2535,10 +2568,6 @@ export const useShellStore = defineStore('shell', () => {
 
   function setEditorSelection(selection: EditorSelectionSnapshot | null): void {
     editorSelection.value = selection;
-  }
-
-  function setActiveEditorTab(id: string): void {
-    activeEditorTabId.value = id;
   }
 
   function migrateMarkdownAgentReviewDraft(id: string): boolean {
@@ -3075,6 +3104,8 @@ export const useShellStore = defineStore('shell', () => {
     selectedRuntimeTargetId,
     selectedComposerModel,
     cursorCatalogRows,
+    claudeCatalogRows,
+    codexCatalogRows,
     cursorPickerVisibleModelIds,
     composerRuntimeLabel,
     setSelectedRuntimeTarget,
@@ -3084,6 +3115,8 @@ export const useShellStore = defineStore('shell', () => {
     currentWorkspace,
     runtimeStatus,
     cursorRuntimeStatus,
+    claudeRuntimeStatus,
+    codexRuntimeStatus,
     composerRuntimePrefsRevision,
     cursorPickerVisibleRevision,
   });
@@ -3096,6 +3129,25 @@ export const useShellStore = defineStore('shell', () => {
     cursorCatalogLoadState,
     cursorCatalogError,
     cursorCatalogRows,
+    composerRuntimePrefsRevision,
+    currentWorkspaceId: () => currentWorkspace.value?.workspace_id ?? null,
+  });
+
+  const { loadCodexCatalog } = createCodexCatalogSlice({
+    codexRuntimeStatus,
+    codexCatalogLoadState,
+    codexCatalogError,
+    codexCatalogRows,
+  });
+
+  const {
+    loadClaudeCatalog,
+    migrateClaudeComposerModelIfNeeded,
+  } = createClaudeCatalogSlice({
+    claudeRuntimeStatus,
+    claudeCatalogLoadState,
+    claudeCatalogError,
+    claudeCatalogRows,
     composerRuntimePrefsRevision,
     currentWorkspaceId: () => currentWorkspace.value?.workspace_id ?? null,
   });
@@ -3268,114 +3320,40 @@ export const useShellStore = defineStore('shell', () => {
     dispatchIdeComposerMessage,
   });
 
-  function clearStaleIdeStreamUi(): void {
-    const runPhaseById: Record<string, string | undefined> = {};
-    for (const run of runs.value) {
-      runPhaseById[run.run_id] = run.phase;
-    }
-    const decisionInput = {
-      streamUiByThreadId: workspaceStreamUiById.value,
-      liveSessionThreadIds: chatStreamSessionsByWorkspace.keys(),
-      runPhaseById,
-      runsLoaded: runsLoadState.value === 'loaded',
-    };
-    const reattachThreadIds = listReattachIdeStreamThreadIds(decisionInput);
-    const staleThreadIds = listStaleIdeStreamThreadIds(decisionInput);
-    const workspaceId = currentWorkspace.value?.workspace_id ?? null;
-    const currentThreadIds = new Set(
-      workspaceId
-        ? (ideThreadsByWorkspaceId.value[workspaceId] ?? []).map((thread) => thread.thread_id)
-        : [],
-    );
-    if (workspaceId) {
-      const surfaceThreadId = getWorkspaceSurfaceThreadId(workspaceId, 'ide');
-      if (surfaceThreadId) {
-        currentThreadIds.add(surfaceThreadId);
-      }
-    }
-    for (const threadId of reattachThreadIds) {
-      if (workspaceId && currentThreadIds.has(threadId)) {
-        void reattachIdeChatStream(threadId, workspaceId);
-      }
-    }
-    if (!staleThreadIds.length) {
-      return;
-    }
-    for (const threadId of staleThreadIds) {
-      disconnectChatStreamSession(threadId);
-      setWorkspaceStreamUi(threadId, {
-        active: false,
-        messageId: null,
-        activity: null,
-        ideAgentRunId: null,
-      });
-    }
-  }
-
-  async function refreshRunSurfaces(options?: { light?: boolean; forceFull?: boolean }): Promise<void> {
-    // During an active stream/run, full surface refresh (CLI status + briefing +
-    // fleet + brain) routinely takes 5–8s and trips Chrome "Page Unresponsive".
-    const activeBusy =
-      agentStreamActive.value ||
-      primaryActiveRun.value?.phase === 'executing' ||
-      primaryActiveRun.value?.phase === 'planning' ||
-      primaryActiveRun.value?.phase === 'starting' ||
-      primaryActiveRun.value?.phase === 'queued';
-    const light =
-      options?.forceFull === true
-        ? false
-        : options?.light === true || activeBusy;
-    if (light) {
-      // Live SSE ticks must stay cheap: skip CLI status/summary AND watch inbox
-      // (inbox watch probe regularly hits a ~5s timeout and freezes the console).
-      await loadRuns({ sync: false });
-      clearStaleIdeStreamUi();
-      await autoContinueInterruptedIdeRun();
-      await flushIdeComposerQueueIfIdle();
-      return;
-    }
-    const briefingBackground = briefingLoadState.value === 'loaded';
-    const runtimeBackground = runtimeSummaryLoadState.value === 'loaded';
-    const inboxBackground = inboxLoadState.value === 'loaded';
-    // Soft full refresh: when surfaces are already loaded, only refresh runs +
-    // inbox + history. Avoid stacking cold CLI/briefing probes on every mutation.
-    if (
-      briefingBackground &&
-      runtimeBackground &&
-      inboxBackground &&
-      runtimeStatusLoadState.value === 'loaded'
-    ) {
-      await Promise.all([
-        loadRuns({ sync: false }),
-        loadInbox({ background: true }),
-      ]);
-      clearStaleIdeStreamUi();
-      await loadRunHistory(
-        resolveRunHistoryRunId(workspaceRuns.value, ideAgentRunId.value),
-      );
-      await autoContinueInterruptedIdeRun();
-      await flushIdeComposerQueueIfIdle();
-      return;
-    }
-    await Promise.all([
-      loadRuns(),
-      loadRuntimeStatus(),
-      loadRuntimeSummary({ background: runtimeBackground }),
-      loadInbox({ background: inboxBackground }),
-      loadConnectors({ background: connectorsLoadState.value === 'loaded' }),
-      loadOperatorBriefing({ background: briefingBackground }),
-      loadOperatorFleetHealth({ background: operatorFleetHealthLoadState.value === 'loaded' }),
-      operatorBrainGraphLoadState.value === 'loaded'
-        ? loadOperatorBrainGraph({ background: true })
-        : Promise.resolve(),
-    ]);
-    clearStaleIdeStreamUi();
-    await loadRunHistory(
-      resolveRunHistoryRunId(workspaceRuns.value, ideAgentRunId.value),
-    );
-    await autoContinueInterruptedIdeRun();
-    await flushIdeComposerQueueIfIdle();
-  }
+  const { clearStaleIdeStreamUi, refreshRunSurfaces } = createRunSurfacesRefreshSlice({
+    runs,
+    workspaceStreamUiById,
+    chatStreamSessionsByWorkspace,
+    runsLoadState,
+    currentWorkspace,
+    ideThreadsByWorkspaceId,
+    getWorkspaceSurfaceThreadId,
+    reattachIdeChatStream,
+    disconnectChatStreamSession,
+    setWorkspaceStreamUi,
+    agentStreamActive,
+    primaryActiveRun,
+    loadRuns,
+    autoContinueInterruptedIdeRun,
+    flushIdeComposerQueueIfIdle,
+    briefingLoadState,
+    runtimeSummaryLoadState,
+    inboxLoadState,
+    runtimeStatusLoadState,
+    loadInbox,
+    loadRunHistory,
+    workspaceRuns,
+    ideAgentRunId,
+    loadRuntimeStatus,
+    loadRuntimeSummary,
+    loadConnectors,
+    connectorsLoadState,
+    loadOperatorBriefing,
+    loadOperatorFleetHealth,
+    operatorFleetHealthLoadState,
+    operatorBrainGraphLoadState,
+    loadOperatorBrainGraph,
+  });
 
   async function completeAllReviewReadyRuns(): Promise<void> {
     const workspaceId = currentWorkspace.value?.workspace_id ?? null;
@@ -3728,7 +3706,6 @@ export const useShellStore = defineStore('shell', () => {
   }
 
   return {
-    activeEditorTabId,
     activeEditorDocument,
     activeEditorDocumentId,
     editorSelection,
@@ -3772,16 +3749,22 @@ export const useShellStore = defineStore('shell', () => {
     composerRuntimeLabel,
     composerRuntimePrefs,
     commandSeamHint,
+    claudeCatalogError,
+    claudeCatalogLoadState,
+    claudeCatalogRows,
+    claudeRuntimeStatus,
     cursorCatalogError,
     cursorCatalogLoadState,
     cursorCatalogRows,
     cursorPickerVisibleModelIds,
     cursorRuntimeStatus,
-    dockContext,
+    codexCatalogError,
+    codexCatalogLoadState,
+    codexCatalogRows,
+    codexRuntimeStatus,
     dockHeroMode,
     dockSeamLayout,
     dockSeamState,
-    editorTabs,
     inboxError,
     ideAgentLinkedRun,
     ideAgentRunId,
@@ -3880,6 +3863,8 @@ export const useShellStore = defineStore('shell', () => {
     loadOperatorPresenceSettings,
     loadRuns,
     loadCursorCatalog,
+    loadClaudeCatalog,
+    loadCodexCatalog,
     loadRuntimeStatus,
     loadRuntimeSummary,
     loadWorkspaceThread,
@@ -3968,7 +3953,6 @@ export const useShellStore = defineStore('shell', () => {
     renameActiveWorkspaceFile,
     closeEditorDocument,
     revealEditorLine,
-    setActiveEditorTab,
     setActiveEditorDocument,
     setCurrentWorkspace,
     setDockHeroMode,
