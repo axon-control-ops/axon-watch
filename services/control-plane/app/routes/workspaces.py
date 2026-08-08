@@ -107,7 +107,7 @@ def workspaces_register(body: RegisterWorkspaceBindingRequest) -> dict[str, Any]
 
 
 @router.get("/api/workspaces/{workspace_id}")
-def workspaces_show(workspace_id: str) -> dict[str, str]:
+def workspaces_show(workspace_id: str) -> dict[str, Any]:
     try:
         return get_workspace_record(workspace_id)
     except WorkspaceNotFoundError as exc:
