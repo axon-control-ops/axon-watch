@@ -144,6 +144,74 @@ class LeadFanOutMaterializeTests(unittest.TestCase):
         self.assertEqual("lead_fan_out", decision.reason)
         self.assertEqual("lead_planner", decision.source)
 
+    def test_explicit_task_ids_dispatch_existing_tasks_not_generic_roster(self) -> None:
+        from app.persistence import run_store, task_store
+        from app.workspace_agents.lead_fan_out import materialize_lead_fan_out
+
+        first_ui = task_store.create_task(
+            workspace_id="workspace_dashpro",
+            goal="Add previous-day navigation controls to the Practice at Home canary screen.",
+            acceptance_criteria="Back arrow shows previous day poem content.",
+            owner_role="frontend",
+            allowed_paths=["apps", "components", "tests"],
+        )
+        backend = task_store.create_task(
+            workspace_id="workspace_dashpro",
+            goal="Add getTeacherSentAssignments(teacherId) to teacherDataService.ts.",
+            acceptance_criteria="Function returns typed homework assignment rows.",
+            owner_role="backend",
+            allowed_paths=["lib", "services", "tests"],
+        )
+        second_ui = task_store.create_task(
+            workspace_id="workspace_dashpro",
+            goal="Build a Sent Activities history view in the teacher dashboard.",
+            acceptance_criteria="Teacher can view and duplicate sent activities.",
+            owner_role="frontend",
+            dependencies=[str(backend["task_id"])],
+            allowed_paths=["apps", "components", "tests"],
+        )
+
+        result = materialize_lead_fan_out(
+            workspace_id="workspace_dashpro",
+            goal=(
+                "The three tasks from this morning are still open — "
+                f"{first_ui['task_id']}, {second_ui['task_id']}, and {backend['task_id']} — "
+                "they were never dispatched. Assign the two UI tasks to Priya "
+                "(frontend) and the teacher query task to the backend specialist now. "
+                "Use materialize_lead_fan_out with create_runs=True or directly lease "
+                "those tasks and create queued runs."
+            ),
+            mode="fan_out",
+            create_runs=True,
+        )
+
+        self.assertEqual("fan_out", result["mode"])
+        self.assertEqual(
+            {first_ui["task_id"], backend["task_id"], second_ui["task_id"]},
+            {task["task_id"] for task in result["tasks"]},
+        )
+        self.assertEqual(
+            {first_ui["task_id"], backend["task_id"]},
+            {run["task_id"] for run in result["runs"]},
+        )
+        self.assertEqual(
+            [second_ui["task_id"]],
+            [row["task_id"] for row in result["deferred"]],
+        )
+        self.assertEqual("dependencies_incomplete", result["deferred"][0]["reason"])
+        self.assertEqual(
+            {"frontend", "backend"},
+            {run["owner_role"] for run in result["runs"]},
+        )
+        self.assertNotIn("watcher", {run["owner_role"] for run in result["runs"]})
+        self.assertNotIn("integrations", {run["owner_role"] for run in result["runs"]})
+        for run in result["runs"]:
+            stored = run_store.get_run(str(run["run_id"]))
+            self.assertIsNotNone(stored)
+            assert stored is not None
+            self.assertEqual("queued", stored["phase"])
+            self.assertEqual(run["task_id"], stored["task_id"])
+
 
 if __name__ == "__main__":
     unittest.main()

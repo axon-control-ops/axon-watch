@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+import re
 from typing import Any
 from uuid import uuid4
 
@@ -12,9 +13,12 @@ from app.workspace_agents import build_company_roster
 from app.workspace_agents import lead_plan_store
 from app.workspace_agents.lead_task_persist import persist_lead_task_plan
 from app.workspace_agents.lead_task_plan import (
+    LeadTaskPlan,
+    LeadTaskPlanItem,
     LeadPlanRosterMember,
     PlanMode,
     detect_fan_out_intent,
+    topo_order,
 )
 from app.workspace_agents.lead_plan_model import resolve_lead_task_plan
 from app.workspace_agents.task_goal_overlap import (
@@ -28,10 +32,27 @@ class LeadFanOutError(ValueError):
     """Operator-facing fan-out / plan materialize failure."""
 
 
+_TASK_ID_RE = re.compile(r"\btask-[a-z0-9]{12,}\b", re.I)
+
+
+def _extract_task_ids(text: str) -> list[str]:
+    seen: set[str] = set()
+    task_ids: list[str] = []
+    for match in _TASK_ID_RE.finditer(text or ""):
+        task_id = match.group(0)
+        key = task_id.lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        task_ids.append(task_id)
+    return task_ids
+
+
 def supersede_stale_queue_for_new_lead_goal(
     *,
     workspace_id: str,
     goal: str,
+    exclude_task_ids: set[str] | None = None,
 ) -> list[dict[str, Any]]:
     """Cancel older open/leased specialist tasks that overlap this Lead ask.
 
@@ -45,6 +66,11 @@ def supersede_stale_queue_for_new_lead_goal(
     core_tokens = token_set(core)
     if len(core_tokens) < 2:
         return []
+    excluded = {
+        str(task_id).strip()
+        for task_id in (exclude_task_ids or set())
+        if str(task_id).strip()
+    }
     cancelled: list[dict[str, Any]] = []
     for record in task_store.list_tasks(workspace_id=workspace, limit=500):
         status = str(record.get("status") or "").strip().lower()
@@ -55,6 +81,8 @@ def supersede_stale_queue_for_new_lead_goal(
             continue
         task_id = str(record.get("task_id") or "").strip()
         if not task_id:
+            continue
+        if task_id in excluded:
             continue
         try:
             row = task_store.cancel_task(
@@ -195,6 +223,254 @@ def _post_assignment_to_employee_thread(
     return thread_id
 
 
+def _build_existing_task_plan(
+    *,
+    goal: str,
+    tasks: list[dict[str, Any]],
+) -> tuple[LeadTaskPlan, dict[str, str]]:
+    plan_key_to_task_id: dict[str, str] = {}
+    key_by_task_id: dict[str, str] = {}
+    items: list[LeadTaskPlanItem] = []
+    for index, task in enumerate(tasks, start=1):
+        task_id = str(task.get("task_id") or "").strip()
+        owner_role = str(task.get("owner_role") or "").strip().lower() or "watcher"
+        plan_key = f"task-{index:02d}-{owner_role}"
+        plan_key_to_task_id[plan_key] = task_id
+        key_by_task_id[task_id] = plan_key
+
+    for index, task in enumerate(tasks, start=1):
+        task_id = str(task.get("task_id") or "").strip()
+        owner_role = str(task.get("owner_role") or "").strip().lower() or "watcher"
+        plan_key = key_by_task_id[task_id]
+        dependencies = [
+            key_by_task_id[str(dep).strip()]
+            for dep in task.get("dependencies") or []
+            if str(dep).strip() in key_by_task_id
+        ]
+        items.append(
+            LeadTaskPlanItem(
+                plan_key=plan_key,
+                goal=str(task.get("goal") or goal).strip(),
+                owner_role=owner_role,
+                acceptance_criteria=str(task.get("acceptance_criteria") or "").strip(),
+                dependencies=dependencies,
+                risk=str(task.get("risk") or "normal").strip() or "normal",
+                exclusive_paths=list(task.get("exclusive_paths") or []),
+                allowed_paths=list(task.get("allowed_paths") or []),
+            )
+        )
+
+    return (
+        LeadTaskPlan(
+            goal=goal,
+            mode="fan_out",
+            items=items,
+            ordered_keys=topo_order(items),
+            ambiguous=False,
+        ),
+        plan_key_to_task_id,
+    )
+
+
+def _create_ready_run_for_task(
+    *,
+    workspace_id: str,
+    task_id: str,
+    plan_key: str,
+    owner_role: str,
+    mode: str,
+    cleaned_goal: str,
+) -> tuple[dict[str, Any] | None, dict[str, Any] | None, dict[str, Any] | None]:
+    fresh = task_store.get_task(task_id)
+    if fresh is None:
+        return None, None, {
+            "task_id": task_id,
+            "plan_key": plan_key,
+            "owner_role": owner_role,
+            "reason": "task_not_found",
+        }
+    if not _deps_completed(fresh):
+        return None, fresh, {
+            "task_id": task_id,
+            "plan_key": plan_key,
+            "owner_role": fresh.get("owner_role"),
+            "reason": "dependencies_incomplete",
+        }
+    role = str(fresh.get("owner_role") or owner_role).strip().lower()
+    holder = f"lead-fan-out-{workspace_id}-{role}"
+    try:
+        leased = task_store.lease_task(task_id, lease_holder=holder)
+    except task_store.TaskLedgerError as exc:
+        return None, fresh, {
+            "task_id": task_id,
+            "plan_key": plan_key,
+            "owner_role": role,
+            "reason": str(exc),
+        }
+    summary = f"{role}: {str(leased.get('goal') or cleaned_goal)[:120]}"
+    run = create_run(
+        workspace_id=workspace_id,
+        mode="agent",
+        summary=summary,
+        detail=f"Lead fan-out ({mode}) plan_key={plan_key} task={task_id}",
+        employee_role=role,
+        task_id=task_id,
+        require_leased_task=True,
+        enter_execution=False,
+    )
+    append_run_execution_receipt(
+        str(run["run_id"]),
+        receipt_type="lead_fan_out_assigned",
+        receipt_summary=f"Lead assigned {role} task {task_id} ({plan_key})",
+        actor="lead_planner",
+    )
+    thread_id = _post_assignment_to_employee_thread(
+        workspace_id=workspace_id,
+        owner_role=role,
+        run_id=str(run["run_id"]),
+        task_id=task_id,
+        goal=str(leased.get("goal") or cleaned_goal),
+    )
+    return (
+        {
+            "run_id": run["run_id"],
+            "task_id": task_id,
+            "plan_key": plan_key,
+            "owner_role": role,
+            "phase": run.get("phase"),
+            "thread_id": thread_id,
+        },
+        task_store.get_task(task_id) or leased,
+        None,
+    )
+
+
+def _materialize_existing_task_ids(
+    *,
+    workspace_id: str,
+    goal: str,
+    task_ids: list[str],
+    create_runs: bool,
+    supersedes_plan_id: str | None,
+) -> dict[str, Any]:
+    workspace = workspace_id.strip()
+    records: list[dict[str, Any]] = []
+    missing: list[str] = []
+    wrong_workspace: list[str] = []
+    for task_id in task_ids:
+        record = task_store.get_task(task_id)
+        if record is None:
+            missing.append(task_id)
+            continue
+        if str(record.get("workspace_id") or "").strip() != workspace:
+            wrong_workspace.append(task_id)
+            continue
+        records.append(record)
+    if missing:
+        raise LeadFanOutError(f"task not found: {', '.join(missing)}")
+    if wrong_workspace:
+        raise LeadFanOutError(
+            f"task workspace mismatch: {', '.join(wrong_workspace)}"
+        )
+    if not records:
+        raise LeadFanOutError("no matching task IDs found")
+
+    explicit_ids = {str(record["task_id"]) for record in records}
+    superseded = supersede_stale_queue_for_new_lead_goal(
+        workspace_id=workspace,
+        goal=goal,
+        exclude_task_ids=explicit_ids,
+    )
+    try:
+        from app.workspace_agents.task_duplicate_cleanup import (
+            reconcile_workspace_waiting_duplicates,
+        )
+
+        reconcile_workspace_waiting_duplicates(workspace_id=workspace)
+    except Exception:  # noqa: BLE001 — never block Lead materialize on cleanup
+        pass
+
+    plan, plan_key_to_task_id = _build_existing_task_plan(goal=goal, tasks=records)
+    stored_plan = lead_plan_store.persist_plan(
+        workspace_id=workspace,
+        plan=plan.to_dict(),
+        plan_key_to_task_id=plan_key_to_task_id,
+        supersedes_plan_id=supersedes_plan_id,
+    )
+    plan_id = str(stored_plan["plan_id"])
+    tasks_by_id = {str(record["task_id"]): record for record in records}
+    runs: list[dict[str, Any]] = []
+    deferred: list[dict[str, Any]] = []
+
+    if create_runs:
+        for plan_key in plan.ordered_keys:
+            task_id = plan_key_to_task_id[plan_key]
+            owner_role = (
+                str((tasks_by_id.get(task_id) or {}).get("owner_role") or "")
+                .strip()
+                .lower()
+            )
+            run, task, defer = _create_ready_run_for_task(
+                workspace_id=workspace,
+                task_id=task_id,
+                plan_key=plan_key,
+                owner_role=owner_role,
+                mode=plan.mode,
+                cleaned_goal=goal,
+            )
+            if task is not None:
+                tasks_by_id[task_id] = task
+            if run is not None:
+                runs.append(run)
+            if defer is not None:
+                deferred.append(defer)
+
+    receipt = lead_plan_store.append_receipt(
+        plan_id=plan_id,
+        workspace_id=workspace,
+        kind="lead_fan_out_materialized",
+        payload={
+            "mode": plan.mode,
+            "task_count": len(records),
+            "run_ids": [str(run["run_id"]) for run in runs],
+            "deferred_task_ids": [str(row["task_id"]) for row in deferred],
+            "thread_ids": [
+                str(run["thread_id"]) for run in runs if run.get("thread_id")
+            ],
+            "explicit_task_ids": list(task_ids),
+        },
+    )
+    return {
+        "plan_id": plan_id,
+        "workspace_id": workspace,
+        "goal": goal,
+        "fan_out_intent": True,
+        "mode": plan.mode,
+        "plan": plan.to_dict(),
+        "plan_key_to_task_id": plan_key_to_task_id,
+        "tasks": list(tasks_by_id.values()),
+        "runs": runs,
+        "deferred": deferred,
+        "superseded_tasks": superseded,
+        "receipt": {
+            "receipt_id": receipt["receipt_id"],
+            "type": receipt["kind"],
+            "summary": (
+                f"Lead materialized {len(records)} existing task(s); "
+                f"queued {len(runs)} ready runs; deferred {len(deferred)}"
+                + (
+                    f"; superseded {len(superseded)} stale queue task(s)"
+                    if superseded
+                    else ""
+                )
+            ),
+            "mode": plan.mode,
+            "run_count": len(runs),
+            "task_count": len(records),
+        },
+    }
+
+
 def materialize_lead_fan_out(
     *,
     workspace_id: str,
@@ -216,6 +492,16 @@ def materialize_lead_fan_out(
         raise LeadFanOutError("workspace_id is required")
     if not cleaned_goal:
         raise LeadFanOutError("goal is required")
+
+    explicit_task_ids = _extract_task_ids(cleaned_goal)
+    if explicit_task_ids:
+        return _materialize_existing_task_ids(
+            workspace_id=workspace,
+            goal=cleaned_goal,
+            task_ids=explicit_task_ids,
+            create_runs=create_runs,
+            supersedes_plan_id=supersedes_plan_id,
+        )
 
     superseded = supersede_stale_queue_for_new_lead_goal(
         workspace_id=workspace,
@@ -270,60 +556,20 @@ def materialize_lead_fan_out(
                 )
                 continue
             owner_role = str(fresh.get("owner_role") or "").strip().lower()
-            holder = f"lead-fan-out-{workspace}-{owner_role}"
-            try:
-                leased = task_store.lease_task(task_id, lease_holder=holder)
-            except task_store.TaskLedgerError as exc:
-                deferred.append(
-                    {
-                        "task_id": task_id,
-                        "plan_key": row.get("plan_key"),
-                        "owner_role": owner_role,
-                        "reason": str(exc),
-                    }
-                )
-                continue
-            summary = f"{owner_role}: {str(leased.get('goal') or cleaned_goal)[:120]}"
-            run = create_run(
+            run, task, defer = _create_ready_run_for_task(
                 workspace_id=workspace,
-                mode="agent",
-                summary=summary,
-                detail=(
-                    f"Lead fan-out ({plan.mode}) plan_key="
-                    f"{row.get('plan_key')} task={task_id}"
-                ),
-                employee_role=owner_role,
                 task_id=task_id,
-                require_leased_task=True,
-                enter_execution=False,
-            )
-            append_run_execution_receipt(
-                str(run["run_id"]),
-                receipt_type="lead_fan_out_assigned",
-                receipt_summary=(
-                    f"Lead assigned {owner_role} task {task_id} "
-                    f"({row.get('plan_key')})"
-                ),
-                actor="lead_planner",
-            )
-            thread_id = _post_assignment_to_employee_thread(
-                workspace_id=workspace,
+                plan_key=str(row.get("plan_key") or ""),
                 owner_role=owner_role,
-                run_id=str(run["run_id"]),
-                task_id=task_id,
-                goal=str(leased.get("goal") or cleaned_goal),
+                mode=plan.mode,
+                cleaned_goal=cleaned_goal,
             )
-            runs.append(
-                {
-                    "run_id": run["run_id"],
-                    "task_id": task_id,
-                    "plan_key": row.get("plan_key"),
-                    "owner_role": owner_role,
-                    "phase": run.get("phase"),
-                    "thread_id": thread_id,
-                }
-            )
-            tasks_by_id[task_id] = task_store.get_task(task_id) or leased
+            if task is not None:
+                tasks_by_id[task_id] = task
+            if run is not None:
+                runs.append(run)
+            if defer is not None:
+                deferred.append(defer)
 
     receipt = lead_plan_store.append_receipt(
         plan_id=plan_id,
