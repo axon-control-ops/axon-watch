@@ -7,6 +7,8 @@ import {
   shortenRunId,
   shouldCollapseSystemMessage,
   summarizeAgentErrorContent,
+  threadMessageSpeakerLabel,
+  threadMessageSpeakerStyle,
 } from './thread-message-view';
 
 describe('thread-message-view', () => {
@@ -14,6 +16,18 @@ describe('thread-message-view', () => {
     expect(formatThreadRole('operator')).toBe('OP');
     expect(formatThreadRole('agent')).toBe('AGENT');
     expect(formatThreadRole('system')).toBe('SYSTEM');
+  });
+
+  it('labels agent messages with speaker names and role colors', () => {
+    const message = {
+      role: 'agent' as const,
+      speaker_name: 'Priya',
+      speaker_role: 'frontend',
+      speaker_employee_id: 'employee-priya',
+    };
+
+    expect(threadMessageSpeakerLabel(message)).toBe('Priya · Frontend');
+    expect(threadMessageSpeakerStyle(message)['--thread-speaker-bg']).toBe('#1f4f6e');
   });
 
   it('formats timestamps for display', () => {

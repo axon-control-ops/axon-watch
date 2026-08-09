@@ -115,6 +115,9 @@ def ensure_schema(connection: sqlite3.Connection) -> None:
             run_id TEXT,
             role TEXT NOT NULL,
             content TEXT NOT NULL,
+            speaker_name TEXT,
+            speaker_role TEXT,
+            speaker_employee_id TEXT,
             created_at TEXT NOT NULL,
             FOREIGN KEY(thread_id) REFERENCES chat_threads(thread_id)
         );
@@ -209,6 +212,7 @@ def ensure_schema(connection: sqlite3.Connection) -> None:
     )
     _ensure_chat_thread_kind_column(connection)
     _ensure_chat_thread_persona_columns(connection)
+    _ensure_chat_message_speaker_columns(connection)
     _ensure_workspace_composer_prefs_runtime_target_column(connection)
     _ensure_workspace_composer_prefs_runtime_policy_columns(connection)
     _ensure_runs_employee_role_column(connection)
@@ -504,5 +508,19 @@ def _ensure_chat_thread_persona_columns(connection: sqlite3.Connection) -> None:
                 ON chat_threads(workspace_id, thread_kind, employee_id)
             """
         )
+    if changed:
+        connection.commit()
+
+
+def _ensure_chat_message_speaker_columns(connection: sqlite3.Connection) -> None:
+    columns = {
+        str(row[1])
+        for row in connection.execute("PRAGMA table_info(chat_messages)").fetchall()
+    }
+    changed = False
+    for column in ("speaker_name", "speaker_role", "speaker_employee_id"):
+        if column not in columns:
+            connection.execute(f"ALTER TABLE chat_messages ADD COLUMN {column} TEXT")
+            changed = True
     if changed:
         connection.commit()

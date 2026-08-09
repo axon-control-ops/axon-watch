@@ -24,6 +24,7 @@ from app.terminal.active_chat_stream import (
 )
 from app.terminal.agent_job_chat import merge_active_agent_job_terminals
 from app.workspace_agents import build_company_roster
+from app.workspace_agents.assignment_messages import assignment_card, employee_display_name, readable_goal
 from app.workspace_agents.config_loader import EmployeeConfig
 
 logger = logging.getLogger(__name__)
@@ -67,12 +68,7 @@ def resolve_worker_employee_id(workspace_id: str, employee: EmployeeConfig) -> s
 def _task_goal_preview(task: dict[str, Any] | None) -> str:
     if not isinstance(task, dict):
         return "(no task goal)"
-    goal = " ".join(str(task.get("goal") or "").split())
-    if not goal:
-        return "(no task goal)"
-    if len(goal) > 400:
-        return f"{goal[:399].rstrip()}…"
-    return goal
+    return readable_goal(str(task.get("goal") or ""), max_chars=400)
 
 
 def prepare_worker_ide_stream(
@@ -101,7 +97,12 @@ def prepare_worker_ide_stream(
         employee_id=employee_id,
         thread_kind="ide",
     )
-    display_name = str(employee.name or "").strip() or employee.role.replace("_", " ").title()
+    display_name = employee_display_name(
+        {
+            "name": employee.name,
+        },
+        employee.role,
+    )
     if thread is None:
         thread = chat_store.create_thread(
             workspace_id=workspace_id,
@@ -117,18 +118,22 @@ def prepare_worker_ide_stream(
 
     chat_store.save_message(
         {
-            "message_id": _new_message_id("message_operator"),
+            "message_id": _new_message_id("message_agent"),
             "thread_id": thread_id,
             "workspace_id": workspace_id,
             "run_id": run_id,
-            "role": "operator",
-            "content": (
-                f"Continuous worker dispatch started.\n"
-                f"Role: {employee.role}\n"
-                f"Task: {task_id}\n"
-                f"Run: {run_id}\n"
-                f"Goal: {_task_goal_preview(task)}"
+            "role": "agent",
+            "content": assignment_card(
+                assignee_name=display_name,
+                assignee_role=employee.role,
+                goal=_task_goal_preview(task),
+                task_id=task_id,
+                run_id=run_id,
+                state="started",
             ),
+            "speaker_name": display_name,
+            "speaker_role": employee.role,
+            "speaker_employee_id": employee_id,
             "created_at": created_at,
         }
     )
@@ -158,6 +163,9 @@ def prepare_worker_ide_stream(
             "run_id": run_id,
             "role": "agent",
             "content": "",
+            "speaker_name": display_name,
+            "speaker_role": employee.role,
+            "speaker_employee_id": employee_id,
             "created_at": created_at,
         }
     )

@@ -17,9 +17,13 @@ class LeadFanOutMaterializeTests(unittest.TestCase):
     def setUp(self) -> None:
         self._saved = prepare_control_plane_imports()
         self.addCleanup(self._restore)
-        from app.persistence import run_store
+        from app.persistence import chat_store, run_store, task_store
 
         isolate_control_plane_db(self, run_store)
+        chat_store.reset_store()
+        task_store.reset_store()
+        self.addCleanup(chat_store.reset_store)
+        self.addCleanup(task_store.reset_store)
 
     def _restore(self) -> None:
         for name in list(sys.modules):
@@ -211,6 +215,28 @@ class LeadFanOutMaterializeTests(unittest.TestCase):
             assert stored is not None
             self.assertEqual("queued", stored["phase"])
             self.assertEqual(run["task_id"], stored["task_id"])
+
+        from app.persistence import chat_store
+
+        priya_thread = chat_store.find_thread_for_employee(
+            "workspace_dashpro",
+            employee_id="employee-workspace_dashpro-frontend-2",
+            thread_kind="ide",
+        )
+        self.assertIsNotNone(priya_thread)
+        assert priya_thread is not None
+        priya_messages = chat_store.list_thread_messages(str(priya_thread["thread_id"]))
+        queued = [message for message in priya_messages if message.get("run_id")]
+        self.assertTrue(queued)
+        first_card = queued[0]
+        self.assertEqual("agent", first_card.get("role"))
+        self.assertEqual("Dana", first_card.get("speaker_name"))
+        self.assertEqual("lead", first_card.get("speaker_role"))
+        content = str(first_card.get("content") or "")
+        self.assertIn("Dana queued a Frontend assignment for Priya.", content)
+        self.assertIn("Assignment: Add previous-day navigation controls", content)
+        self.assertIn("Receipt: task-", content)
+        self.assertNotIn("Queued for dispatch ·", content)
 
 
 if __name__ == "__main__":

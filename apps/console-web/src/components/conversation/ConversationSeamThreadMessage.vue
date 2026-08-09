@@ -10,6 +10,8 @@ import {
   systemMessagePreview,
   agentContentLooksLikeErrorDump,
   agentContentLooksLikeRuntimeFallback,
+  threadMessageSpeakerLabel,
+  threadMessageSpeakerStyle,
 } from '../../lib/thread-message-view';
 import { thinkingPreview, agentContentHasTranscriptBlocks } from '../../lib/agent-transcript-blocks';
 import {
@@ -236,11 +238,13 @@ async function copyTerminalOutput(output: string): Promise<void> {
     <div class="conversation-seam__meta-leading">
       <span
         v-if="message.role === 'agent'"
-        class="conversation-seam__role-icon"
-        aria-label="Agent"
-        title="Agent"
+        class="conversation-seam__speaker-chip"
+        :style="threadMessageSpeakerStyle(message)"
+        :aria-label="threadMessageSpeakerLabel(message)"
+        :title="threadMessageSpeakerLabel(message)"
       >
-        <IdeActivityIcon name="agent" :size="14" />
+        <IdeActivityIcon name="agent" :size="12" />
+        <span>{{ threadMessageSpeakerLabel(message) }}</span>
       </span>
       <span v-else class="conversation-seam__role">{{ formatThreadRole(message.role) }}</span>
     </div>

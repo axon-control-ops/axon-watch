@@ -134,6 +134,29 @@
   color: rgba(0, 210, 255, 0.92);
 }
 
+.conversation-seam__speaker-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.28rem;
+  max-width: 14rem;
+  padding: 0.12rem 0.38rem;
+  border: 1px solid var(--thread-speaker-border, rgba(0, 210, 255, 0.28));
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--thread-speaker-bg, #1f4f6e) 34%, transparent);
+  color: var(--thread-speaker-fg, rgba(0, 210, 255, 0.92));
+  font-size: 0.58rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.conversation-seam__speaker-chip > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .conversation-seam__resend-button,
 .conversation-seam__edit-button {
   flex-shrink: 0;
@@ -338,4 +361,3 @@
   max-width: 100%;
   min-width: 0;
 }
-

@@ -21,9 +21,28 @@ def _normalize_thread_kind(thread_kind: str | None) -> str:
     return kind if kind in {"operator", "ide"} else "operator"
 
 
-def _enrich_message_records(records: list[dict[str, object]]) -> list[dict[str, object]]:
+def _thread_employee_speaker(thread: dict[str, object]) -> dict[str, str | None]:
+    employee_id = str(thread.get("employee_id") or "").strip()
+    employee_role = str(thread.get("employee_role") or "").strip().lower()
+    if not employee_id and not employee_role:
+        return {"speaker_name": None, "speaker_role": None, "speaker_employee_id": None}
+    title = str(thread.get("title") or "").strip()
+    speaker_name = title.split("·", 1)[0].strip() if title else ""
+    return {
+        "speaker_name": speaker_name or None,
+        "speaker_role": employee_role or None,
+        "speaker_employee_id": employee_id or None,
+    }
+
+
+def _enrich_message_records(
+    records: list[dict[str, object]],
+    *,
+    thread: dict[str, object] | None = None,
+) -> list[dict[str, object]]:
     message_ids = [str(item.get("message_id") or "") for item in records]
     grouped = attachment_store.list_attachments_for_messages(message_ids)
+    fallback_speaker = _thread_employee_speaker(thread or {})
     enriched: list[dict[str, object]] = []
     for record in records:
         next_record = dict(record)
@@ -33,6 +52,10 @@ def _enrich_message_records(records: list[dict[str, object]]) -> list[dict[str, 
             next_record["attachments"] = [
                 attachment_store.serialize_attachment(item) for item in attachments
             ]
+        if next_record.get("role") == "agent":
+            for key, value in fallback_speaker.items():
+                if not str(next_record.get(key) or "").strip() and value:
+                    next_record[key] = value
         enriched.append(next_record)
     return enriched
 
@@ -93,7 +116,7 @@ def get_chat_thread_history(
         if content:
             record["content"] = _cap_history_message_content(content)
         normalized_items.append(record)
-    enriched_items = _enrich_message_records(normalized_items)
+    enriched_items = _enrich_message_records(normalized_items, thread=thread)
     return {
         "thread_id": thread["thread_id"],
         "workspace_id": thread["workspace_id"],

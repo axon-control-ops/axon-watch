@@ -112,10 +112,18 @@ class WorkerIdeStreamTests(unittest.TestCase):
         self.assertEqual(run_id, thread.get("run_id"))
         messages = chat_store.list_thread_messages(str(thread["thread_id"]))
         roles = [str(item.get("role") or "") for item in messages]
-        self.assertIn("operator", roles)
+        self.assertNotIn("operator", roles)
         self.assertIn("system", roles)
         self.assertIn("agent", roles)
-        agent = next(item for item in messages if item.get("role") == "agent")
+        start_card = messages[0]
+        self.assertEqual("agent", start_card.get("role"))
+        self.assertEqual("API Craft", start_card.get("speaker_name"))
+        self.assertEqual("backend", start_card.get("speaker_role"))
+        self.assertEqual(employee_id, start_card.get("speaker_employee_id"))
+        self.assertIn("API Craft started this Backend assignment.", str(start_card.get("content") or ""))
+        self.assertIn("Assignment: Ship IDE mirror for continuous workers", str(start_card.get("content") or ""))
+        self.assertNotIn("Role:", str(start_card.get("content") or ""))
+        agent = [item for item in messages if item.get("role") == "agent"][-1]
         self.assertIn("Critical Review Confidence: 9/10", str(agent.get("content") or ""))
         self.assertIn(run_id, str(agent.get("run_id") or ""))
 
@@ -165,7 +173,7 @@ class WorkerIdeStreamTests(unittest.TestCase):
         )
         assert thread is not None
         messages = chat_store.list_thread_messages(str(thread["thread_id"]))
-        agent = next(item for item in messages if item.get("role") == "agent")
+        agent = [item for item in messages if item.get("role") == "agent"][-1]
         self.assertIn("boom", str(agent.get("content") or ""))
 
 

@@ -10,6 +10,7 @@ from uuid import uuid4
 from app.persistence import chat_store, task_store
 from app.runs.service import append_run_execution_receipt, create_run
 from app.workspace_agents import build_company_roster
+from app.workspace_agents.assignment_messages import assignment_card, employee_display_name
 from app.workspace_agents import lead_plan_store
 from app.workspace_agents.lead_task_persist import persist_lead_task_plan
 from app.workspace_agents.lead_task_plan import (
@@ -186,6 +187,11 @@ def _post_assignment_to_employee_thread(
     employee_id = _employee_id_for_role(workspace_id, owner_role)
     if not employee_id:
         return None
+    assignee = employee_for_role(workspace_id, owner_role)
+    lead = employee_for_role(workspace_id, "lead")
+    assignee_name = employee_display_name(assignee, owner_role)
+    lead_name = employee_display_name(lead, "lead")
+    lead_employee_id = str((lead or {}).get("employee_id") or "").strip() or None
     created_at = _utc_now_iso()
     thread = chat_store.find_thread_for_employee(
         workspace_id,
@@ -207,7 +213,7 @@ def _post_assignment_to_employee_thread(
     goal_line = " ".join(str(goal or "").strip().split())
     if len(goal_line) > 160:
         goal_line = f"{goal_line[:159].rstrip()}…"
-    # Compact chip only — SYSTEM queue essays clutter the specialist dock.
+    # Compact human assignment card only — raw task/run ids stay in the receipt line.
     # Lead keeps a full summary on their own thread; run receipts stay on the ledger.
     chat_store.save_message(
         {
@@ -216,7 +222,18 @@ def _post_assignment_to_employee_thread(
             "workspace_id": workspace_id,
             "run_id": run_id,
             "role": "agent",
-            "content": f"Queued for dispatch · {goal_line or f'task `{task_id}`'}",
+            "content": assignment_card(
+                assignee_name=assignee_name,
+                assignee_role=owner_role,
+                goal=goal_line or str(task_id),
+                task_id=task_id,
+                run_id=run_id,
+                state="queued",
+                lead_name=lead_name,
+            ),
+            "speaker_name": lead_name,
+            "speaker_role": "lead",
+            "speaker_employee_id": lead_employee_id,
             "created_at": created_at,
         }
     )
