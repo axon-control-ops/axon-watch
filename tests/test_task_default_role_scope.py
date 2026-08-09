@@ -91,7 +91,19 @@ class EffectivePolicyEndToEndTests(unittest.TestCase):
     # instead would wipe write_paths on its own — resolve_effective_policy
     # intersects with the workspace scope too — and would test nothing.
     WORKSPACE_SCOPE = (
-        "apps/", "services/", "packages/", "scripts/", "tests/", "config/", "docs/", ".github/",
+        "app/",
+        "apps/",
+        "components/",
+        "features/",
+        "hooks/",
+        "locales/",
+        "services/",
+        "packages/",
+        "scripts/",
+        "tests/",
+        "config/",
+        "docs/",
+        ".github/",
     )
 
     def setUp(self) -> None:
@@ -121,6 +133,18 @@ class EffectivePolicyEndToEndTests(unittest.TestCase):
         _task, policy = self._policy_for("backend")
         self.assertTrue(policy.write_paths, "backend fix task must be able to write")
         self.assertNotEqual("consultative", policy.execution_access)
+
+    def test_frontend_fix_task_can_edit_hooks(self) -> None:
+        _task, policy = self._policy_for("frontend")
+        self.assertIn("hooks", policy.write_paths)
+        self.assertNotEqual("consultative", policy.execution_access)
+
+    def test_legacy_frontend_ui_scope_self_heals_hooks(self) -> None:
+        _task, policy = self._policy_for(
+            "frontend",
+            allowed_paths=["app", "components", "tests", "locales"],
+        )
+        self.assertIn("hooks", policy.write_paths)
 
     def test_watcher_task_remains_consultative(self) -> None:
         _task, policy = self._policy_for("watcher")

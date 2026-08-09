@@ -306,7 +306,21 @@ def dispatch_continuous_worker_run(
                         turn_subject=str(task.get("goal") or "") if isinstance(task, dict) else None,
                     )
                     preserve_isolation = not publish.cleanup_isolation
-                    if publish.ok:
+                    if (
+                        publish.ok
+                        and publish.stage == "no_change"
+                        and publish.delivery is not None
+                        and execution_policy.execution_access == "full"
+                    ):
+                        finalized = _fail_worker_run(
+                            run_id,
+                            receipt_summary=(
+                                "Workspace delivery blocked: full-access worker produced "
+                                f"no publishable changes ({publish.detail})"
+                            ),
+                        )
+                        dispatched = False
+                    elif publish.ok:
                         try:
                             finalized = complete_run(run_id)
                         except RunLifecycleError as exc:

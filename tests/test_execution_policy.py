@@ -39,6 +39,7 @@ class RoleExecutionPolicyTests(unittest.TestCase):
         self.assertEqual((), watcher.write_paths)
         self.assertEqual("consultative", watcher.execution_access)
         self.assertIn("components", frontend.write_paths)
+        self.assertIn("hooks", frontend.write_paths)
         self.assertIn("services", backend.write_paths)
         self.assertNotIn("apps", integrations.write_paths)
         self.assertTrue(
@@ -101,6 +102,31 @@ class EffectiveExecutionPolicyTests(unittest.TestCase):
 
         self.assertEqual(("services", "tests"), policy.write_paths)
         self.assertEqual("full", policy.execution_access)
+
+    def test_frontend_ui_task_scope_restores_safe_hooks_root(self) -> None:
+        policy = resolve_effective_policy(
+            role="frontend",
+            workspace_allowed_paths=("app", "components", "hooks", "tests"),
+            task_allowed_paths=("app", "components", "tests"),
+        )
+
+        self.assertIn("hooks", policy.write_paths)
+        self.assertEqual("full", policy.execution_access)
+
+    def test_safe_scope_expansion_stays_role_and_contract_bounded(self) -> None:
+        backend = resolve_effective_policy(
+            role="backend",
+            workspace_allowed_paths=("services", "hooks", "tests"),
+            task_allowed_paths=("services",),
+        )
+        missing_contract = resolve_effective_policy(
+            role="frontend",
+            workspace_allowed_paths=("app", "components", "tests"),
+            task_allowed_paths=("app", "components", "tests"),
+        )
+
+        self.assertNotIn("hooks", backend.write_paths)
+        self.assertNotIn("hooks", missing_contract.write_paths)
 
     def test_missing_or_disjoint_scope_fails_closed(self) -> None:
         missing_contract = resolve_effective_policy(

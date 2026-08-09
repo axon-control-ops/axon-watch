@@ -106,7 +106,19 @@ _ROLE_DEFAULTS: dict[str, AgentExecutionPolicy] = {
     ),
     "frontend": AgentExecutionPolicy(
         read_paths=(".",),
-        write_paths=("apps", "app", "src", "components", "packages", "tests", "__tests__", "locales"),
+        write_paths=(
+            "apps",
+            "app",
+            "src",
+            "components",
+            "features",
+            "screens",
+            "hooks",
+            "packages",
+            "tests",
+            "__tests__",
+            "locales",
+        ),
         forbidden_path_globs=(),
         approved_wrapper_names=(*_COMMON_AUDITED_WRAPPERS, "console-web.sh"),
         approved_command_prefixes=_COMMON_READ_PREFIXES,
@@ -158,6 +170,16 @@ _FALLBACK_POLICY = AgentExecutionPolicy(
 _NETWORK_RANK = {"none": 0, "audited": 1, "unrestricted": 2}
 _TRUST_RANK = {"worker": 0, "operator": 1}
 _ACCESS_RANK = {"consultative": 0, "full": 1}
+_FRONTEND_UI_SCOPE_MARKERS = frozenset(
+    {"apps", "app", "src", "components", "features", "screens", "locales"}
+)
+_ROLE_SAFE_TASK_SCOPE_EXPANSIONS: dict[str, tuple[tuple[str, frozenset[str]], ...]] = {
+    # Frontend hooks are part of the UI implementation surface in React/Expo
+    # apps.  Older task rows often leased app/components but omitted hooks,
+    # which made normal hook edits look like a read-only checkout failure.  The
+    # expansion stays bounded by the role baseline and workspace contract below.
+    "frontend": (("hooks", _FRONTEND_UI_SCOPE_MARKERS),),
+}
 
 
 def role_execution_policy(role: str) -> AgentExecutionPolicy:
@@ -177,6 +199,42 @@ def default_write_scope_for_role(role: str) -> list[str]:
     """
 
     return [str(path).strip() for path in role_execution_policy(role).write_paths if str(path).strip()]
+
+
+def safe_task_write_scope_for_role(
+    role: str,
+    task_allowed_paths: Iterable[str],
+) -> tuple[str, ...]:
+    """Return a role-bounded task scope with safe conventional siblings restored.
+
+    A task scope is still an authority boundary; this helper does not widen a
+    run beyond the role baseline or workspace contract.  It only prevents stale
+    leased scopes from excluding standard role-owned roots that are commonly
+    required by the same implementation slice (for example React UI hooks).
+    """
+
+    normalized = _normalize_paths(task_allowed_paths)
+    if not normalized:
+        return normalized
+
+    role_name = _normalize_name(role)
+    additions = _ROLE_SAFE_TASK_SCOPE_EXPANSIONS.get(role_name, ())
+    if not additions:
+        return normalized
+
+    role_roots = set(role_execution_policy(role_name).write_paths)
+    present_roots = {
+        path if path == "." else path.split("/", 1)[0]
+        for path in normalized
+    }
+    expanded = list(normalized)
+    for candidate, markers in additions:
+        if candidate not in role_roots or candidate in present_roots:
+            continue
+        if present_roots & markers:
+            expanded.append(candidate)
+            present_roots.add(candidate)
+    return _normalize_paths(expanded)
 
 
 def parse_execution_policy_override(raw: Any) -> AgentExecutionPolicyOverride | None:
@@ -286,7 +344,7 @@ def resolve_effective_policy(
     read_paths = _intersect_path_scopes(read_paths, workspace_scope)
     write_paths = _intersect_path_scopes(write_paths, workspace_scope)
     if task_allowed_paths is not None:
-        task_scope = _normalize_paths(task_allowed_paths)
+        task_scope = safe_task_write_scope_for_role(role, task_allowed_paths)
         write_paths = _intersect_path_scopes(write_paths, task_scope)
     forbidden = _ordered_union(
         forbidden, _normalize_strings(workspace_forbidden_path_globs or ())
@@ -501,4 +559,5 @@ __all__ = [
     "parse_execution_policy_override",
     "resolve_effective_policy",
     "role_execution_policy",
+    "safe_task_write_scope_for_role",
 ]

@@ -321,6 +321,86 @@ class WorkspaceAgentSchedulerTests(unittest.TestCase):
         receipt_types = [str(item.get("receipt", {}).get("type") or "") for item in history]
         self.assertIn("worker_dispatch_started", receipt_types)
 
+    def test_full_access_no_change_delivery_reopens_task(self) -> None:
+        from app.workspace_agents.config_loader import EmployeeConfig
+        from app.workspace_agents.execution_policy import role_execution_policy
+        from app.workspace_agents.worker_dispatch import dispatch_continuous_worker_run
+        from app.workspace_delivery.publish import PublishResult
+
+        opened = _seed_open_task(
+            workspace_id="workspace_worker_noop",
+            owner_role="backend",
+            goal="Implement the backend fix",
+        )
+        leased = task_store.lease_task(
+            opened["task_id"],
+            lease_holder="employee-workspace_worker_noop-backend",
+        )
+        created = create_run(
+            workspace_id="workspace_worker_noop",
+            mode="agent",
+            summary="Backend continuous shift",
+            employee_role="backend",
+            task_id=leased["task_id"],
+            require_leased_task=True,
+        )
+        run_id = str(created["run_id"])
+        with patch(
+            "app.workspace_agents.worker_dispatch.generate_lane_b_result",
+            return_value={
+                "dispatched": True,
+                "runtime_label": "test",
+                "content": "No files changed.\n\nConfidence: 10/10",
+            },
+        ), patch(
+            "app.workspace_agents.worker_dispatch.resolve_worker_execution_policy",
+            return_value=role_execution_policy("backend"),
+        ), patch(
+            "app.workspace_agents.worker_dispatch.finalize_lane_b_agent_run",
+            return_value=(True, {"phase": "executing"}),
+        ), patch(
+            "app.workspace_agents.verifier_contract.run_requires_acceptance_evidence",
+            return_value=True,
+        ), patch(
+            "app.workspace_agents.verifier_contract.has_passing_acceptance_evidence",
+            return_value=True,
+        ), patch(
+            "app.workspace_delivery.publish_worker_isolation",
+            return_value=PublishResult(
+                ok=True,
+                stage="no_change",
+                delivery={"delivery_id": "delivery-noop"},
+                detail="no changes",
+                cleanup_isolation=True,
+            ),
+        ):
+            dispatched, finalized = dispatch_continuous_worker_run(
+                workspace_id="workspace_worker_noop",
+                employee=EmployeeConfig(
+                    name="API Craft",
+                    role="backend",
+                    owns="APIs and persistence",
+                    schedule="continuous",
+                ),
+                run_record=created,
+            )
+
+        self.assertFalse(dispatched)
+        assert finalized is not None
+        self.assertEqual("failed", finalized["phase"])
+        task = task_store.get_task(leased["task_id"])
+        assert task is not None
+        self.assertEqual("open", task["status"])
+        history = run_store.list_history(get_run(run_id)["history_ref"])
+        summaries = [
+            str(item.get("receipt", {}).get("summary") or "").lower()
+            for item in history
+        ]
+        self.assertTrue(
+            any("no publishable changes" in summary for summary in summaries),
+            summaries,
+        )
+
     def test_continuous_worker_tick_skips_role_after_usage_limit_failure(self) -> None:
         with tempfile.TemporaryDirectory() as tempdir:
             agents_file = Path(tempdir) / "agents.json"

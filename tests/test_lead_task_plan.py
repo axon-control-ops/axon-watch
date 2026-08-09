@@ -111,6 +111,14 @@ class LeadTaskPlanTests(unittest.TestCase):
             if item.exclusive_paths:
                 self.assertEqual(item.exclusive_paths, item.allowed_paths)
 
+    def test_extract_exclusive_paths_includes_frontend_hooks(self) -> None:
+        paths = extract_exclusive_paths(
+            "Fix hooks/homework/usePracticeAtHome.ts and components/HomeworkCard.tsx"
+        )
+
+        self.assertIn("hooks/homework/usePracticeAtHome.ts", paths)
+        self.assertIn("components/HomeworkCard.tsx", paths)
+
     def test_should_lead_decompose_dispatch(self) -> None:
         multi = build_lead_task_plan(
             goal="Fix the quality-gate API failure and the enrollment confirmation popup",

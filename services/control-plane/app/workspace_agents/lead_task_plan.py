@@ -49,7 +49,7 @@ _ALSO_SPLIT_RE = re.compile(
     re.I,
 )
 _PATH_RE = re.compile(
-    r"(?:^|[\s`\"'(])((?:apps|services|packages|docs|tests|src)/[\w./\-]+)",
+    r"(?:^|[\s`\"'(])((?:app|apps|components|features|hooks|lib|locales|screens|services|packages|docs|tests|src)/[\w./\-]+)",
     re.I,
 )
 
