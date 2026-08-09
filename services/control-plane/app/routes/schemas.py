@@ -174,6 +174,8 @@ class OperatorPresenceSettingsRequest(BaseModel):
     stt_mode: str | None = None
     voice_routing_mode: str | None = None
     vaxon_model_id: str | None = None
+    auto_composer_runtime_override_enabled: bool | None = None
+    auto_composer_runtime_target: str | None = None
     narrate_tool_progress: bool | None = None
 
 

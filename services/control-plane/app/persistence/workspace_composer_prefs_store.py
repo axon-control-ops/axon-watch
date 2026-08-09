@@ -166,6 +166,20 @@ def resolve_worker_runtime_target(workspace_id: str) -> str | None:
     Mirrors the operator's Agent Dock runtime-target pick so continuous/fleet
     workers don't silently fall back to the server's default runtime.
     """
+    try:
+        from app.persistence import operator_presence_settings_store
+
+        settings = operator_presence_settings_store.load_settings()
+        if (
+            bool(settings.get("auto_composer_runtime_override_enabled"))
+            and str(settings.get("autonomy_mode") or "").strip().lower() == "full"
+        ):
+            override = str(settings.get("auto_composer_runtime_target") or "").strip()
+            if override:
+                return override
+    except Exception:
+        pass
+
     prefs = get_workspace_composer_prefs(workspace_id)
     target = str(prefs.get("runtime_target") or "").strip()
     return target or None

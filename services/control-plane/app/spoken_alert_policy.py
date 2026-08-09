@@ -32,6 +32,9 @@ def default_operator_presence_settings() -> dict[str, bool | str | float]:
         "voice_routing_mode": "runtime_on_deep",
         # Operator-global VAXON model — independent from workspace Composer prefs.
         "vaxon_model_id": "cursor-grok-4.5-high-fast",
+        # Full Auto composer override — applies only while autonomy_mode=full.
+        "auto_composer_runtime_override_enabled": False,
+        "auto_composer_runtime_target": "",
         "narrate_tool_progress": False,
     }
 

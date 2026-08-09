@@ -44,6 +44,8 @@ describe('operator presence helpers', () => {
           proactive_duplex_enabled: false,
           autonomy_mode: 'manual',
           vaxon_model_id: 'gpt-5.4-high',
+          auto_composer_runtime_override_enabled: false,
+          auto_composer_runtime_target: '',
         },
         spoken_alert: {
           eligible: false,

@@ -6,6 +6,7 @@ import type {
   CursorRuntimeStatusSnapshot,
   RuntimeStatusSnapshot,
 } from '../../../api/control-plane';
+import type { OperatorPresenceSettings } from '../../../contracts/canonical';
 import {
   buildClaudeCatalogRows,
   claudeRuntimeLabel,
@@ -23,6 +24,7 @@ import {
   readComposerRuntimePrefs,
   writeComposerRuntimePrefs,
 } from '../../../lib/composer-runtime-prefs';
+import { resolveAutoComposerRuntimeOverride } from '../../../lib/operator-presence-settings';
 import {
   readCursorPickerVisibleModelIds,
   toggleCursorPickerVisibleModel as toggleCursorPickerVisibleModelPref,
@@ -38,6 +40,7 @@ interface CreateComposerRuntimePrefsSliceInput {
   cursorRuntimeStatus: Ref<CursorRuntimeStatusSnapshot | null>;
   claudeRuntimeStatus: Ref<ClaudeRuntimeStatusSnapshot | null>;
   codexRuntimeStatus: Ref<CodexRuntimeStatusSnapshot | null>;
+  operatorPresenceSettings: Ref<OperatorPresenceSettings>;
   composerRuntimePrefsRevision: Ref<number>;
   cursorPickerVisibleRevision: Ref<number>;
 }
@@ -51,7 +54,15 @@ export function createComposerRuntimePrefsSlice(input: CreateComposerRuntimePref
     );
   });
 
+  const autoOverrideRuntimeTargetId = computed(() => {
+    return resolveAutoComposerRuntimeOverride(input.operatorPresenceSettings.value);
+  });
+
   const selectedRuntimeTargetId = computed(() => {
+    const override = autoOverrideRuntimeTargetId.value;
+    if (override) {
+      return override;
+    }
     const preferred = composerRuntimePrefs.value.runtime_target?.trim();
     if (preferred) {
       return preferred;

@@ -49,7 +49,41 @@ const actionTone = ref<'idle' | 'ok' | 'error' | 'pending'>('idle');
 const copiedCommand = ref<string | null>(null);
 
 const isLoading = computed(() => shell.runtimeStatusLoadState === 'loading' && !shell.runtimeStatus);
+const runtimeTargets = computed(() => [
+  ...(shell.runtimeStatus?.local ?? []),
+  ...(shell.runtimeStatus?.cloud ?? []),
+]);
 const runtimeCards = computed(() => buildCards());
+const autoOverrideEnabled = computed(
+  () => shell.operatorPresenceSettings.auto_composer_runtime_override_enabled,
+);
+const autoOverrideTarget = computed(
+  () => shell.operatorPresenceSettings.auto_composer_runtime_target,
+);
+const autoOverrideEffective = computed(
+  () =>
+    shell.operatorPresenceSettings.autonomy_mode === 'full' &&
+    autoOverrideEnabled.value &&
+    Boolean(autoOverrideTarget.value.trim()),
+);
+const selectedAutoOverrideTarget = computed(() => {
+  const targetId = autoOverrideTarget.value.trim();
+  return runtimeTargets.value.find((record) => record.id === targetId) ?? null;
+});
+const autoOverrideSummary = computed(() => {
+  if (!autoOverrideEnabled.value) {
+    return 'Off — composers keep their manual per-thread runtime selections.';
+  }
+  if (!autoOverrideTarget.value.trim()) {
+    return 'Choose a runtime target before Full Auto can override composers.';
+  }
+  const target = selectedAutoOverrideTarget.value;
+  const label = target ? `${target.label} (${runtimeStatusLine(target)})` : autoOverrideTarget.value;
+  if (shell.operatorPresenceSettings.autonomy_mode !== 'full') {
+    return `${label} is armed, but it only applies when VAXON is on Full Auto.`;
+  }
+  return `${label} is controlling all composers while VAXON is on Full Auto.`;
+});
 
 function shortenBinaryPath(path: string): string {
   const trimmed = path.trim();
@@ -64,11 +98,12 @@ function shortenBinaryPath(path: string): string {
 }
 
 function buildCards(): RuntimeCard[] {
-  const targets = [...(shell.runtimeStatus?.local ?? []), ...(shell.runtimeStatus?.cloud ?? [])];
   return (['cursor', 'claude', 'codex'] as RuntimeFamily[]).map((family) => {
     const target =
-      targets.find((record) => record.family === family && record.target_type === 'local') ??
-      targets.find((record) => record.family === family) ??
+      runtimeTargets.value.find(
+        (record) => record.family === family && record.target_type === 'local',
+      ) ??
+      runtimeTargets.value.find((record) => record.family === family) ??
       null;
     return buildCard(family, target);
   });
@@ -207,6 +242,45 @@ async function copyCommand(command: string): Promise<void> {
   }
 }
 
+function runtimeStatusLine(record: RuntimeTargetRecord): string {
+  if (record.ready) return 'Ready';
+  if (!record.available) return 'Not installed';
+  return record.auth.message || 'Installed but not ready';
+}
+
+async function setAutoOverrideEnabled(enabled: boolean): Promise<void> {
+  const fallbackTarget =
+    autoOverrideTarget.value.trim() ||
+    shell.selectedRuntimeTargetId ||
+    shell.runtimeStatus?.default_runtime ||
+    runtimeTargets.value[0]?.id ||
+    '';
+  await shell.saveOperatorPresenceSettingsPatch({
+    auto_composer_runtime_override_enabled: enabled,
+    auto_composer_runtime_target: enabled ? fallbackTarget : autoOverrideTarget.value,
+  });
+}
+
+async function onAutoOverrideToggle(event: Event): Promise<void> {
+  const checked = (event.target as HTMLInputElement).checked;
+  try {
+    await setAutoOverrideEnabled(checked);
+  } catch {
+    // Settings banner in the shell owns the durable error; keep the switch controlled by store state.
+  }
+}
+
+async function onAutoOverrideTargetChange(event: Event): Promise<void> {
+  const target = (event.target as HTMLSelectElement).value;
+  try {
+    await shell.saveOperatorPresenceSettingsPatch({
+      auto_composer_runtime_target: target,
+    });
+  } catch {
+    // Settings banner in the shell owns the durable error.
+  }
+}
+
 onMounted(() => {
   void Promise.all([shell.loadRuntimeStatus(true), shell.loadCursorCatalog(true)]);
 });
@@ -261,6 +335,62 @@ onMounted(() => {
       class="runtime-auth-settings__usage"
       :usage="shell.runtimeStatus?.claude_usage"
     />
+
+    <section v-if="!isLoading" class="runtime-auth-settings__policy-section">
+      <header class="runtime-auth-settings__policy-header">
+        <h2>Full Auto composer runtime</h2>
+        <p>
+          Temporarily force every IDE composer and continuous worker onto one runtime while
+          VAXON is on Full Auto. Manual per-thread choices are preserved and return when this
+          toggle or Full Auto is off.
+        </p>
+      </header>
+      <label class="operator-settings-form__row">
+        <input
+          type="checkbox"
+          :checked="autoOverrideEnabled"
+          :disabled="shell.operatorPresenceSettingsSaving"
+          @change="onAutoOverrideToggle"
+        />
+        <span class="operator-settings-form__copy">
+          <strong>Override all composers during Full Auto</strong>
+          <small>{{ autoOverrideSummary }}</small>
+        </span>
+      </label>
+      <label class="operator-settings-form__row operator-settings-form__row--select">
+        <span class="operator-settings-form__copy">
+          <strong>Runtime to use in Auto</strong>
+          <small>
+            This does not erase manual composer selections; it only masks them while active.
+          </small>
+        </span>
+        <select
+          class="operator-settings-form__select"
+          :value="autoOverrideTarget"
+          :disabled="shell.operatorPresenceSettingsSaving || !autoOverrideEnabled"
+          @change="onAutoOverrideTargetChange"
+        >
+          <option value="">Use each composer's manual runtime</option>
+          <option
+            v-for="target in runtimeTargets"
+            :key="target.id"
+            :value="target.id"
+          >
+            {{ target.label }} · {{ runtimeStatusLine(target) }}
+          </option>
+        </select>
+      </label>
+      <p
+        class="settings-feedback-banner settings-feedback-banner--inline"
+        :class="{
+          'settings-feedback-banner--ok': autoOverrideEffective,
+          'settings-feedback-banner--pending': autoOverrideEnabled && !autoOverrideEffective,
+        }"
+        role="status"
+      >
+        {{ autoOverrideSummary }}
+      </p>
+    </section>
 
     <div v-if="!isLoading" class="runtime-auth-settings__grid">
       <article

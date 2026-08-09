@@ -12,8 +12,10 @@ sys.path.insert(0, str(CONTROL_PLANE_ROOT))
 from app.persistence.workspace_composer_prefs_store import (  # noqa: E402
     get_workspace_composer_prefs,
     resolve_worker_runtime_model,
+    resolve_worker_runtime_target,
     set_workspace_composer_prefs,
 )
+from app.persistence import operator_presence_settings_store  # noqa: E402
 
 
 class WorkspaceComposerPrefsStoreTests(unittest.TestCase):
@@ -53,6 +55,42 @@ class WorkspaceComposerPrefsStoreTests(unittest.TestCase):
         self.assertEqual(
             resolve_worker_runtime_model("workspace_axon_watch"),
             "gpt-5.4-high",
+        )
+
+    def test_full_auto_runtime_override_masks_workspace_runtime_target(self) -> None:
+        set_workspace_composer_prefs(
+            "workspace_axon_watch",
+            runtime_target="cursor_local",
+        )
+        operator_presence_settings_store.save_settings(
+            {
+                "autonomy_mode": "full",
+                "auto_composer_runtime_override_enabled": True,
+                "auto_composer_runtime_target": "claude_local",
+            }
+        )
+
+        self.assertEqual(
+            resolve_worker_runtime_target("workspace_axon_watch"),
+            "claude_local",
+        )
+
+    def test_disabled_auto_runtime_override_restores_workspace_runtime_target(self) -> None:
+        set_workspace_composer_prefs(
+            "workspace_axon_watch",
+            runtime_target="cursor_local",
+        )
+        operator_presence_settings_store.save_settings(
+            {
+                "autonomy_mode": "semi",
+                "auto_composer_runtime_override_enabled": True,
+                "auto_composer_runtime_target": "claude_local",
+            }
+        )
+
+        self.assertEqual(
+            resolve_worker_runtime_target("workspace_axon_watch"),
+            "cursor_local",
         )
 
 

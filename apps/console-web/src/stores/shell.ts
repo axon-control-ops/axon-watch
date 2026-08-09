@@ -3205,6 +3205,7 @@ export const useShellStore = defineStore('shell', () => {
     cursorRuntimeStatus,
     claudeRuntimeStatus,
     codexRuntimeStatus,
+    operatorPresenceSettings,
     composerRuntimePrefsRevision,
     cursorPickerVisibleRevision,
   });
