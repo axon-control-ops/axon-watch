@@ -9,6 +9,12 @@ from app.cli_runtime.approval_gate import (
     rewritten_execution_access_notice,
 )
 from app.persistence import attachment_store, chat_store
+from app.workspace_agents import build_company_roster
+from app.workspace_agents.assignment_messages import (
+    assignment_card,
+    employee_display_name,
+    readable_goal,
+)
 from app.workspace_catalog import get_workspace_record
 
 
@@ -35,6 +41,93 @@ def _thread_employee_speaker(thread: dict[str, object]) -> dict[str, str | None]
     }
 
 
+def _company_employee(workspace_id: str, *, employee_id: str = "", role: str = "") -> dict[str, object] | None:
+    company = build_company_roster(workspace_id)
+    rows = company.get("employees") if isinstance(company, dict) else None
+    if not isinstance(rows, list):
+        return None
+    wanted_id = employee_id.strip()
+    wanted_role = role.strip().lower()
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        if wanted_id and str(row.get("employee_id") or "").strip() == wanted_id:
+            return row
+        if wanted_role and str(row.get("role") or "").strip().lower() == wanted_role:
+            return row
+    return None
+
+
+def _legacy_key_values(content: str) -> dict[str, str]:
+    values: dict[str, str] = {}
+    for line in content.splitlines():
+        if ":" not in line:
+            continue
+        key, value = line.split(":", 1)
+        values[key.strip().lower()] = value.strip()
+    return values
+
+
+def _legacy_assignment_message(
+    record: dict[str, object],
+    *,
+    thread: dict[str, object] | None,
+    fallback_speaker: dict[str, str | None],
+) -> dict[str, object] | None:
+    content = str(record.get("content") or "").strip()
+    workspace_id = str(record.get("workspace_id") or (thread or {}).get("workspace_id") or "")
+    run_id = str(record.get("run_id") or "").strip()
+    thread_employee_id = str((thread or {}).get("employee_id") or "").strip()
+    thread_role = str((thread or {}).get("employee_role") or fallback_speaker.get("speaker_role") or "")
+
+    if content.startswith("Continuous worker dispatch started."):
+        values = _legacy_key_values(content)
+        role = values.get("role") or thread_role
+        task_id = values.get("task") or "task pending"
+        goal = values.get("goal") or "Complete the assigned work and report back with verification."
+        employee = _company_employee(workspace_id, employee_id=thread_employee_id, role=role)
+        name = employee_display_name(employee, role)
+        return {
+            **record,
+            "role": "agent",
+            "content": assignment_card(
+                assignee_name=name,
+                assignee_role=role,
+                goal=goal,
+                task_id=task_id,
+                run_id=run_id or values.get("run") or "run pending",
+                state="started",
+            ),
+            "speaker_name": name,
+            "speaker_role": role,
+            "speaker_employee_id": str((employee or {}).get("employee_id") or thread_employee_id),
+        }
+
+    if content.startswith("Queued for dispatch ·"):
+        goal = readable_goal(content.split("·", 1)[1] if "·" in content else content)
+        assignee = _company_employee(workspace_id, employee_id=thread_employee_id, role=thread_role)
+        lead = _company_employee(workspace_id, role="lead")
+        lead_name = employee_display_name(lead, "lead")
+        assignee_name = employee_display_name(assignee, thread_role)
+        return {
+            **record,
+            "role": "agent",
+            "content": assignment_card(
+                assignee_name=assignee_name,
+                assignee_role=thread_role,
+                goal=goal,
+                task_id="task pending",
+                run_id=run_id or "run pending",
+                state="queued",
+                lead_name=lead_name,
+            ),
+            "speaker_name": lead_name,
+            "speaker_role": "lead",
+            "speaker_employee_id": str((lead or {}).get("employee_id") or ""),
+        }
+    return None
+
+
 def _enrich_message_records(
     records: list[dict[str, object]],
     *,
@@ -45,7 +138,11 @@ def _enrich_message_records(
     fallback_speaker = _thread_employee_speaker(thread or {})
     enriched: list[dict[str, object]] = []
     for record in records:
-        next_record = dict(record)
+        next_record = _legacy_assignment_message(
+            record,
+            thread=thread,
+            fallback_speaker=fallback_speaker,
+        ) or dict(record)
         message_id = str(record.get("message_id") or "")
         attachments = grouped.get(message_id, [])
         if attachments:

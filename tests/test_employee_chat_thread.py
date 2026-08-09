@@ -126,6 +126,68 @@ class EmployeeChatThreadRouteTests(unittest.TestCase):
         self.assertEqual("integrations", match["employee_role"])
         self.assertEqual("Quinn · Integrations", match["preview_label"])
 
+    def test_history_normalizes_legacy_worker_start_card(self) -> None:
+        thread = create_workspace_chat_thread(
+            "workspace_dashpro",
+            thread_kind="ide",
+            title="Priya · Frontend",
+            employee_id="employee-workspace_dashpro-frontend-2",
+            employee_role="frontend",
+        )
+        chat_store.save_message(
+            {
+                "message_id": "message_operator_legacy_start",
+                "thread_id": thread["thread_id"],
+                "workspace_id": "workspace_dashpro",
+                "run_id": "run_legacy",
+                "role": "operator",
+                "content": (
+                    "Continuous worker dispatch started.\n"
+                    "Role: frontend\n"
+                    "Task: task-abc123def456\n"
+                    "Run: run_legacy\n"
+                    "Goal: Add previous-day navigation controls to Practice at Home."
+                ),
+                "created_at": "2026-08-09T12:00:00Z",
+            }
+        )
+
+        body = self.client.get(f"/api/chat/threads/{thread['thread_id']}/history").json()
+        item = body["items"][0]
+        self.assertEqual("agent", item["role"])
+        self.assertEqual("Priya", item["speaker_name"])
+        self.assertEqual("frontend", item["speaker_role"])
+        self.assertIn("Priya started this Frontend assignment.", item["content"])
+        self.assertNotIn("Role: frontend", item["content"])
+
+    def test_history_normalizes_legacy_queued_card_as_lead_authored(self) -> None:
+        thread = create_workspace_chat_thread(
+            "workspace_dashpro",
+            thread_kind="ide",
+            title="Priya · Frontend",
+            employee_id="employee-workspace_dashpro-frontend-2",
+            employee_role="frontend",
+        )
+        chat_store.save_message(
+            {
+                "message_id": "message_agent_legacy_queue",
+                "thread_id": thread["thread_id"],
+                "workspace_id": "workspace_dashpro",
+                "run_id": "run_legacy_queue",
+                "role": "agent",
+                "content": "Queued for dispatch · Add previous-day navigation controls to Practice at Home.",
+                "created_at": "2026-08-09T12:01:00Z",
+            }
+        )
+
+        body = self.client.get(f"/api/chat/threads/{thread['thread_id']}/history").json()
+        item = body["items"][0]
+        self.assertEqual("agent", item["role"])
+        self.assertEqual("Dana", item["speaker_name"])
+        self.assertEqual("lead", item["speaker_role"])
+        self.assertIn("Dana queued a Frontend assignment for Priya.", item["content"])
+        self.assertNotIn("Queued for dispatch ·", item["content"])
+
     def test_http_employee_thread_skips_vaxon_persona_fast_path(self) -> None:
         streaming = patch.dict(os.environ, {"AXON_WATCH_LANE_B_STREAMING": "0"}, clear=False)
         streaming.start()
