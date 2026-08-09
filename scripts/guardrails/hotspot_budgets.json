@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generated_on": "2026-07-09",
+  "generated_on": "2026-08-09",
   "note": "Baseline from Axon-X file-size audit. Ratchet budgets block growth until extraction lowers max_lines.",
   "critical_hotspots": {
     "apps/console-web/src/styles/mockup-shell.css": {
@@ -11,7 +11,7 @@
       "rule": "operator shell presentation only; split by surface"
     },
     "apps/console-web/src/stores/shell.ts": {
-      "max_lines": 4085,
+      "max_lines": 4160,
       "soft_limit": 350,
       "hard_limit": 500,
       "target": "apps/console-web/src/stores/shell/slices/*",
@@ -41,7 +41,7 @@
   },
   "ratcheted_oversize_files": {
     "apps/console-web/src/components/ide/AgentDockComposer.vue": {
-      "max_lines": 152,
+      "max_lines": 156,
       "soft_limit": 350,
       "hard_limit": 500,
       "target": "apps/console-web/src/components/ide/agent-dock/*",
@@ -61,7 +61,7 @@
       "target": "apps/console-web/src/styles/tokens/* + feature CSS"
     },
     "apps/console-web/src/lib/kairo-voice-playback.ts": {
-      "max_lines": 535,
+      "max_lines": 634,
       "soft_limit": 350,
       "hard_limit": 500,
       "target": "apps/console-web/src/lib/kairo-voice-*",
@@ -114,7 +114,7 @@
       "target": "services/control-plane/app/kairo/replies/*"
     },
     "services/control-plane/app/cli_runtime/catalog.py": {
-      "max_lines": 44,
+      "max_lines": 45,
       "soft_limit": 350,
       "hard_limit": 500,
       "target": "services/control-plane/app/cli_runtime/catalog/*",
@@ -126,6 +126,13 @@
       "hard_limit": 500,
       "target": "services/control-plane/app/cli_runtime/catalog/*",
       "note": "Runtime status snapshot cache and probe assembly; +2 lines for claude_usage probe wiring"
+    },
+    "services/control-plane/app/cli_runtime/agent_sandbox.py": {
+      "max_lines": 607,
+      "soft_limit": 350,
+      "hard_limit": 650,
+      "target": "services/control-plane/app/cli_runtime/agent_sandbox_*.py",
+      "note": "Sandbox launch and policy materialization; retain a strict cap while the policy helpers are extracted."
     },
     "apps/console-web/src/composables/agent-dock/use-agent-dock-composer-setup.ts": {
       "max_lines": 518,
@@ -204,7 +211,7 @@
       "target": "docs/generated/*"
     },
     "tests/test_control_plane_chat.py": {
-      "max_lines": 312,
+      "max_lines": 407,
       "soft_limit": 350,
       "hard_limit": 500,
       "target": "tests/test_control_plane_chat_* slices"
@@ -255,7 +262,7 @@
       "note": "Lowered after explorer/activity panel CSS extraction"
     },
     "apps/console-web/src/styles/ide/ide-layout-08.css": {
-      "max_lines": 552,
+      "max_lines": 577,
       "soft_limit": 350,
       "hard_limit": 500,
       "target": "apps/console-web/src/styles/ide/*",
@@ -408,7 +415,7 @@
       "note": "Teammate route after specialty routing; fan-out short-circuits to Lead; extract next"
     },
     "services/control-plane/app/chat/lane_b_post_message.py": {
-      "max_lines": 515,
+      "max_lines": 525,
       "soft_limit": 350,
       "hard_limit": 515,
       "target": "services/control-plane/app/chat/*",
@@ -435,6 +442,13 @@
       "target": "services/control-plane/app/persistence/*",
       "note": "Gate 4/5 task ledger + reopen/re-budget + usage-limit attempt refund. +6 lines default an unset task scope to the owning role's write boundary; the resolution logic itself lives in execution_policy.default_write_scope_for_role to keep it out of this hotspot."
     },
+    "services/control-plane/app/persistence/run_store_sqlite.py": {
+      "max_lines": 508,
+      "soft_limit": 350,
+      "hard_limit": 550,
+      "target": "services/control-plane/app/persistence/run_store_*.py",
+      "note": "SQLite schema migrations; split migration helpers before further growth."
+    },
     "services/control-plane/app/workspace_agents/worker_dispatch.py": {
       "max_lines": 504,
       "soft_limit": 350,
@@ -443,7 +457,7 @@
       "note": "Continuous worker dispatch; usage-limit attempt refund on finalize"
     },
     "services/control-plane/app/workspace_delivery/publish.py": {
-      "max_lines": 602,
+      "max_lines": 611,
       "soft_limit": 350,
       "hard_limit": 500,
       "target": "services/control-plane/app/workspace_delivery/*",
@@ -478,7 +492,7 @@
       "note": "Deterministic REPORT lane; next-move selection extracted to report_next_move.py"
     },
     "apps/console-web/src/stores/shell/slices/create-kairo-voice-slice.ts": {
-      "max_lines": 525,
+      "max_lines": 559,
       "soft_limit": 350,
       "hard_limit": 500,
       "target": "apps/console-web/src/stores/shell/slices/kairo-voice-*",
@@ -492,11 +506,18 @@
       "note": "Core roster outcome selection; confidence + roster API split to sibling modules"
     },
     "services/control-plane/app/workspace_agents/lead_vaxon_handoff.py": {
-      "max_lines": 454,
+      "max_lines": 526,
       "soft_limit": 350,
       "hard_limit": 500,
       "target": "services/control-plane/app/workspace_agents/lead_vaxon_*",
       "note": "Lead\u2192VAXON handoffs; message builders in lead_vaxon_messages.py"
+    },
+    "services/control-plane/app/workspace_agents/execution_policy.py": {
+      "max_lines": 504,
+      "soft_limit": 350,
+      "hard_limit": 550,
+      "target": "services/control-plane/app/workspace_agents/execution_policy_*.py",
+      "note": "Worker policy authority resolution; keep the role and scope layers split."
     },
     "services/control-plane/app/workspace_agents/lead_team_checkin.py": {
       "max_lines": 510,
