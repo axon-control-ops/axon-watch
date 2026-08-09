@@ -242,13 +242,7 @@ function scoreRoster(
   return scored;
 }
 
-function isLeadFanOutDirective(
-  text: string,
-  currentEmployee: TeammateRouteEmployee | null | undefined,
-): boolean {
-  if (normalizeTeammateRole(currentEmployee?.role ?? '') !== 'lead') {
-    return false;
-  }
+function isLeadFanOutDirective(text: string): boolean {
   return LEAD_FAN_OUT_RE.test(text);
 }
 
@@ -274,7 +268,7 @@ export function shouldSoftRouteToTeammate(
   if (isBuildPlanImplementPrompt(text)) {
     return { shouldRoute: false, reason: 'build_plan_implement', source: 'deterministic' };
   }
-  if (isLeadFanOutDirective(text, currentEmployee)) {
+  if (isLeadFanOutDirective(text)) {
     const currentId = currentEmployee?.employee_id?.trim() ?? '';
     return {
       shouldRoute: false,
