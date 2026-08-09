@@ -1,7 +1,11 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
 
+import { fetchClaudeRuntimeStatus, fetchCodexRuntimeStatus, fetchCursorRuntimeStatus } from '../../api/runtime-api';
 import { fetchWorkspaceComposerPrefs, saveWorkspaceComposerPrefs } from '../../api/workspace-api';
+import { buildClaudeCatalogRows } from '../../lib/claude-catalog-view';
+import { buildCodexCatalogRows } from '../../lib/codex-catalog-view';
+import { buildCursorCatalogRows, type CursorCatalogRow } from '../../lib/cursor-catalog-view';
 import { useShellStore } from '../../stores/shell';
 
 type RuntimeFamily = 'cursor' | 'claude' | 'codex';
@@ -21,6 +25,17 @@ const actionTone = ref<'idle' | 'ok' | 'error' | 'pending'>('idle');
 
 const autoAllowedRuntimes = ref<string[]>([]);
 const maxConcurrentRuntimes = ref<1 | 'multiple'>(1);
+const runtimeModels = ref<Record<RuntimeFamily, string>>({
+  cursor: 'auto',
+  claude: 'auto',
+  codex: 'auto',
+});
+
+const modelCatalog = ref<Record<RuntimeFamily, CursorCatalogRow[]>>({
+  cursor: [],
+  claude: [],
+  codex: [],
+});
 
 const workspaceId = computed(() => shell.currentWorkspace?.workspace_id ?? null);
 const workspaceLabel = computed(
@@ -44,6 +59,23 @@ function setAllRuntimes(): void {
   autoAllowedRuntimes.value = [];
 }
 
+function setRuntimeModel(family: RuntimeFamily, modelId: string): void {
+  runtimeModels.value = { ...runtimeModels.value, [family]: modelId || 'auto' };
+}
+
+async function loadCatalogs(): Promise<void> {
+  const [cursorStatus, claudeStatus, codexStatus] = await Promise.allSettled([
+    fetchCursorRuntimeStatus(),
+    fetchClaudeRuntimeStatus(),
+    fetchCodexRuntimeStatus(),
+  ]);
+  modelCatalog.value = {
+    cursor: buildCursorCatalogRows(cursorStatus.status === 'fulfilled' ? cursorStatus.value : null),
+    claude: buildClaudeCatalogRows(claudeStatus.status === 'fulfilled' ? claudeStatus.value : null),
+    codex: buildCodexCatalogRows(codexStatus.status === 'fulfilled' ? codexStatus.value : null),
+  };
+}
+
 async function load(): Promise<void> {
   const id = workspaceId.value;
   if (!id) {
@@ -51,9 +83,14 @@ async function load(): Promise<void> {
   }
   loadState.value = 'loading';
   try {
-    const prefs = await fetchWorkspaceComposerPrefs(id);
+    const [prefs] = await Promise.all([fetchWorkspaceComposerPrefs(id), loadCatalogs()]);
     autoAllowedRuntimes.value = prefs.auto_allowed_runtimes ?? [];
     maxConcurrentRuntimes.value = (prefs.max_concurrent_runtimes ?? 1) > 1 ? 'multiple' : 1;
+    runtimeModels.value = {
+      cursor: prefs.cursor_cli_model || 'auto',
+      claude: prefs.claude_cli_model || 'auto',
+      codex: prefs.codex_cli_model || 'auto',
+    };
     loadState.value = 'loaded';
   } catch (error) {
     loadState.value = 'error';
@@ -74,6 +111,9 @@ async function save(): Promise<void> {
     await saveWorkspaceComposerPrefs(id, {
       auto_allowed_runtimes: autoAllowedRuntimes.value,
       max_concurrent_runtimes: maxConcurrentRuntimes.value === 'multiple' ? 4 : 1,
+      cursor_cli_model: runtimeModels.value.cursor,
+      claude_cli_model: runtimeModels.value.claude,
+      codex_cli_model: runtimeModels.value.codex,
     });
     actionTone.value = 'ok';
     actionMessage.value = 'Runtime policy saved.';
@@ -138,24 +178,51 @@ onMounted(() => {
             </span>
           </label>
 
-          <label
+          <div
             v-for="rt in RUNTIME_FAMILIES"
             :key="rt.id"
             class="workspace-runtime-policy__runtime-row"
             :class="{ 'workspace-runtime-policy__runtime-row--active': autoAllowedRuntimes.includes(rt.id) }"
           >
-            <input
-              type="checkbox"
-              :checked="autoAllowedRuntimes.includes(rt.id)"
-              :disabled="saving"
-              @change="toggleRuntime(rt.id)"
-            />
-            <span class="workspace-runtime-policy__runtime-copy">
-              <span class="workspace-runtime-policy__runtime-label">{{ rt.label }}</span>
-              <span class="workspace-runtime-policy__runtime-hint">{{ rt.hint }}</span>
-            </span>
-          </label>
+            <label class="workspace-runtime-policy__runtime-row-main">
+              <input
+                type="checkbox"
+                :checked="autoAllowedRuntimes.includes(rt.id)"
+                :disabled="saving"
+                @change="toggleRuntime(rt.id)"
+              />
+              <span class="workspace-runtime-policy__runtime-copy">
+                <span class="workspace-runtime-policy__runtime-label">{{ rt.label }}</span>
+                <span class="workspace-runtime-policy__runtime-hint">{{ rt.hint }}</span>
+              </span>
+            </label>
+
+            <label class="workspace-runtime-policy__runtime-model">
+              <span class="workspace-runtime-policy__runtime-model-label">Model</span>
+              <select
+                :value="runtimeModels[rt.id]"
+                :disabled="saving"
+                @change="setRuntimeModel(rt.id, ($event.target as HTMLSelectElement).value)"
+              >
+                <option value="auto">Auto</option>
+                <option
+                  v-for="model in modelCatalog[rt.id]"
+                  :key="model.id"
+                  :value="model.id"
+                  :disabled="model.available === false"
+                >
+                  {{ model.label }}
+                </option>
+              </select>
+            </label>
+          </div>
         </div>
+
+        <p class="workspace-runtime-policy__note" role="note">
+          Pin the exact model each runtime dispatches with for AUTO shifts in
+          <strong>{{ workspaceLabel }}</strong>. "Auto" leaves the choice to that
+          runtime's own default routing.
+        </p>
 
         <p class="workspace-runtime-policy__note" role="note">
           Selecting specific runtimes overrides "All runtimes." Uncheck all three to

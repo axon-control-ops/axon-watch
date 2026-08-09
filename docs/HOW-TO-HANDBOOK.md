@@ -26,6 +26,7 @@ Use it to operate the console, teach Axon-X, understand the codebase, verify and
 3.67. [Auto-loop status & credits](how-to/auto-loop-and-credits.md) — are we autonomous yet? Cursor / API budget for multi-project
 3.68. [Company hierarchy & Lead check-in](how-to/company-hierarchy-and-lead-checkin.md) — VAXON attend loop + AUTONOMOUS ON safety matrix
 3.69. [Stuck agent recovery & School Operations Phase 1](how-to/agent-recovery-and-school-operations.md) — restart decisions, VAXON's recovery contract, and daily homework approval
+3.70. [AXON-X Constitution registries](#axon-x-constitution-registries) — missions, evidence, decisions, capabilities, ADRs, debt, health, and self-healing proof
 3.7. [VAXON Desktop](#vaxon-desktop) — packaged Linux install
 4. [Teaching Axon-X](#teaching-axon-x-to-someone-else) — explain it to others
 5. [Codebase in plain English](#codebase-in-plain-english) — what happens under the hood
@@ -54,6 +55,7 @@ Use it to operate the console, teach Axon-X, understand the codebase, verify and
 | **Integrator / merge** | [CI, merge, and worker agents](how-to/ci-merge-and-worker-agents.md) | [`docs/CI_GATES.md`](CI_GATES.md), `./scripts/ops/watch-fast-gate.sh` |
 | **Autonomy / remote host** | [Auto-loop status & credits](how-to/auto-loop-and-credits.md) | [Autonomy gates & service identity](how-to/autonomy-gates-and-service-identity.md), [Recent operator features](how-to/recent-operator-features.md) |
 | **Stuck agent / school operator** | [Stuck agent recovery & School Operations Phase 1](how-to/agent-recovery-and-school-operations.md) | [Debugging playbook](#debugging-playbook), [Company hierarchy & Lead check-in](how-to/company-hierarchy-and-lead-checkin.md) |
+| **Lead / autonomous agent** | [AXON-X Constitution registries](#axon-x-constitution-registries) | [Verification](#verification-commands), `docs/ops/agent-reports/axon-x-constitution-gap-audit-2026-08-09.md` |
 | **Debugger** | [Debugging playbook](#debugging-playbook) | [Troubleshooting](#troubleshooting) |
 | **Upgrader** | [Upgrading & updating](#upgrading-and-updating) | `./scripts/ops/sync_planning_mirror_to_axon_local.py` |
 
@@ -101,6 +103,48 @@ cd /home/edp/axon-nvme/repos/axon-watch
 Open **http://127.0.0.1:4173** and hard-refresh after upgrades (`Ctrl+Shift+R`).
 
 > **Important:** `./scripts/dev/down.sh` does **not** stop systemd always-on units. On this host use `axonrestart` / `axonrevive`.
+
+## AXON-X Constitution registries
+
+The Constitution work adds a durable executive memory layer for AXON-X. It does **not** replace the original execution stores; it indexes them so VAXON, Dana, specialists, and the operator can answer: what mission is active, what evidence exists, what decision was made, what capability owns it, and what platform health looked like at the time.
+
+### What changed
+
+The control plane now has these SQLite-backed registries:
+
+| Registry | What it means | Why it makes AXON-X stronger |
+| --- | --- | --- |
+| Evidence | Pointers to run history, Lead receipts, autonomy receipts, deliveries, and host-action receipts | Agents stop inventing receipts and can point to source records. |
+| Missions | Operator goals with workspace, risk, Lead-plan link, checkpoint, and success criteria | Lead work becomes durable mission progress, not only chat text. |
+| Decisions | Autonomous/operator-gated decisions with actor, tier, risk, confidence note, and evidence IDs | “Why did VAXON/Dana do that?” has a queryable answer. |
+| Capabilities | Stable `CAP-###` anchors for major platform abilities | Blockers can name the exact capability that is missing or degraded. |
+| ADRs | Canonical `docs/adr/ADR-*.md` records | Architecture choices are visible to agents without rereading the repo. |
+| Technical debt | Known gaps with severity, area, and evidence links | Gaps survive handoffs instead of being rediscovered. |
+| Platform health | Runtime/watch/degraded snapshots | Self-healing decisions can prove current service posture first. |
+
+### How agents should use it
+
+- Before claiming a dispatch, recovery, or blocker is real, look for evidence through `/api/operator/constitution/evidence`.
+- When a Lead plan is persisted, the system creates a linked mission automatically and attaches Lead receipt evidence to that mission.
+- When VAXON/autonomous attention records a safe action, the system records both evidence and a decision row.
+- If platform health matters, capture it with `POST /api/operator/constitution/health/capture-runtime-summary`.
+- If seed data is missing, run `POST /api/operator/constitution/seed`; this indexes canonical ADR markdown and seeds stable capability anchors such as `CAP-007`, `CAP-034`, and `CAP-070`.
+
+### Operator console surface
+
+Open **Settings → Constitution** to view the registry counts and recent human-readable summaries for missions, decisions, capabilities, ADRs, debt, and health. This surface is read-only on purpose: it gives visibility without letting a UI refresh mutate planning state.
+
+### Verification
+
+Use:
+
+```bash
+npm run verify:constitution
+python -m pytest tests/test_constitution_registry.py tests/test_constitution_gate_script.py -q
+npm run test -w @axon-watch/console-web -- constitution-overview-view
+```
+
+`verify:constitution` checks the registry spine, required routes, ADR/capability seed anchors, auth coverage for mutating routes, focused tests, and the handoff ledger.
 
 ### Pick a real workspace
 

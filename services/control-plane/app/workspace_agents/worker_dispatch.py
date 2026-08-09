@@ -230,9 +230,7 @@ def dispatch_continuous_worker_run(
         # default runtime regardless of what's selected in the composer.
         runtime_target = resolve_worker_runtime_target(workspace_id)
         runtime_family = (runtime_target or "cursor_local").split("_", 1)[0]
-        runtime_model = (
-            resolve_worker_runtime_model(workspace_id) if runtime_family == "cursor" else None
-        )
+        runtime_model = resolve_worker_runtime_model(workspace_id, runtime_family)
         lane_b_result = generate_lane_b_result(
             context=context,
             user_prompt=prompt,

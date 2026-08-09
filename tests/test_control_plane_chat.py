@@ -136,10 +136,8 @@ class ControlPlaneChatTests(unittest.TestCase):
         history_payload = history.json()
         self.assertEqual(thread_id, history_payload["thread_id"])
         self.assertEqual(3, history_payload["count"])
-        self.assertEqual(
-            {"message_id", "thread_id", "run_id", "workspace_id", "role", "content", "created_at"},
-            set(history_payload["items"][0]),
-        )
+        expected_message_keys = "message_id thread_id run_id workspace_id role content created_at speaker_employee_id speaker_name speaker_role".split()
+        self.assertEqual(set(expected_message_keys), set(history_payload["items"][0]))
         self.assertEqual(
             ["operator", "system", "agent"],
             [item["role"] for item in history_payload["items"]],

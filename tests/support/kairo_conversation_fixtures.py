@@ -11,6 +11,7 @@ sys.path.insert(0, str(CONTROL_PLANE_ROOT))
 
 from app.kairo.context_pack_cache import clear_pack_cache_for_tests  # noqa: E402
 from app.kairo.turn_memory import clear_memory_for_tests  # noqa: E402
+from tests.support.control_plane_db import isolate_workspace_bindings  # noqa: E402
 
 MOCK_BRIEFING = {
     "generated_at": "2026-07-08T00:00:00Z",
@@ -45,5 +46,6 @@ GRAPH_PATCH = "app.kairo.conversation_context_pack.build_operator_brain_graph"
 
 class KairoConversationTestCase(unittest.TestCase):
     def setUp(self) -> None:
+        isolate_workspace_bindings(self)
         clear_pack_cache_for_tests()
         clear_memory_for_tests()

@@ -20,9 +20,13 @@ from app.workspace_agents.employee_persona_prompt import (  # noqa: E402
 )
 from app.workspace_agents.worker_prompt import build_continuous_worker_prompt  # noqa: E402
 from app.workspace_agents.config_loader import EmployeeConfig  # noqa: E402
+from tests.support.control_plane_db import isolate_workspace_bindings  # noqa: E402
 
 
 class EmployeePersonaPromptTests(unittest.TestCase):
+    def setUp(self) -> None:
+        isolate_workspace_bindings(self)
+
     def test_identity_line_shape(self) -> None:
         line = build_employee_identity_line(
             workspace_id="workspace_axon_watch",

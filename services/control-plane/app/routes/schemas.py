@@ -13,6 +13,8 @@ class WriteWorkspaceFileRequest(BaseModel):
 
 class WorkspaceComposerPrefsRequest(BaseModel):
     cursor_cli_model: str | None = None
+    claude_cli_model: str | None = None
+    codex_cli_model: str | None = None
     runtime_target: str | None = None
     auto_allowed_runtimes: list[str] | None = None
     max_concurrent_runtimes: int | None = None

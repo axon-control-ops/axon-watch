@@ -44,6 +44,8 @@ def _utc_now_iso() -> str:
 def default_prefs() -> dict[str, Any]:
     return {
         "cursor_cli_model": "auto",
+        "claude_cli_model": "auto",
+        "codex_cli_model": "auto",
         "runtime_target": "",
         "auto_allowed_runtimes": [],
         "max_concurrent_runtimes": 1,
@@ -72,7 +74,7 @@ def get_workspace_composer_prefs(workspace_id: str) -> dict[str, Any]:
     with _managed_connection() as connection:
         row = connection.execute(
             """
-            SELECT cursor_cli_model, runtime_target,
+            SELECT cursor_cli_model, claude_cli_model, codex_cli_model, runtime_target,
                    auto_allowed_runtimes_json, max_concurrent_runtimes,
                    updated_at
             FROM workspace_composer_prefs
@@ -83,12 +85,16 @@ def get_workspace_composer_prefs(workspace_id: str) -> dict[str, Any]:
     if not row:
         return default_prefs()
     model = normalize_model_id(row["cursor_cli_model"]) or "auto"
+    claude_model = normalize_model_id(row["claude_cli_model"]) or "auto"
+    codex_model = normalize_model_id(row["codex_cli_model"]) or "auto"
     try:
         raw_runtimes = json.loads(row["auto_allowed_runtimes_json"] or "[]")
     except (TypeError, ValueError):
         raw_runtimes = []
     return {
         "cursor_cli_model": model if model else "auto",
+        "claude_cli_model": claude_model if claude_model else "auto",
+        "codex_cli_model": codex_model if codex_model else "auto",
         "runtime_target": str(row["runtime_target"] or "").strip(),
         "auto_allowed_runtimes": _normalize_auto_allowed_runtimes(raw_runtimes),
         "max_concurrent_runtimes": _normalize_max_concurrent_runtimes(row["max_concurrent_runtimes"]),
@@ -100,6 +106,8 @@ def set_workspace_composer_prefs(
     workspace_id: str,
     *,
     cursor_cli_model: str | None = None,
+    claude_cli_model: str | None = None,
+    codex_cli_model: str | None = None,
     runtime_target: str | None = None,
     auto_allowed_runtimes: list[str] | None = None,
     max_concurrent_runtimes: int | None = None,
@@ -111,6 +119,12 @@ def set_workspace_composer_prefs(
     next_model = current["cursor_cli_model"]
     if cursor_cli_model is not None:
         next_model = normalize_model_id(cursor_cli_model) or "auto"
+    next_claude_model = current["claude_cli_model"]
+    if claude_cli_model is not None:
+        next_claude_model = normalize_model_id(claude_cli_model) or "auto"
+    next_codex_model = current["codex_cli_model"]
+    if codex_cli_model is not None:
+        next_codex_model = normalize_model_id(codex_cli_model) or "auto"
     next_runtime_target = current["runtime_target"]
     if runtime_target is not None:
         next_runtime_target = str(runtime_target or "").strip()
@@ -125,22 +139,35 @@ def set_workspace_composer_prefs(
         connection.execute(
             """
             INSERT INTO workspace_composer_prefs (
-                workspace_id, cursor_cli_model, runtime_target,
-                auto_allowed_runtimes_json, max_concurrent_runtimes, updated_at
+                workspace_id, cursor_cli_model, claude_cli_model, codex_cli_model,
+                runtime_target, auto_allowed_runtimes_json, max_concurrent_runtimes, updated_at
             )
-            VALUES (?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(workspace_id) DO UPDATE SET
                 cursor_cli_model = excluded.cursor_cli_model,
+                claude_cli_model = excluded.claude_cli_model,
+                codex_cli_model = excluded.codex_cli_model,
                 runtime_target = excluded.runtime_target,
                 auto_allowed_runtimes_json = excluded.auto_allowed_runtimes_json,
                 max_concurrent_runtimes = excluded.max_concurrent_runtimes,
                 updated_at = excluded.updated_at
             """,
-            (cleaned, next_model, next_runtime_target, json.dumps(next_allowed), next_concurrent, updated_at),
+            (
+                cleaned,
+                next_model,
+                next_claude_model,
+                next_codex_model,
+                next_runtime_target,
+                json.dumps(next_allowed),
+                next_concurrent,
+                updated_at,
+            ),
         )
         connection.commit()
     return {
         "cursor_cli_model": next_model,
+        "claude_cli_model": next_claude_model,
+        "codex_cli_model": next_codex_model,
         "runtime_target": next_runtime_target,
         "auto_allowed_runtimes": next_allowed,
         "max_concurrent_runtimes": next_concurrent,
@@ -148,13 +175,21 @@ def set_workspace_composer_prefs(
     }
 
 
-def resolve_worker_runtime_model(workspace_id: str) -> str | None:
-    """Model workers may pass into Lane B.
+_RUNTIME_FAMILY_MODEL_FIELD = {
+    "cursor": "cursor_cli_model",
+    "claude": "claude_cli_model",
+    "codex": "codex_cli_model",
+}
+
+
+def resolve_worker_runtime_model(workspace_id: str, runtime_family: str = "cursor") -> str | None:
+    """Model workers may pass into Lane B for the given runtime family.
 
     Auto → None (omit --model). Composer or explicit API pin → that id.
     """
+    field = _RUNTIME_FAMILY_MODEL_FIELD.get(str(runtime_family or "").strip().lower(), "cursor_cli_model")
     prefs = get_workspace_composer_prefs(workspace_id)
-    model = normalize_model_id(prefs.get("cursor_cli_model"))
+    model = normalize_model_id(prefs.get(field))
     if not model or model.lower() == "auto":
         return None
     return model

@@ -16,9 +16,13 @@ from app.chat.lane_b_agent import (  # noqa: E402
     generate_lane_b_result,
     should_use_lane_b,
 )
+from tests.support.control_plane_db import isolate_workspace_bindings  # noqa: E402
 
 
 class LaneBAgentTests(unittest.TestCase):
+    def setUp(self) -> None:
+        isolate_workspace_bindings(self)
+
     def test_should_use_lane_b_for_ide_modes_only(self) -> None:
         self.assertTrue(should_use_lane_b(composer_mode="ask", command_intent="unsupported"))
         self.assertTrue(should_use_lane_b(composer_mode="plan", command_intent="unsupported"))

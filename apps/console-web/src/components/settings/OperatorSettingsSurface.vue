@@ -3,6 +3,7 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 
 import AgentFleetControlPanel from './AgentFleetControlPanel.vue';
 import AppGeneralSettingsPanel from './AppGeneralSettingsPanel.vue';
+import ConstitutionOverviewPanel from './ConstitutionOverviewPanel.vue';
 import EmailSettingsPanel from './EmailSettingsPanel.vue';
 import OperatorPresenceSettingsForm from './OperatorPresenceSettingsForm.vue';
 import RuntimeAuthSettingsPanel from './RuntimeAuthSettingsPanel.vue';
@@ -29,7 +30,8 @@ const sections = [
   { id: 'agents' as const, label: 'Agents', hint: 'VAXON autonomy, hard-kill / resume workers', mark: '02' },
   { id: 'runtime' as const, label: 'CLI runtime', hint: 'Cursor & Codex auth · AUTO policy', mark: '03' },
   { id: 'email' as const, label: 'Email & triage', hint: 'IMAP mailboxes, bridge, inbox', mark: '04' },
-  { id: 'app' as const, label: 'App & console', hint: 'Layout, workspace, diagnostics', mark: '05' },
+  { id: 'constitution' as const, label: 'Constitution', hint: 'Missions, proof, ADRs, health', mark: '05' },
+  { id: 'app' as const, label: 'App & console', hint: 'Layout, workspace, diagnostics', mark: '06' },
 ];
 
 const sectionMeta = computed(() => {
@@ -54,6 +56,11 @@ const sectionMeta = computed(() => {
       return {
         title: 'App & console',
         subtitle: 'Layout mode, workspace context, and control-plane diagnostics.',
+      };
+    case 'constitution':
+      return {
+        title: 'AXON-X Constitution',
+        subtitle: 'Read-only mission, evidence, decision, capability, ADR, debt, and platform-health registries.',
       };
     default:
       return {
@@ -193,6 +200,7 @@ async function returnToConsole(): Promise<void> {
             <AgentFleetControlPanel v-else-if="activeSection === 'agents'" />
             <RuntimeAuthSettingsPanel v-else-if="activeSection === 'runtime'" />
             <EmailSettingsPanel v-else-if="activeSection === 'email'" />
+            <ConstitutionOverviewPanel v-else-if="activeSection === 'constitution'" />
             <AppGeneralSettingsPanel v-else />
           </div>
         </div>

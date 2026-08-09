@@ -140,6 +140,8 @@ def workspace_composer_prefs_put(
     prefs = set_workspace_composer_prefs(
         workspace_id,
         cursor_cli_model=body.cursor_cli_model,
+        claude_cli_model=body.claude_cli_model,
+        codex_cli_model=body.codex_cli_model,
         runtime_target=body.runtime_target,
         auto_allowed_runtimes=body.auto_allowed_runtimes,
         max_concurrent_runtimes=body.max_concurrent_runtimes,
