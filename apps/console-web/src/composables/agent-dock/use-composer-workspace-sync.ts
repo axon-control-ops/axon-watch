@@ -66,7 +66,12 @@ export function useComposerWorkspaceSync(options: UseComposerWorkspaceSyncOption
 
   function handleDocumentClick(event: MouseEvent): void {
     const root = composerRootRef?.value;
-    if (root && event.target instanceof Node && root.contains(event.target)) {
+    const contains = (root as { contains?: unknown } | null)?.contains;
+    if (
+      typeof contains === 'function' &&
+      event.target instanceof Node &&
+      contains.call(root, event.target)
+    ) {
       return;
     }
     closeMenus();

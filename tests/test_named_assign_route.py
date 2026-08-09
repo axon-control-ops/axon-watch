@@ -131,6 +131,31 @@ class NamedAssignRouteTests(unittest.TestCase):
             )
         self.assertIsNone(response)
 
+    def test_lead_fast_path_skips_multi_role_fan_out(self) -> None:
+        roster = _roster()
+        with patch(
+            "app.chat.lane_b_lead_named_assign_fast_path.build_company_roster",
+            return_value={"employees": [row.__dict__ for row in roster]},
+        ):
+            response = maybe_post_lead_named_assign_message(
+                workspace_id="workspace_test",
+                content=(
+                    "The three tasks are still open. Assign the two UI tasks to "
+                    "Lila (frontend) and the teacher query task to the backend "
+                    "specialist now. Use materialize_lead_fan_out with "
+                    "create_runs=True or directly lease those tasks."
+                ),
+                thread_id="thread_lead",
+                employee_role="lead",
+                lead_name="Imani",
+                composer_mode="agent",
+                created_at="2026-07-29T12:00:00Z",
+                save_message=Mock(),
+                new_message_id=lambda prefix: f"{prefix}_1",
+                bind_attachments=lambda _message_id: [],
+            )
+        self.assertIsNone(response)
+
 
 if __name__ == "__main__":
     unittest.main()
