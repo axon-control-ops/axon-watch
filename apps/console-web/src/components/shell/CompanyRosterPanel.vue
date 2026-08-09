@@ -368,9 +368,10 @@ async function onPresenceSelect(employee: CompanyEmployeeRecord): Promise<void> 
   <section
     v-if="currentWorkspaceId"
     class="company-roster company-roster--ide company-roster--persona-dock"
+    :class="{ 'company-roster--reporting': selectedEmployeeIsReporting }"
     aria-label="Company employees"
   >
-    <header class="company-roster__header">
+    <header class="company-roster__header" :aria-hidden="selectedEmployeeIsReporting">
       <div class="company-roster__header-row">
         <div>
           <p class="company-roster__eyebrow">Company team</p>
