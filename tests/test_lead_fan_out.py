@@ -124,6 +124,26 @@ class LeadFanOutMaterializeTests(unittest.TestCase):
         self.assertEqual("lead_fan_out", decision.reason)
         self.assertEqual("lead_planner", decision.source)
 
+    def test_named_multi_role_dispatch_stays_with_lead(self) -> None:
+        from app.workspace_agents.teammate_route import route_teammate_decision
+
+        decision = route_teammate_decision(
+            workspace_id="workspace_dashpro",
+            current_employee_id="employee-workspace_dashpro-lead-0",
+            prompt=(
+                "The three tasks from this morning are still open — "
+                "task-ec42c713997048aa, task-c3f1c233ea184ade, and "
+                "task-138a5dec16bf4ddf — they were never dispatched. Assign the "
+                "two UI tasks to Priya (frontend) and the teacher query task to "
+                "the backend specialist now. Use materialize_lead_fan_out with "
+                "create_runs=True or directly lease those tasks and create queued runs."
+            ),
+            use_model_tiebreak=False,
+        )
+        self.assertFalse(decision.should_route)
+        self.assertEqual("lead_fan_out", decision.reason)
+        self.assertEqual("lead_planner", decision.source)
+
 
 if __name__ == "__main__":
     unittest.main()

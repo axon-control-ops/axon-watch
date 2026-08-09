@@ -40,6 +40,9 @@ const AMBIGUOUS_REASONS = new Set([
   'score_too_low',
 ]);
 
+const LEAD_FAN_OUT_RE =
+  /\bmaterialize[_\s-]lead[_\s-]fan[_\s-]out\b|\b(?:assign|dispatch|route|lease|queue)\b[\s\S]{0,160}\b(?:two|three|\d+)\b[\s\S]{0,120}\b(?:frontend|ui|backend|integrations?|watcher)\b[\s\S]{0,120}\b(?:frontend|ui|backend|integrations?|watcher|specialists?)\b/i;
+
 type RoleBag = {
   role: string;
   patterns: RegExp[];
@@ -239,6 +242,16 @@ function scoreRoster(
   return scored;
 }
 
+function isLeadFanOutDirective(
+  text: string,
+  currentEmployee: TeammateRouteEmployee | null | undefined,
+): boolean {
+  if (normalizeTeammateRole(currentEmployee?.role ?? '') !== 'lead') {
+    return false;
+  }
+  return LEAD_FAN_OUT_RE.test(text);
+}
+
 /**
  * Soft-route when the prompt clearly belongs to another specialist.
  * Cold-start (no active employee) picks a clear roster winner.
@@ -260,6 +273,17 @@ export function shouldSoftRouteToTeammate(
   }
   if (isBuildPlanImplementPrompt(text)) {
     return { shouldRoute: false, reason: 'build_plan_implement', source: 'deterministic' };
+  }
+  if (isLeadFanOutDirective(text, currentEmployee)) {
+    const currentId = currentEmployee?.employee_id?.trim() ?? '';
+    return {
+      shouldRoute: false,
+      reason: 'lead_fan_out',
+      fromEmployeeId: currentId || undefined,
+      fromName: currentEmployee?.name.trim() || undefined,
+      source: 'deterministic',
+      routingReceipt: 'lead_fan_out;multi_specialist_directive',
+    };
   }
 
   const named = matchNamedAssignEmployee(text, employees);
