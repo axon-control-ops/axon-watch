@@ -26,6 +26,16 @@ def resolve_worker_execution_policy(
     except (OSError, ProjectContractError, ValueError):
         contract = {}
     task_paths = task_payload.get("allowed_paths")
+    # Older task rows (and rows created before task_store began applying role
+    # defaults) serialize an omitted scope as ``[]``.  The ledger cannot
+    # distinguish that representation from an explicit empty list, so treating
+    # it as an authority restriction here permanently strands those already
+    # queued specialist tasks in a read-only sandbox.  New task creation
+    # persists the role-bounded default; for legacy empty rows, use that same
+    # bounded fallback.  Direct policy callers can still pass an explicit empty
+    # scope to resolve_effective_policy when a deliberately read-only run is
+    # required.
+    task_scope = task_paths if isinstance(task_paths, list) and task_paths else None
     return resolve_effective_policy(
         role=employee.role,
         employee_override=employee.execution_policy,
@@ -35,7 +45,7 @@ def resolve_worker_execution_policy(
         workspace_forbidden_path_globs=contract.get("forbidden_path_globs")
         if isinstance(contract.get("forbidden_path_globs"), list)
         else (),
-        task_allowed_paths=task_paths if isinstance(task_paths, list) else (),
+        task_allowed_paths=task_scope,
     )
 
 

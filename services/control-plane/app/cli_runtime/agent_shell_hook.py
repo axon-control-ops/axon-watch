@@ -115,7 +115,9 @@ def _string_tuple(value: Any) -> tuple[str, ...]:
     return result
 
 
-def _load_policy(policy_path: Path) -> tuple[frozenset[str], tuple[tuple[str, ...], ...]]:
+def _load_policy(
+    policy_path: Path,
+) -> tuple[frozenset[str], tuple[tuple[str, ...], ...], str]:
     with policy_path.open("r", encoding="utf-8") as handle:
         document = json.load(handle)
     if not isinstance(document, Mapping) or document.get("version") != 1:
@@ -126,7 +128,8 @@ def _load_policy(policy_path: Path) -> tuple[frozenset[str], tuple[tuple[str, ..
     if not isinstance(prefixes_raw, Sequence) or isinstance(prefixes_raw, (str, bytes)):
         raise ValueError("approved command prefixes are malformed")
     prefixes = tuple(_string_tuple(prefix) for prefix in prefixes_raw)
-    return wrappers, prefixes
+    write_scope_hint = str(document.get("write_scope_hint") or "")
+    return wrappers, prefixes, write_scope_hint
 
 
 def _extract_shell_command(payload: Mapping[str, Any]) -> str:
@@ -173,6 +176,7 @@ def evaluate_hook_payload(
     *,
     approved_wrappers: frozenset[str],
     approved_command_prefixes: tuple[tuple[str, ...], ...],
+    write_scope_hint: str = "",
 ) -> dict[str, str]:
     """Return a Cursor hook permission response; malformed input always denies."""
     try:
@@ -204,7 +208,8 @@ def evaluate_hook_payload(
     if executable_token.startswith("-") or "=" in executable_token:
         return _deny("environment assignments and option-shaped executables are not allowed")
     if executable in _PRIVILEGE_TOOLS:
-        return _deny("privilege escalation is not allowed")
+        hint = f" {write_scope_hint}" if write_scope_hint else ""
+        return _deny(f"privilege escalation is not allowed — never use sudo/su to work around filesystem restrictions.{hint}")
     if executable in _RAW_NETWORK_TOOLS:
         return _deny("raw network tools are not allowed")
     if executable in _INTERPRETER_ESCAPES:
@@ -227,11 +232,12 @@ def run_hook(policy_path: Path, raw_input: str) -> dict[str, str]:
         payload = json.loads(raw_input)
         if not isinstance(payload, Mapping):
             raise ValueError("hook input must be a JSON object")
-        wrappers, prefixes = _load_policy(policy_path)
+        wrappers, prefixes, write_scope_hint = _load_policy(policy_path)
         return evaluate_hook_payload(
             payload,
             approved_wrappers=wrappers,
             approved_command_prefixes=prefixes,
+            write_scope_hint=write_scope_hint,
         )
     except Exception as exc:  # Hook boundaries must fail closed, including I/O errors.
         return _deny(f"hook policy unavailable: {type(exc).__name__}")

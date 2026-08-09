@@ -13,6 +13,7 @@ const toolbarProps = useAgentDockComposerToolbarProps(composer);
 
 <template>
   <AgentDockComposerChrome
+    :ref="(el) => { composer.composerRootRef.value = el as HTMLElement | null; }"
     :show-full-access-consent="composer.showFullAccessConsent.value"
     :full-access-consent-checked="composer.fullAccessConsentChecked.value"
     :show-sandbox-consent="composer.showSandboxConsent.value"

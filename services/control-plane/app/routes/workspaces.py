@@ -141,6 +141,8 @@ def workspace_composer_prefs_put(
         workspace_id,
         cursor_cli_model=body.cursor_cli_model,
         runtime_target=body.runtime_target,
+        auto_allowed_runtimes=body.auto_allowed_runtimes,
+        max_concurrent_runtimes=body.max_concurrent_runtimes,
     )
     return {"workspace_id": workspace_id, **prefs}
 

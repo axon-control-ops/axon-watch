@@ -448,6 +448,11 @@ function runtimeStatusLine(record: AgentDockComposerRuntimeTarget): string {
             <span class="agent-dock-composer__model-label">
               {{ row.label }}
               <span v-if="row.badge" class="agent-dock-composer__model-badge">{{ row.badge }}</span>
+              <span
+                v-if="row.effort"
+                class="agent-dock-composer__model-effort"
+                :data-effort="row.effort"
+              >{{ row.effort }}</span>
             </span>
             <small>{{ row.description }}</small>
           </button>

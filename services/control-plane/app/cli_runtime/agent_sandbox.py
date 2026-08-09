@@ -91,6 +91,34 @@ def _validate_policy(policy: AgentSandboxPolicy) -> None:
             raise SandboxConfigurationError("Approved command prefixes must contain valid tokens.")
 
 
+_ROLE_WRITE_SCOPE_HINTS: dict[str, list[str]] = {
+    "frontend": ["app/", "apps/", "src/", "components/", "features/", "screens/", "locales/", "packages/", "tests/", "__tests__/"],
+    "backend": ["services/", "server/", "api/", "lib/", "supabase/", "packages/", "tests/"],
+    "integrations": [".github/", "config/", "scripts/"],
+    "lead": ["docs/planning/", "docs/ops/", "plans/"],
+}
+
+
+def _write_scope_specialist_hint(writable_roots: tuple[str, ...]) -> str:
+    """Return a plain-language hint about which specialist role can write paths not in writable_roots."""
+    if not writable_roots:
+        return (
+            "This agent role has read-only access to the workspace. "
+            "To make code changes, dispatch a specialist: "
+            "frontend (UI/screens/components), backend (services/api/lib), "
+            "or integrations (scripts/config/.github)."
+        )
+    roots_str = ", ".join(sorted(writable_roots))
+    return (
+        f"This agent can only write within: {roots_str}. "
+        "For paths outside this scope, dispatch the appropriate specialist: "
+        "frontend (app/components/features/screens), "
+        "backend (services/api/lib/supabase), "
+        "integrations (scripts/config/.github). "
+        "Do NOT ask the operator to remount the filesystem — use dispatch instead."
+    )
+
+
 def _policy_document(policy: AgentSandboxPolicy) -> dict[str, object]:
     _validate_policy(policy)
     return {
@@ -100,6 +128,8 @@ def _policy_document(policy: AgentSandboxPolicy) -> dict[str, object]:
             list(prefix) for prefix in policy.approved_command_prefixes
         ],
         "forbidden_path_globs": sorted(set(policy.forbidden_path_globs)),
+        "writable_roots": sorted(set(policy.writable_roots)),
+        "write_scope_hint": _write_scope_specialist_hint(policy.writable_roots),
     }
 
 

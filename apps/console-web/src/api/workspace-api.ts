@@ -160,6 +160,8 @@ export type WorkspaceComposerPrefs = {
   workspace_id: string;
   cursor_cli_model: string;
   runtime_target: string;
+  auto_allowed_runtimes: string[];
+  max_concurrent_runtimes: number;
   updated_at: string | null;
 };
 
@@ -176,7 +178,12 @@ export async function fetchWorkspaceComposerPrefs(
 
 export async function saveWorkspaceComposerPrefs(
   workspaceId: string,
-  body: { cursor_cli_model?: string; runtime_target?: string },
+  body: {
+    cursor_cli_model?: string;
+    runtime_target?: string;
+    auto_allowed_runtimes?: string[];
+    max_concurrent_runtimes?: number;
+  },
 ): Promise<WorkspaceComposerPrefs> {
   const encoded = encodeURIComponent(workspaceId);
   return fetchJson<WorkspaceComposerPrefs>(

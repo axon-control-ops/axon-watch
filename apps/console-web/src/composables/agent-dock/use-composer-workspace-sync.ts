@@ -16,6 +16,7 @@ type UseComposerWorkspaceSyncOptions = {
   composerMode: Ref<ComposerMode>;
   defaultComposerMode: ComposerMode;
   inputRef: Ref<HTMLTextAreaElement | null>;
+  composerRootRef?: Ref<HTMLElement | null>;
   applyingHistoryDraft: Ref<boolean>;
   composerHistoryIndex: Ref<number>;
   composerHistoryScratch: Ref<string>;
@@ -41,6 +42,7 @@ export function useComposerWorkspaceSync(options: UseComposerWorkspaceSyncOption
     composerMode,
     defaultComposerMode,
     inputRef,
+    composerRootRef,
     applyingHistoryDraft,
     composerHistoryIndex,
     composerHistoryScratch,
@@ -62,7 +64,11 @@ export function useComposerWorkspaceSync(options: UseComposerWorkspaceSyncOption
   let lastSyncedThreadId: string | null = null;
   let hasSyncedContext = false;
 
-  function handleDocumentClick(): void {
+  function handleDocumentClick(event: MouseEvent): void {
+    const root = composerRootRef?.value;
+    if (root && event.target instanceof Node && root.contains(event.target)) {
+      return;
+    }
     closeMenus();
   }
 

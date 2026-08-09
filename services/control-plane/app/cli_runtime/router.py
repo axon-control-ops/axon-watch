@@ -153,6 +153,7 @@ def _build_prompt(
     context_block: str,
     execution_tier: str = "consultative",
     research_snapshot: dict[str, object] | None = None,
+    write_scope_hint: str = "",
 ) -> str:
     from app.workspace_agents.employee_persona_prompt import (
         adapt_lane_b_system_prompt_for_employee,
@@ -171,12 +172,14 @@ def _build_prompt(
     workspace_body = remainder_context if persona_block else context_block
     sentry_context = _sentry_monitor_context(user_prompt)
     sentry_section = f"\n\n{sentry_context}" if sentry_context else ""
+    scope_section = f"\n\nSandbox write scope: {write_scope_hint}" if write_scope_hint else ""
     return (
         f"{system}"
         f"{policy_block}"
         f"{persona_section}\n\n"
         f"Workspace context:\n{workspace_body}\n\n"
-        f"{sentry_section}\n\n"
+        f"{sentry_section}"
+        f"{scope_section}\n\n"
         f"Operator request:\n{user_prompt.strip()}"
     )
 def _resolve_workspace_root(workspace_id: str) -> Path | None:
@@ -192,11 +195,28 @@ def _cloud_runtime_message(record: dict[str, object]) -> str:
     )
 
 
+_CLAUDE_EFFORT_LEVELS = frozenset({"low", "medium", "high", "xhigh", "max"})
+_CODEX_EFFORT_LEVELS = frozenset({"low", "medium", "high", "xhigh"})
+
+
+def _split_claude_model_selection(model: str) -> tuple[str, str]:
+    """Decode the UI's model@effort preference into Claude CLI arguments.
+
+    The Claude CLI accepts --effort low|medium|high|xhigh|max.
+    UI sends e.g. "sonnet@max" or "opus@high"; strip the suffix before --model.
+    """
+    selected = str(model or "").strip()
+    model_id, marker, effort = selected.rpartition("@")
+    if marker and model_id and effort in _CLAUDE_EFFORT_LEVELS:
+        return model_id, effort
+    return selected, ""
+
+
 def _split_codex_model_selection(model: str) -> tuple[str, str]:
     """Decode the UI's model@effort preference into Codex CLI arguments."""
     selected = str(model or "").strip()
     model_id, marker, effort = selected.rpartition("@")
-    if marker and model_id and effort in {"low", "medium", "high", "xhigh"}:
+    if marker and model_id and effort in _CODEX_EFFORT_LEVELS:
         return model_id, effort
     return selected, ""
 
@@ -270,12 +290,19 @@ def dispatch_ide_composer(
     research_snapshot = research_capability_snapshot()
     if workspace_root is not None:
         ensure_workspace_research_mcp(workspace_root)
+    from app.cli_runtime.agent_sandbox import _write_scope_specialist_hint
+    write_scope_hint = (
+        _write_scope_specialist_hint(execution_policy.write_paths)
+        if execution_policy is not None
+        else ""
+    )
     prompt = _build_prompt(
         composer_mode=composer_mode,
         user_prompt=user_prompt,
         context_block=context_block,
         execution_tier=execution_tier,
         research_snapshot=research_snapshot,
+        write_scope_hint=write_scope_hint,
     )
     approval_notice = consultative_only_notice(
         composer_mode=composer_mode,
@@ -319,6 +346,7 @@ def dispatch_ide_composer(
                 auth=record.get("auth") if isinstance(record.get("auth"), dict) else None,
             )
         elif family == "claude":
+            model, reasoning_effort = _split_claude_model_selection(model)
             dispatch_env = claude_dispatch_env(
                 subprocess_env,
                 auth=record.get("auth") if isinstance(record.get("auth"), dict) else None,
