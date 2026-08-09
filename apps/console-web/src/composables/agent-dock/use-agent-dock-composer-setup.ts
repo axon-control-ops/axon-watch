@@ -27,6 +27,7 @@ export function useAgentDockComposerSetup() {
     stopVoiceCapture,
   } = useKairoConversation();
   const inputRef = ref<HTMLTextAreaElement | null>(null);
+  const composerRootRef = ref<HTMLElement | null>(null);
   const dismissedDebugReproduceMessageId = ref<string | null>(null);
   const planSoftSwitchNotice = ref<PlanSoftSwitchNotice | null>(null);
   function setInputRef(el: HTMLTextAreaElement | null): void {
@@ -338,6 +339,7 @@ export function useAgentDockComposerSetup() {
     composerMode,
     defaultComposerMode,
     inputRef,
+    composerRootRef,
     applyingHistoryDraft,
     composerHistoryIndex,
     composerHistoryScratch,
@@ -510,6 +512,7 @@ export function useAgentDockComposerSetup() {
     undoPlanSoftSwitch,
     undoTeammateRoute,
     updateComposerDraft,
+    composerRootRef,
     cancelFullAccessConsent,
   });
 }

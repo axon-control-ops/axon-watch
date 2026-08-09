@@ -34,7 +34,7 @@ def run_non_cursor_local(
         composer_mode=composer_mode,
         execution_tier=execution_tier,
         model=model,
-        **({"reasoning_effort": reasoning_effort} if family == "codex" else {}),
+        **({"reasoning_effort": reasoning_effort} if reasoning_effort else {}),
         subprocess_env=subprocess_env,
         run_id=run_id,
         on_chunk=on_chunk,

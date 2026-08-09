@@ -17,6 +17,7 @@ from app.chat.lane_b_git_dispatch import (  # noqa: E402
 from app.chat.workspace_git import derive_commit_message, git_commit, git_status, git_working_tree_is_clean  # noqa: E402
 from app.chat.lane_b_agent import LaneBContext, generate_lane_b_result  # noqa: E402
 from app.workspace_agents.execution_policy import role_execution_policy  # noqa: E402
+from tests.support.git_repo_helpers import init_git_repo  # noqa: E402
 
 
 class WorkspaceGitTests(unittest.TestCase):
@@ -37,19 +38,7 @@ class WorkspaceGitTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tempdir:
             root = Path(tempdir) / "workspace_alpha"
             root.mkdir()
-            subprocess.run(["git", "init"], cwd=root, capture_output=True, check=False)
-            subprocess.run(
-                ["git", "config", "user.email", "test@example.com"],
-                cwd=root,
-                capture_output=True,
-                check=False,
-            )
-            subprocess.run(
-                ["git", "config", "user.name", "Axon Test"],
-                cwd=root,
-                capture_output=True,
-                check=False,
-            )
+            init_git_repo(root)
             (root / "notes.txt").write_text("hello\n", encoding="utf-8")
             subprocess.run(["git", "add", "notes.txt"], cwd=root, capture_output=True, check=False)
 
@@ -287,19 +276,7 @@ class LaneBGitDispatchTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tempdir:
             root = Path(tempdir) / "workspace_alpha"
             root.mkdir()
-            subprocess.run(["git", "init"], cwd=root, capture_output=True, check=False)
-            subprocess.run(
-                ["git", "config", "user.email", "test@example.com"],
-                cwd=root,
-                capture_output=True,
-                check=False,
-            )
-            subprocess.run(
-                ["git", "config", "user.name", "Axon Test"],
-                cwd=root,
-                capture_output=True,
-                check=False,
-            )
+            init_git_repo(root)
             (root / "notes.txt").write_text("hello\n", encoding="utf-8")
 
             with patch.dict("os.environ", {"AXON_WATCH_WORKSPACE_ROOT": tempdir}, clear=False):
@@ -336,19 +313,7 @@ class LaneBGitDispatchTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tempdir:
             root = Path(tempdir) / "workspace_alpha"
             root.mkdir()
-            subprocess.run(["git", "init"], cwd=root, capture_output=True, check=False)
-            subprocess.run(
-                ["git", "config", "user.email", "test@example.com"],
-                cwd=root,
-                capture_output=True,
-                check=False,
-            )
-            subprocess.run(
-                ["git", "config", "user.name", "Axon Test"],
-                cwd=root,
-                capture_output=True,
-                check=False,
-            )
+            init_git_repo(root)
             (root / "notes.txt").write_text("hello\n", encoding="utf-8")
 
             with patch.dict("os.environ", {"AXON_WATCH_WORKSPACE_ROOT": tempdir}, clear=False):
@@ -375,19 +340,7 @@ class LaneBGitDispatchTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tempdir:
             root = Path(tempdir) / "workspace_alpha"
             root.mkdir()
-            subprocess.run(["git", "init"], cwd=root, capture_output=True, check=False)
-            subprocess.run(
-                ["git", "config", "user.email", "test@example.com"],
-                cwd=root,
-                capture_output=True,
-                check=False,
-            )
-            subprocess.run(
-                ["git", "config", "user.name", "Axon Test"],
-                cwd=root,
-                capture_output=True,
-                check=False,
-            )
+            init_git_repo(root)
             (root / "notes.txt").write_text("hello\n", encoding="utf-8")
 
             with patch.dict("os.environ", {"AXON_WATCH_WORKSPACE_ROOT": tempdir}, clear=False):
@@ -411,19 +364,7 @@ class LaneBGitDispatchTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tempdir:
             root = Path(tempdir) / "workspace_alpha"
             root.mkdir()
-            subprocess.run(["git", "init"], cwd=root, capture_output=True, check=False)
-            subprocess.run(
-                ["git", "config", "user.email", "test@example.com"],
-                cwd=root,
-                capture_output=True,
-                check=False,
-            )
-            subprocess.run(
-                ["git", "config", "user.name", "Axon Test"],
-                cwd=root,
-                capture_output=True,
-                check=False,
-            )
+            init_git_repo(root)
             (root / "notes.txt").write_text("hello\n", encoding="utf-8")
 
             with patch.dict("os.environ", {"AXON_WATCH_WORKSPACE_ROOT": tempdir}, clear=False):

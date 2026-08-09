@@ -25,22 +25,61 @@ CLAUDE_CLI_MODEL_OPTIONS: list[ModelRecord] = [
     {
         "id": "auto",
         "label": "Auto",
-        "description": "Let Claude Code choose automatically.",
+        "description": "Let Claude Code choose model and effort automatically.",
+        "effort": "",
     },
+    # Sonnet 4.6 — default workhorse; three effort tiers
+    # Effort values must match claude CLI --effort flag: low|medium|high|xhigh|max
     {
         "id": "sonnet",
         "label": "Sonnet",
-        "description": "Balanced quality and speed — Claude Code's default model.",
+        "description": "Balanced quality and speed — Claude Code's default.",
+        "badge": "default",
+        "effort": "medium",
     },
+    {
+        "id": "sonnet@low",
+        "label": "Sonnet · Low",
+        "description": "Reduced extended thinking — fastest responses.",
+        "effort": "low",
+    },
+    {
+        "id": "sonnet@high",
+        "label": "Sonnet · High",
+        "description": "Increased extended thinking — more thorough analysis.",
+        "effort": "high",
+    },
+    {
+        "id": "sonnet@max",
+        "label": "Sonnet · Max",
+        "description": "Maximum extended thinking — most thorough, slowest.",
+        "effort": "max",
+    },
+    # Opus 4.8 — highest capability
     {
         "id": "opus",
         "label": "Opus",
-        "description": "Highest capability — slower and costlier per request.",
+        "description": "Highest capability — deeper reasoning, slower per request.",
+        "effort": "medium",
     },
+    {
+        "id": "opus@high",
+        "label": "Opus · High",
+        "description": "Opus with high extended thinking — for complex problems.",
+        "effort": "high",
+    },
+    {
+        "id": "opus@max",
+        "label": "Opus · Max",
+        "description": "Opus with maximum extended thinking — hardest problems only.",
+        "effort": "max",
+    },
+    # Haiku 4.5 — fast and economical
     {
         "id": "haiku",
         "label": "Haiku",
-        "description": "Fastest and most economical, for lighter tasks.",
+        "description": "Fastest and most economical — for lighter, well-scoped tasks.",
+        "effort": "low",
     },
 ]
 

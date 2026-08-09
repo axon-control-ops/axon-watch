@@ -414,6 +414,17 @@ export const useShellStore = defineStore('shell', () => {
   const operatorFleetHealth = ref<FleetHealthSnapshot | null>(null);
   const operatorFleetHealthLoadState = ref<'idle' | 'loading' | 'loaded' | 'error'>('idle');
   const operatorFleetHealthError = ref<string | null>(null);
+  /** Workspace whose detail overlay (overview/next actions/full log) is open, if any. */
+  const workspaceDetailWorkspaceId = ref<string | null>(null);
+  function openWorkspaceDetail(workspaceId: string): void {
+    const trimmed = workspaceId.trim();
+    if (trimmed) {
+      workspaceDetailWorkspaceId.value = trimmed;
+    }
+  }
+  function closeWorkspaceDetail(): void {
+    workspaceDetailWorkspaceId.value = null;
+  }
   const operatorBrainGraph = ref<BrainGraphSnapshot | null>(null);
   const operatorBrainGraphLoadState = ref<'idle' | 'loading' | 'loaded' | 'error'>('idle');
   const operatorBrainGraphError = ref<string | null>(null);
@@ -3976,6 +3987,9 @@ export const useShellStore = defineStore('shell', () => {
     operatorFleetHealth,
     operatorFleetHealthError,
     operatorFleetHealthLoadState,
+    workspaceDetailWorkspaceId,
+    openWorkspaceDetail,
+    closeWorkspaceDetail,
     operatorCommandDraft,
     ideComposerDraft,
     operatorPresenceSettings,

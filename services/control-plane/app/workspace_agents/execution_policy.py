@@ -68,6 +68,15 @@ _COMMON_READ_PREFIXES = (
     ("git", "log"),
     ("rg",),
 )
+# gh read-only sub-commands used at ship gates: auth probe, CI run status, log tails.
+# These never mutate repo or PR state; they're safe to pre-approve for Lead + Integrations.
+_GH_READ_PREFIXES = (
+    ("gh", "auth", "status"),
+    ("gh", "run", "list"),
+    ("gh", "run", "view"),
+    ("gh", "run", "watch"),
+    ("gh", "api", "repos"),
+)
 _COMMON_AUDITED_WRAPPERS = ("axon-agent-terminal-job",)
 
 _ROLE_DEFAULTS: dict[str, AgentExecutionPolicy] = {
@@ -76,9 +85,9 @@ _ROLE_DEFAULTS: dict[str, AgentExecutionPolicy] = {
         write_paths=("docs/planning", "docs/ops", "plans"),
         forbidden_path_globs=(),
         approved_wrapper_names=(*_COMMON_AUDITED_WRAPPERS, "run_contract_unit_tests.sh"),
-        approved_command_prefixes=_COMMON_READ_PREFIXES,
-        audited_capabilities=("planning_write", "test", "workspace_read"),
-        network_mode="none",
+        approved_command_prefixes=(*_COMMON_READ_PREFIXES, *_GH_READ_PREFIXES),
+        audited_capabilities=("planning_write", "test", "workspace_read", "ci_read"),
+        network_mode="audited",
         timeout_seconds=900,
         trust_policy="worker",
         execution_access="full",
@@ -124,7 +133,7 @@ _ROLE_DEFAULTS: dict[str, AgentExecutionPolicy] = {
         write_paths=(".github", "config", "scripts"),
         forbidden_path_globs=(),
         approved_wrapper_names=(*_COMMON_AUDITED_WRAPPERS, "axonhealth", "watch-fast-gate.sh"),
-        approved_command_prefixes=(*_COMMON_READ_PREFIXES,),
+        approved_command_prefixes=(*_COMMON_READ_PREFIXES, *_GH_READ_PREFIXES),
         audited_capabilities=("ci_read", "health", "test", "workspace_read"),
         network_mode="audited",
         timeout_seconds=900,
@@ -160,15 +169,11 @@ def role_execution_policy(role: str) -> AgentExecutionPolicy:
 def default_write_scope_for_role(role: str) -> list[str]:
     """Write scope for a task that declared none — the role's own boundary.
 
-    An unset task scope is fail-closed downstream: resolve_effective_policy
-    intersects role write_paths with it, and an empty side yields (), so the
-    run drops to consultative and the sandbox mounts nothing writable. Tasks
-    created without an explicit scope therefore cannot write at all, which
-    silently disables any task whose purpose is to change something.
-
-    Falling back to the role's own write boundary is bounded, not permissive:
-    the same ceiling still applies afterwards, so a role that is read-only by
-    design (watcher) still resolves to no write access.
+    Returns the role's own write boundary as the fallback scope when a task
+    declares no allowed_paths.  resolve_effective_policy treats task_allowed_paths=None
+    as "no restriction", so passing these paths gives the task the role ceiling
+    without granting anything beyond it.  A role that is read-only by design
+    (watcher) still resolves to no write access.
     """
 
     return [str(path).strip() for path in role_execution_policy(role).write_paths if str(path).strip()]
@@ -226,9 +231,9 @@ def resolve_effective_policy(
 ) -> AgentExecutionPolicy:
     """Intersect every authority source at a worker enforcement boundary.
 
-    Workspace and task allowlists are mandatory authority sources here. Missing,
-    empty, invalid, or disjoint task scope therefore resolves to no writable
-    paths rather than an unrestricted workspace.
+    task_allowed_paths=None means "no task-level restriction" — the role's
+    write_paths are used as-is after workspace intersection.  An explicit empty
+    list still collapses write access to nothing (fail-closed).
     """
 
     baseline = role_execution_policy(role)
@@ -278,10 +283,11 @@ def resolve_effective_policy(
             )
 
     workspace_scope = _normalize_paths(workspace_allowed_paths or ())
-    task_scope = _normalize_paths(task_allowed_paths or ())
     read_paths = _intersect_path_scopes(read_paths, workspace_scope)
     write_paths = _intersect_path_scopes(write_paths, workspace_scope)
-    write_paths = _intersect_path_scopes(write_paths, task_scope)
+    if task_allowed_paths is not None:
+        task_scope = _normalize_paths(task_allowed_paths)
+        write_paths = _intersect_path_scopes(write_paths, task_scope)
     forbidden = _ordered_union(
         forbidden, _normalize_strings(workspace_forbidden_path_globs or ())
     )

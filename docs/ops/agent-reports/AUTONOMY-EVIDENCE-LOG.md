@@ -260,3 +260,13 @@ Template:
 - acceptance evidence (this retry scope): `acceptance=pass · intent=gate6_acceptance · actor=integrations-retry-receipt · summary=run_01bb18cb3b92 triaged (billing-not-code + paths=0 Gate 6 miss); verify:console-web+contract unit tests green locally; Fast Gate 30648759025; watch 6/6 connectors; reverted stray IdeActivityBar whitespace; ship not approved`
 - residual risks: DashPro org billing still blocks dashpro main CI until Sir King fixes payment/spend limit; Rowan Gate 6 still open on watcher thread; decision-only tasks may need Reed policy so Gate 6 does not require full build when paths=0
 - next gate unlocked: Lead close `task-1f499843c3424aa9` after publish; Sir King billing on axon-control-ops; Jules owns any further IdeActivityBar product polish
+
+### Lead continuous dispatch follow-up after frontend sandbox failure — 2026-08-07
+- owner: lead (`run_5b15e580dd0e`; task `task-9f7ec3f128354407`; plan `lead-plan-a3c6ea9dd9574936`; follows failed frontend run `run_8f88a8812015`)
+- failure triaged: frontend dispatch reported `Approved writable root is not a directory: 'apps/console-web/src/components/ide/AgentDockComposer.vue'`
+- verified repair on disk: `services/control-plane/app/cli_runtime/agent_sandbox.py::_resolve_workspace_path` accepts an existing, workspace-contained file as a writable target; `tests/test_cli_runtime_agent_sandbox.py::test_writable_root_can_narrow_to_an_existing_file` covers the failure mode
+- commands run: `python3 -m unittest tests.test_cli_runtime_agent_sandbox tests.test_gate6_control_plane_owned_paths` → 30 tests passed; `GET /health` and the failed run history endpoint could not connect on `127.0.0.1:8787`; local `control-plane.sqlite3` is empty (0 bytes)
+- pass/fail: pass for the bounded source regression check; live dispatch and plan completion remain unverified
+- acceptance evidence: `acceptance=pass · intent=lead_frontend_dispatch_triage · actor=lead-follow-up-receipt · summary=Existing-file writable target repair and regression coverage present; 30 targeted tests passed; no live completion claimed because control plane is unavailable`
+- residual risk: the running control plane may not have loaded the repaired source; Jules's frontend task must be retried once after service recovery/restart and its run history must show completion with passing Gate 6 evidence
+- next gate unlocked: restore or restart the control plane, retry the same bounded frontend assignment once, then verify the specialist run and synthesize the plan before marking Done

@@ -19,6 +19,7 @@ import {
 import { useShellStore } from '../../stores/shell';
 import ClaudeUsageCard from './ClaudeUsageCard.vue';
 import CursorUsageCard from './CursorUsageCard.vue';
+import WorkspaceRuntimePolicyPanel from './WorkspaceRuntimePolicyPanel.vue';
 
 type RuntimeFamily = 'cursor' | 'claude' | 'codex';
 
@@ -348,6 +349,14 @@ onMounted(() => {
           </button>
         </div>
       </article>
+    </div>
+
+    <div v-if="!isLoading" class="runtime-auth-settings__policy-section">
+      <header class="runtime-auth-settings__policy-header">
+        <h2>Workspace runtime policy</h2>
+        <p>Control which runtimes may run AUTO shifts and how many can run in parallel per workspace.</p>
+      </header>
+      <WorkspaceRuntimePolicyPanel />
     </div>
   </div>
 </template>

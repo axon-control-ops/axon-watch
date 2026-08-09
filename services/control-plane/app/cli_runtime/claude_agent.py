@@ -24,6 +24,9 @@ def _claude_permission_mode(composer_mode: str, execution_tier: str) -> str:
     return "plan"
 
 
+_CLAUDE_EFFORT_LEVELS = frozenset({"low", "medium", "high", "xhigh", "max"})
+
+
 def build_claude_agent_command(
     *,
     binary: str,
@@ -31,6 +34,7 @@ def build_claude_agent_command(
     composer_mode: str,
     execution_tier: str = "consultative",
     model: str = "",
+    reasoning_effort: str = "",
 ) -> list[str]:
     """Build the Claude Code argv for headless Lane B dispatch."""
     command = [
@@ -46,6 +50,9 @@ def build_claude_agent_command(
     ]
     if model:
         command.extend(["--model", model])
+    effort = str(reasoning_effort or "").strip().lower()
+    if effort and effort in _CLAUDE_EFFORT_LEVELS:
+        command.extend(["--effort", effort])
     command.append(prompt)
     return command
 
@@ -164,6 +171,7 @@ def run_claude_local(
     composer_mode: str,
     execution_tier: str = "consultative",
     model: str = "",
+    reasoning_effort: str = "",
     timeout_seconds: int = 240,
     subprocess_env: dict[str, str] | None = None,
     run_id: str = "",
@@ -176,6 +184,7 @@ def run_claude_local(
         composer_mode=composer_mode,
         execution_tier=execution_tier,
         model=model,
+        reasoning_effort=reasoning_effort,
     )
     run_cwd = str(workspace_root.resolve()) if workspace_root else None
 
