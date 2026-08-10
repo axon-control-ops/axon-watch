@@ -1,5 +1,4 @@
 """CLI runtime status snapshot cache and probe assembly."""
-
 from __future__ import annotations
 
 import copy
@@ -8,7 +7,6 @@ import threading
 import time
 from datetime import datetime, timezone
 from typing import Any
-
 from app.cli_runtime.catalog_inventory import build_runtime_inventory
 from app.cli_runtime.catalog_records import choose_default_runtime
 from app.cli_runtime.claude_usage_probe import probe_claude_usage

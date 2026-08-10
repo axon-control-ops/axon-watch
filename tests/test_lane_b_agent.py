@@ -43,7 +43,7 @@ class LaneBAgentTests(unittest.TestCase):
         self.assertIn("edit files", executing.lower())
         self.assertIn("audited commands", executing.lower())
         self.assertIn("Reply in first person", executing)
-        self.assertIn("current turn's `Operator request:` is the sole active task", executing)
+        self.assertIn("current turn's explicit request block is the sole active task", executing)
         self.assertIn("Do not continue, complete, commit, push, or clean up work from earlier", executing)
         self.assertNotIn("consultative", executing.lower())
 
