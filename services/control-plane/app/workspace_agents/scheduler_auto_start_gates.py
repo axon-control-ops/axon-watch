@@ -52,6 +52,16 @@ def usage_limit_blocks_auto_start(workspace_id: str, role: str) -> bool:
             record_claude_usage_limit_hit(detail)
             if claude_usage_allows_agent_retry(probe_claude_usage()):
                 return False
+        elif "codex" in lowered:
+            from app.cli_runtime.codex_usage_probe import (
+                codex_usage_allows_agent_retry,
+                probe_codex_usage,
+                record_codex_usage_limit_hit,
+            )
+
+            record_codex_usage_limit_hit(detail)
+            if codex_usage_allows_agent_retry(probe_codex_usage()):
+                return False
         else:
             # Cursor remains the default/legacy source of this failure shape;
             # unknown runtimes fall back to the Cursor pool check too.

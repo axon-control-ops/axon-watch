@@ -40,6 +40,7 @@ export interface RuntimeStatusSnapshot {
   cloud: RuntimeTargetRecord[];
   cursor_usage?: CursorUsageSnapshot | null;
   claude_usage?: ClaudeUsageSnapshot | null;
+  codex_usage?: CodexUsageSnapshot | null;
 }
 
 export interface CursorUsageSnapshot {
@@ -77,6 +78,23 @@ export interface ClaudeUsageSnapshot {
   total_sessions?: number | null;
   total_messages?: number | null;
   lifetime_estimated_cost_usd?: number | null;
+  limit_reached?: boolean;
+  limit_reset_hint?: string | null;
+  message?: string | null;
+  display_message?: string | null;
+  allows_agent_retry?: boolean;
+}
+
+export interface CodexUsageSnapshot {
+  ok: boolean;
+  source?: string;
+  updated_at?: string;
+  total_events?: number | null;
+  total_estimated_bytes?: number | null;
+  events_24h?: number | null;
+  estimated_bytes_24h?: number | null;
+  turn_events?: number | null;
+  latest_log_at?: string | null;
   limit_reached?: boolean;
   limit_reset_hint?: string | null;
   message?: string | null;

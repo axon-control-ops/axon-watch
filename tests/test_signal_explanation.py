@@ -52,6 +52,28 @@ class SignalExplanationTests(unittest.TestCase):
         self.assertIsNotNone(explanation)
         self.assertEqual("agent", explanation.owner_hint)
 
+    def test_receipt_backed_ops_task_explains_no_diff_success(self) -> None:
+        explanation = self.resolve_signal_explanation(
+            {
+                "severity": "normal",
+                "summary": "Workspace delivery completed: receipt-backed ops task required no publishable code changes.",
+            }
+        )
+        self.assertIsNotNone(explanation)
+        self.assertIn("command receipt", explanation.plain_explanation)
+        self.assertEqual("agent", explanation.owner_hint)
+
+    def test_terminal_approval_blocker_routes_to_operator(self) -> None:
+        explanation = self.resolve_signal_explanation(
+            {
+                "severity": "high",
+                "summary": "axon-agent-terminal-job requires an approval from this session before running",
+            }
+        )
+        self.assertIsNotNone(explanation)
+        self.assertIn("approve", explanation.next_step.lower())
+        self.assertEqual("you", explanation.owner_hint)
+
     def test_unrecognized_summary_returns_none(self) -> None:
         explanation = self.resolve_signal_explanation(
             {"severity": "critical", "summary": "Something totally novel and undiagnosed"}

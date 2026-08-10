@@ -74,6 +74,18 @@ describe('agent-terminal-job-view', () => {
     expect(view.displayOutput.split('\n').length).toBeLessThanOrEqual(40);
   });
 
+  it('prefers server-tracked job status over regex-parsed stream text', () => {
+    const view = buildAgentTerminalJobView({
+      command: 'npm run ota:canary',
+      output: '# axon-job:agent-job-1\nstatus=running\nFinished.',
+      serverStatus: 'completed',
+    });
+    expect(view.kind).toBe('job_stream');
+    expect(view.jobId).toBe('agent-job-1');
+    expect(view.status).toBe('completed');
+    expect(view.headline).toContain('completed');
+  });
+
   it('shortens env-prefixed OTA commands', () => {
     expect(
       shortenTerminalCommandLabel(

@@ -386,6 +386,7 @@ export const useShellStore = defineStore('shell', () => {
   const chatStreamSessionsByWorkspace = new Map<string, ChatStreamSession>();
   const composerRuntimePrefsRevision = ref(0);
   const cursorPickerVisibleRevision = ref(0);
+  let readSelectedRuntimeTargetIdForStatusBar = (): string => '';
   const activeRun = ref<RunRecord | null>(null);
   const runs = ref<RunRecord[]>([]);
   const runsLoadState = ref<RunsLoadState>('idle');
@@ -618,6 +619,7 @@ export const useShellStore = defineStore('shell', () => {
     connectorsItems,
     connectorsSummary,
     connectorsLoadState,
+    getSelectedRuntimeTargetId: () => readSelectedRuntimeTargetIdForStatusBar(),
   });
 
   const runHistoryRows = computed(() => buildRunHistoryRows(runHistorySnapshot.value));
@@ -3236,6 +3238,7 @@ export const useShellStore = defineStore('shell', () => {
     composerRuntimePrefsRevision,
     cursorPickerVisibleRevision,
   });
+  readSelectedRuntimeTargetIdForStatusBar = () => selectedRuntimeTargetId.value;
 
   const {
     loadCursorCatalog,

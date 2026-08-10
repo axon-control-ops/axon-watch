@@ -12,6 +12,7 @@ from typing import Any
 from app.cli_runtime.catalog_inventory import build_runtime_inventory
 from app.cli_runtime.catalog_records import choose_default_runtime
 from app.cli_runtime.claude_usage_probe import probe_claude_usage
+from app.cli_runtime.codex_usage_probe import probe_codex_usage
 from app.cli_runtime.cursor_usage_probe import probe_cursor_usage
 from app.cli_runtime.vault_keys import fetch_runtime_context
 
@@ -220,6 +221,7 @@ def runtime_status_snapshot(
             "cloud": cloud,
             "cursor_usage": probe_cursor_usage(force_refresh=force_refresh),
             "claude_usage": probe_claude_usage(force_refresh=force_refresh),
+            "codex_usage": probe_codex_usage(force_refresh=force_refresh),
         }
         _SNAPSHOT_CACHE["fetched_at"] = time.monotonic()
         _SNAPSHOT_CACHE["payload"] = copy.deepcopy(payload)

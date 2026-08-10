@@ -4,6 +4,7 @@ import { computed, ref, watch } from 'vue';
 import type { AgentTranscriptSegment } from '../../lib/agent-transcript-blocks';
 import {
   buildAgentTerminalJobView,
+  extractAxonJobId,
   shortenTerminalCommandLabel,
 } from '../../lib/agent-terminal-job-view';
 import { shouldShowConversationTerminalOutput } from '../../lib/conversation-terminal-display';
@@ -18,6 +19,7 @@ const props = defineProps<{
   compact?: boolean;
   terminalMirrorBadge: (open: boolean) => string | null;
   showTerminalBackgroundControl: (messageId: string, open: boolean) => boolean;
+  agentTerminalJobStatuses?: Record<string, string>;
 }>();
 
 const emit = defineEmits<{
@@ -47,6 +49,10 @@ const jobView = computed(() => {
   return buildAgentTerminalJobView({
     command: props.segment.command,
     output: props.segment.output || '',
+    serverStatus:
+      props.agentTerminalJobStatuses?.[
+        extractAxonJobId(props.segment.command, props.segment.output || '') || ''
+      ] ?? null,
   });
 });
 

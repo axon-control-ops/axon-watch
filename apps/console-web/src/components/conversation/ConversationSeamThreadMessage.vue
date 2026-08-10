@@ -384,6 +384,7 @@ async function copyTerminalOutput(output: string): Promise<void> {
         :compact="isCompactTerminalCard(message.message_id, segmentIndex)"
         :terminal-mirror-badge="terminalMirrorBadge"
         :show-terminal-background-control="showTerminalBackgroundControl"
+        :agent-terminal-job-statuses="shell.agentTerminalJobStatuses"
         @reveal="revealTerminalPanel"
         @background="backgroundAgentTerminalRun"
         @copy-output="copyTerminalOutput"

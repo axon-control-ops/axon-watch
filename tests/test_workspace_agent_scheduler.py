@@ -401,6 +401,90 @@ class WorkspaceAgentSchedulerTests(unittest.TestCase):
             summaries,
         )
 
+    def test_full_access_no_change_ops_task_completes_with_receipt(self) -> None:
+        from app.workspace_agents.config_loader import EmployeeConfig
+        from app.workspace_agents.execution_policy import role_execution_policy
+        from app.workspace_agents.worker_dispatch import dispatch_continuous_worker_run
+        from app.workspace_delivery.publish import PublishResult
+
+        opened = _seed_open_task(
+            workspace_id="workspace_worker_ops_noop",
+            owner_role="integrations",
+            goal=(
+                "Run the command `axon-agent-terminal-job --workspace workspace_dashpro "
+                "-- npm run ota:canary` and report the Expo update receipt. "
+                "Terminal job receipt proves the OTA publish; no code diff is expected."
+            ),
+        )
+        leased = task_store.lease_task(
+            opened["task_id"],
+            lease_holder="employee-workspace_worker_ops_noop-integrations",
+        )
+        created = create_run(
+            workspace_id="workspace_worker_ops_noop",
+            mode="agent",
+            summary="Integrations ops shift",
+            employee_role="integrations",
+            task_id=leased["task_id"],
+            require_leased_task=True,
+        )
+        run_id = str(created["run_id"])
+        with patch(
+            "app.workspace_agents.worker_dispatch.generate_lane_b_result",
+            return_value={
+                "dispatched": True,
+                "runtime_label": "test",
+                "content": "OTA command completed by terminal receipt.\n\nConfidence: 10/10",
+            },
+        ), patch(
+            "app.workspace_agents.worker_dispatch.resolve_worker_execution_policy",
+            return_value=role_execution_policy("integrations"),
+        ), patch(
+            "app.workspace_agents.worker_dispatch.finalize_lane_b_agent_run",
+            return_value=(True, {"phase": "executing"}),
+        ), patch(
+            "app.workspace_agents.verifier_contract.run_requires_acceptance_evidence",
+            return_value=True,
+        ), patch(
+            "app.workspace_agents.verifier_contract.has_passing_acceptance_evidence",
+            return_value=True,
+        ), patch(
+            "app.workspace_delivery.publish_worker_isolation",
+            return_value=PublishResult(
+                ok=True,
+                stage="no_change",
+                delivery={"delivery_id": "delivery-ops-noop"},
+                detail="no changes",
+                cleanup_isolation=True,
+            ),
+        ):
+            dispatched, finalized = dispatch_continuous_worker_run(
+                workspace_id="workspace_worker_ops_noop",
+                employee=EmployeeConfig(
+                    name="Release Ops",
+                    role="integrations",
+                    owns="OTA publish",
+                    schedule="continuous",
+                ),
+                run_record=created,
+            )
+
+        self.assertTrue(dispatched)
+        assert finalized is not None
+        self.assertEqual("completed", finalized["phase"])
+        task = task_store.get_task(leased["task_id"])
+        assert task is not None
+        self.assertEqual("completed", task["status"])
+        history = run_store.list_history(get_run(run_id)["history_ref"])
+        summaries = [
+            str(item.get("receipt", {}).get("summary") or "").lower()
+            for item in history
+        ]
+        self.assertTrue(
+            any("receipt-backed ops task" in summary for summary in summaries),
+            summaries,
+        )
+
     def test_continuous_worker_tick_skips_role_after_usage_limit_failure(self) -> None:
         with tempfile.TemporaryDirectory() as tempdir:
             agents_file = Path(tempdir) / "agents.json"

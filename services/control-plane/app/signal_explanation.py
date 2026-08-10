@@ -68,4 +68,27 @@ def resolve_signal_explanation(item: dict[str, object]) -> SignalExplanation | N
             owner_hint="agent",
         )
 
+    if _matches(
+        summary,
+        r"receipt-backed\s+ops\s+task",
+        r"ops\s+task\s+required\s+no\s+publishable\s+code\s+changes",
+    ):
+        return SignalExplanation(
+            plain_explanation="This was an operations task, so success is proven by the command receipt rather than a git diff.",
+            next_step="Open the run receipt or terminal job status; if the command succeeded, the task can stay completed.",
+            owner_hint="agent",
+        )
+
+    if _matches(
+        summary,
+        r"requires?\s+an?\s+approval",
+        r"terminal[-\s]?job\s+approval",
+        r"approval\s+profiles?",
+    ):
+        return SignalExplanation(
+            plain_explanation="The worker reached a safe-control boundary and needs an attended approval before it can run the host command.",
+            next_step="Approve the exact terminal job from the attended session, or pre-grant this approved wrapper in the worker runtime profile.",
+            owner_hint="you",
+        )
+
     return None

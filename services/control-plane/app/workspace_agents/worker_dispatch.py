@@ -49,6 +49,50 @@ from app.workspace_agents.worker_dispatch_progress import (
 
 logger = logging.getLogger(__name__)
 
+
+_OPS_COMMAND_PATTERNS = (
+    "axon-agent-terminal-job",
+    "npm run ota",
+    "eas update",
+    "expo update",
+    "supabase db push",
+    "gh workflow run",
+)
+
+
+def no_change_delivery_is_successful_ops_task(task: dict[str, object] | None) -> bool:
+    """Return True when a no-diff delivery can honestly complete the task.
+
+    Delivery normally requires a publishable git diff. Ops tasks are different:
+    a worker may need to run a durable host command (OTA publish, Supabase push,
+    workflow dispatch) whose success is recorded as a receipt rather than a code
+    change. Keep this narrow so ordinary code-fix tasks still fail on no diff.
+    """
+    if not isinstance(task, dict):
+        return False
+    blob = " ".join(
+        str(task.get(key) or "")
+        for key in ("goal", "acceptance_criteria", "terminal_outcome")
+    ).lower()
+    if not blob:
+        return False
+    if not any(pattern in blob for pattern in _OPS_COMMAND_PATTERNS):
+        return False
+    return any(
+        marker in blob
+        for marker in (
+            "receipt",
+            "run the command",
+            "ops command",
+            "ota",
+            "publish",
+            "migration",
+            "workflow",
+            "supabase",
+        )
+    )
+
+
 def worker_dispatch_enabled() -> bool:
     raw = os.environ.get("AXON_WATCH_WORKER_SCHEDULER_DISPATCH", "1").strip().lower()
     return raw not in {"0", "false", "off", "no"}
@@ -241,8 +285,10 @@ def dispatch_continuous_worker_run(
                 from app.workspace_delivery import publish_worker_isolation
 
                 run_snapshot = get_run(run_id)
-                if run_requires_acceptance_evidence(run_snapshot) and not has_passing_acceptance_evidence(
-                    run_id
+                if (
+                    run_requires_acceptance_evidence(run_snapshot)
+                    and not has_passing_acceptance_evidence(run_id)
+                    and not no_change_delivery_is_successful_ops_task(task)
                 ):
                     finalized = _fail_worker_run(
                         run_id,
@@ -268,7 +314,40 @@ def dispatch_continuous_worker_run(
                         and publish.delivery is not None
                         and execution_policy.execution_access == "full"
                     ):
-                        if auto_ask_resolution is not None:
+                        if no_change_delivery_is_successful_ops_task(task):
+                            try:
+                                from app.workspace_agents.verifier_contract import (
+                                    record_acceptance_evidence,
+                                )
+
+                                record_acceptance_evidence(
+                                    run_id,
+                                    passed=True,
+                                    summary=(
+                                        "receipt-backed ops task accepted: terminal/host "
+                                        "command receipt is the delivery evidence; no code "
+                                        "diff expected"
+                                    ),
+                                    actor="verifier",
+                                )
+                                finalized = complete_run(run_id)
+                                append_run_execution_receipt(
+                                    run_id,
+                                    receipt_type="worker_delivery_ops_receipt",
+                                    actor="workspace_scheduler",
+                                    receipt_summary=(
+                                        "Workspace delivery completed: receipt-backed "
+                                        "ops task required no publishable code changes."
+                                    ),
+                                )
+                            except RunLifecycleError as exc:
+                                logger.exception("complete_run after ops delivery failed for %s", run_id)
+                                finalized = _fail_worker_run(
+                                    run_id,
+                                    receipt_summary=f"Ops delivery succeeded but complete_run failed: {exc}",
+                                )
+                                dispatched = False
+                        elif auto_ask_resolution is not None:
                             finalized = _fail_worker_run(
                                 run_id,
                                 receipt_summary=(

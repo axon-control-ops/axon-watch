@@ -210,10 +210,12 @@ export function looksLikeAgentTerminalJob(command: string, output: string): bool
 export function buildAgentTerminalJobView(input: {
   command: string;
   output: string;
+  serverStatus?: string | null;
 }): AgentTerminalJobView {
   const command = String(input.command || '');
   const commandLabel = shortenTerminalCommandLabel(command) || null;
   const isStatusPoll = STATUS_POLL_RE.test(command);
+  const serverStatus = input.serverStatus?.trim().toLowerCase() || null;
 
   // Fast path: ordinary shell cards — no regex noise stripping / JSON parse.
   if (!looksLikeAgentTerminalJob(command, input.output || '')) {
@@ -247,7 +249,7 @@ export function buildAgentTerminalJobView(input: {
     Boolean(json && typeof json.command === 'string' && OTA_RE.test(String(json.command)));
 
   if (json && (isStatusPoll || looksLikeJobStatus(json))) {
-    const status = typeof json.status === 'string' ? json.status : null;
+    const status = serverStatus || (typeof json.status === 'string' ? json.status : null);
     const resolvedJobId =
       (typeof json.job_id === 'string' && json.job_id) ||
       (typeof json.jobId === 'string' && json.jobId) ||
@@ -271,7 +273,7 @@ export function buildAgentTerminalJobView(input: {
 
   if (jobId || /#\s*axon-job:/i.test(output)) {
     const statusMatch = /\bstatus[=:]\s*([A-Za-z_]+)/i.exec(cleaned);
-    const status = statusMatch?.[1]?.toLowerCase() ?? null;
+    const status = serverStatus || statusMatch?.[1]?.toLowerCase() || null;
     return {
       kind: 'job_stream',
       jobId,
