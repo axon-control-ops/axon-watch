@@ -24,6 +24,7 @@ def _build_codex_exec_command(
     execution_tier: str = "consultative",
     model: str = "",
     reasoning_effort: str = "",
+    outer_sandboxed: bool = False,
 ) -> list[str]:
     # Safe-improvement evaluation must pass the disposable isolation root here
     # (see proposal_service.sandbox_agent_workspace), never the live bound project.
@@ -31,7 +32,17 @@ def _build_codex_exec_command(
     if workspace_root:
         command.extend(["-C", str(workspace_root), "--skip-git-repo-check"])
     if execution_tier == "executing":
-        command.extend(["--sandbox", "workspace-write", "-c", 'approval_policy="on-request"'])
+        # Continuous workers are already contained by Axon's per-run Bubblewrap
+        # sandbox and immutable shell hooks. Nesting Codex's workspace-write
+        # sandbox inside that boundary blocks approved wrapper callbacks such
+        # as axon-agent-terminal-job (localhost control-plane enqueue), leaving
+        # long-running ship jobs unable to create their Axon-owned PTY job.
+        #
+        # Keep Codex unrestricted only inside the outer Axon sandbox; the outer
+        # sandbox still enforces writable paths, approved wrappers, hidden
+        # metadata mounts, and process cancellation.
+        codex_sandbox = "danger-full-access" if outer_sandboxed else "workspace-write"
+        command.extend(["--sandbox", codex_sandbox, "-c", 'approval_policy="on-request"'])
     else:
         command.extend(["--sandbox", "read-only", "-c", 'approval_policy="never"'])
     if model:
@@ -92,6 +103,7 @@ def run_codex_local(
         execution_tier=execution_tier,
         model=model,
         reasoning_effort=reasoning_effort,
+        outer_sandboxed=sandbox_policy is not None,
     )
 
     def _emit_codex_chunk(accumulated: str, delta: str) -> None:

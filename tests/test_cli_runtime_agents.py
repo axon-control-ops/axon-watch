@@ -164,6 +164,18 @@ class CliRuntimeAgentTests(unittest.TestCase):
         )
         self.assertEqual("gpt-5.5", command[command.index("--model") + 1])
 
+    def test_codex_uses_outer_sandbox_without_nested_workspace_write(self) -> None:
+        command = _build_codex_exec_command(
+            binary="/usr/bin/codex",
+            prompt="ship canary",
+            workspace_root=Path("/tmp/ws"),
+            composer_mode="agent",
+            execution_tier="executing",
+            outer_sandboxed=True,
+        )
+        self.assertIn("danger-full-access", command)
+        self.assertNotIn("workspace-write", command)
+
     def test_codex_passes_the_selected_reasoning_effort(self) -> None:
         command = _build_codex_exec_command(
             binary="/usr/bin/codex",

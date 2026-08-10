@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from app.cli_runtime.long_running_shell import is_long_running_ship_shell
 from app.cli_runtime.agent_shell_hook import evaluate_hook_payload
 from app.persistence import task_store
 from app.runs.service import (
@@ -11,6 +12,7 @@ from app.runs.service import (
 )
 from app.terminal.workspace_roots import WorkspaceRootError, resolve_workspace_root
 from app.workspace_agents.config_loader import EmployeeConfig, load_workspace_agent_configs
+from app.workspace_agents.execution_policy import role_execution_policy
 from app.workspace_agents.execution_policy_runtime import resolve_worker_execution_policy
 
 
@@ -55,12 +57,27 @@ def assert_agent_terminal_job_allowed(
         raise AgentTerminalPolicyError("agent terminal run has no employee role")
     task_id = str(run.get("task_id") or "").strip()
     task = task_store.get_task(task_id) if task_id else None
-    if task is None:
-        raise AgentTerminalPolicyError("agent terminal run has no scoped task")
     try:
         root = resolve_workspace_root(workspace_id)
     except WorkspaceRootError as exc:
         raise AgentTerminalPolicyError(str(exc)) from exc
+    if task is None:
+        policy = role_execution_policy(role)
+        if (
+            policy.execution_access != "full"
+            or role not in {"lead", "integrations"}
+            or not is_long_running_ship_shell(command)
+        ):
+            raise AgentTerminalPolicyError("agent terminal run has no scoped task")
+        append_run_execution_receipt(
+            clean_run,
+            receipt_type="agent_terminal_allowed",
+            receipt_summary="Approved no-task ship terminal command accepted",
+            actor="agent_terminal_policy",
+            success=True,
+            intent="terminal_command",
+        )
+        return role
     policy = resolve_worker_execution_policy(
         employee=_employee_for_role(source, role),
         task_payload=task,

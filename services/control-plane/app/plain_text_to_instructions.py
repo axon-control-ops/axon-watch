@@ -20,9 +20,16 @@ _NEGATED_COMMIT_RE = re.compile(
     re.IGNORECASE,
 )
 _AFFIRMATIVE_COMMIT_RE = re.compile(
-    r"(?:^|[\s,.:;!\-—])(?:please\s+)?(?:"
-    r"commit(?:\s+(?:these|my|the|all))?(?:\s+changes?)?(?:\s+and\s+push)?"
-    r"|create\s+(?:a\s+)?commit|git\s+commit)\b",
+    r"(?:"
+    r"^\s*(?:ok(?:ay)?[,\s]+)?(?:please\s+)?commit\b"
+    r"(?:\s+(?:first|these|my|the|all|current|pending|this|those))?"
+    r"(?:\s+changes?)?(?:\s+and\s+push)?"
+    r"|(?:^|[\s,.:;!\-—])(?:please\s+)?commit\s+"
+    r"(?:first|these|my|the|all|current|pending|this|those|changes?\b)"
+    r"(?:\s+changes?)?(?:\s+and\s+push)?"
+    r"|(?:^|[\s,.:;!\-—])(?:please\s+)?commit\s+and\s+(?![0-9a-f]{7,40}\b)\w+\b"
+    r"|(?:^|[\s,.:;!\-—])(?:create\s+(?:a\s+)?commit|git\s+commit)\b"
+    r")",
     re.IGNORECASE,
 )
 

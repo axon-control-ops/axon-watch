@@ -12,11 +12,19 @@ repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 env_file="${AXON_WATCH_DEPLOYMENT_ENV:-/etc/axon-watch/deployment.env}"
 
 if [[ -f "${env_file}" ]]; then
+  # deployment.env is a process environment contract, not only shell-local
+  # configuration. Export values while sourcing so Python services and their
+  # worker subprocesses inherit the same DB/token/root paths after a manual
+  # restart.
+  set -a
   # shellcheck disable=SC1090
   source "${env_file}"
+  set +a
 elif [[ -f "${repo_root}/config/deployment.env.example" ]]; then
+  set -a
   # shellcheck disable=SC1091
   source "${repo_root}/config/deployment.env.example"
+  set +a
 fi
 
 : "${AXON_WATCH_REPO_ROOT:=${repo_root}}"

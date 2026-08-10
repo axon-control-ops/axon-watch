@@ -40,6 +40,18 @@ Plan CI handling.
         self.assertTrue(prompt_requests_git_actions("commit these changes"))
         self.assertTrue(prompt_requests_git_actions("please commit and push"))
 
+    def test_commit_sha_reference_is_not_git_intent(self) -> None:
+        self.assertFalse(
+            prompt_requests_git_actions(
+                "Real DashPro fix commit: 2c0870708ddaa54550fb602c7fd3026c46e7ebb3"
+            )
+        )
+        self.assertFalse(
+            prompt_requests_git_actions(
+                "Publish the verified commit 2c0870708ddaa54550fb602c7fd3026c46e7ebb3 to canary"
+            )
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

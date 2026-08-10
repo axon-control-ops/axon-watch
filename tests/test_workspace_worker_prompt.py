@@ -38,6 +38,29 @@ class WorkspaceWorkerPromptTests(unittest.TestCase):
         self.assertIn("Vue shell and IDE polish", prompt)
         self.assertIn("busy-poll", prompt)
 
+    def test_dashpro_ship_prompt_does_not_block_on_disposable_git(self) -> None:
+        with patch(
+            "app.workspace_agents.worker_prompt.build_team_roster_context",
+            return_value="",
+        ):
+            prompt = build_continuous_worker_prompt(
+                workspace_id="workspace_dashpro",
+                employee=EmployeeConfig(
+                    name="Soren",
+                    role="integrations",
+                    owns="DashPro OTA and release guardrails",
+                    schedule="continuous",
+                ),
+                task={
+                    "task_id": "task-ota",
+                    "goal": "Publish the verified DashPro fix to canary using npm run ota:canary.",
+                },
+            )
+        self.assertIn("Disposable worker checkouts may intentionally lack usable `.git` metadata", prompt)
+        self.assertIn("real workspace by `--workspace`", prompt)
+        self.assertIn("retry the helper with `--no-stream`", prompt)
+        self.assertIn("own branch, dirty-tree, and auth guards", prompt)
+
     def test_prompt_teaches_safe_worker_delivery(self) -> None:
         with patch(
             "app.workspace_agents.worker_prompt.build_team_roster_context",

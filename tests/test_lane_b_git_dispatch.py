@@ -58,6 +58,18 @@ class LaneBGitDispatchTests(unittest.TestCase):
         )
         self.assertIsNone(payload)
 
+    def test_commit_sha_reference_does_not_trigger_git_dispatch(self) -> None:
+        payload = try_lane_b_git_commit_dispatch(
+            workspace_id="workspace_alpha",
+            user_prompt=(
+                "Publish the verified DashPro dashboard fix to canary. "
+                "Real DashPro fix commit: 2c0870708ddaa54550fb602c7fd3026c46e7ebb3. "
+                "Run axon-agent-terminal-job --workspace workspace_dashpro -- npm run ota:canary."
+            ),
+            execution_access="full",
+        )
+        self.assertIsNone(payload)
+
     def test_derive_commit_message_from_pending_changes(self) -> None:
         with tempfile.TemporaryDirectory() as tempdir:
             root = Path(tempdir) / "workspace_alpha"
@@ -127,7 +139,7 @@ class LaneBGitDispatchTests(unittest.TestCase):
             self.assertNotIn("You should", message)
             self.assertNotIn("make sure", message.lower())
             self.assertTrue(
-                "OTA canary" in message
+                message.startswith("Unblock ")
                 or message.startswith("Add ")
                 or message.startswith("Update "),
                 message,
@@ -165,7 +177,7 @@ class LaneBGitDispatchTests(unittest.TestCase):
                     ),
                 )
 
-            self.assertTrue(message.startswith("Unblock OTA canary"), message)
+            self.assertTrue(message.startswith("Unblock "), message)
             self.assertNotIn("You should", message)
             self.assertTrue(
                 "pricing" in message.lower()

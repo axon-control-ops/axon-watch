@@ -69,6 +69,10 @@ _REPLY_STYLE = (
 )
 
 _INSTRUCTION_TAKING = (
+    "The current turn's `Operator request:` is the sole active task. "
+    "Do not continue, complete, commit, push, or clean up work from earlier thread "
+    "messages, Kairo memory, prior runs, or visible terminal history unless the current "
+    "request explicitly asks you to continue that specific earlier task. "
     "Before acting, treat the request as binding Instructions when it includes "
     "Goal / In scope / Out of scope / Steps / Constraints. "
     "Out of scope is strict: if commit, push, merge, release, or git status was not asked for, "
