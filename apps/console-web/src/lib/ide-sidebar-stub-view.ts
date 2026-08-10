@@ -10,9 +10,12 @@ export type IdeSidebarStubTone =
   | 'failure'
   | 'interrupted';
 
+export type IdeSidebarStubActionKind = 'toggle_agent_dock' | 'open_team';
+
 export type IdeSidebarStubPanel = {
   lines: string[];
   actionLabel: string | null;
+  actionKind?: IdeSidebarStubActionKind;
   /** Optional second CTA — e.g. Try again when the dock stays collapsed. */
   secondaryActionLabel?: string | null;
   tone: IdeSidebarStubTone;
@@ -42,6 +45,7 @@ export function ideSidebarStubActionAriaLabel(
     if (actionLabel === 'Collapse agent dock') {
       return 'Collapse agent dock on the right edge';
     }
+    if (actionLabel === 'Open Team roster') return 'Open Team roster in the left sidebar';
   }
 
   if (scope === 'terminal') {
@@ -88,9 +92,10 @@ export function buildIdeAgentSidebarStub(input: {
       tone: 'neutral',
       lines: [
         'Agent dock is open on the right edge.',
-        'Ctrl/Cmd+\\ collapses it when you need more editor space.',
+        'Use Team for teammate status/action cards and dispatch follow-up.',
       ],
-      actionLabel: 'Collapse agent dock',
+      actionLabel: 'Open Team roster',
+      actionKind: 'open_team',
     };
   }
 
@@ -103,6 +108,7 @@ export function buildIdeAgentSidebarStub(input: {
         'Ctrl/Cmd+\\ · editor status bar AGENT chip · right-edge reopen strip.',
       ],
       actionLabel: 'Expand agent dock',
+      actionKind: 'toggle_agent_dock',
     };
   }
 
@@ -114,6 +120,7 @@ export function buildIdeAgentSidebarStub(input: {
         'Ctrl/Cmd+\\ · editor status bar · right-edge reopen strip.',
       ],
       actionLabel: 'Expand agent dock',
+      actionKind: 'toggle_agent_dock',
     };
   }
 
@@ -130,6 +137,7 @@ export function buildIdeAgentSidebarStub(input: {
         'Ctrl/Cmd+\\ · editor status bar AGENT chip · right-edge reopen strip.',
       ],
       actionLabel: 'Expand agent dock',
+      actionKind: 'toggle_agent_dock',
       secondaryActionLabel: retryLabel || null,
     };
   }
@@ -142,6 +150,7 @@ export function buildIdeAgentSidebarStub(input: {
         'Ctrl/Cmd+\\ · editor status bar AGENT chip · right-edge reopen strip.',
       ],
       actionLabel: 'Expand agent dock',
+      actionKind: 'toggle_agent_dock',
     };
   }
 
@@ -153,6 +162,7 @@ export function buildIdeAgentSidebarStub(input: {
         'Ctrl/Cmd+\\ · editor status bar AGENT chip · right-edge reopen strip.',
       ],
       actionLabel: 'Expand agent dock',
+      actionKind: 'toggle_agent_dock',
     };
   }
 
@@ -163,6 +173,7 @@ export function buildIdeAgentSidebarStub(input: {
       'Ctrl/Cmd+\\ expands it for conversation and composer.',
     ],
     actionLabel: 'Expand agent dock',
+    actionKind: 'toggle_agent_dock',
   };
 }
 

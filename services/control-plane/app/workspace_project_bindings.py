@@ -47,11 +47,15 @@ def project_root_allowlist() -> tuple[Path, ...]:
             return tuple(roots)
 
     repo_root = _repo_root()
-    return (
+    defaults = [
         repo_root.resolve(),
         repo_root.parent.resolve(),
         Path.home().resolve(),
-    )
+    ]
+    parts = repo_root.resolve().parts
+    if len(parts) >= 4 and parts[:3] == ("/", "run", "media"):
+        defaults.append(Path(*parts[:4]).resolve())
+    return tuple(dict.fromkeys(defaults))
 
 
 def _resolve_project_root(raw_root: str, *, bindings_file: Path) -> Path:

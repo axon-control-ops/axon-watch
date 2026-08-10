@@ -113,6 +113,56 @@ class LeadDecomposeFastPathTests(unittest.TestCase):
         self.assertIn("Fleet:", agent["content"])
         self.assertEqual("run_lead_handoff", agent["run_id"])
 
+    def test_materializes_dashpro_dashboard_fix_prompt(self) -> None:
+        saved: list[dict] = []
+        prompt = (
+            "I ran the dev server - but I still don't see any changes in the teachers "
+            "dashboard - and in the parent dashboard - can you please make the fixes "
+            "end to end - and stop at nothing until this is fixed"
+        )
+        materialize = {
+            "plan_id": "plan_dashboard",
+            "mode": "decompose",
+            "tasks": [{"owner_role": "frontend", "goal": prompt}],
+            "runs": [{"run_id": "run_priya", "owner_role": "frontend"}],
+            "deferred": [],
+        }
+        handoff = {"run_id": "run_lead_handoff", "phase": "completed", "employee_role": "lead"}
+
+        with (
+            patch("app.chat.lane_b_lead_decompose_fast_path._roster_members", return_value=ROSTER),
+            patch(
+                "app.chat.lane_b_lead_decompose_fast_path.materialize_lead_fan_out",
+                return_value=materialize,
+            ) as materialize_call,
+            patch(
+                "app.chat.lane_b_lead_decompose_fast_path.record_lead_handoff_run",
+                return_value=handoff,
+            ),
+            patch("app.chat.lane_b_lead_decompose_fast_path._kick_continuous_dispatch"),
+        ):
+            response = maybe_post_lead_decompose_message(
+                workspace_id="workspace_dashpro",
+                content=prompt,
+                thread_id="thread_lead",
+                employee_role="lead",
+                lead_name="Dana",
+                composer_mode="agent",
+                created_at="2026-08-10T01:39:18Z",
+                save_message=lambda payload: saved.append(payload) or payload,
+                new_message_id=lambda prefix: f"{prefix}_1",
+                bind_attachments=lambda _mid: [],
+            )
+
+        self.assertIsNotNone(response)
+        assert response is not None
+        self.assertEqual("run_lead_handoff", response["run_id"])
+        self.assertEqual("plan_dashboard", response["lead_decompose"]["plan_id"])
+        self.assertFalse(response["streaming"])
+        materialize_call.assert_called_once()
+        self.assertEqual("decompose", materialize_call.call_args.kwargs["mode"])
+        self.assertTrue(materialize_call.call_args.kwargs["create_runs"])
+
     def test_skips_assign_all_intent(self) -> None:
         response = maybe_post_lead_decompose_message(
             workspace_id="workspace_dashpro",

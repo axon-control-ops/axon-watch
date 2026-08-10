@@ -181,6 +181,7 @@ const runConnectorNotice = computed(() =>
 );
 
 function toggleAgentDockFromStub(): void {
+  if (agentSidebarStub.value.actionKind === 'open_team') return shell.setIdeActivityView('team');
   shell.toggleAgentDock();
 }
 
@@ -195,9 +196,7 @@ function retryEmployeeShiftFromStub(): void {
   });
 }
 
-function toggleTerminalFromStub(): void {
-  shell.toggleIdeTerminalPanel();
-}
+function toggleTerminalFromStub(): void { shell.toggleIdeTerminalPanel(); }
 
 function openConnectorsFromRunNotice(): void {
   openWatchConnectors(shell);

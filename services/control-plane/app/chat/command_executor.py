@@ -263,7 +263,7 @@ def execute_shell_command_intent(workspace_id: str, content: str) -> CommandExec
             success=False,
             output=_truncate_output(
                 "DashPro OTA canary commands must run from workspace_dashpro "
-                "(/home/edp/Projectx/product/dashpro). Switch to the DashPro workspace and retry."
+                "(/run/media/vaxon/axon-data/projectx/product/dashpro). Switch to the DashPro workspace and retry."
             ),
             receipt_summary="Shell command failed (wrong workspace for DashPro OTA)",
         )

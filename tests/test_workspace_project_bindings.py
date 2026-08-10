@@ -15,6 +15,7 @@ from app.workspace_project_bindings import (  # noqa: E402
     WorkspaceBindingError,
     get_workspace_project_binding,
     load_workspace_project_bindings,
+    project_root_allowlist,
 )
 
 
@@ -84,6 +85,14 @@ class WorkspaceProjectBindingsTests(unittest.TestCase):
             ):
                 with self.assertRaises(WorkspaceBindingError):
                     load_workspace_project_bindings(bindings_file)
+
+    def test_default_allowlist_includes_run_media_user_mount(self) -> None:
+        with patch("app.workspace_project_bindings._repo_root") as repo_root:
+            repo_root.return_value = Path(
+                "/run/media/vaxon/axon-data/repos/axon-nvme/repos/axon-watch"
+            )
+
+            self.assertIn(Path("/run/media/vaxon"), project_root_allowlist())
 
     def test_get_workspace_project_binding_returns_none_for_unknown(self) -> None:
         with tempfile.TemporaryDirectory() as tempdir:

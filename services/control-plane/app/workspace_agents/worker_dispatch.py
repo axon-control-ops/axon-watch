@@ -5,8 +5,6 @@ from __future__ import annotations
 import logging
 import os
 import threading
-import time
-from collections.abc import Callable
 from typing import Any
 
 from app.chat.lane_b_agent import LaneBContext, generate_lane_b_result
@@ -27,7 +25,6 @@ from app.workspace_agents.worker_ide_stream import (
     fail_worker_ide_stream,
     finalize_worker_ide_stream,
     prepare_worker_ide_stream,
-    stream_worker_chunk,
 )
 from app.workspace_agents.worker_isolation import (
     IsolationError,
@@ -39,76 +36,22 @@ from app.workspace_agents.worker_isolation import (
 from app.workspace_agents.worker_prompt import build_continuous_worker_prompt
 from app.workspace_agents.worker_prompt import parse_out_of_scope_guard
 from app.persistence import task_store
+from app.persistence import worker_scheduler_settings_store
+from app.workspace_agents.ask_autopilot import maybe_resolve_safe_ask
 from app.persistence.workspace_composer_prefs_store import (
     resolve_worker_runtime_model,
     resolve_worker_runtime_target,
 )
+from app.workspace_agents.worker_dispatch_progress import (
+    run_dispatch_heartbeat,
+    throttled_worker_stream_progress,
+)
 
 logger = logging.getLogger(__name__)
-
-_HEARTBEAT_SECONDS = 60.0
-_PROGRESS_RECEIPT_MIN_SECONDS = 60.0
-
 
 def worker_dispatch_enabled() -> bool:
     raw = os.environ.get("AXON_WATCH_WORKER_SCHEDULER_DISPATCH", "1").strip().lower()
     return raw not in {"0", "false", "off", "no"}
-
-
-def _throttled_worker_stream_progress(
-    run_id: str,
-    ide_stream: WorkerIdeStream | None = None,
-) -> Callable[[str, str], None]:
-    """Emit worker_progress receipts and mirror chunks into the employee IDE thread."""
-    last_at = 0.0
-    lock = threading.Lock()
-    milestone_content = ""
-
-    def on_chunk(accumulated: str, delta: str) -> None:
-        nonlocal last_at, milestone_content
-        if ide_stream is not None:
-            try:
-                milestone_content = stream_worker_chunk(
-                    ide_stream,
-                    previous_content=milestone_content,
-                    accumulated=accumulated,
-                    delta=delta,
-                )
-            except Exception:  # noqa: BLE001 — never block dispatch on UI mirror
-                logger.exception(
-                    "continuous worker IDE stream chunk failed for %s",
-                    run_id,
-                )
-        now = time.monotonic()
-        with lock:
-            if now - last_at < _PROGRESS_RECEIPT_MIN_SECONDS:
-                return
-            last_at = now
-        try:
-            append_run_execution_receipt(
-                run_id,
-                receipt_type="worker_progress",
-                receipt_summary="Continuous worker dispatch still executing",
-                actor="workspace_scheduler",
-            )
-        except (RunLifecycleError, RunNotFoundError):
-            return
-
-    return on_chunk
-
-
-def _run_dispatch_heartbeat(run_id: str, stop: threading.Event) -> None:
-    """Record dispatch-thread liveness; stale reap ignores heartbeat-only bumps."""
-    while not stop.wait(_HEARTBEAT_SECONDS):
-        try:
-            append_run_execution_receipt(
-                run_id,
-                receipt_type="worker_heartbeat",
-                receipt_summary="Continuous worker dispatch still running",
-                actor="workspace_scheduler",
-            )
-        except (RunLifecycleError, RunNotFoundError):
-            return
 
 
 def _fail_worker_run(run_id: str, *, receipt_summary: str) -> dict[str, Any] | None:
@@ -148,7 +91,7 @@ def dispatch_continuous_worker_run(
 
     stop_heartbeat = threading.Event()
     heartbeat = threading.Thread(
-        target=_run_dispatch_heartbeat,
+        target=run_dispatch_heartbeat,
         args=(run_id, stop_heartbeat),
         daemon=True,
         name=f"worker-heartbeat-{run_id}",
@@ -238,7 +181,7 @@ def dispatch_continuous_worker_run(
             runtime_target=runtime_target,
             runtime_model=runtime_model,
             execution_access=execution_policy.execution_access,
-            on_chunk=_throttled_worker_stream_progress(run_id, ide_stream),
+            on_chunk=throttled_worker_stream_progress(run_id, ide_stream),
             cursor_trust_policy=execution_policy.trust_policy,
             workspace_root=agent_root,
             execution_policy=execution_policy,
@@ -253,6 +196,21 @@ def dispatch_continuous_worker_run(
             reply_text,
             str(employee.name or "").strip() or None,
         )
+        auto_ask_resolution = maybe_resolve_safe_ask(
+            reply_text,
+            auto_mode_enabled=bool(
+                worker_scheduler_settings_store.load_settings().get("scheduler_enabled")
+            ),
+        )
+        if auto_ask_resolution is not None:
+            append_run_execution_receipt(
+                run_id,
+                receipt_type="auto_ask_resolution",
+                receipt_summary=auto_ask_resolution.receipt_summary,
+                actor="workspace_scheduler",
+                success=True,
+                intent="worker_autonomy",
+            )
         scope_guard_detail = parse_out_of_scope_guard(reply_text)
         if scope_guard_detail:
             dispatched = False
@@ -310,11 +268,36 @@ def dispatch_continuous_worker_run(
                         and publish.delivery is not None
                         and execution_policy.execution_access == "full"
                     ):
+                        if auto_ask_resolution is not None:
+                            finalized = _fail_worker_run(
+                                run_id,
+                                receipt_summary=(
+                                    auto_ask_resolution.receipt_summary
+                                    + ". Reopening the task so the next Auto shift "
+                                    "continues with that selected answer."
+                                ),
+                            )
+                            dispatched = False
+                        else:
+                            finalized = _fail_worker_run(
+                                run_id,
+                                receipt_summary=(
+                                    "Workspace delivery blocked: full-access worker produced "
+                                    f"no publishable changes ({publish.detail})"
+                                ),
+                            )
+                            dispatched = False
+                    elif (
+                        auto_ask_resolution is not None
+                        and publish.ok
+                        and publish.stage == "no_change"
+                    ):
                         finalized = _fail_worker_run(
                             run_id,
                             receipt_summary=(
-                                "Workspace delivery blocked: full-access worker produced "
-                                f"no publishable changes ({publish.detail})"
+                                auto_ask_resolution.receipt_summary
+                                + ". Reopening the task so the next Auto shift continues "
+                                "with that selected answer."
                             ),
                         )
                         dispatched = False

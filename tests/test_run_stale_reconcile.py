@@ -470,7 +470,7 @@ class RunStaleReconcileTests(unittest.TestCase):
             "app.workspace_agents.worker_dispatch.generate_lane_b_result",
             side_effect=blocked_lane_b,
         ), patch(
-            "app.workspace_agents.worker_dispatch._HEARTBEAT_SECONDS",
+            "app.workspace_agents.worker_dispatch_progress.HEARTBEAT_SECONDS",
             0.05,
         ), patch(
             "app.workspace_agents.worker_dispatch.create_worker_isolation",

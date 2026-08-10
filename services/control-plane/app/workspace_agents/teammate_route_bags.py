@@ -13,6 +13,7 @@ _ROLE_BAGS: list[tuple[str, int, list[re.Pattern[str]]]] = [
             re.compile(r"\bux\b", re.I),
             re.compile(r"\bscreen\b", re.I),
             re.compile(r"\bcomponent\b", re.I),
+            re.compile(r"\bdashboard\b", re.I),
             re.compile(r"\blayout\b", re.I),
             re.compile(r"\bexpo\b", re.I),
             re.compile(r"\bandroid\b", re.I),
@@ -27,6 +28,7 @@ _ROLE_BAGS: list[tuple[str, int, list[re.Pattern[str]]]] = [
             re.compile(r"\bcss\b", re.I),
             re.compile(r"\bvue\b", re.I),
             re.compile(r"\bparent[- ]facing\b", re.I),
+            re.compile(r"\b(?:teacher|parent)s? dashboard\b", re.I),
             re.compile(r"\bcanary build\b", re.I),
             re.compile(r"\bmissing (?:on|in) (?:the )?(?:app|ui|screen|build)\b", re.I),
         ],
@@ -117,4 +119,3 @@ _PATH_ROLE_HINTS: list[tuple[str, re.Pattern[str], int]] = [
         2,
     ),
 ]
-

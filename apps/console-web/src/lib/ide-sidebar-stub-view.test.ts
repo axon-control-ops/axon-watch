@@ -34,7 +34,7 @@ describe('buildIdeAgentSidebarStub', () => {
     expect(panel.lines[0]).toContain('responding');
   });
 
-  it('offers collapse when the dock is already open', () => {
+  it('offers Team roster handoff when the dock is already open', () => {
     const panel = buildIdeAgentSidebarStub({
       agentDockCollapsed: false,
       streaming: true,
@@ -42,7 +42,9 @@ describe('buildIdeAgentSidebarStub', () => {
       runPhase: null,
     });
 
-    expect(panel.actionLabel).toBe('Collapse agent dock');
+    expect(panel.actionLabel).toBe('Open Team roster');
+    expect(panel.actionKind).toBe('open_team');
+    expect(panel.lines.join(' ')).toContain('teammate status/action cards');
   });
 
   it('surfaces run phase guidance when the dock stays collapsed', () => {
@@ -189,6 +191,7 @@ describe('ideSidebarStubUsesLiveRegion', () => {
 describe('ideSidebarStubActionAriaLabel', () => {
   it('expands agent and terminal stub button labels for screen readers', () => {
     expect(ideSidebarStubActionAriaLabel('Expand agent dock', 'agent')).toContain('right edge');
+    expect(ideSidebarStubActionAriaLabel('Open Team roster', 'agent')).toContain('left sidebar');
     expect(ideSidebarStubActionAriaLabel('Show terminal', 'terminal')).toContain('below the editor');
     expect(ideSidebarStubActionAriaLabel('Try again', 'agent')).toContain('agent dock composer');
     expect(ideSidebarStubActionAriaLabel('Continue', 'agent')).toContain('agent dock composer');

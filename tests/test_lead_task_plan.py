@@ -12,6 +12,7 @@ sys.path.insert(0, str(CONTROL_PLANE_ROOT))
 from app.workspace_agents.lead_task_plan import (  # noqa: E402
     build_lead_task_plan,
     detect_fan_out_intent,
+    detect_implement_intent,
     extract_exclusive_paths,
     should_lead_decompose_dispatch,
 )
@@ -138,6 +139,19 @@ class LeadTaskPlanTests(unittest.TestCase):
             mode="auto",
         )
         self.assertFalse(should_lead_decompose_dispatch(fan))
+
+    def test_dashpro_dashboard_fixes_dispatch_to_frontend(self) -> None:
+        goal = (
+            "I ran the dev server - but I still don't see any changes in the teachers "
+            "dashboard - and in the parent dashboard - can you please make the fixes "
+            "end to end - and stop at nothing until this is fixed"
+        )
+
+        plan = build_lead_task_plan(goal=goal, roster=DASHPRO_ROSTER, mode="decompose")
+
+        self.assertTrue(detect_implement_intent(goal))
+        self.assertTrue(should_lead_decompose_dispatch(plan))
+        self.assertEqual(["frontend"], [item.owner_role for item in plan.items])
 
     def test_shift_retry_skips_lead_decompose_dispatch(self) -> None:
         from app.workspace_agents.lead_task_plan import is_employee_shift_retry_request

@@ -32,6 +32,18 @@ def _prior_failure_clause(*, workspace_id: str, role: str) -> str:
     )
 
 
+def _auto_mode_ask_clause() -> str:
+    return (
+        " Auto-mode question discipline: do not stop on ask cards for safe, "
+        "reversible engineering choices such as continuing investigation, clearing "
+        "local cache, hardening a route, or running targeted checks. Pick the safest "
+        "progress path yourself, state the assumption, and continue. Only emit an "
+        "Axon ask card for a real operator decision: destructive data changes, "
+        "credentials/secrets, spending/billing, production release/merge/push, or an "
+        "irreversible product choice."
+    )
+
+
 def _role_tools_clause(role: str) -> str:
     """Tell specialists which tools they should use — Full Access means Shell/Edit/Read."""
     cleaned = str(role or "").strip().lower()
@@ -305,6 +317,7 @@ def build_continuous_worker_prompt(
         f"{tools_clause}"
         f"{ci_clause}"
         f"{memory_clause}"
+        f"{_auto_mode_ask_clause()}"
         " If a step fails, say what failed and why (command, assertion, import, CI step) — "
         "never a bare FAILED."
         f"{roster_clause}"

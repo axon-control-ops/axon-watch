@@ -3,7 +3,7 @@
   "enabled": true,
   "workspace_id": "workspace_dashpro",
   "workspace_label": "DashPro",
-  "project_root": "/home/edp/Projectx/product/dashpro",
+  "project_root": "/run/media/vaxon/axon-data/projectx/product/dashpro",
   "checks": [
     {
       "id": "dashpro_sentry_recent_issues",
