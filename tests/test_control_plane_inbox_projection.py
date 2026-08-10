@@ -20,6 +20,7 @@ class ControlPlaneInboxProjectionTests(unittest.TestCase):
         from app.inbox_projection import (  # noqa: WPS433
             WatchInboxUnavailableError,
             build_inbox_response,
+            project_inbox_item,
             project_watch_inbox,
         )
         from app.main import app  # noqa: WPS433
@@ -27,6 +28,7 @@ class ControlPlaneInboxProjectionTests(unittest.TestCase):
 
         self.WatchInboxUnavailableError = WatchInboxUnavailableError
         self.build_inbox_response = build_inbox_response
+        self.project_inbox_item = project_inbox_item
         self.project_watch_inbox = project_watch_inbox
         isolate_control_plane_db(self, run_store)
         self.client = TestClient(app)
@@ -53,6 +55,31 @@ class ControlPlaneInboxProjectionTests(unittest.TestCase):
         projected_item = payload["items"][0]
         source_item = BOOTSTRAP_WATCH_INBOX["items"][0]
         self.assertEqual(consistency_tuple(source_item), consistency_tuple(projected_item))
+
+    def test_project_inbox_item_feeds_known_pattern_into_meta_override(self) -> None:
+        projected = self.project_inbox_item(
+            {
+                "signal_id": "signal_x",
+                "severity": "critical",
+                "title": "DashPro Sentry critical",
+                "summary": "Sentry API rejected the auth token",
+            }
+        )
+        self.assertIn("operator_what", projected["meta"])
+        self.assertIn("operator_you_do", projected["meta"])
+        self.assertIn("Vault", projected["meta"]["operator_you_do"])
+
+    def test_project_inbox_item_does_not_overwrite_existing_meta_override(self) -> None:
+        projected = self.project_inbox_item(
+            {
+                "signal_id": "signal_x",
+                "severity": "critical",
+                "title": "DashPro Sentry critical",
+                "summary": "Sentry API rejected the auth token",
+                "meta": {"operator_what": "a more specific upstream explanation"},
+            }
+        )
+        self.assertEqual("a more specific upstream explanation", projected["meta"]["operator_what"])
 
     def test_build_inbox_response_fails_closed_when_watch_unavailable(self) -> None:
         with self.assertRaises(self.WatchInboxUnavailableError):

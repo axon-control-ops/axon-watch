@@ -54,6 +54,14 @@ type TerminalHostInstance = InstanceType<typeof TerminalHost>;
 const shell = useShellStore();
 const bottomTab = ref<BottomTabId>(props.hideOperatorEditor ? 'ops' : 'terminal');
 const showNewTerminalMenu = ref(false);
+const terminalActionError = ref<string | null>(null);
+let terminalActionErrorTimer: ReturnType<typeof setTimeout> | null = null;
+
+function flashTerminalActionError(message: string): void {
+  terminalActionError.value = message;
+  if (terminalActionErrorTimer) clearTimeout(terminalActionErrorTimer);
+  terminalActionErrorTimer = setTimeout(() => (terminalActionError.value = null), 4000);
+}
 const terminalHostRefs = ref<Record<string, TerminalHostInstance | null>>({});
 const visibleTerminalSessionIds = ref<string[]>([]);
 
@@ -240,13 +248,23 @@ function handleDocumentPointerDown(event: PointerEvent): void {
 function createTerminalSession(kind: 'bash' | 'zsh' | 'vaxon' = 'zsh'): void {
   closeNewTerminalMenu();
   if (kind === 'vaxon') {
-    void shell.createVaxonTerminalSession();
+    void shell.createVaxonTerminalSession().then((ok) => {
+      if (!ok) {
+        flashTerminalActionError('Could not start the vaxon terminal — check your connection and try again.');
+      }
+    });
     return;
   }
-  void shell.createTerminalSession({
-    role: 'operator',
-    title: kind,
-  });
+  void shell
+    .createTerminalSession({
+      role: 'operator',
+      title: kind,
+    })
+    .then((created) => {
+      if (!created) {
+        flashTerminalActionError('Could not open a new terminal — check your connection and try again.');
+      }
+    });
 }
 
 function toggleNewTerminalMenu(): void {
@@ -293,7 +311,11 @@ function handleHeaderKill(): void {
 }
 
 function renameTerminalSession(sessionId: string, title: string): void {
-  void shell.renameTerminalSession(sessionId, title);
+  void shell.renameTerminalSession(sessionId, title).then((ok) => {
+    if (!ok) {
+      flashTerminalActionError('Could not rename that terminal tab — check your connection and try again.');
+    }
+  });
 }
 
 function clearTerminalPanel(): void {
@@ -331,6 +353,9 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   document.removeEventListener('pointerdown', handleDocumentPointerDown, true);
+  if (terminalActionErrorTimer) {
+    clearTimeout(terminalActionErrorTimer);
+  }
 });
 </script>
 
@@ -350,6 +375,10 @@ onBeforeUnmount(() => {
       >
         <span class="center-workbench__resize-grip" aria-hidden="true" />
       </div>
+
+      <p v-if="terminalActionError" class="terminal-tabbar__action-error" role="alert">
+        {{ terminalActionError }}
+      </p>
 
       <div class="terminal-tabbar terminal-tabbar--mockup">
         <div class="terminal-tabbar__tabs">

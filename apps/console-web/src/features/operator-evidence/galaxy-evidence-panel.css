@@ -137,3 +137,58 @@
 .brain-galaxy-stage--mockup .galaxy-inspector__autonomy--info {
   color: #7ad8ff;
 }
+
+.brain-galaxy-stage--mockup .galaxy-inspector__autonomy-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  margin-top: 0.35rem;
+  padding: 0.4rem 0.6rem;
+  border: 1px solid rgba(0, 210, 255, 0.16);
+  border-radius: 0.4rem;
+  background: rgba(0, 210, 255, 0.04);
+}
+
+.brain-galaxy-stage--mockup .galaxy-inspector__autonomy-toggle-label {
+  font-size: 0.68rem;
+  color: rgba(200, 225, 240, 0.85);
+}
+
+.brain-galaxy-stage--mockup .galaxy-inspector__autonomy-switch {
+  position: relative;
+  flex-shrink: 0;
+  width: 2.3rem;
+  height: 1.25rem;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 999px;
+  background: rgba(8, 20, 28, 0.75);
+  cursor: pointer;
+  padding: 0;
+  transition: background 150ms ease, border-color 150ms ease;
+}
+
+.brain-galaxy-stage--mockup .galaxy-inspector__autonomy-switch:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.brain-galaxy-stage--mockup .galaxy-inspector__autonomy-switch--on {
+  background: rgba(0, 242, 255, 0.35);
+  border-color: rgba(0, 242, 255, 0.6);
+}
+
+.brain-galaxy-stage--mockup .galaxy-inspector__autonomy-switch-knob {
+  position: absolute;
+  top: 0.12rem;
+  left: 0.12rem;
+  width: 0.9rem;
+  height: 0.9rem;
+  border-radius: 999px;
+  background: rgba(220, 240, 255, 0.92);
+  transition: transform 150ms ease;
+}
+
+.brain-galaxy-stage--mockup .galaxy-inspector__autonomy-switch--on .galaxy-inspector__autonomy-switch-knob {
+  transform: translateX(1.05rem);
+}

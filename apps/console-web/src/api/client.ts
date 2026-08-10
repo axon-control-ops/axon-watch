@@ -40,6 +40,10 @@ export function isApiNotFoundError(error: unknown): boolean {
   return error instanceof ApiRequestError && error.status === 404;
 }
 
+export function isApiConflictError(error: unknown): boolean {
+  return error instanceof ApiRequestError && error.status === 409;
+}
+
 export function controlPlaneBaseUrl(): string {
   const configured = import.meta.env.VITE_CONTROL_PLANE_BASE_URL;
   if (configured) {

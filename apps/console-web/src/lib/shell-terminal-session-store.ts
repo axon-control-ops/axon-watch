@@ -1,9 +1,10 @@
-import { computed, type Ref } from 'vue';
+import { computed, ref, type Ref } from 'vue';
 
 import {
   createWorkspaceTerminalSession,
   deleteWorkspaceTerminalSession,
   enqueueWorkspaceAgentTerminalJob,
+  fetchAgentTerminalJobStatus,
   fetchWorkspaceTerminalSessions,
   renameWorkspaceTerminalSession,
   type TerminalSessionRecord,
@@ -55,12 +56,48 @@ function mapTerminalSessionRecord(record: TerminalSessionRecord): TerminalSessio
   };
 }
 
+const AGENT_TERMINAL_JOB_POLL_INTERVAL_MS = 4000;
+const AGENT_TERMINAL_JOB_POLL_MAX_ATTEMPTS = 90; // ~6 minutes
+
+const TERMINAL_JOB_STATUSES_TERMINAL = new Set(['completed', 'failed', 'error', 'cancelled']);
+
 export function createTerminalSessionStore(input: TerminalSessionStoreInput) {
   const activeTerminalSession = computed(
     () =>
       input.terminalSessions.value.find((session) => session.id === input.activeTerminalSessionId.value) ??
       DEFAULT_TERMINAL_SESSIONS[0],
   );
+
+  /** job_id -> last known server-tracked status, independent of whatever the
+   * terminal output stream shows (that stream can drop — see create-xterm-session
+   * reconnect logic — leaving output-based status parsing stuck forever). */
+  const agentTerminalJobStatuses = ref<Record<string, string>>({});
+
+  function pollAgentTerminalJobStatus(workspaceId: string, jobId: string): void {
+    let attempts = 0;
+    const tick = async (): Promise<void> => {
+      attempts += 1;
+      try {
+        const record = await fetchAgentTerminalJobStatus(workspaceId, jobId);
+        agentTerminalJobStatuses.value = { ...agentTerminalJobStatuses.value, [jobId]: record.status };
+        if (TERMINAL_JOB_STATUSES_TERMINAL.has(record.status)) {
+          return;
+        }
+      } catch {
+        // Transient poll failure — keep trying until max attempts; the job's
+        // last known status (or "running" default) stays as-is meanwhile.
+      }
+      if (attempts >= AGENT_TERMINAL_JOB_POLL_MAX_ATTEMPTS) {
+        agentTerminalJobStatuses.value = {
+          ...agentTerminalJobStatuses.value,
+          [jobId]: agentTerminalJobStatuses.value[jobId] ?? 'unknown',
+        };
+        return;
+      }
+      setTimeout(() => void tick(), AGENT_TERMINAL_JOB_POLL_INTERVAL_MS);
+    };
+    void tick();
+  }
 
   async function loadTerminalSessions(workspaceId: string): Promise<void> {
     try {
@@ -128,19 +165,24 @@ export function createTerminalSessionStore(input: TerminalSessionStoreInput) {
 
     const role = options.role ?? 'operator';
     const title = options.title ?? (role === 'agent' ? 'vaxon' : 'zsh');
-    const created = await createWorkspaceTerminalSession(workspaceId, {
-      role,
-      title,
-    });
-    applyTerminalSession(created);
-    input.revealIdeTerminalPanel();
-    return created;
+    try {
+      const created = await createWorkspaceTerminalSession(workspaceId, {
+        role,
+        title,
+      });
+      applyTerminalSession(created);
+      input.revealIdeTerminalPanel();
+      return created;
+    } catch (error) {
+      console.error('createTerminalSession failed', error);
+      return null;
+    }
   }
 
-  async function createVaxonTerminalSession(runId?: string | null): Promise<void> {
+  async function createVaxonTerminalSession(runId?: string | null): Promise<boolean> {
     const workspaceId = input.currentWorkspace.value?.workspace_id;
     if (!workspaceId) {
-      return;
+      return false;
     }
     const existing = input.terminalSessions.value.find(
       (session) =>
@@ -150,15 +192,21 @@ export function createTerminalSessionStore(input: TerminalSessionStoreInput) {
     if (existing) {
       input.activeTerminalSessionId.value = existing.id;
       input.revealIdeTerminalPanel();
-      return;
+      return true;
     }
-    const created = await createWorkspaceTerminalSession(workspaceId, {
-      role: 'agent',
-      title: 'vaxon',
-      runId: runId ?? input.ideAgentRunId.value ?? null,
-    });
-    applyTerminalSession(created);
-    input.revealIdeTerminalPanel();
+    try {
+      const created = await createWorkspaceTerminalSession(workspaceId, {
+        role: 'agent',
+        title: 'vaxon',
+        runId: runId ?? input.ideAgentRunId.value ?? null,
+      });
+      applyTerminalSession(created);
+      input.revealIdeTerminalPanel();
+      return true;
+    } catch (error) {
+      console.error('createVaxonTerminalSession failed', error);
+      return false;
+    }
   }
 
   /** Inject a command into the Axon agent PTY and focus the vaxon tab. */
@@ -177,6 +225,7 @@ export function createTerminalSessionStore(input: TerminalSessionStoreInput) {
         applyTerminalSession(job.agent_terminal_session);
         input.revealIdeTerminalPanel();
         input.activeTerminalSessionId.value = job.session_id;
+        pollAgentTerminalJobStatus(workspaceId, job.job_id);
         return;
       } catch {
         // Fall through to local pending queue if control-plane is unreachable.
@@ -237,14 +286,20 @@ export function createTerminalSessionStore(input: TerminalSessionStoreInput) {
     return created?.session_id ?? null;
   }
 
-  async function renameTerminalSession(sessionId: string, nextTitle: string): Promise<void> {
+  async function renameTerminalSession(sessionId: string, nextTitle: string): Promise<boolean> {
     const title = nextTitle.trim();
     const workspaceId = input.currentWorkspace.value?.workspace_id;
     if (!title || !workspaceId) {
-      return;
+      return false;
     }
-    const updated = await renameWorkspaceTerminalSession(workspaceId, sessionId, title);
-    applyTerminalSession(updated);
+    try {
+      const updated = await renameWorkspaceTerminalSession(workspaceId, sessionId, title);
+      applyTerminalSession(updated);
+      return true;
+    } catch (error) {
+      console.error('renameTerminalSession failed', error);
+      return false;
+    }
   }
 
   async function closeTerminalSession(sessionId: string): Promise<void> {
@@ -278,6 +333,7 @@ export function createTerminalSessionStore(input: TerminalSessionStoreInput) {
 
   return {
     activeTerminalSession,
+    agentTerminalJobStatuses,
     applyAgentTerminalSession: applyTerminalSession,
     backgroundIdeAgentRun,
     closeTerminalSession,

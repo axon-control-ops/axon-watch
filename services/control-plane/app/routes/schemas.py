@@ -9,6 +9,11 @@ from pydantic import BaseModel
 
 class WriteWorkspaceFileRequest(BaseModel):
     content: str
+    # sha256 of the content this save was based on, from the last read/save
+    # response. When present, the save is rejected with 409 if the file on disk
+    # no longer matches — someone else (agent or another tab) changed it since
+    # load. Omit to keep the old last-write-wins behavior.
+    base_sha256: str | None = None
 
 
 class WorkspaceComposerPrefsRequest(BaseModel):

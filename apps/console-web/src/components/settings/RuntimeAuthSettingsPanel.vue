@@ -19,6 +19,7 @@ import {
 import { useShellStore } from '../../stores/shell';
 import ClaudeUsageCard from './ClaudeUsageCard.vue';
 import CursorUsageCard from './CursorUsageCard.vue';
+import WorkspaceAutonomyTogglePanel from './WorkspaceAutonomyTogglePanel.vue';
 import WorkspaceRuntimePolicyPanel from './WorkspaceRuntimePolicyPanel.vue';
 
 type RuntimeFamily = 'cursor' | 'claude' | 'codex';
@@ -479,6 +480,11 @@ onMounted(() => {
           </button>
         </div>
       </article>
+    </div>
+
+    <div v-if="!isLoading" class="runtime-auth-settings__policy-section">
+      <header class="runtime-auth-settings__policy-header"><h2>Workspace autonomy</h2><p>Turn AUTO dispatch on or off per workspace, without switching your active workspace to check each one.</p></header>
+      <WorkspaceAutonomyTogglePanel />
     </div>
 
     <div v-if="!isLoading" class="runtime-auth-settings__policy-section">

@@ -11,11 +11,11 @@
       "rule": "operator shell presentation only; split by surface"
     },
     "apps/console-web/src/stores/shell.ts": {
-      "max_lines": 4161,
+      "max_lines": 4189,
       "soft_limit": 350,
       "hard_limit": 500,
       "target": "apps/console-web/src/stores/shell/slices/*",
-      "rule": "FS-003 in progress: dock/connectors/probes/briefing/presence/inbox/catalog + viewport/thread/chrome/composer-prefs/operator-focus/display + busy-employee IDE stream follow slices extracted; +1 for AUTO runtime policy state bridge, extract next."
+      "rule": "FS-003 in progress: dock/connectors/probes/briefing/presence/inbox/catalog + viewport/thread/chrome/composer-prefs/operator-focus/display + busy-employee IDE stream follow slices extracted; +28 for file-save conflict-sha tracking + agent-terminal-job status poll wiring, extract next."
     },
     "apps/console-web/src/styles/ide-layout.css": {
       "max_lines": 15,
@@ -464,11 +464,11 @@
       "note": "First constitution registry spine with seven tables and CRUD helpers; split per-registry modules after the initial audit slice lands."
     },
     "services/control-plane/app/routes/workspaces.py": {
-      "max_lines": 502,
+      "max_lines": 507,
       "soft_limit": 350,
       "hard_limit": 525,
       "target": "services/control-plane/app/routes/workspaces_*",
-      "note": "Workspace routes plus runtime/composer policy DTOs. Extract composer policy routes next."
+      "note": "Workspace routes plus runtime/composer policy DTOs. +5 for save-conflict base_sha256 (409). Extract composer policy routes next."
     },
     "services/control-plane/app/workspace_agents/worker_dispatch.py": {
       "max_lines": 504,

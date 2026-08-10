@@ -45,6 +45,7 @@ from app.workspace_project_bindings import (
     upsert_workspace_project_binding,
 )
 from app.workspace_files import (
+    WorkspaceFileConflictError,
     WorkspaceFileError,
     list_workspace_files,
     read_workspace_file,
@@ -480,9 +481,13 @@ def workspace_files_update(
     body: WriteWorkspaceFileRequest,
 ) -> dict[str, object]:
     try:
-        return write_workspace_file(workspace_id, file_path, body.content)
+        return write_workspace_file(
+            workspace_id, file_path, body.content, base_sha256=body.base_sha256
+        )
     except WorkspaceNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except WorkspaceFileConflictError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
     except WorkspaceFileError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 

@@ -1,6 +1,7 @@
 import { computed, ref, watch, type ComputedRef } from 'vue';
 import { defineStore } from 'pinia';
 
+import { isApiConflictError } from '../api/client';
 import {
   approveRun,
   completeRun,
@@ -504,6 +505,10 @@ export const useShellStore = defineStore('shell', () => {
   const fileContents = ref<Record<string, string>>({});
   const fileSavedContents = ref<Record<string, string>>({});
   const fileContentLoadStates = ref<Record<string, FileContentLoadState>>({});
+  // sha256 of each file's content as last read/saved from the server — sent back
+  // on save so the backend can reject stale writes instead of clobbering changes
+  // made by an agent or another operator tab since this one loaded the file.
+  const fileContentShas = ref<Record<string, string>>({});
   const openedFilePaths = ref<string[]>([]);
   const draftDocuments = ref<WorkspaceDocumentDescriptor[]>([]);
   const fileSaveState = ref<'idle' | 'saving'>('idle');
@@ -2638,6 +2643,7 @@ export const useShellStore = defineStore('shell', () => {
   });
   const {
     activeTerminalSession,
+    agentTerminalJobStatuses,
     applyAgentTerminalSession,
     backgroundIdeAgentRun,
     closeTerminalSession,
@@ -2773,6 +2779,10 @@ export const useShellStore = defineStore('shell', () => {
         ...fileSavedContents.value,
         [path]: payload.content,
       };
+      fileContentShas.value = {
+        ...fileContentShas.value,
+        [path]: payload.content_sha256,
+      };
       fileContentLoadStates.value = {
         ...fileContentLoadStates.value,
         [path]: 'loaded',
@@ -2820,6 +2830,12 @@ export const useShellStore = defineStore('shell', () => {
         fileSavedContents.value = {
           ...fileSavedContents.value,
           [path]: payload.content,
+        };
+      }
+      if (fileContentShas.value[path] === undefined) {
+        fileContentShas.value = {
+          ...fileContentShas.value,
+          [path]: payload.content_sha256,
         };
       }
       fileContentLoadStates.value = {
@@ -3155,13 +3171,24 @@ export const useShellStore = defineStore('shell', () => {
 
     try {
       const content = fileContents.value[document.filePath] ?? '';
-      await saveWorkspaceFile(workspaceId, document.filePath, content);
+      const baseSha = fileContentShas.value[document.filePath];
+      const saved = await saveWorkspaceFile(workspaceId, document.filePath, content, baseSha);
       fileSavedContents.value = {
         ...fileSavedContents.value,
         [document.filePath]: content,
       };
+      fileContentShas.value = {
+        ...fileContentShas.value,
+        [document.filePath]: saved.content_sha256,
+      };
     } catch (error) {
-      fileSaveError.value = error instanceof Error ? error.message : 'workspace file save failed';
+      if (isApiConflictError(error)) {
+        fileSaveError.value =
+          'This file changed on disk since you opened it (likely an agent edit). ' +
+          'Reload it to see the current version before saving again — your changes here are still in the editor.';
+      } else {
+        fileSaveError.value = error instanceof Error ? error.message : 'workspace file save failed';
+      }
     } finally {
       fileSaveState.value = 'idle';
     }
@@ -3892,6 +3919,7 @@ export const useShellStore = defineStore('shell', () => {
     ideThreadsForCurrentWorkspace,
     openIdeThreadTabsForCurrentWorkspace,
     activeTerminalSession,
+    agentTerminalJobStatuses,
     ideDisplayKairoPresenceState,
     idePresenceProfile,
     inboxItems,
