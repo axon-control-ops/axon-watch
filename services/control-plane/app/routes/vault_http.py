@@ -31,6 +31,7 @@ from app.vault.routes import (
     vault_setup,
     vault_unlock,
 )
+from app.vault.sentry_validation import validate_sentry_vault_credentials
 
 router = APIRouter()
 
@@ -56,6 +57,14 @@ def vault_status_route() -> dict[str, object]:
 def vault_provider_keys_route() -> dict[str, object]:
     try:
         return vault_provider_keys()
+    except RuntimeError as exc:
+        raise _vault_http_error(exc) from exc
+
+
+@router.post("/api/vault/validate/sentry")
+def vault_validate_sentry_route() -> dict[str, object]:
+    try:
+        return validate_sentry_vault_credentials()
     except RuntimeError as exc:
         raise _vault_http_error(exc) from exc
 

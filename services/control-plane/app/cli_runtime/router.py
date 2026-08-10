@@ -69,7 +69,7 @@ _REPLY_STYLE = (
 )
 
 _INSTRUCTION_TAKING = (
-    "The current turn's `Operator request:` is the sole active task. "
+    "The current turn's explicit request block is the sole active task. "
     "Do not continue, complete, commit, push, or clean up work from earlier thread "
     "messages, Kairo memory, prior runs, or visible terminal history unless the current "
     "request explicitly asks you to continue that specific earlier task. "

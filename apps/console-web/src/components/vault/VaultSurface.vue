@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, ref } from 'vue';
-
 import VaultHudPanel from './VaultHudPanel.vue';
+import VaultSentryValidationCard from './VaultSentryValidationCard.vue';
 import { useVaultSurface } from '../../composables/useVaultSurface';
 import {
   formatVaultTimestamp,
@@ -21,7 +21,6 @@ import {
 } from '../../lib/runtime-auth-view';
 
 const vault = useVaultSurface();
-
 const snapshot = computed(() => vault.snapshot.value);
 const knownKeys = computed(() => snapshot.value?.known_keys ?? []);
 const consumers = computed(() => snapshot.value?.consumers ?? []);
@@ -277,6 +276,7 @@ function onBackupFileSelected(event: Event): void {
               <div><dt>Legacy import file</dt><dd>{{ snapshot.import_file_present ? importFileLabel : 'None' }}</dd></div>
               <div><dt>Resolved keys</dt><dd>{{ snapshot.available_keys.length }}</dd></div>
             </dl>
+            <VaultSentryValidationCard />
           </VaultHudPanel>
         </aside>
 
