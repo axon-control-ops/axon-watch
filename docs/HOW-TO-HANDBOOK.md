@@ -95,7 +95,7 @@ for Vite recovery, manual STAND-UP, speech onset, and AgentDock hover actions.
 **Dev bootstrap (alternate, not used when systemd owns the ports):**
 
 ```bash
-cd /home/edp/axon-nvme/repos/axon-watch
+cd /run/media/vaxon/axon-data/repos/axon-nvme/repos/axon-watch
 ./scripts/dev/up.sh
 ./scripts/dev/check-health.sh
 ```
@@ -103,7 +103,6 @@ cd /home/edp/axon-nvme/repos/axon-watch
 Open **http://127.0.0.1:4173** and hard-refresh after upgrades (`Ctrl+Shift+R`).
 
 > **Important:** `./scripts/dev/down.sh` does **not** stop systemd always-on units. On this host use `axonrestart` / `axonrevive`.
-
 ## AXON-X Constitution registries
 
 The Constitution work adds a durable executive memory layer for AXON-X. It does **not** replace the original execution stores; it indexes them so VAXON, Dana, specialists, and the operator can answer: what mission is active, what evidence exists, what decision was made, what capability owns it, and what platform health looked like at the time.
@@ -595,11 +594,11 @@ The target product combines:
 
 The implementation repo is here:
 
-- `/home/edp/axon-nvme/repos/axon-watch`
+- `/run/media/vaxon/axon-data/repos/axon-nvme/repos/axon-watch`
 
 The frozen planning source-of-truth still lives here:
 
-- `/home/edp/axon-nvme/repos/axon-local/Plans/Axon-Watch/`
+- `/run/media/vaxon/axon-data/repos/axon-nvme/repos/axon-local/Plans/Axon-Watch/`
 
 Important rule:
 
@@ -838,7 +837,7 @@ It avoids:
 ## 1. Go to the repo
 
 ```bash
-cd /home/edp/axon-nvme/repos/axon-watch
+cd /run/media/vaxon/axon-data/repos/axon-nvme/repos/axon-watch
 ```
 
 ## 2. Install JavaScript dependencies
@@ -1658,7 +1657,7 @@ systemctl --user restart console-web.service
 After pulling new commits or changing dependencies:
 
 ```bash
-cd /home/edp/axon-nvme/repos/axon-watch
+cd /run/media/vaxon/axon-data/repos/axon-nvme/repos/axon-watch
 git pull
 npm install
 ./scripts/dev/down.sh && ./scripts/dev/up.sh

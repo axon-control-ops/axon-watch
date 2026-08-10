@@ -53,8 +53,8 @@ const showSetupFlow = computed(
 const showUnlockFlow = computed(
   () => Boolean(snapshot.value?.is_setup) && !snapshot.value?.is_unlocked && !vault.setupTotpSecret.value,
 );
-const secretSearch = ref('');
-const secretCategoryFilter = ref('all');
+const [showUnlockPassword, showSetupPassword, showSetupConfirmPassword] = [ref(false), ref(false), ref(false)];
+const secretSearch = ref(''), secretCategoryFilter = ref('all');
 const secretsExpanded = ref(true);
 const defaultCategories = ['general', 'runtime', 'monitor', 'analytics', 'security', 'integration'];
 const secretCategoryOptions = computed(() => {
@@ -211,11 +211,11 @@ function onBackupFileSelected(event: Event): void {
         <div class="vault-surface__form-grid">
           <label>
             Master password
-            <input v-model="vault.setupPassword.value" class="vault-surface__input" type="password" autocomplete="new-password" />
+            <input v-model="vault.setupPassword.value" class="vault-surface__input" :type="showSetupPassword ? 'text' : 'password'" autocomplete="new-password" /><button type="button" class="vault-surface__button" :aria-label="showSetupPassword ? 'Hide password' : 'Show password'" @click="showSetupPassword = !showSetupPassword">{{ showSetupPassword ? 'Hide' : 'Show' }}</button>
           </label>
           <label>
             Confirm password
-            <input v-model="vault.setupConfirmPassword.value" class="vault-surface__input" type="password" autocomplete="new-password" />
+            <input v-model="vault.setupConfirmPassword.value" class="vault-surface__input" :type="showSetupConfirmPassword ? 'text' : 'password'" autocomplete="new-password" /><button type="button" class="vault-surface__button" :aria-label="showSetupConfirmPassword ? 'Hide password' : 'Show password'" @click="showSetupConfirmPassword = !showSetupConfirmPassword">{{ showSetupConfirmPassword ? 'Hide' : 'Show' }}</button>
           </label>
         </div>
         <button type="button" class="vault-surface__button vault-surface__button--primary" @click="vault.submitSetup">
@@ -239,7 +239,7 @@ function onBackupFileSelected(event: Event): void {
         <div class="vault-surface__form-grid">
           <label>
             Master password
-            <input v-model="vault.unlockPassword.value" class="vault-surface__input" type="password" autocomplete="current-password" />
+            <input v-model="vault.unlockPassword.value" class="vault-surface__input" :type="showUnlockPassword ? 'text' : 'password'" autocomplete="current-password" /><button type="button" class="vault-surface__button" :aria-label="showUnlockPassword ? 'Hide password' : 'Show password'" @click="showUnlockPassword = !showUnlockPassword">{{ showUnlockPassword ? 'Hide' : 'Show' }}</button>
           </label>
           <label>
             2FA code

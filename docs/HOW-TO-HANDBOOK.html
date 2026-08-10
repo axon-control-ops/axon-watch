@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <title>Axon-X How-To Handbook</title>
-  <link rel="stylesheet" href="file:///mnt/axon-data/repos/axon-nvme/repos/axon-watch/docs/how-to-handbook-print.css" />
+  <link rel="stylesheet" href="file:///run/media/vaxon/axon-data/repos/axon-nvme/repos/axon-watch/docs/how-to-handbook-print.css" />
 </head>
 <body>
   <main class="page">
@@ -170,7 +170,7 @@ axonfixconnectors  # required connector / tunnel / vault 503 — diagnose (+ opt
 <p>See <a href="how-to/reliability-and-deliberate-controls.md">Reliability and deliberate controls</a>
 for Vite recovery, manual STAND-UP, speech onset, and AgentDock hover actions.</p>
 <p><strong>Dev bootstrap (alternate, not used when systemd owns the ports):</strong></p>
-<pre><code class="language-bash">cd /home/edp/axon-nvme/repos/axon-watch
+<pre><code class="language-bash">cd /run/media/vaxon/axon-data/repos/axon-nvme/repos/axon-watch
 ./scripts/dev/up.sh
 ./scripts/dev/check-health.sh
 </code></pre>
@@ -1014,11 +1014,11 @@ legacy/internal; the product name is <strong>Axon-X</strong>.</p>
 </ul>
 <p>The implementation repo is here:</p>
 <ul>
-<li><code>/home/edp/axon-nvme/repos/axon-watch</code></li>
+<li><code>/run/media/vaxon/axon-data/repos/axon-nvme/repos/axon-watch</code></li>
 </ul>
 <p>The frozen planning source-of-truth still lives here:</p>
 <ul>
-<li><code>/home/edp/axon-nvme/repos/axon-local/Plans/Axon-Watch/</code></li>
+<li><code>/run/media/vaxon/axon-data/repos/axon-nvme/repos/axon-local/Plans/Axon-Watch/</code></li>
 </ul>
 <p>Important rule:</p>
 <ul>
@@ -1154,7 +1154,7 @@ here, not in ad hoc local types.</p>
 </ul>
 </div></section><section class="chapter" id="chapter-detailed-setup-first-install"><div class="chapter-header"><span class="chapter-num">13</span><h2 id="detailed-setup-first-install">Detailed setup (first install)</h2></div><div class="chapter-body">
 <h2>1. Go to the repo</h2>
-<pre><code class="language-bash">cd /home/edp/axon-nvme/repos/axon-watch
+<pre><code class="language-bash">cd /run/media/vaxon/axon-data/repos/axon-nvme/repos/axon-watch
 </code></pre>
 <h2>2. Install JavaScript dependencies</h2>
 <pre><code class="language-bash">npm install
@@ -1736,7 +1736,7 @@ systemctl --user restart console-web.service
 </code></pre>
 </div></section><section class="chapter" id="chapter-upgrading-and-updating"><div class="chapter-header"><span class="chapter-num">28</span><h2 id="upgrading-and-updating">Upgrading and updating</h2></div><div class="chapter-body">
 <p>After pulling new commits or changing dependencies:</p>
-<pre><code class="language-bash">cd /home/edp/axon-nvme/repos/axon-watch
+<pre><code class="language-bash">cd /run/media/vaxon/axon-data/repos/axon-nvme/repos/axon-watch
 git pull
 npm install
 ./scripts/dev/down.sh &amp;&amp; ./scripts/dev/up.sh

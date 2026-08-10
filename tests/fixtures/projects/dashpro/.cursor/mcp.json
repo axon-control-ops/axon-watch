@@ -1,14 +1,14 @@
 {
   "mcpServers": {
     "axon-research": {
-      "command": "/mnt/axon-data/repos/axon-nvme/repos/axon-watch/.venv/bin/python3",
+      "command": "/run/media/vaxon/axon-data/repos/axon-nvme/repos/axon-watch/.venv/bin/python3",
       "args": [
         "-m",
         "app.research.mcp_server"
       ],
-      "cwd": "/mnt/axon-data/repos/axon-nvme/repos/axon-watch/services/control-plane",
+      "cwd": "/run/media/vaxon/axon-data/repos/axon-nvme/repos/axon-watch/services/control-plane",
       "env": {
-        "PYTHONPATH": "/mnt/axon-data/repos/axon-nvme/repos/axon-watch/services/control-plane"
+        "PYTHONPATH": "/run/media/vaxon/axon-data/repos/axon-nvme/repos/axon-watch/services/control-plane"
       }
     }
   }

@@ -40,7 +40,7 @@ mirror only.
 ## Start and stop (the only commands you need daily)
 
 ```bash
-cd /home/edp/axon-nvme/repos/axon-watch
+cd /run/media/vaxon/axon-data/repos/axon-nvme/repos/axon-watch
 npm install          # once, or after dependency changes
 ./scripts/dev/up.sh  # start console + control-plane + watch
 ```
