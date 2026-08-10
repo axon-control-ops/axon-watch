@@ -66,7 +66,7 @@ async function submit(): Promise<void> {
         type="text"
         name="project_root"
         autocomplete="off"
-        placeholder="/home/edp/path/to/repo"
+        placeholder="/run/media/vaxon/axon-data/path/to/repo"
         required
       />
     </label>

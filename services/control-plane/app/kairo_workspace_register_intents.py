@@ -181,7 +181,7 @@ def _school_pair_note_body(*, sync_peer: str) -> str:
         "It does **not** mean rebuilding or editing the DashPro product repo "
         "from this tree.\n\n"
         f"Product app workspace: `{sync_peer}` "
-        "(typically `/home/edp/Projectx/product/dashpro` when bound as DashPro).\n"
+        "(typically `/run/media/vaxon/axon-data/projectx/product/dashpro` when bound as DashPro).\n"
     )
 
 
