@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 import json
+from difflib import unified_diff
 from collections.abc import Callable
 from pathlib import Path
 
 from app.cli_runtime.agent_sandbox import AgentSandboxPolicy
+from app.cli_runtime.stream_blocks.terminal_blocks import _relative_path, terminal_block
 from app.cli_runtime.subprocess_runner import (
     RuntimeProcessStoppedError,
     communicate_registered_process,
@@ -141,7 +143,74 @@ def _iter_json_payloads(stream_text: str) -> list[dict[str, object]]:
     return payloads
 
 
-def _extract_claude_text(stream_text: str) -> tuple[str, str]:
+def _claude_tool_transcript(stream_text: str, workspace_root: Path) -> str:
+    """Turn Claude stream-json tool activity into the shared transcript blocks.
+
+    Cursor already emits these blocks directly. Without this adapter, Claude
+    tool use was invisible to every workspace despite Full Access being active.
+    """
+    emitted: set[str] = set()
+    commands: dict[str, str] = {}
+    blocks: list[str] = []
+    for payload in _iter_json_payloads(stream_text):
+        event_type = str(payload.get("type") or "")
+        content: object = None
+        if event_type == "assistant":
+            message = payload.get("message")
+            content = message.get("content") if isinstance(message, dict) else payload.get("content")
+        elif event_type == "user":
+            message = payload.get("message")
+            content = message.get("content") if isinstance(message, dict) else payload.get("content")
+        if not isinstance(content, list):
+            continue
+        for block in content:
+            if not isinstance(block, dict):
+                continue
+            block_type = str(block.get("type") or "")
+            if block_type == "tool_use":
+                tool_id = str(block.get("id") or "").strip()
+                if not tool_id or tool_id in emitted:
+                    continue
+                emitted.add(tool_id)
+                name = str(block.get("name") or "Tool").strip()
+                tool_input = block.get("input") if isinstance(block.get("input"), dict) else {}
+                command = str(tool_input.get("command") or "").strip()
+                if name.lower() in {"bash", "shell", "terminal"} and command:
+                    commands[tool_id] = command
+                    continue
+                path = str(tool_input.get("file_path") or tool_input.get("path") or "").strip()
+                relative_path = _relative_path(path, str(workspace_root)) if path else ""
+                if name.lower() in {"edit", "write"} and relative_path:
+                    before = str(tool_input.get("old_string") or "")
+                    after = str(tool_input.get("new_string") or tool_input.get("content") or "")
+                    diff = "\n".join(
+                        unified_diff(
+                            before.splitlines(), after.splitlines(),
+                            fromfile=f"a/{relative_path}", tofile=f"b/{relative_path}", lineterm="",
+                        )
+                    )
+                    added = sum(1 for line in diff.splitlines() if line.startswith("+") and not line.startswith("+++"))
+                    removed = sum(1 for line in diff.splitlines() if line.startswith("-") and not line.startswith("---"))
+                    blocks.append(f"\n:::edit {relative_path} +{added} -{removed}\n{diff}\n:::\n")
+                else:
+                    suffix = f" {relative_path}" if relative_path else ""
+                    blocks.append(f":::tool {name}{suffix}\n")
+            elif block_type == "tool_result":
+                tool_id = str(block.get("tool_use_id") or "").strip()
+                command = commands.get(tool_id)
+                if not command:
+                    continue
+                result = _text_from_content_blocks(block.get("content"))
+                blocks.append(terminal_block(command, result))
+                commands.pop(tool_id, None)
+    # Keep in-progress commands visible in a live transcript even before their
+    # tool_result message arrives.
+    for command in commands.values():
+        blocks.append(f"\n:::terminal {command}\n:::\n")
+    return "".join(blocks).strip()
+
+
+def _extract_claude_text(stream_text: str, workspace_root: Path | None = None) -> tuple[str, str]:
     """Return (assistant_text, error_text) from Claude Code stream-json/json output."""
     final_text = ""
     accumulated_deltas: list[str] = []
@@ -160,7 +229,8 @@ def _extract_claude_text(stream_text: str) -> tuple[str, str]:
         final_text = text
     if not final_text and accumulated_deltas:
         final_text = "".join(accumulated_deltas).strip()
-    return final_text, error_text
+    transcript = _claude_tool_transcript(stream_text, workspace_root or Path.cwd())
+    return "\n\n".join(part for part in (transcript, final_text) if part).strip(), error_text
 
 
 def run_claude_local(
@@ -191,7 +261,7 @@ def run_claude_local(
     def _emit_claude_chunk(accumulated: str, delta: str) -> None:
         if on_chunk is None:
             return
-        extracted, _error = _extract_claude_text(accumulated)
+        extracted, _error = _extract_claude_text(accumulated, workspace_root)
         if extracted:
             on_chunk(extracted, delta)
 
@@ -211,7 +281,7 @@ def run_claude_local(
     except RuntimeError:
         raise
     raise_if_operator_stopped(returncode=returncode, stderr=stderr, stdout=stdout)
-    output, error_text = _extract_claude_text(stdout)
+    output, error_text = _extract_claude_text(stdout, workspace_root)
     if not output:
         output = stdout.strip() or stderr.strip()
     if returncode != 0:

@@ -7,6 +7,7 @@ from collections.abc import Callable
 from pathlib import Path
 
 from app.cli_runtime.agent_sandbox import AgentSandboxPolicy
+from app.cli_runtime.stream_blocks.terminal_blocks import _relative_path, terminal_block
 from app.cli_runtime.subprocess_runner import (
     RuntimeProcessStoppedError,
     communicate_registered_process,
@@ -54,30 +55,79 @@ def _build_codex_exec_command(
     return command
 
 
-def _extract_codex_text(stream_text: str) -> str:
-    final_text = ""
+def _iter_codex_payloads(stream_text: str) -> list[dict[str, object]]:
+    payloads: list[dict[str, object]] = []
     for raw_line in str(stream_text or "").splitlines():
-        line = raw_line.strip()
-        if not line:
-            continue
         try:
-            payload = json.loads(line)
+            payload = json.loads(raw_line.strip())
         except json.JSONDecodeError:
-            final_text = line
             continue
-        if not isinstance(payload, dict):
-            continue
+        if isinstance(payload, dict):
+            payloads.append(payload)
+    return payloads
+
+
+def _diff_counts(diff: str) -> tuple[int, int]:
+    added = sum(1 for line in diff.splitlines() if line.startswith("+") and not line.startswith("+++"))
+    removed = sum(1 for line in diff.splitlines() if line.startswith("-") and not line.startswith("---"))
+    return added, removed
+
+
+def _codex_item_block(item: dict[str, object], workspace_root: Path) -> str:
+    """Translate Codex JSON items into the transcript grammar used by every UI.
+
+    Codex emits real command/file events, but the old adapter retained only the
+    final agent_message. Keeping them here gives all workspace threads the same
+    terminal, file-change, and expandable-diff cards already used by Cursor.
+    """
+    item_type = str(item.get("type") or "").strip()
+    if item_type == "command_execution":
+        command = str(item.get("command") or "").strip()
+        if command:
+            return terminal_block(command, str(item.get("aggregated_output") or ""))
+        return ""
+    if item_type == "file_change":
+        changes = item.get("changes")
+        if not isinstance(changes, list):
+            return ":::tool File change\n"
+        blocks: list[str] = []
+        for change in changes:
+            if not isinstance(change, dict):
+                continue
+            path = _relative_path(str(change.get("path") or ""), str(workspace_root)) or "changed file"
+            diff = str(change.get("diff") or change.get("patch") or "").strip()
+            added, removed = _diff_counts(diff)
+            blocks.append(f"\n:::edit {path} +{added} -{removed}\n{diff}\n:::\n")
+        return "".join(blocks) or ":::tool File change\n"
+    if item_type and item_type not in {"agent_message", "reasoning"}:
+        return f":::tool {item_type.replace('_', ' ').capitalize()}\n"
+    return ""
+
+
+def _extract_codex_text(stream_text: str, workspace_root: Path | None = None) -> str:
+    final_text = ""
+    blocks: list[str] = []
+    saw_json = False
+    root = workspace_root or Path.cwd()
+    for payload in _iter_codex_payloads(stream_text):
+        saw_json = True
         if payload.get("type") != "item.completed":
             continue
         item = payload.get("item")
         if not isinstance(item, dict):
             continue
         if item.get("type") != "agent_message":
+            block = _codex_item_block(item, root)
+            if block:
+                blocks.append(block)
             continue
         text = str(item.get("text") or "").strip()
         if text:
             final_text = text
-    return final_text
+    if not saw_json:
+        return str(stream_text or "").strip()
+    transcript = "".join(blocks).strip()
+    return "\n\n".join(part for part in (transcript, final_text) if part).strip()
 
 
 def run_codex_local(
@@ -109,7 +159,7 @@ def run_codex_local(
     def _emit_codex_chunk(accumulated: str, delta: str) -> None:
         if on_chunk is None:
             return
-        extracted = _extract_codex_text(accumulated)
+        extracted = _extract_codex_text(accumulated, workspace_root)
         if extracted:
             on_chunk(extracted, delta)
 
@@ -129,7 +179,7 @@ def run_codex_local(
     except RuntimeError:
         raise
     raise_if_operator_stopped(returncode=returncode, stderr=stderr, stdout=stdout)
-    output = _extract_codex_text(stdout)
+    output = _extract_codex_text(stdout, workspace_root)
     if not output:
         output = stdout.strip() or stderr.strip()
     if returncode != 0:
