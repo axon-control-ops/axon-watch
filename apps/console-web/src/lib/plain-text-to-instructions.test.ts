@@ -55,6 +55,16 @@ describe('plainTextToInstructionsMarkdown', () => {
     );
   });
 
+  it('builds a concrete duplicate-assignment verification brief', () => {
+    const markdown = plainTextToInstructionsMarkdown(
+      'Can you double verify - and also confirm that the same assignment cannot be assigned twice by the teachers - and also remove the current duplication from the teachers dashboard',
+    );
+    expect(markdown).toContain('same teacher, targets, assignment/pack, and start date');
+    expect(markdown).toContain('Teacher Dashboard no longer renders duplicate cards');
+    expect(markdown).toContain('Parents receive and open the correct assignment');
+    expect(markdown).toContain('No valid submissions or history is deleted');
+  });
+
   it('returns a blank template for empty input', () => {
     const markdown = plainTextToInstructionsMarkdown('   ');
     expect(markdown).toContain('# Instructions');

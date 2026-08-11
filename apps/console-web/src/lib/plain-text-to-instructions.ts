@@ -160,19 +160,63 @@ function inferHandoff(): string[] {
   ];
 }
 
+/** High-confidence task patterns get a concrete execution plan. This is
+ * deliberately narrow: unknown prompts still use the lossless generic plan
+ * instead of pretending to understand a domain. */
+function assignmentDuplicatePlan(plain: string): Partial<InstructionsSections> | null {
+  const normalized = plain.toLowerCase();
+  if (!/assign(?:ment|ed)?/.test(normalized) || !/(?:twice|duplicate|duplication)/.test(normalized)) {
+    return null;
+  }
+  return {
+    inScope: [
+      'Inspect teacher assignment creation and active-assignment queries',
+      'Define and prevent duplicate assignments for the same teacher, targets, assignment/pack, and start date',
+      'Identify and remove duplicate cards from the Teacher Dashboard without removing distinct valid assignments',
+      'Verify the parent-facing assignment flow still receives the correct remaining assignment',
+    ],
+    outOfScope: ['Do not remove different valid assignments for the same class', 'Do not delete valid submissions or assignment history', 'Any task that was not asked for'],
+    steps: [
+      'Inspect assignment creation, dashboard queries, and parent delivery before changing code',
+      'Verify a repeated assignment attempt and add idempotency protection if required',
+      'Identify existing duplicates and retain only the valid active assignment record',
+      'Verify teacher dashboard cards and the parent assignment experience after cleanup',
+    ],
+    acceptance: [
+      'The same assignment cannot be created twice for the same teacher, targets, and start date',
+      'Distinct valid assignments can still coexist',
+      'The Teacher Dashboard no longer renders duplicate cards',
+      'Parents receive and open the correct assignment',
+      'No valid submissions or history is deleted',
+    ],
+    verification: [
+      'Record the affected assignment IDs before any cleanup',
+      'Attempt the same assignment twice and confirm only one active record exists',
+      'Check the Teacher Dashboard card count and parent-facing assignment screen',
+      'Run focused tests, type-check, and report any remaining uncertainty',
+    ],
+    handoff: [
+      'Report the root cause and every duplicate record handled',
+      'List changed files, migrations if any, validation results, and commit hash',
+      'Do not claim completion unless all acceptance checks are met',
+    ],
+  };
+}
+
 export function projectInstructionsSections(plainText: string): InstructionsSections {
   const plain = plainText.replace(/\r\n/g, '\n').trim();
   const sentences = splitSentences(plain);
   const goal = inferGoal(sentences, plain);
+  const specialist = assignmentDuplicatePlan(plain);
   return {
     goal,
-    inScope: inferInScope(sentences, plain, goal),
-    outOfScope: inferOutOfScope(plain),
-    steps: inferSteps(plain),
+    inScope: specialist?.inScope ?? inferInScope(sentences, plain, goal),
+    outOfScope: specialist?.outOfScope ?? inferOutOfScope(plain),
+    steps: specialist?.steps ?? inferSteps(plain),
     constraints: inferConstraints(),
-    acceptance: inferAcceptance(plain),
-    verification: inferVerification(),
-    handoff: inferHandoff(),
+    acceptance: specialist?.acceptance ?? inferAcceptance(plain),
+    verification: specialist?.verification ?? inferVerification(),
+    handoff: specialist?.handoff ?? inferHandoff(),
     sourceRequest: plain,
   };
 }
