@@ -1,4 +1,4 @@
-"""Ordering helpers for preferred and fallback local runtime targets."""
+"""Ordering helpers for runtime selection and automatic fallback."""
 
 from __future__ import annotations
 
@@ -33,13 +33,11 @@ def ordered_candidates_for_dispatch(
         return candidates
     by_id = {str(record.get("id") or ""): record for record in candidates}
     selected = by_id.get(preferred)
-    if not selected:
-        return candidates
-    return [selected, *(
-        record
-        for record in candidates
-        if str(record.get("id") or "") not in {"", preferred}
-    )]
+    # A value passed by the composer is an explicit operator selection, not a
+    # ranking hint. Falling through to another provider made the UI say Codex
+    # while a failed turn actually consumed Claude/Cursor capacity. Automatic
+    # fallback remains available only when the composer leaves the target auto.
+    return [selected] if selected else []
 
 
 __all__ = ["effective_cli_model", "ordered_candidates_for_dispatch"]

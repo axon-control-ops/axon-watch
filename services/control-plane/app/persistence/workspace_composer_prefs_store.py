@@ -201,6 +201,14 @@ def resolve_worker_runtime_target(workspace_id: str) -> str | None:
     Mirrors the operator's Agent Dock runtime-target pick so continuous/fleet
     workers don't silently fall back to the server's default runtime.
     """
+    prefs = get_workspace_composer_prefs(workspace_id)
+    target = str(prefs.get("runtime_target") or "").strip()
+    # The visible Agent Dock selection is an explicit operator preference. It
+    # must win over an Auto-mode default for continuous workers too; otherwise
+    # a worker can silently run a different provider than the composer shows.
+    if target:
+        return target
+
     try:
         from app.persistence import operator_presence_settings_store
 
@@ -215,6 +223,4 @@ def resolve_worker_runtime_target(workspace_id: str) -> str | None:
     except Exception:
         pass
 
-    prefs = get_workspace_composer_prefs(workspace_id)
-    target = str(prefs.get("runtime_target") or "").strip()
-    return target or None
+    return None

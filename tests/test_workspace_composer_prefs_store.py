@@ -57,7 +57,7 @@ class WorkspaceComposerPrefsStoreTests(unittest.TestCase):
             "gpt-5.4-high",
         )
 
-    def test_full_auto_runtime_override_masks_workspace_runtime_target(self) -> None:
+    def test_explicit_workspace_runtime_target_wins_over_full_auto_default(self) -> None:
         set_workspace_composer_prefs(
             "workspace_axon_watch",
             runtime_target="cursor_local",
@@ -70,6 +70,19 @@ class WorkspaceComposerPrefsStoreTests(unittest.TestCase):
             }
         )
 
+        self.assertEqual(
+            resolve_worker_runtime_target("workspace_axon_watch"),
+            "cursor_local",
+        )
+
+    def test_full_auto_runtime_override_is_used_when_no_runtime_is_selected(self) -> None:
+        operator_presence_settings_store.save_settings(
+            {
+                "autonomy_mode": "full",
+                "auto_composer_runtime_override_enabled": True,
+                "auto_composer_runtime_target": "claude_local",
+            }
+        )
         self.assertEqual(
             resolve_worker_runtime_target("workspace_axon_watch"),
             "claude_local",

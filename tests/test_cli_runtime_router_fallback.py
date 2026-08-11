@@ -253,12 +253,10 @@ class DispatchRecursionRecoveryTests(unittest.TestCase):
         self.assertIn("maximum recursion depth exceeded", reason)
         self.assertNotIn("Codex CLI (local) unavailable", reason)
 
-    def test_failure_headline_names_the_operators_selection_not_the_last_fallback(self) -> None:
-        # Regression: an operator with Cursor explicitly selected, where
-        # Cursor fails and the router silently falls back to Codex which
-        # ALSO fails, must not headline the failure as "failed on Codex" —
-        # that mislabels the operator's actual selection with whatever
-        # runtime happened to be tried last in the fallback chain.
+    def test_explicit_runtime_never_falls_through_to_another_provider(self) -> None:
+        # Regression: an operator with Cursor explicitly selected must never
+        # silently consume Codex capacity after Cursor fails. Fallback is only
+        # valid for Auto (no runtime_target) dispatch.
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             with (
@@ -281,7 +279,7 @@ class DispatchRecursionRecoveryTests(unittest.TestCase):
                 patch(
                     "app.cli_runtime.router.run_non_cursor_local",
                     side_effect=RuntimeError("Codex/OpenAI API key was rejected."),
-                ),
+                ) as mock_non_cursor,
             ):
                 result = dispatch_ide_composer(
                     workspace_id="workspace_dashpro",
@@ -295,10 +293,10 @@ class DispatchRecursionRecoveryTests(unittest.TestCase):
         content = str(result.get("content") or "")
         self.assertIn("failed on Cursor CLI (local)", content)
         self.assertNotIn("failed on Codex CLI (local)", content)
-        # Both failure reasons must still be present, just not as the headline.
         reason = str(result.get("reason") or "")
         self.assertIn("not signed in", reason)
-        self.assertIn("API key was rejected", reason)
+        self.assertNotIn("API key was rejected", reason)
+        mock_non_cursor.assert_not_called()
 
 
 if __name__ == "__main__":
