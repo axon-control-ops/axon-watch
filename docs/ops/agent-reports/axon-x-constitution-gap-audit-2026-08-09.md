@@ -998,3 +998,113 @@ Verification:
 python -m pytest tests/test_workspace_agent_scheduler.py tests/test_worker_scheduler_routes.py tests/test_lead_team_checkin.py -q
 # 34 passed
 ```
+
+### 2026-08-11 — Codex monitoring-lane visibility slice completed
+
+Status: completed; not committed yet.
+
+Files changed:
+
+- `apps/console-web/src/api/worker-scheduler-api.ts`
+- `apps/console-web/src/composables/useWorkerAutonomyControl.ts`
+- `apps/console-web/src/components/settings/AgentFleetControlPanel.vue`
+- `docs/HOW-TO-HANDBOOK.md`
+
+Implemented:
+
+- Exposed watcher scheduler fields in the console TypeScript API contract.
+- Added a separate **Monitoring lane** status to Settings → Agent Fleet.
+- Added a watcher switch display and a safe pause/resume action for the
+  observation lane, independent from the worker/action scheduler.
+- Updated autonomy copy so Manual/Semi/Full describe action authority while
+  watcher observation remains separately visible.
+
+Why this improves AXON-X:
+
+- The operator can safely give Dana/team tasks while AXON-X continues watching
+  CI, stale runs, delivery receipts, Lead blockers, and fleet health.
+- “Workers paused” no longer looks like “nobody is watching.”
+- Monitoring can be paused only through the explicit watcher control or the
+  host brake `AXON_WATCH_OBSERVATION_SCHEDULER=0`.
+
+Verification:
+
+```bash
+python -m pytest tests/test_workspace_agent_scheduler.py tests/test_worker_scheduler_routes.py tests/test_lead_team_checkin.py -q
+# 34 passed
+
+npm --workspace apps/console-web run typecheck
+# passed
+```
+
+### 2026-08-11 — Codex scheduler trace + Lead handoff rescue slice completed
+
+Status: completed; not committed yet.
+
+Files changed:
+
+- `services/control-plane/app/workspace_agents/scheduler.py`
+- `services/control-plane/app/chat/lane_b_lead_decompose_fast_path.py`
+- `services/control-plane/app/chat/lane_b_lead_fan_out_fast_path.py`
+- `services/control-plane/app/cli_runtime/runtime_auth_actions.py`
+- `apps/console-web/src/api/runtime-api.ts`
+- `apps/console-web/src/components/settings/RuntimeAuthSettingsPanel.vue`
+- `apps/console-web/src/components/settings/CodexUsageCard.vue`
+- `tests/test_workspace_agent_scheduler.py`
+- `tests/test_lead_decompose_fast_path.py`
+- `tests/test_lead_fan_out_dispatch_kick.py`
+- `tests/test_runtime_auth_actions.py`
+- `docs/HOW-TO-HANDBOOK.md`
+
+Implemented:
+
+- Added best-effort Constitution evidence + decision records for scheduler
+  dispatch/refusal choices, using `workspace_tasks` evidence and actor
+  `worker_scheduler`.
+- Changed Lead decompose/fan-out send paths to attempt the bounded dispatch kick
+  before rendering the Lead receipt, so the message can report whether any
+  specialist run actually started.
+- Added watcher-tick rescue for already-approved queued Lead handoff runs. This
+  runs before the Manual/Semi worker scheduler gate and only promotes explicit
+  Lead handoff runs; it does not enable general autonomous task leasing.
+- Added runtime-auth warnings that CLI browser login is host-profile scoped.
+  This prevents operators from assuming Axon-X can hold two simultaneous
+  terminal OAuth accounts in the same host config.
+- Added a Codex usage card to Runtime settings using the existing local Codex
+  telemetry contract. The card explicitly says it is not a live provider quota
+  percentage.
+
+Why this improves AXON-X:
+
+- Dana can no longer truthfully say “queued” while the UI gives no path for a
+  missed Priya/Marco start after a control-plane restart.
+- The watcher lane now has a safe self-heal action for explicit handoffs without
+  broadening Manual/Semi into general auto-work.
+- Scheduler actions become auditable through the Constitution registry instead
+  of being explainable only by logs.
+- Runtime authentication now communicates the real host-account constraint and
+  points operators toward Vault/API-key auth for secondary accounts.
+
+Verification:
+
+```bash
+python -m pytest tests/test_workspace_agent_scheduler.py tests/test_worker_scheduler_routes.py tests/test_lead_team_checkin.py tests/test_lead_decompose_fast_path.py tests/test_lead_fan_out_dispatch_kick.py tests/test_runtime_auth_actions.py tests/test_constitution_registry.py tests/test_constitution_gate_script.py -q
+# 60 passed
+
+npm --workspace apps/console-web run typecheck
+# passed
+
+npm run verify:constitution
+# PASS constitution_registry_tables
+# PASS constitution_run_history_adapter
+# PASS constitution_seed_capabilities
+# PASS constitution_route_registration
+# PASS constitution_registry_endpoints
+# PASS mutating_auth_middleware_registered
+# PASS mutating_methods_guarded
+# PASS constitution_registry_tests
+# PASS constitution_handoff_ledger
+
+git diff --check
+# passed
+```

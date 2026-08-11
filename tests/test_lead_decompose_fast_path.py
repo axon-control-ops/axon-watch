@@ -83,7 +83,8 @@ class LeadDecomposeFastPathTests(unittest.TestCase):
             ),
             patch(
                 "app.chat.lane_b_lead_decompose_fast_path._kick_continuous_dispatch",
-            ),
+                return_value=1,
+            ) as kick,
         ):
             response = maybe_post_lead_decompose_message(
                 workspace_id="workspace_dashpro",
@@ -111,7 +112,9 @@ class LeadDecomposeFastPathTests(unittest.TestCase):
         self.assertIn("backend", agent["content"])
         self.assertIn("frontend:", agent["content"].lower())
         self.assertIn("Fleet:", agent["content"])
+        self.assertIn("Dispatch kick started 1 specialist run", agent["content"])
         self.assertEqual("run_lead_handoff", agent["run_id"])
+        kick.assert_called_once()
 
     def test_materializes_dashpro_dashboard_fix_prompt(self) -> None:
         saved: list[dict] = []
@@ -139,7 +142,10 @@ class LeadDecomposeFastPathTests(unittest.TestCase):
                 "app.chat.lane_b_lead_decompose_fast_path.record_lead_handoff_run",
                 return_value=handoff,
             ),
-            patch("app.chat.lane_b_lead_decompose_fast_path._kick_continuous_dispatch"),
+            patch(
+                "app.chat.lane_b_lead_decompose_fast_path._kick_continuous_dispatch",
+                return_value=0,
+            ),
         ):
             response = maybe_post_lead_decompose_message(
                 workspace_id="workspace_dashpro",

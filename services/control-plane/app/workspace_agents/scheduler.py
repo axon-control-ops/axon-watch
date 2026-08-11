@@ -167,6 +167,77 @@ def _dispatch_failure_summary(exc: BaseException) -> str:
     return f"{role_hint} — open run history for receipts."
 
 
+def _trace_scheduler_lease_decision(
+    *,
+    task: dict[str, Any],
+    decision: str,
+    tier: str,
+    risk: str,
+    explanation: str,
+    run_id: str | None = None,
+) -> None:
+    """Best-effort constitution trace for scheduler lease decisions.
+
+    The task ledger and run history remain the source of truth. Constitution
+    indexing is deliberately non-blocking so the worker scheduler does not fail
+    closed because an executive/audit registry write failed.
+    """
+    task_id = str(task.get("task_id") or "").strip()
+    workspace_id = str(task.get("workspace_id") or "").strip()
+    if not task_id:
+        return
+    try:
+        from app.persistence import constitution_registry_store as registry
+
+        evidence = registry.index_evidence(
+            source_table="workspace_tasks",
+            source_id=task_id,
+            source_ref={
+                "task_id": task_id,
+                "owner_role": str(task.get("owner_role") or "").strip(),
+                "status": str(task.get("status") or "").strip(),
+            },
+            kind="scheduler_lease_decision",
+            summary=str(task.get("goal") or "Scheduler leased task").strip(),
+            workspace_id=workspace_id,
+            run_id=run_id,
+            task_id=task_id,
+            tags=["worker_scheduler", decision, tier, risk],
+        )
+        recorded = registry.record_decision(
+            actor="worker_scheduler",
+            capability_id="CAP-034",
+            decision=decision,
+            tier=tier,
+            risk=risk,
+            explanation=explanation,
+            confidence_note="deterministic scheduler lease policy",
+            task_id=task_id,
+            run_id=run_id,
+            source_table="workspace_tasks",
+            source_id=task_id,
+            evidence_ids=[str(evidence["evidence_id"])],
+        )
+        registry.index_evidence(
+            source_table="workspace_tasks",
+            source_id=task_id,
+            source_ref={
+                "task_id": task_id,
+                "owner_role": str(task.get("owner_role") or "").strip(),
+                "status": str(task.get("status") or "").strip(),
+            },
+            kind="scheduler_lease_decision",
+            summary=str(task.get("goal") or "Scheduler leased task").strip(),
+            workspace_id=workspace_id,
+            run_id=run_id,
+            task_id=task_id,
+            decision_id=str(recorded.get("decision_id") or ""),
+            tags=["worker_scheduler", decision, tier, risk],
+        )
+    except Exception:  # noqa: BLE001 — scheduler must not depend on registry writes
+        logger.exception("could not trace scheduler lease decision for task=%s", task_id)
+
+
 def _dispatch_worker_run(
     *,
     workspace_id: str,
@@ -326,6 +397,23 @@ def run_continuous_worker_tick(
     """Run watcher observation, then start bounded role-tagged runs when enabled."""
     run_observation_tick()
 
+    # Lead fan-out/decompose is an explicit operator handoff, not background
+    # auto-leasing.  If the control plane restarts after Dana queued a
+    # specialist run but before the one-shot dispatch kick succeeds, Manual/Semi
+    # mode used to leave Priya/Marco/etc. stranded in queued forever.  Keep this
+    # rescue before the scheduler_enabled gate so watcher ticks can self-heal
+    # only those already-approved handoff runs without enabling general worker
+    # autonomy.
+    try:
+        lead_fan_out_started = kick_lead_fan_out_dispatch(starts_bound=2)
+        if lead_fan_out_started:
+            logger.info(
+                "continuous worker tick rescued %s queued Lead handoff run(s)",
+                len(lead_fan_out_started),
+            )
+    except Exception:  # noqa: BLE001 — never block scheduler on handoff rescue
+        logger.exception("queued Lead handoff rescue failed")
+
     # Semi / Manual pause continuous specialist leasing, but Lead-owned board
     # tickets and soft-failed handoff autostarts still need operator_start + kick.
     try:
@@ -449,6 +537,13 @@ def run_continuous_worker_tick(
 
             lease_decision = task_allows_autonomous_lease(claimed)
             if lease_decision.tier != "auto_safe" or lease_decision.decision != "dispatch":
+                _trace_scheduler_lease_decision(
+                    task=claimed,
+                    decision="refuse",
+                    tier=lease_decision.tier,
+                    risk=lease_decision.risk,
+                    explanation=lease_decision.reason,
+                )
                 task_id = str(claimed.get("task_id") or "").strip()
                 logger.warning(
                     "continuous worker tick refused gated task=%s role=%s reason=%s",
@@ -503,6 +598,14 @@ def run_continuous_worker_tick(
                     logger.exception("could not reopen task after create_run refuse: %s", task_id)
                 continue
             started.append(record)
+            _trace_scheduler_lease_decision(
+                task=claimed,
+                decision="dispatch",
+                tier=lease_decision.tier,
+                risk=lease_decision.risk,
+                explanation=lease_decision.reason,
+                run_id=str(record.get("run_id") or "").strip() or None,
+            )
             if worker_dispatch_enabled():
                 threading.Thread(
                     target=_dispatch_worker_run,

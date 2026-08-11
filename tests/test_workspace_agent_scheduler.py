@@ -14,6 +14,7 @@ CONTROL_PLANE_ROOT = Path(__file__).resolve().parents[1] / "services" / "control
 sys.path.insert(0, str(CONTROL_PLANE_ROOT))
 
 from app.persistence import (  # noqa: E402
+    constitution_registry_store,
     run_store,
     task_store,
     worker_scheduler_settings_store,
@@ -38,7 +39,9 @@ class WorkspaceAgentSchedulerTests(unittest.TestCase):
     def setUp(self) -> None:
         isolate_control_plane_db(self, run_store)
         task_store.reset_store()
+        constitution_registry_store.reset_store()
         self.addCleanup(task_store.reset_store)
+        self.addCleanup(constitution_registry_store.reset_store)
 
     def test_default_agents_file_resolves_to_repo_config_not_services(self) -> None:
         from app.workspace_agents.config_loader import default_agents_file, load_workspace_agent_configs
@@ -585,6 +588,58 @@ class WorkspaceAgentSchedulerTests(unittest.TestCase):
         roles = [str(run.get("employee_role") or "") for run in started]
         self.assertEqual(["backend"], roles)
         self.assertTrue(all(run.get("task_id") for run in started))
+
+    def test_scheduler_dispatch_records_constitution_decision_trace(self) -> None:
+        with tempfile.TemporaryDirectory() as tempdir:
+            agents_file = Path(tempdir) / "agents.json"
+            agents_file.write_text(
+                json.dumps(
+                    {
+                        "companies": {
+                            "workspace_axon_watch": {
+                                "company_name": "Axon-X",
+                                "employees": [
+                                    {
+                                        "name": "Trace",
+                                        "role": "backend",
+                                        "schedule": "continuous",
+                                    },
+                                ],
+                            }
+                        }
+                    }
+                ),
+                encoding="utf-8",
+            )
+            with patch.dict(
+                os.environ,
+                {
+                    "AXON_WATCH_WORKSPACE_AGENTS_FILE": str(agents_file),
+                    "AXON_WATCH_WORKER_SCHEDULER": "1",
+                    "AXON_WATCH_WORKER_SCHEDULER_DISPATCH": "0",
+                },
+                clear=False,
+            ):
+                worker_scheduler_settings_store.patch_settings({"scheduler_enabled": True})
+                task = _seed_open_task(
+                    workspace_id="workspace_axon_watch",
+                    owner_role="backend",
+                    goal="Trace a scheduler dispatch",
+                )
+                started = run_continuous_worker_tick()
+
+        self.assertEqual(1, len(started))
+        decisions = constitution_registry_store.list_decisions(task_id=task["task_id"])
+        self.assertEqual(1, len(decisions))
+        self.assertEqual("worker_scheduler", decisions[0]["actor"])
+        self.assertEqual("dispatch", decisions[0]["decision"])
+        self.assertEqual("CAP-034", decisions[0]["capability_id"])
+        evidence = constitution_registry_store.list_evidence(
+            source_table="workspace_tasks",
+            task_id=task["task_id"],
+        )
+        self.assertEqual(1, len(evidence))
+        self.assertEqual(decisions[0]["decision_id"], evidence[0]["decision_id"])
 
 
 if __name__ == "__main__":

@@ -164,6 +164,7 @@ export interface RuntimeAuthActionResult {
   message: string;
   command_preview?: string;
   output?: string;
+  account_scope_notice?: string;
   runtime_status?: RuntimeStatusSnapshot;
   cursor_runtime?: CursorRuntimeStatusSnapshot;
 }

@@ -18,6 +18,7 @@ import {
 } from '../../lib/runtime-auth-view';
 import { useShellStore } from '../../stores/shell';
 import ClaudeUsageCard from './ClaudeUsageCard.vue';
+import CodexUsageCard from './CodexUsageCard.vue';
 import CursorUsageCard from './CursorUsageCard.vue';
 import WorkspaceAutonomyTogglePanel from './WorkspaceAutonomyTogglePanel.vue';
 import WorkspaceRuntimePolicyPanel from './WorkspaceRuntimePolicyPanel.vue';
@@ -39,6 +40,7 @@ type RuntimeCard = {
   canSignIn: boolean;
   canSignOut: boolean;
   managedByVault: boolean;
+  accountScopeNote: string;
   statusTone: 'ready' | 'warn' | 'muted';
   statusLabel: string;
 };
@@ -146,6 +148,9 @@ function buildCard(family: RuntimeFamily, target: RuntimeTargetRecord | null): R
   const installed = Boolean(target?.available && target.binary);
   const managedByVault =
     auth?.auth_method === 'vault_api_key' || auth?.auth_method === 'api_key';
+  const oauthBacked = ['oauth', 'chatgpt', 'claude.ai'].includes(
+    String(auth?.auth_method ?? '').trim().toLowerCase(),
+  );
   const title = familyTitle(family);
   const binary = target?.binary ?? '';
   const loginCommand = familyLoginCommand(family, binary);
@@ -176,6 +181,10 @@ function buildCard(family: RuntimeFamily, target: RuntimeTargetRecord | null): R
     canSignIn: installed && !loggedIn,
     canSignOut: installed && loggedIn && !managedByVault,
     managedByVault,
+    accountScopeNote:
+      installed && loggedIn && oauthBacked
+        ? `${title} browser login is shared by this host profile. To use another account, sign out first or configure the second account through Vault/API-key auth where supported.`
+        : '',
     statusTone,
     statusLabel,
   };
@@ -218,7 +227,10 @@ async function runAction(family: RuntimeFamily, action: 'login' | 'logout'): Pro
             ? await startCodexRuntimeLogin()
             : await logoutCodexRuntime();
     actionTone.value = result.status === 'error' ? 'error' : 'ok';
-    actionMessage.value = result.message;
+    actionMessage.value =
+      result.account_scope_notice && !result.message.includes(result.account_scope_notice)
+        ? `${result.message} ${result.account_scope_notice}`
+        : result.message;
     await Promise.all([shell.loadRuntimeStatus(true), shell.loadCursorCatalog(true)]);
   } catch (error) {
     actionTone.value = 'error';
@@ -337,6 +349,12 @@ onMounted(() => {
       :usage="shell.runtimeStatus?.claude_usage"
     />
 
+    <CodexUsageCard
+      v-if="!isLoading"
+      class="runtime-auth-settings__usage"
+      :usage="shell.runtimeStatus?.codex_usage"
+    />
+
     <section v-if="!isLoading" class="runtime-auth-settings__policy-section">
       <header class="runtime-auth-settings__policy-header">
         <h2>Full Auto composer runtime</h2>
@@ -451,6 +469,9 @@ onMounted(() => {
         </p>
         <p v-else-if="!card.installed" class="runtime-auth-settings__note">
           Install the CLI on the control-plane host, then refresh status.
+        </p>
+        <p v-else-if="card.accountScopeNote" class="runtime-auth-settings__note">
+          {{ card.accountScopeNote }}
         </p>
 
         <div class="runtime-auth-settings__actions">

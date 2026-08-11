@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import threading
 from typing import Any, Callable
 
 from app.chat.lead_fan_out_transcript import format_lead_fan_out_agent_message
@@ -175,12 +174,13 @@ def maybe_post_lead_decompose_message(
     except Exception:
         return None
 
-    # Background kick with elevated start budget when slots are free.
-    threading.Thread(
-        target=_kick_continuous_dispatch,
-        daemon=True,
-        name="lead-decompose-dispatch-kick",
-    ).start()
+    # Lead Send is an explicit operator handoff, so attempt the Lane B kick
+    # before rendering the receipt.  This is intentionally bounded: the kick
+    # only promotes queued handoff runs and starts worker threads; the worker's
+    # actual shift continues asynchronously.  Reporting the real kick count
+    # avoids the old "queued, trust me" card that could hide a restart/routing
+    # miss.
+    kick_started = _kick_continuous_dispatch()
 
     plan_id = str(materialize.get("plan_id") or "").strip()
     handoff_run = record_lead_handoff_run(
@@ -197,7 +197,7 @@ def maybe_post_lead_decompose_message(
     agent_content = _format_decompose_reply(
         lead_name=lead_name.strip() or "Lead",
         materialize=materialize,
-        kick_started=0,
+        kick_started=kick_started,
     )
     operator_message = save_message(
         {

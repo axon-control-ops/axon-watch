@@ -33,6 +33,7 @@ def _action_result(
     message: str,
     command_preview: str = "",
     output: str = "",
+    account_scope_notice: str = "",
     force_refresh: bool = True,
 ) -> StatusRecord:
     # Login start should return quickly so the browser flow can open; callers
@@ -44,9 +45,19 @@ def _action_result(
         "message": message,
         "command_preview": command_preview,
         "output": output,
+        "account_scope_notice": account_scope_notice,
         "runtime_status": snapshot,
         "cursor_runtime": cursor,
     }
+
+
+def _host_cli_oauth_notice(runtime_label: str) -> str:
+    return (
+        f"{runtime_label} browser login is host-profile scoped. If another account is "
+        "already active in this machine session, sign out first or use Vault/API-key "
+        "auth for the second account where that runtime supports it; Axon-X will not "
+        "silently replace accounts."
+    )
 
 
 def logout_cursor_runtime() -> StatusRecord:
@@ -184,10 +195,15 @@ def start_cursor_runtime_login() -> StatusRecord:
         )
     if auth.get("logged_in") and auth.get("auth_method") == "oauth":
         account = str(auth.get("account_label") or "").strip()
+        notice = _host_cli_oauth_notice("Cursor CLI")
         return _action_result(
             status="completed",
-            message=f"Cursor CLI is already signed in{(': ' + account) if account else ''}.",
+            message=(
+                f"Cursor CLI is already signed in{(': ' + account) if account else ''}. "
+                f"{notice}"
+            ),
             command_preview=" ".join(cursor_cli_argv(binary, "status")),
+            account_scope_notice=notice,
             force_refresh=False,
         )
     command = cursor_cli_argv(binary, "login")
@@ -226,10 +242,15 @@ def start_codex_runtime_login() -> StatusRecord:
         )
     if auth.get("logged_in") and auth.get("auth_method") in {"oauth", "chatgpt"}:
         account = str(auth.get("account_label") or "").strip()
+        notice = _host_cli_oauth_notice("Codex CLI")
         return _action_result(
             status="completed",
-            message=f"Codex CLI is already signed in{(': ' + account) if account else ''}.",
+            message=(
+                f"Codex CLI is already signed in{(': ' + account) if account else ''}. "
+                f"{notice}"
+            ),
             command_preview=f"{binary} login status",
+            account_scope_notice=notice,
             force_refresh=False,
         )
     command = [binary, "login"]
@@ -328,10 +349,15 @@ def start_claude_runtime_login() -> StatusRecord:
         )
     if auth.get("logged_in") and auth.get("auth_method") in {"oauth", "claude.ai"}:
         account = str(auth.get("account_label") or "").strip()
+        notice = _host_cli_oauth_notice("Claude Code CLI")
         return _action_result(
             status="completed",
-            message=f"Claude Code CLI is already signed in{(': ' + account) if account else ''}.",
+            message=(
+                f"Claude Code CLI is already signed in{(': ' + account) if account else ''}. "
+                f"{notice}"
+            ),
             command_preview=f"{binary} auth status",
+            account_scope_notice=notice,
             force_refresh=False,
         )
     command = [binary, "auth", "login"]

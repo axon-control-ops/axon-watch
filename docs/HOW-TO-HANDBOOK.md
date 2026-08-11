@@ -1755,6 +1755,20 @@ A good next slice should:
   `GET /api/chat/threads/{thread_id}/history`)
 - always-on watcher/action split: company watchers can keep polling and
   escalating health while worker dispatch stays governed by Auto/Semi/Manual
+- visible monitoring lane: Settings → Agent Fleet now shows watcher status
+  separately from worker status, so the operator can let Dana/specialists work
+  while AXON-X watches for blockers without starting extra shifts
+- scheduler decision trace: continuous worker dispatch/refusal decisions are
+  indexed into the Constitution registry with task evidence so later reviews can
+  explain why a worker did or did not start
+- restart-safe Lead handoff rescue: watcher ticks retry explicit queued Lead
+  handoffs, so a control-plane restart between Dana queuing work and Priya/Marco
+  starting no longer leaves specialists stranded in Manual/Semi
+- runtime account-scope warning: Runtime settings now explain that local CLI
+  browser login is host-profile scoped; use sign-out or Vault/API-key auth for a
+  second account until true isolated runtime profiles land
+- Codex usage visibility: Runtime settings expose Codex local usage telemetry,
+  matching the status-bar behavior when Codex is the selected runtime
 - Lead failure escalation: Lead roles must not remain inert in Error; failed
   Lead shifts become VAXON/operator attention receipts instead of silent red
   roster state or incorrect specialist spam
