@@ -5,12 +5,26 @@ from __future__ import annotations
 import json
 import os
 import subprocess
+import base64
 from typing import Any
 
 from app.cli_runtime.catalog_discovery import cursor_cli_argv
 from app.cli_runtime.runtime_auth import env_without_api_keys
 
 StatusRecord = dict[str, Any]
+
+
+def _codex_account_email() -> str:
+    """Return only the local Codex ID-token email claim; never expose its token."""
+    try:
+        with open(os.path.expanduser("~/.codex/auth.json"), encoding="utf-8") as handle:
+            token = str((json.load(handle).get("tokens") or {}).get("id_token") or "")
+        payload = token.split(".")[1]
+        decoded = base64.urlsafe_b64decode(payload + "=" * (-len(payload) % 4))
+        email = str((json.loads(decoded).get("email") or "")).strip()
+        return email if "@" in email else ""
+    except (OSError, ValueError, IndexError, KeyError, TypeError, json.JSONDecodeError):
+        return ""
 
 # `cursor agent status` commonly takes 6–8s on this host; keep headroom above that.
 # Occasional cold starts / contention can push past 15s — retry once before failing.
@@ -249,7 +263,7 @@ def _probe_codex_cli(
         "logged_in": True,
         "auth_method": method,
         "provider_label": "Codex",
-        "account_label": raw.splitlines()[0].strip(),
+        "account_label": _codex_account_email() or raw.splitlines()[0].strip(),
         "vault_posture": "ready",
         "message": "Authenticated with Codex CLI.",
     }
