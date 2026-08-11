@@ -166,6 +166,29 @@ class WorkspaceWorkerPromptTests(unittest.TestCase):
         self.assertIn("ubuntu-latest", prompt)
         self.assertIn("billing-blocked", prompt)
 
+    def test_dashpro_prompt_teaches_supabase_vault_self_heal(self) -> None:
+        with patch(
+            "app.workspace_agents.worker_prompt.build_team_roster_context",
+            return_value="",
+        ):
+            prompt = build_continuous_worker_prompt(
+                workspace_id="workspace_dashpro",
+                employee=EmployeeConfig(
+                    name="Marco",
+                    role="backend",
+                    owns="DashPro Supabase and assignment data",
+                    schedule="continuous",
+                ),
+                task={
+                    "task_id": "task-migration-audit",
+                    "goal": "Audit Supabase migration history without deploying.",
+                },
+            )
+        self.assertIn("Supabase CLI self-heal", prompt)
+        self.assertIn("SUPABASE_ACCESS_TOKEN", prompt)
+        self.assertIn("never ask for pasted tokens in chat", prompt)
+        self.assertIn("Do not run `supabase db push` without separate operator deployment approval", prompt)
+
     def test_prompt_includes_prior_failure_detail_for_retry(self) -> None:
         with patch(
             "app.workspace_agents.worker_prompt.latest_role_run_outcome",

@@ -11,6 +11,7 @@ from app.workspace_agents.critical_review_clause import append_critical_review_c
 from app.workspace_agents.employee_persona_prompt import build_employee_identity_line
 from app.workspace_agents.lead_text import truncate_text as _truncate
 from app.workspace_agents.run_outcome import latest_role_run_outcome
+from app.workspace_agents.supabase_self_heal import dashpro_supabase_self_heal_clause
 from app.workspace_agents.team_roster_context import build_team_roster_context
 
 OUT_OF_SCOPE_GUARD_MARKER = "OUT_OF_SCOPE_GUARD:"
@@ -489,6 +490,7 @@ def build_continuous_worker_prompt(
             "OOM-froze the host at ~18G. Create/queue CI repair tasks for operator Start; "
             "do not stack Quality Gates + Android + typecheck heaps. "
         )
+        memory_clause += dashpro_supabase_self_heal_clause()
     prior_failure = "" if task_payload else _prior_failure_clause(workspace_id=workspace_id, role=role)
     task_packet = _current_task_packet(
         workspace_id=workspace_id,

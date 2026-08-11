@@ -79,6 +79,17 @@ _VAULT_CONSUMERS: tuple[dict[str, object], ...] = (
         ),
     },
     {
+        "id": "supabase_cli",
+        "label": "Supabase CLI migration checks",
+        "required_keys": ("SUPABASE_ACCESS_TOKEN",),
+        "auth_note": (
+            "Store SUPABASE_ACCESS_TOKEN in /vault so agents can run read-only "
+            "`supabase migration list --linked` checks without asking the operator "
+            "to paste tokens into chat. Database pushes still require explicit "
+            "deployment approval."
+        ),
+    },
+    {
         "id": "vaxon_research",
         "label": "VAXON online research (Google CSE)",
         "required_keys": ("AXON_WATCH_GOOGLE_CSE_API_KEY", "AXON_WATCH_GOOGLE_CSE_CX"),

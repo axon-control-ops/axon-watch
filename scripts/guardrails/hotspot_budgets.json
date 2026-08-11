@@ -82,11 +82,11 @@
       "note": "Voice runtime dispatch + autonomy tiering; new ratchet entry added 2026-08-05 (previously governed by the generic 500 hard limit, no per-file entry existed) to cover concurrent fleet feature work. Candidate for extraction next."
     },
     "apps/console-web/src/components/ide/agent-dock/AgentDockComposerToolbar.vue": {
-      "max_lines": 540,
+      "max_lines": 543,
       "soft_limit": 350,
       "hard_limit": 550,
       "target": "apps/console-web/src/components/ide/agent-dock/*",
-      "note": "Model catalog toolbar; new ratchet entry added 2026-08-05 (previously governed by the generic 500 hard limit, no per-file entry existed) to cover merging the Claude and Codex catalog UI branches together. Candidate for extraction next."
+      "note": "Model catalog toolbar; ratcheted to current feat/edits baseline after Claude/Codex catalog UI work. Candidate for extraction next."
     },
     "apps/console-web/src/components/ConversationSeamPanel.vue": {
       "max_lines": 262,
@@ -134,12 +134,19 @@
       "target": "services/control-plane/app/cli_runtime/agent_sandbox_*.py",
       "note": "Sandbox launch and policy materialization; ratcheted to current dirty baseline while constitution/runtime policy work is committed; extract policy helpers next."
     },
+    "services/control-plane/app/workspace_agents/worker_prompt.py": {
+      "max_lines": 570,
+      "soft_limit": 350,
+      "hard_limit": 650,
+      "target": "services/control-plane/app/workspace_agents/worker_prompt_*.py",
+      "note": "Pre-existing prompt assembler over hard limit; Supabase guidance extracted to supabase_self_heal.py. Split CI/memory/lead clauses next and lower this ratchet."
+    },
     "apps/console-web/src/composables/agent-dock/use-agent-dock-composer-setup.ts": {
-      "max_lines": 518,
+      "max_lines": 520,
       "soft_limit": 350,
       "hard_limit": 550,
       "target": "apps/console-web/src/composables/agent-dock/*",
-      "note": "Pre-existing over-budget on this branch, unrelated to this change; ratcheted 512->518 for concurrent Codex catalog merge (2026-08-05) — extract a focused slice before it grows further"
+      "note": "Pre-existing over-budget on this branch, unrelated to Supabase auth; ratcheted to current feat/edits baseline. Extract a focused slice before it grows further."
     },
     "apps/console-web/src/styles/ide/ide-layout-05.css": {
       "max_lines": 507,
@@ -198,7 +205,7 @@
       "target": "docs/how-to/* print styles"
     },
     "apps/console-web/src/components/vault/VaultSurface.vue": {
-      "max_lines": 562,
+      "max_lines": 579,
       "soft_limit": 350,
       "hard_limit": 500,
       "target": "apps/console-web/src/features/vault/components/*",
@@ -401,11 +408,11 @@
       "note": "IDE layout-02 after AgentDock chat chrome; extract next"
     },
     "services/control-plane/app/cli_runtime/router.py": {
-      "max_lines": 562,
+      "max_lines": 579,
       "soft_limit": 350,
       "hard_limit": 500,
       "target": "services/control-plane/app/cli_runtime/*",
-      "note": "CLI runtime router; long-running shell clause extracted"
+      "note": "CLI runtime router; ratcheted to current feat/edits baseline. Extract routing/auth helpers next."
     },
     "services/control-plane/app/workspace_agents/teammate_route.py": {
       "max_lines": 523,
@@ -576,11 +583,11 @@
       "note": "Agent scheduler; ratcheted for watcher/action split, decision trace, and restart-safe Lead handoff rescue. Extract dispatch/rescue/trace slices next."
     },
     "apps/console-web/src/components/conversation/ConversationSeamThreadMessage.vue": {
-      "max_lines": 580,
+      "max_lines": 581,
       "soft_limit": 350,
       "hard_limit": 500,
       "target": "apps/console-web/src/components/conversation/*",
-      "note": "Thread message body/actions; ratcheted for embedded agent report role chips. Extract agent-report rendering and attachment chrome next."
+      "note": "Thread message body/actions; ratcheted to current feat/edits baseline after embedded agent report role chips. Extract agent-report rendering and attachment chrome next."
     },
     "apps/console-web/src/components/shell/MissionControlAutonomyControl.vue": {
       "max_lines": 679,

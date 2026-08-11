@@ -19,6 +19,9 @@ ALLOWED_IMPORT_KEYS: tuple[str, ...] = (
     "GH_TOKEN",
     "GITHUB_TOKEN",
     "AXON_GITHUB_TOKEN",
+    # Supabase CLI access for read-only migration history checks and separately
+    # operator-approved db push operations.
+    "SUPABASE_ACCESS_TOKEN",
     # Optional CLI runtime API keys (subscription login preferred).
     "CURSOR_API_KEY",
     "ANTHROPIC_API_KEY",

@@ -74,6 +74,7 @@ def vault_runtime_env() -> dict[str, str]:
         ("CODEX_API_KEY", "codex_cli"),
         ("OPENAI_API_KEY", "openai_gpts"),
         ("ANTHROPIC_API_KEY", "anthropic"),
+        ("SUPABASE_ACCESS_TOKEN", "supabase_cli"),
     )
     for env_name, provider_id in named_bindings:
         value = vault_resolve_named_secret(env_name) or vault_resolve_provider_key(provider_id)
@@ -148,6 +149,9 @@ def vault_runtime_posture() -> dict[str, object]:
         "CODEX_API_KEY": bool(vault_resolve_named_secret("CODEX_API_KEY")) if unlocked else False,
         "OPENAI_API_KEY": bool(vault_resolve_named_secret("OPENAI_API_KEY")) if unlocked else False,
         "ANTHROPIC_API_KEY": bool(vault_resolve_named_secret("ANTHROPIC_API_KEY")) if unlocked else False,
+        "SUPABASE_ACCESS_TOKEN": bool(vault_resolve_named_secret("SUPABASE_ACCESS_TOKEN"))
+        if unlocked
+        else False,
         "AZURE_SPEECH_KEY": bool(
             vault_resolve_named_secret("AZURE_SPEECH_KEY")
             or vault_resolve_named_secret("azure_speech_key")

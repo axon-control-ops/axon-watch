@@ -411,9 +411,8 @@ Select **Claude Code CLI (local)** in the composer runtime picker (or set `AXON_
 | `claude_runtime` | `claude auth login` **or** `ANTHROPIC_API_KEY` in vault | Max/Pro subscription preferred |
 | `codex_runtime` | `codex login` **or** Codex/OpenAI vault keys | |
 | `openai_provider` | `OPENAI_API_KEY` in vault | Direct OpenAI fallback |
+| `supabase_cli` | `SUPABASE_ACCESS_TOKEN` in vault | Read-only migration audits; pushes stay operator-gated. See [`docs/how-to/supabase-cli-auth.md`](how-to/supabase-cli-auth.md). |
 | DashPro monitor consumers | Required monitor keys in vault/import | |
-
-Source: `services/axon-watch/app/vault/snapshot.py`, `cli_runtime_probe.py`
 
 **Runtime dispatch** (actually running a model) lives in the control-plane:
 
