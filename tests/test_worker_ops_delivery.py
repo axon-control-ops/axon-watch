@@ -120,3 +120,13 @@ class WorkerOpsDeliveryTests(unittest.TestCase):
         }
 
         self.assertFalse(no_change_delivery_is_successful_ops_task(task))
+
+    def test_no_change_supabase_migration_fix_is_not_successful_delivery(self) -> None:
+        task = {
+            "owner_role": "backend",
+            "goal": "Fix the Supabase migration SQL lint failure.",
+            "acceptance_criteria": "Run SQLFluff lint on the changed migration and report the command output.",
+            "allowed_paths": ["supabase", "scripts", "tests"],
+        }
+
+        self.assertFalse(no_change_delivery_is_successful_ops_task(task))

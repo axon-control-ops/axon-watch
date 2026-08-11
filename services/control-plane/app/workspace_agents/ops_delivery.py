@@ -39,6 +39,20 @@ _LEAD_COORDINATION_ACTIONS = (
     "receipt",
 )
 
+_IMPLEMENTATION_ACTIONS = (
+    "add",
+    "build",
+    "change",
+    "code",
+    "create",
+    "edit",
+    "fix",
+    "implement",
+    "refactor",
+    "update",
+    "wire",
+)
+
 
 def _no_change_lead_coordination_is_successful(task: dict[str, object]) -> bool:
     """True for Lead coordination tasks whose output is a decision/receipt, not a diff."""
@@ -67,6 +81,20 @@ def no_change_delivery_is_successful_ops_task(task: dict[str, object] | None) ->
         for key in ("goal", "acceptance_criteria", "terminal_outcome")
     ).lower()
     if not blob or not any(pattern in blob for pattern in _OPS_COMMAND_PATTERNS):
+        return False
+    explicit_no_diff_receipt = any(
+        marker in blob
+        for marker in (
+            "no code diff is expected",
+            "no diff is expected",
+            "no code changes expected",
+            "terminal job receipt",
+        )
+    )
+    owner_role = str(task.get("owner_role") or "").strip().lower()
+    if not explicit_no_diff_receipt and owner_role in {"frontend", "backend", "integrations"} and any(
+        action in blob for action in _IMPLEMENTATION_ACTIONS
+    ):
         return False
     return any(
         marker in blob

@@ -96,8 +96,6 @@ def implementation_requested(task: dict[str, Any] | None) -> bool:
     """True when the task asks for product/code changes, not just coordination."""
     if not isinstance(task, dict):
         return False
-    if no_change_delivery_is_successful_ops_task(task):
-        return False
     role = str(task.get("owner_role") or "").strip().lower()
     # Leads coordinate and watchers verify. Their inherited parent-plan text
     # can mention a fix, but their own delivery is a report/decision rather
@@ -108,11 +106,14 @@ def implementation_requested(task: dict[str, Any] | None) -> bool:
     assigned_blob = " ".join(
         str(task.get(key) or "") for key in ("goal", "acceptance_criteria")
     ).lower()
+    explicitly_requests_implementation = any(word in assigned_blob for word in _IMPLEMENTATION_WORDS)
+    if no_change_delivery_is_successful_ops_task(task):
+        return False
     if role in _IMPLEMENTATION_ROLES:
-        return any(word in assigned_blob for word in _IMPLEMENTATION_WORDS) or not any(
+        return explicitly_requests_implementation or not any(
             word in assigned_blob for word in _REPORT_ONLY_WORDS
         )
-    return any(word in assigned_blob for word in _IMPLEMENTATION_WORDS)
+    return explicitly_requests_implementation
 
 
 def expected_files_for_task(task: dict[str, Any] | None) -> list[str]:

@@ -38,12 +38,25 @@ class WorkerCompletionGateTests(unittest.TestCase):
             lease_holder="employee-workspace_dashpro-frontend",
         )
 
+    def _leased_backend_task(self, *, goal: str, acceptance: str = "") -> dict:
+        opened = task_store.create_task(
+            workspace_id="workspace_dashpro",
+            owner_role="backend",
+            goal=goal,
+            acceptance_criteria=acceptance,
+            allowed_paths=["supabase", "scripts", "tests"],
+        )
+        return task_store.lease_task(
+            opened["task_id"],
+            lease_holder="employee-workspace_dashpro-backend",
+        )
+
     def _run_for_task(self, task: dict) -> str:
         run = create_run(
             workspace_id=str(task["workspace_id"]),
             mode="agent",
-            summary="Frontend worker",
-            employee_role="frontend",
+            summary=f"{task['owner_role']} worker",
+            employee_role=str(task["owner_role"]),
             task_id=str(task["task_id"]),
             require_leased_task=True,
         )
@@ -259,6 +272,33 @@ class WorkerCompletionGateTests(unittest.TestCase):
 
         self.assertFalse(result.passed)
         self.assertIn("no commit hash", result.reason)
+
+    def test_backend_migration_fix_requires_validation_outputs(self) -> None:
+        task = self._leased_backend_task(
+            goal="Fix the Supabase migration SQL lint failure.",
+            acceptance="Run SQLFluff lint on the changed migration and report the command output.",
+        )
+        run_id = self._run_for_task(task)
+        self._pass_acceptance(run_id, with_checks=False)
+
+        with tempfile.TemporaryDirectory() as tempdir:
+            root = Path(tempdir)
+            path = root / "supabase" / "migrations" / "20260811130000_practice.sql"
+            path.parent.mkdir(parents=True)
+            path.write_text("select 1;\n", encoding="utf-8")
+            result = evaluate_pre_publish_completion_gate(
+                run_id=run_id,
+                task=task,
+                isolation_root=root,
+                reply_text=(
+                    "Changed files: supabase/migrations/20260811130000_practice.sql. "
+                    "SQL lint fixed."
+                ),
+                changed_paths=["supabase/migrations/20260811130000_practice.sql"],
+            )
+
+        self.assertFalse(result.passed)
+        self.assertIn("missing validation command outputs", result.reason)
 
 
 if __name__ == "__main__":

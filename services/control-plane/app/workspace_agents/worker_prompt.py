@@ -5,6 +5,7 @@ from __future__ import annotations
 import re
 from typing import Any
 
+from app.workspace_agents.backend_agent_training import backend_agent_training_clause
 from app.workspace_agents.catalog import _DEFAULT_OWNS
 from app.workspace_agents.config_loader import EmployeeConfig
 from app.workspace_agents.critical_review_clause import append_critical_review_clause
@@ -35,14 +36,7 @@ def _prior_failure_clause(*, workspace_id: str, role: str) -> str:
 
 
 def _workspace_continuity_clause(*, workspace_id: str, current_role: str) -> str:
-    """Give every specialist a compact, durable cross-role handoff packet.
-
-    Team roster says *who* owns work, but it did not say what a neighbouring
-    specialist had actually changed or verified. That made a new Priya shift
-    re-discover work from a stale chat tab. Receipts are the control-plane
-    source of truth and survive disposable checkouts, so surface recent
-    terminal employee outcomes without treating them as completion evidence.
-    """
+    """Give every specialist a compact receipt packet without treating it as proof."""
     workspace = str(workspace_id or "").strip()
     if not workspace:
         return ""
@@ -144,6 +138,7 @@ def _role_tools_clause(role: str) -> str:
             shared
             + "Backend focus: data/API/scripts with verified query or script output — "
             "not UI layout work. "
+            + backend_agent_training_clause()
         )
     if cleaned == "frontend":
         return (
