@@ -164,6 +164,25 @@
   white-space: nowrap;
 }
 
+.conversation-seam__embedded-reports {
+  display: grid;
+  gap: 0.42rem;
+  white-space: normal;
+}
+
+.conversation-seam__embedded-report-line {
+  display: grid;
+  gap: 0.22rem;
+}
+
+.conversation-seam__embedded-report-line pre {
+  margin: 0;
+  color: inherit;
+  font: inherit;
+  line-height: inherit;
+  white-space: pre-wrap;
+}
+
 .conversation-seam__resend-button,
 .conversation-seam__edit-button {
   flex-shrink: 0;

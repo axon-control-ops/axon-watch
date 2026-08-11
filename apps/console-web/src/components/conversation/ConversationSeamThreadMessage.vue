@@ -225,6 +225,29 @@ function terminalMirrorBadge(segmentOpen: boolean): string | null {
   });
 }
 
+type EmbeddedReportLine = { text: string; speaker: { name: string; role: string; employeeId: string } | null };
+
+/** A Lead roll-up can contain several employee reports in one agent message.
+ * Render those as real, colour-coded reporter blocks instead of hiding them
+ * in Dana's plain text body. */
+function embeddedReportLines(content: string): EmbeddedReportLine[] {
+  const employees = shell.companyEmployeesForCurrentWorkspace ?? [];
+  return content.split('\n').map((text) => {
+    const explicit = text.match(/^\s*(?:[•*-]\s*)?(.+?)\s*\((lead|watcher|frontend|backend|integrations)\)\s*(?::|reported\b|completed\b|handoff\b)/i);
+    const named = employees.find((employee) => {
+      const name = String(employee.name ?? '').trim();
+      return name && new RegExp(`^\\s*(?:[•*-]\\s*)?${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*(?::|—|-)`, 'i').test(text);
+    });
+    const name = explicit?.[1]?.trim() || String(named?.name ?? '').trim();
+    const role = explicit?.[2]?.toLowerCase() || String(named?.role ?? '').trim().toLowerCase();
+    return { text, speaker: name && role ? { name, role, employeeId: String(named?.employee_id ?? `report:${name}:${role}`) } : null };
+  });
+}
+
+function hasEmbeddedEmployeeReports(content: string): boolean {
+  return embeddedReportLines(content).some((line) => line.speaker !== null);
+}
+
 async function copyTerminalOutput(output: string): Promise<void> {
   if (typeof navigator === 'undefined' || !navigator.clipboard || !output.trim()) {
     return;
@@ -482,6 +505,23 @@ async function copyTerminalOutput(output: string): Promise<void> {
     v-else-if="isMarkdownFileBlock(message.content)"
     :content="message.content"
   />
+
+  <div
+    v-else-if="hasEmbeddedEmployeeReports(message.content)"
+    class="conversation-seam__embedded-reports conversation-seam__content--agent"
+  >
+    <div v-for="(line, index) in embeddedReportLines(message.content)" :key="`${message.message_id}:report:${index}`" class="conversation-seam__embedded-report-line">
+      <span
+        v-if="line.speaker"
+        class="conversation-seam__speaker-chip"
+        :style="threadMessageSpeakerStyle({ role: 'agent', speaker_name: line.speaker.name, speaker_role: line.speaker.role, speaker_employee_id: line.speaker.employeeId })"
+      >
+        <IdeActivityIcon name="agent" :size="12" />
+        <span>{{ threadMessageSpeakerLabel({ role: 'agent', speaker_name: line.speaker.name, speaker_role: line.speaker.role }) }}</span>
+      </span>
+      <pre>{{ line.text }}</pre>
+    </div>
+  </div>
 
   <AgentMarkdownBlock
     v-else-if="isMarkdownBlock(message.content, !isStreamingMessage(message.message_id))"
