@@ -182,6 +182,7 @@ def _post_assignment_to_employee_thread(
     run_id: str,
     task_id: str,
     goal: str,
+    expected_files: list[str] | None = None,
 ) -> str | None:
     """Surface fan-out assignment in the specialist IDE thread (not silent busy)."""
     employee_id = _employee_id_for_role(workspace_id, owner_role)
@@ -210,9 +211,6 @@ def _post_assignment_to_employee_thread(
             employee_role=owner_role,
         )
     thread_id = str(thread["thread_id"])
-    goal_line = " ".join(str(goal or "").strip().split())
-    if len(goal_line) > 160:
-        goal_line = f"{goal_line[:159].rstrip()}…"
     # Compact human assignment card only — raw task/run ids stay in the receipt line.
     # Lead keeps a full summary on their own thread; run receipts stay on the ledger.
     chat_store.save_message(
@@ -225,11 +223,12 @@ def _post_assignment_to_employee_thread(
             "content": assignment_card(
                 assignee_name=assignee_name,
                 assignee_role=owner_role,
-                goal=goal_line or str(task_id),
+                goal=goal or str(task_id),
                 task_id=task_id,
                 run_id=run_id,
                 state="queued",
                 lead_name=lead_name,
+                expected_files=expected_files,
             ),
             "speaker_name": lead_name,
             "speaker_role": "lead",
@@ -347,6 +346,7 @@ def _create_ready_run_for_task(
         run_id=str(run["run_id"]),
         task_id=task_id,
         goal=str(leased.get("goal") or cleaned_goal),
+        expected_files=list(leased.get("allowed_paths") or []),
     )
     return (
         {

@@ -45,6 +45,9 @@ def assignment_card(
     run_id: str,
     state: str,
     lead_name: str | None = None,
+    expected_files: list[str] | None = None,
+    validation_status: str | None = None,
+    commit_hash: str | None = None,
 ) -> str:
     action = "started work on" if state == "started" else "queued"
     role = str(assignee_role or "").strip().lower()
@@ -58,11 +61,18 @@ def assignment_card(
         if state == "started"
         else f"{lead_name or 'Lead'} queued a {role_label(assignee_role)} assignment for {assignee_name}."
     )
+    expected = ", ".join(str(item).strip() for item in (expected_files or []) if str(item).strip())
     return "\n".join(
         [
             title,
             "",
+            f"Assigned to: {assignee_name} ({role_label(assignee_role)})",
+            f"Task ID: {task_id}",
             f"Assignment: {readable_goal(goal)}",
+            f"Objective: {readable_goal(goal)}",
+            f"Expected files: {expected or 'role/task scoped files'}",
+            f"Validation: {validation_status or 'pending'}",
+            f"Commit: {commit_hash or 'pending'}",
             f"Status: {action}; {status_subject}.",
             f"Receipt: {task_id} · {run_id}",
         ]

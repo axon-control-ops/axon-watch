@@ -18,6 +18,7 @@ from app.chat.progress_milestones import (
 from app.chat.stream_hub import clear_chat_stream_buffer, publish_chat_stream_event
 from app.cli_runtime.research_stream_blocks import normalize_transcript_content
 from app.persistence import chat_store
+from app.persistence import run_store
 from app.terminal.active_chat_stream import (
     clear_active_chat_stream,
     register_active_chat_stream,
@@ -130,6 +131,7 @@ def prepare_worker_ide_stream(
                 task_id=task_id,
                 run_id=run_id,
                 state="started",
+                expected_files=list((task or {}).get("allowed_paths") or []),
             ),
             "speaker_name": display_name,
             "speaker_role": employee.role,
@@ -210,6 +212,21 @@ def stream_worker_chunk(
     )
 
 
+def _latest_completion_gate_summary(run_record: dict[str, Any] | None) -> str:
+    history_ref = str((run_record or {}).get("history_ref") or "").strip()
+    if not history_ref:
+        return ""
+    fallback = ""
+    for item in reversed(run_store.list_history(history_ref)):
+        receipt = item.get("receipt") if isinstance(item, dict) else None
+        if isinstance(receipt, dict) and receipt.get("type") == "completion_gate":
+            summary = str(receipt.get("summary") or "").strip()
+            if "commit=pending" not in summary:
+                return summary
+            fallback = fallback or summary
+    return fallback
+
+
 def finalize_worker_ide_stream(
     stream: WorkerIdeStream,
     *,
@@ -223,6 +240,9 @@ def finalize_worker_ide_stream(
         stream.agent_message_id,
         agent_content,
     )
+    gate_summary = _latest_completion_gate_summary(run_record)
+    if gate_summary:
+        agent_content = f"{agent_content.rstrip()}\n\nDelivery receipt: {gate_summary}".strip()
     chat_store.update_message_content(
         message_id=stream.agent_message_id,
         content=agent_content,

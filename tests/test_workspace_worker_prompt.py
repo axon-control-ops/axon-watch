@@ -167,6 +167,42 @@ class WorkspaceWorkerPromptTests(unittest.TestCase):
         self.assertIn("assertion failed", prompt)
         self.assertIn("Prefer fixing or clearing that failure", prompt)
 
+    def test_leased_prompt_uses_current_task_packet_not_prior_failure(self) -> None:
+        with patch(
+            "app.workspace_agents.worker_prompt.latest_role_run_outcome",
+            return_value={
+                "run_id": "run_stale_frontend",
+                "outcome": "failed",
+                "detail": "continue after server restart",
+                "phase": "failed",
+                "terminal": "1",
+            },
+        ), patch(
+            "app.workspace_agents.worker_prompt.build_team_roster_context",
+            return_value="",
+        ):
+            prompt = build_continuous_worker_prompt(
+                workspace_id="workspace_dashpro",
+                employee=EmployeeConfig(
+                    name="Priya",
+                    role="frontend",
+                    owns="DashPro UI",
+                    schedule="continuous",
+                ),
+                task={
+                    "task_id": "task-current-student-ui",
+                    "goal": "Redesign the Student Management header UI.",
+                    "acceptance_criteria": "Changed files and targeted validation required.",
+                    "allowed_paths": ["app", "components"],
+                },
+            )
+        self.assertIn("Current task packet", prompt)
+        self.assertIn("task-current-student-ui", prompt)
+        self.assertIn("Redesign the Student Management header UI", prompt)
+        self.assertIn("ignore stale thread context", prompt)
+        self.assertNotIn("Prior shift failed", prompt)
+        self.assertNotIn("continue after server restart", prompt)
+
     def test_prompt_omits_prior_failure_when_last_shift_completed(self) -> None:
         with patch(
             "app.workspace_agents.worker_prompt.latest_role_run_outcome",

@@ -82,6 +82,10 @@ class LeadFanOutDispatchKickTests(unittest.TestCase):
 
         self.assertIn("Lead should decide, assign, escalate, or report back", card)
         self.assertNotIn("specialist should implement", card)
+        self.assertIn("Assigned to: Dana (Lead)", card)
+        self.assertIn("Task ID: task-demo123456789", card)
+        self.assertIn("Validation: pending", card)
+        self.assertIn("Commit: pending", card)
 
     def test_paused_tick_rescues_queued_lead_handoff_after_restart(self) -> None:
         """Restarted Manual/Semi sessions must not strand Dana→specialist handoffs."""

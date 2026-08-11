@@ -238,36 +238,29 @@ def dispatch_continuous_worker_run(
         if dispatched and finalized is not None:
             phase = str(finalized.get("phase") or "").strip().lower()
             if phase not in {"failed", "cancelled"}:
-                from app.workspace_agents.verifier_contract import (
-                    has_passing_acceptance_evidence,
-                    run_requires_acceptance_evidence,
-                )
-                from app.runs.service import get_run
-                from app.workspace_delivery import publish_worker_isolation
+                from app.workspace_agents.completion_gate import run_worker_delivery_gate
 
-                run_snapshot = get_run(run_id)
-                if (
-                    run_requires_acceptance_evidence(run_snapshot)
-                    and not has_passing_acceptance_evidence(run_id)
-                    and not no_change_delivery_is_successful_ops_task(task)
-                ):
+                gate = run_worker_delivery_gate(
+                    workspace_id=workspace_id,
+                    run_id=run_id,
+                    task_id=task_id,
+                    task=task,
+                    isolation_root=agent_root,
+                    reply_text=reply_text,
+                )
+                if not gate.passed:
                     finalized = _fail_worker_run(
                         run_id,
-                        receipt_summary=(
-                            "Workspace delivery blocked: missing or failing "
-                            "acceptance_evidence (Gate 6)"
-                        ),
+                        receipt_summary=gate.reason,
                     )
                     dispatched = False
-                    preserve_isolation = True
+                    preserve_isolation = gate.preserve_isolation
+                    publish = None
                 else:
-                    publish = publish_worker_isolation(
-                        workspace_id=workspace_id,
-                        run_id=run_id,
-                        isolation_root=agent_root,
-                        task_id=task_id,
-                        turn_subject=str(task.get("goal") or "") if isinstance(task, dict) else None,
-                    )
+                    publish = gate.publish
+                if not dispatched or publish is None:
+                    pass
+                else:
                     preserve_isolation = not publish.cleanup_isolation
                     if (
                         publish.ok
@@ -283,7 +276,10 @@ def dispatch_continuous_worker_run(
                                     receipt_summary=summary,
                                 ),
                             )
-                            dispatched = finalized is not None and finalized.get("phase") == "completed"
+                            dispatched = (
+                                finalized is not None
+                                and finalized.get("phase") == "completed"
+                            )
                         elif auto_ask_resolution is not None:
                             finalized = _fail_worker_run(
                                 run_id,
@@ -300,7 +296,7 @@ def dispatch_continuous_worker_run(
                                 receipt_summary=(
                                     "Workspace delivery blocked: full-access worker produced "
                                     f"no publishable changes ({publish.detail})"
-                                ),
+                                )
                             )
                             dispatched = False
                     elif (

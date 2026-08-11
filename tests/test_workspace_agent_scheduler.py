@@ -432,7 +432,7 @@ class WorkspaceAgentSchedulerTests(unittest.TestCase):
             for item in history
         ]
         self.assertTrue(
-            any("no publishable changes" in summary for summary in summaries),
+            any("no changed files" in summary or "completion gate" in summary for summary in summaries),
             summaries,
         )
 

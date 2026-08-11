@@ -141,6 +141,28 @@ def _task_scope_clause(
     )
 
 
+def _current_task_packet(
+    *,
+    workspace_id: str,
+    task_id: str,
+    goal: str,
+    acceptance: str,
+    allowed_paths: list[str],
+) -> str:
+    expected = ", ".join(f"`{path}`" for path in allowed_paths[:12]) or "role/task scoped files"
+    return (
+        " Current task packet (authoritative; ignore stale thread context): "
+        f"workspace=`{workspace_id.strip() or 'unknown'}`; "
+        f"task_id=`{task_id}`; "
+        f"title=`{_truncate(goal, max_len=90)}`; "
+        f"objective=`{_truncate(goal, max_len=260)}`; "
+        f"acceptance=`{_truncate(acceptance or 'Use receipts to prove the goal is met.', max_len=260)}`; "
+        f"expected_files={expected}. "
+        "If any prior conversation, previous run, tab title, or last-failure hint conflicts "
+        "with this packet, this packet wins."
+    )
+
+
 def parse_out_of_scope_guard(reply_text: str) -> str | None:
     match = _OUT_OF_SCOPE_GUARD_RE.search(str(reply_text or ""))
     if match is None:
@@ -395,7 +417,14 @@ def build_continuous_worker_prompt(
             "OOM-froze the host at ~18G. Create/queue CI repair tasks for operator Start; "
             "do not stack Quality Gates + Android + typecheck heaps. "
         )
-    prior_failure = _prior_failure_clause(workspace_id=workspace_id, role=role)
+    prior_failure = "" if task_payload else _prior_failure_clause(workspace_id=workspace_id, role=role)
+    task_packet = _current_task_packet(
+        workspace_id=workspace_id,
+        task_id=task_id,
+        goal=goal,
+        acceptance=acceptance,
+        allowed_paths=allowed_paths,
+    )
     roster_block = build_team_roster_context(workspace_id, viewer_role=role)
     roster_clause = f"\n\n{roster_block}" if roster_block else ""
     lead_clause = ""
@@ -405,6 +434,9 @@ def build_continuous_worker_prompt(
             "teammates, roles, and owns — do not Glob/Grep/Read the tree to discover "
             "staffing before planning or delegating."
             " Reporting chain: specialists → you → VAXON → operator Decide."
+            " For frontend implementation assignments, act as coordinator/QA only: "
+            "delegate the current task packet to the frontend specialist, then verify "
+            "their actual diff, validation receipts, and delivery commit before reporting success."
             " After specialist completions, post a short Lead rollup (done / verified / next)."
         )
         if "[plan " in goal.lower() or goal.lower().startswith("lead: advance"):
@@ -441,6 +473,7 @@ def build_continuous_worker_prompt(
         f"{prior_failure}"
         f"Execute only this leased task — do not invent, assume, or self-select other work. "
         f"The leased goal is the sole truth for this shift's scope. "
+        f"{task_packet}"
         f"Goal: {goal}.{acceptance_clause} "
         "Do it with verified receipts and summarize what changed. "
         "Stay inside your role boundary. Never hallucinate outcomes."
