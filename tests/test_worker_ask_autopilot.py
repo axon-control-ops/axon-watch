@@ -7,7 +7,11 @@ from pathlib import Path
 CONTROL_PLANE_ROOT = Path(__file__).resolve().parents[1] / "services" / "control-plane"
 sys.path.insert(0, str(CONTROL_PLANE_ROOT))
 
-from app.workspace_agents.ask_autopilot import maybe_resolve_safe_ask, parse_latest_ask_card  # noqa: E402
+from app.workspace_agents.ask_autopilot import (  # noqa: E402
+    maybe_resolve_safe_ask,
+    parse_latest_ask_card,
+    unresolved_operator_ask,
+)
 from app.workspace_agents.worker_prompt import build_continuous_worker_prompt  # noqa: E402
 from app.workspace_agents.config_loader import EmployeeConfig  # noqa: E402
 
@@ -88,6 +92,21 @@ Confidence: 9/10
         )
 
         self.assertIsNone(resolution)
+
+    def test_unsafe_auto_ask_becomes_operator_escalation(self) -> None:
+        escalation = unresolved_operator_ask(
+            """
+:::ask How should authenticated QA identities be supplied?
+- 1 | Use approved non-production accounts
+- 2 | Authorize new synthetic accounts
+- 3 | Keep release blocked
+:::
+""",
+            auto_mode_enabled=True,
+        )
+        assert escalation is not None
+        self.assertIn("Auto mode did not choose", escalation.reason)
+        self.assertIn("2. Authorize new synthetic accounts", escalation.detail)
 
     def test_worker_prompt_tells_agents_not_to_stop_on_safe_auto_asks(self) -> None:
         prompt = build_continuous_worker_prompt(

@@ -113,6 +113,20 @@ class AutoAskResolution:
         )
 
 
+@dataclass(frozen=True)
+class OperatorAskEscalation:
+    """A real decision that Auto must not choose, but VAXON must surface."""
+
+    prompt: str
+    options: tuple[AskOption, ...]
+    reason: str
+
+    @property
+    def detail(self) -> str:
+        choices = "; ".join(f"{option.id}. {option.label}" for option in self.options)
+        return f"{self.reason} Choices: {choices}".strip()
+
+
 def _clean(text: object) -> str:
     return " ".join(str(text or "").split()).strip()
 
@@ -217,3 +231,28 @@ def maybe_resolve_safe_ask(
         answer_text=answer,
         reason=reason,
     )
+
+
+def unresolved_operator_ask(
+    content: str,
+    *,
+    auto_mode_enabled: bool,
+) -> OperatorAskEscalation | None:
+    """Return a durable VAXON escalation for an ask Auto cannot safely answer.
+
+    Full Auto is deliberately not authority to create identities, release code,
+    spend money, or perform destructive actions. It must still raise the exact
+    question globally—rather than leaving it hidden in one employee thread.
+    """
+    parsed = parse_latest_ask_card(content)
+    if parsed is None:
+        return None
+    prompt, options = parsed
+    if not options or maybe_resolve_safe_ask(content, auto_mode_enabled=auto_mode_enabled):
+        return None
+    reason = (
+        "Auto mode did not choose this because it requires an operator decision."
+        if auto_mode_enabled
+        else "Worker requires an operator decision."
+    )
+    return OperatorAskEscalation(prompt=prompt, options=tuple(options), reason=reason)

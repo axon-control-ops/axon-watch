@@ -37,7 +37,7 @@ from app.workspace_agents.worker_prompt import build_continuous_worker_prompt
 from app.workspace_agents.worker_prompt import parse_out_of_scope_guard
 from app.persistence import task_store
 from app.persistence import worker_scheduler_settings_store
-from app.workspace_agents.ask_autopilot import maybe_resolve_safe_ask
+from app.workspace_agents.ask_autopilot import maybe_resolve_safe_ask, unresolved_operator_ask
 from app.persistence.workspace_composer_prefs_store import (
     resolve_worker_runtime_model,
     resolve_worker_runtime_target,
@@ -215,6 +215,39 @@ def dispatch_continuous_worker_run(
                 actor="workspace_scheduler",
                 success=True,
                 intent="worker_autonomy",
+            )
+        operator_ask = unresolved_operator_ask(
+            reply_text,
+            auto_mode_enabled=bool(
+                worker_scheduler_settings_store.load_settings().get("scheduler_enabled")
+            ),
+        )
+        if operator_ask is not None:
+            # Do not silently choose a real approval in Auto. Persist it as a
+            # pending VAXON decision so the operator sees it outside the
+            # employee tab that happened to ask it.
+            from app.persistence import autonomous_attention_store
+
+            autonomous_attention_store.append_receipt(
+                kind="worker_ask",
+                decision="escalate",
+                tier="operator_decision",
+                risk="high",
+                title=f"{employee.name} needs a decision: {operator_ask.prompt}",
+                detail=operator_ask.detail,
+                dedupe_key=f"worker-ask:{run_id}",
+                workspace_id=workspace_id,
+                task_id=task_id or None,
+                ask_operator=True,
+                payload={
+                    "owner_role": str(employee.role or "").strip().lower(),
+                    "run_id": run_id,
+                    "prompt": operator_ask.prompt,
+                    "options": [
+                        {"id": option.id, "label": option.label}
+                        for option in operator_ask.options
+                    ],
+                },
             )
         scope_guard_detail = parse_out_of_scope_guard(reply_text)
         if scope_guard_detail:
