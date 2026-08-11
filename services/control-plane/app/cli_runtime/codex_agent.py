@@ -84,6 +84,14 @@ def _codex_item_block(item: dict[str, object], workspace_root: Path) -> str:
     if item_type == "command_execution":
         command = str(item.get("command") or "").strip()
         if command:
+            # Codex reports a command as an ``item.started`` well before it
+            # completes. Keep an open terminal card in the live transcript so
+            # Full Access never looks like an inert text-only response.
+            if str(item.get("_axon_event_type") or "").strip().lower() == "item.started" or str(item.get("status") or "").strip().lower() in {
+                "in_progress",
+                "running",
+            }:
+                return f"\n:::terminal {command}\n# Running…\n:::\n"
             return terminal_block(command, str(item.get("aggregated_output") or ""))
         return ""
     if item_type == "file_change":
@@ -106,26 +114,35 @@ def _codex_item_block(item: dict[str, object], workspace_root: Path) -> str:
 
 def _extract_codex_text(stream_text: str, workspace_root: Path | None = None) -> str:
     final_text = ""
-    blocks: list[str] = []
+    item_states: dict[str, dict[str, object]] = {}
+    anonymous_items: list[dict[str, object]] = []
     saw_json = False
     root = workspace_root or Path.cwd()
     for payload in _iter_codex_payloads(stream_text):
         saw_json = True
-        if payload.get("type") != "item.completed":
+        if payload.get("type") not in {"item.started", "item.updated", "item.completed"}:
             continue
-        item = payload.get("item")
-        if not isinstance(item, dict):
+        raw_item = payload.get("item")
+        if not isinstance(raw_item, dict):
             continue
-        if item.get("type") != "agent_message":
-            block = _codex_item_block(item, root)
-            if block:
-                blocks.append(block)
-            continue
-        text = str(item.get("text") or "").strip()
-        if text:
-            final_text = text
+        item = {**raw_item, "_axon_event_type": str(payload.get("type") or "")}
+        item_id = str(item.get("id") or "").strip()
+        if item_id:
+            item_states[item_id] = item
+        else:
+            anonymous_items.append(item)
     if not saw_json:
         return str(stream_text or "").strip()
+    blocks: list[str] = []
+    for item in (*item_states.values(), *anonymous_items):
+        if item.get("type") == "agent_message":
+            text = str(item.get("text") or "").strip()
+            if text:
+                final_text = text
+            continue
+        block = _codex_item_block(item, root)
+        if block:
+            blocks.append(block)
     transcript = "".join(blocks).strip()
     return "\n\n".join(part for part in (transcript, final_text) if part).strip()
 

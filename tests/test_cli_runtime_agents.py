@@ -203,6 +203,15 @@ class CliRuntimeAgentTests(unittest.TestCase):
         self.assertIn("+new", transcript)
         self.assertTrue(transcript.endswith("Done."))
 
+    def test_codex_shows_an_open_terminal_card_while_command_is_running(self) -> None:
+        stream = (
+            '{"type":"item.started","item":{"id":"cmd-1","type":"command_execution",'
+            '"command":"npm test"}}\n'
+        )
+        transcript = _extract_codex_text(stream, Path("/tmp/ws"))
+        self.assertIn(":::terminal npm test", transcript)
+        self.assertIn("# Running…", transcript)
+
     @patch("app.cli_runtime.claude_agent.communicate_registered_process")
     def test_claude_parses_stream_json_reply(self, mock_communicate) -> None:
         mock_communicate.return_value = (_stream_json_stdout("PONG"), "", 0)

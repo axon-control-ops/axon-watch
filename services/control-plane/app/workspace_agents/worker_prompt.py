@@ -119,6 +119,11 @@ def _role_tools_clause(role: str) -> str:
         " Tools: this shift has Full Access for project Shell, Read, Edit, and Grep. "
         "Use them to verify — do not invent counts or claim done without a command receipt. "
         "If Shell fails once, retry once with a shorter command; then report the exact error. "
+        "Do not make one missing optional documentation/playbook path a user-facing stop: "
+        "inspect the available workspace files, continue with the next relevant read-only check, "
+        "and mention the absent path only in the final blocker report if it prevents the acceptance check. "
+        "Avoid a combined multi-file read that stops at its first missing path; check required files "
+        "individually or guard optional reads. "
         "Do not spin on Task/MCP workarounds for basic ls/node/npm checks. "
     )
     if cleaned == "watcher":

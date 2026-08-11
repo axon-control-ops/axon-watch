@@ -39,6 +39,8 @@ class WorkspaceWorkerPromptTests(unittest.TestCase):
         self.assertIn("Shell Craft", prompt)
         self.assertIn("Vue shell and IDE polish", prompt)
         self.assertIn("busy-poll", prompt)
+        self.assertIn("one missing optional documentation/playbook path", prompt)
+        self.assertIn("Avoid a combined multi-file read", prompt)
 
     def test_prompt_includes_cross_role_receipts_for_specialist_handoffs(self) -> None:
         with patch(
