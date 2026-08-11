@@ -11,6 +11,7 @@ sys.path.insert(0, str(CONTROL_PLANE_ROOT))
 from app.cli_runtime.subprocess_runner import (  # noqa: E402
     communicate_registered_process,
     headless_cli_env,
+    stream_registered_process,
 )
 
 
@@ -75,6 +76,17 @@ class HeadlessCliEnvTests(unittest.TestCase):
         assert isinstance(env, dict)
         self.assertEqual(env["TERM"], "xterm-256color")
         self.assertEqual(env["NO_COLOR"], "1")
+
+    def test_stream_closes_process_pipes(self) -> None:
+        stdout, stderr, code = stream_registered_process(
+            run_id="run_stream_cleanup",
+            command=[sys.executable, "-c", "print('ready')"],
+            timeout_seconds=5,
+        )
+
+        self.assertEqual(stdout, "ready\n")
+        self.assertEqual(stderr, "")
+        self.assertEqual(code, 0)
 
 
 if __name__ == "__main__":

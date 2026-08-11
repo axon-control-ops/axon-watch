@@ -3,6 +3,7 @@ import { computed, nextTick, ref, watch } from 'vue';
 
 import AgentPersonaDock from './AgentPersonaDock.vue';
 import CompanyPresenceStrip from './CompanyPresenceStrip.vue';
+import RosterDecisionBadge from './RosterDecisionBadge.vue';
 import VaxonRosterVoiceDock from './VaxonRosterVoiceDock.vue';
 import {
   shouldShowVaxonRosterVoiceDock,
@@ -43,7 +44,6 @@ import { navigateToSettingsSection } from '../../lib/settings-section-route';
 import { useCompanyRosterControlActions } from '../../composables/use-company-roster-control-actions';
 import { useCompanyRosterQuickActionState } from '../../composables/use-company-roster-quick-action-state';
 import { useShellStore } from '../../stores/shell';
-
 const shell = useShellStore();
 const currentWorkspaceId = computed(() => shell.currentWorkspace?.workspace_id ?? null);
 const vaxonVoiceDock = useVaxonRosterVoiceDock(
@@ -208,14 +208,7 @@ const rosterAlertBadge = computed(() =>
 
 const busyCount = computed(() => liveBusyEmployeeIds.value.length);
 
-const pendingDecisionEmployees = computed(() =>
-  employees.value.filter((employee) => Boolean(employee.pending_decision_id)),
-);
-
-const pendingDecisionLabel = computed(() => {
-  const count = pendingDecisionEmployees.value.length;
-  return count ? `${count} NEED${count === 1 ? 'S' : ''} YOU` : null;
-});
+const pendingDecisionEmployees = computed(() => employees.value.filter((employee) => employee.pending_decision_id));
 
 const busyBadgeLabel = computed(() => {
   if (!employees.value.length) {
@@ -366,9 +359,7 @@ async function focusFailedEmployee(): Promise<void> {
 
 async function focusPendingDecisionEmployee(): Promise<void> {
   const target = pendingDecisionEmployees.value[0];
-  if (!target) {
-    return;
-  }
+  if (!target) return;
   selectEmployee(target);
   presenceStripRef.value?.focusEmployee(target.employee_id);
   await shell.openOrFocusEmployeeIdeThread(target);
@@ -420,16 +411,10 @@ async function onPresenceSelect(employee: CompanyEmployeeRecord): Promise<void> 
             >
               {{ busyBadgeLabel }}
             </span>
-            <button
-              v-if="pendingDecisionLabel"
-              type="button"
-              class="company-roster__decision-badge"
-              aria-live="polite"
-              :aria-label="`${pendingDecisionLabel}: open the agent awaiting your decision`"
-              @click="focusPendingDecisionEmployee"
-            >
-              {{ pendingDecisionLabel }}
-            </button>
+            <RosterDecisionBadge
+              :count="pendingDecisionEmployees.length"
+              @open="focusPendingDecisionEmployee"
+            />
           </h3>
         </div>
         <button

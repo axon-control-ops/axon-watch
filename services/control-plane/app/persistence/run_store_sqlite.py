@@ -6,6 +6,7 @@ import os
 import sqlite3
 import threading
 from pathlib import Path
+from app.persistence.sqlite_connection import ManagedConnection
 
 _DEFAULT_DB = "./.local/state/control-plane.sqlite3"
 _DEFAULT_BUSY_TIMEOUT_MS = 30_000
@@ -49,6 +50,7 @@ def connect(configured_path: str | None) -> sqlite3.Connection:
     connection = sqlite3.connect(
         str(db_path),
         timeout=busy_timeout_ms / 1_000,
+        factory=ManagedConnection,
     )
     connection.row_factory = sqlite3.Row
     connection.execute(f"PRAGMA busy_timeout = {busy_timeout_ms}")
@@ -57,9 +59,7 @@ def connect(configured_path: str | None) -> sqlite3.Connection:
     try:
         with _SCHEMA_LOCK:
             if db_path not in _INITIALIZED_DATABASES:
-                # WAL lets readers continue while one writer commits. SQLite
-                # still serializes writers; busy_timeout makes them wait instead
-                # of failing agent/chat/voice requests during short bursts.
+                # WAL plus busy_timeout keeps short writer bursts from failing.
                 connection.execute("PRAGMA journal_mode = WAL")
                 ensure_schema(connection)
                 connection.commit()

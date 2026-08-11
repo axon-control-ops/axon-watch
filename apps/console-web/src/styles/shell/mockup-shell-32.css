@@ -1,4 +1,5 @@
 @import './agent-persona-dock.css';
+@import './agent-persona-decision.css';
 @import './agent-persona-handoff.css';
 @import './agent-persona-dock-responsive.css';
 @import './agent-persona-dock-reporting.css';
@@ -9,8 +10,7 @@
 .company-roster {
   margin-top: 0.75rem;
   padding: 0.7rem 0.75rem 0.8rem;
-  border-top: 1px solid rgba(120, 170, 210, 0.14);
-  background: linear-gradient(180deg, rgba(8, 18, 28, 0.55), rgba(6, 12, 18, 0.2));
+  border-top: 1px solid rgba(120, 170, 210, 0.14); background: linear-gradient(180deg, rgba(8, 18, 28, 0.55), rgba(6, 12, 18, 0.2));
 }
 
 .company-roster__header {

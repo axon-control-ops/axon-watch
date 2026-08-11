@@ -161,6 +161,9 @@ def stream_registered_process(
     finally:
         if clean_run_id:
             unregister(clean_run_id)
+        for pipe in (proc.stdout, proc.stderr):
+            if pipe is not None and not pipe.closed:
+                pipe.close()
 
 
 def raise_if_operator_stopped(*, returncode: int, stderr: str, stdout: str) -> None:

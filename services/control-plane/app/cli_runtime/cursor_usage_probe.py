@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from contextlib import closing
 import json
 import os
 import sqlite3
@@ -47,7 +48,7 @@ def _read_cursor_auth_item(key: str) -> str | None:
     if db_path is None:
         return None
     try:
-        with sqlite3.connect(f"file:{db_path}?mode=ro", uri=True) as connection:
+        with closing(sqlite3.connect(f"file:{db_path}?mode=ro", uri=True)) as connection:
             row = connection.execute(
                 "SELECT value FROM ItemTable WHERE key = ?",
                 (key,),

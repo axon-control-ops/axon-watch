@@ -1,0 +1,85 @@
+.company-presence-strip__approval-mark {
+  display: grid;
+  place-items: center;
+  font: 800 0.62rem/1 var(--font-mono, ui-monospace, monospace);
+  color: rgba(45, 28, 3, 0.98);
+  background: rgba(255, 207, 82, 0.98);
+}
+
+.company-presence-strip__avatar[data-presence='approval'] {
+  box-shadow: 0 0 0 2px rgba(20, 30, 40, 0.9), 0 0 0 3px rgba(255, 201, 74, 0.96),
+    0 0 1rem rgba(255, 180, 45, 0.68);
+  animation: presence-avatar-approval-glow 1.25s ease-in-out infinite;
+}
+
+.company-presence-strip__busy-ring--approval {
+  border-color: rgba(255, 194, 60, 0.62);
+  border-top-color: rgba(255, 235, 164, 0.98);
+  animation-duration: 0.85s;
+}
+
+.company-presence-strip__btn--selected .company-presence-strip__avatar[data-presence='approval'] {
+  box-shadow: 0 0 0 2px rgba(20, 30, 40, 0.9), 0 0 0 3px rgba(255, 201, 74, 0.96),
+    0 0 1rem rgba(255, 180, 45, 0.68), 0 0 0 4px rgba(0, 242, 255, 0.55);
+}
+
+.agent-persona-dock[data-presence='approval'] {
+  border-color: rgba(255, 202, 82, 0.75);
+  box-shadow: 0 0 1.2rem rgba(255, 184, 55, 0.2);
+  animation: agent-persona-approval-pulse 1.55s ease-in-out infinite;
+}
+
+.agent-persona-dock__avatar[data-presence='approval'] {
+  box-shadow: 0 0 0 2px rgba(12, 20, 30, 0.95), 0 0 0 3px rgba(255, 201, 74, 0.95),
+    0 0 1.1rem rgba(255, 178, 45, 0.75);
+  animation: presence-avatar-approval-glow 1.25s ease-in-out infinite;
+}
+
+.agent-persona-dock__decision-alert {
+  width: 100%;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 0.45rem;
+  align-items: center;
+  margin-top: 0.65rem;
+  padding: 0.5rem 0.6rem;
+  border: 1px solid rgba(255, 202, 82, 0.68);
+  border-radius: 0.5rem;
+  color: rgba(255, 232, 172, 0.98);
+  background: rgba(94, 57, 14, 0.34);
+  cursor: pointer;
+  text-align: left;
+  animation: agent-persona-approval-pulse 1.55s ease-in-out infinite;
+}
+
+.agent-persona-dock__decision-alert small {
+  display: block;
+  overflow: hidden;
+  margin-top: 0.12rem;
+  color: rgba(255, 238, 194, 0.78);
+  font-size: 0.69rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.agent-persona-dock__decision-alert:focus-visible {
+  outline: 2px solid rgba(255, 221, 126, 0.95);
+  outline-offset: 2px;
+}
+
+@keyframes agent-persona-approval-pulse {
+  50% { box-shadow: 0 0 1.65rem rgba(255, 185, 45, 0.48); }
+}
+
+@keyframes presence-avatar-approval-glow {
+  50% { filter: brightness(1.2); transform: scale(1.04); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .company-presence-strip__avatar[data-presence='approval'],
+  .agent-persona-dock__avatar[data-presence='approval'],
+  .agent-persona-dock[data-presence='approval'],
+  .agent-persona-dock__decision-alert {
+    animation: none;
+  }
+}

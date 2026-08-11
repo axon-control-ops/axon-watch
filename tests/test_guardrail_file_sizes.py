@@ -76,6 +76,8 @@ class GuardrailScriptTests(unittest.TestCase):
             msg=result.stdout + result.stderr,
         )
         self.assertIn("File-size guardrails passed.", result.stdout)
+        self.assertIn("additional legacy advisory-size files omitted", result.stdout)
+        self.assertLess(result.stdout.count("\nWARN "), 8)
 
 
 if __name__ == "__main__":

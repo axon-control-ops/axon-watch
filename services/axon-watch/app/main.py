@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from contextlib import asynccontextmanager
 import os
 import threading
 from pathlib import Path
@@ -99,16 +100,6 @@ class SentryAttendBody(BaseModel):
     workspace_id: str = "workspace_dashpro"
 
 
-app = FastAPI(
-    title="Axon-X Watch Service",
-    version="0.1.0",
-    docs_url=None,
-    redoc_url=None,
-)
-app.add_middleware(InternalServiceTokenMiddleware)
-
-
-@app.on_event("startup")
 def vault_startup_auto_unlock() -> None:
     # Vault first so named-tunnel tokens from unlock are available to autostart.
     attempt_auto_unlock()
@@ -131,6 +122,22 @@ def vault_startup_auto_unlock() -> None:
         name="axon-watch-probe-cache-warm",
         daemon=True,
     ).start()
+
+
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    vault_startup_auto_unlock()
+    yield
+
+
+app = FastAPI(
+    title="Axon-X Watch Service",
+    version="0.1.0",
+    docs_url=None,
+    redoc_url=None,
+    lifespan=lifespan,
+)
+app.add_middleware(InternalServiceTokenMiddleware)
 
 
 @app.get("/internal/watch/health")

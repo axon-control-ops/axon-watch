@@ -256,3 +256,48 @@ def unresolved_operator_ask(
         else "Worker requires an operator decision."
     )
     return OperatorAskEscalation(prompt=prompt, options=tuple(options), reason=reason)
+
+
+def escalate_unresolved_operator_ask(
+    content: str,
+    *,
+    employee_name: str,
+    employee_role: str,
+    workspace_id: str,
+    task_id: str,
+    run_id: str,
+) -> bool:
+    """Persist a worker's unsafe ask as a visible VAXON decision."""
+    from app.persistence import autonomous_attention_store
+    from app.persistence import worker_scheduler_settings_store
+
+    operator_ask = unresolved_operator_ask(
+        content,
+        auto_mode_enabled=bool(
+            worker_scheduler_settings_store.load_settings().get("scheduler_enabled")
+        ),
+    )
+    if operator_ask is None:
+        return False
+    autonomous_attention_store.append_receipt(
+        kind="worker_ask",
+        decision="escalate",
+        tier="operator_decision",
+        risk="high",
+        title=f"{employee_name} needs a decision: {operator_ask.prompt}",
+        detail=operator_ask.detail,
+        dedupe_key=f"worker-ask:{run_id}",
+        workspace_id=workspace_id,
+        task_id=task_id or None,
+        ask_operator=True,
+        payload={
+            "owner_role": employee_role.strip().lower(),
+            "run_id": run_id,
+            "prompt": operator_ask.prompt,
+            "options": [
+                {"id": option.id, "label": option.label}
+                for option in operator_ask.options
+            ],
+        },
+    )
+    return True
