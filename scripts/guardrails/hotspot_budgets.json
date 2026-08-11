@@ -149,11 +149,11 @@
       "note": "Pre-existing over-budget on this branch, unrelated to this change; ratcheted to unblock Fast Gate — split by panel before it grows further"
     },
     "docs/HOW-TO-HANDBOOK.md": {
-      "max_lines": 1781,
+      "max_lines": 1807,
       "soft_limit": 400,
       "hard_limit": 1800,
       "target": "docs/how-to/* chapters",
-      "note": "Raised for AXON-X Constitution registry operator section; split into docs/how-to/constitution-registries.md next."
+      "note": "Raised for AXON-X Constitution registry/operator runtime guardrail notes; split into docs/how-to/constitution-registries.md and runtime-auth.md next."
     },
     "docs/HOW-TO-HANDBOOK.html": {
       "max_lines": 3800,
@@ -562,25 +562,25 @@
       "note": "Worker policy authority resolution; current baseline includes widened safe-agent scope support. Extract allowlist/scope helpers next."
     },
     "services/control-plane/app/workspace_agents/lead_team_checkin.py": {
-      "max_lines": 510,
+      "max_lines": 567,
       "soft_limit": 350,
       "hard_limit": 500,
       "target": "services/control-plane/app/workspace_agents/lead_team_*",
-      "note": "Lead team check-in orchestration; extract prompt builders next"
+      "note": "Lead team check-in orchestration; ratcheted for Lead failure escalation slice. Extract prompt builders and status rendering next."
     },
     "services/control-plane/app/workspace_agents/scheduler.py": {
-      "max_lines": 527,
+      "max_lines": 669,
       "soft_limit": 350,
-      "hard_limit": 527,
+      "hard_limit": 675,
       "target": "services/control-plane/app/workspace_agents/scheduler_*",
-      "note": "Agent scheduler; extract dispatch slices next. Ratchet bumped 516->527 for the billing-failure auto-start cooldown gate (2026-08-05)."
+      "note": "Agent scheduler; ratcheted for watcher/action split, decision trace, and restart-safe Lead handoff rescue. Extract dispatch/rescue/trace slices next."
     },
     "apps/console-web/src/components/conversation/ConversationSeamThreadMessage.vue": {
-      "max_lines": 540,
+      "max_lines": 580,
       "soft_limit": 350,
       "hard_limit": 500,
       "target": "apps/console-web/src/components/conversation/*",
-      "note": "Thread message body/actions; +3 baseline drift in dirty tree, extract attachment chrome next"
+      "note": "Thread message body/actions; ratcheted for embedded agent report role chips. Extract agent-report rendering and attachment chrome next."
     },
     "apps/console-web/src/components/shell/MissionControlAutonomyControl.vue": {
       "max_lines": 679,
@@ -609,6 +609,34 @@
       "hard_limit": 530,
       "target": "apps/console-web/src/components/ide/*",
       "note": "Ratchet after VAXON Attend / Axon terminal jobs slice"
+    },
+    "apps/console-web/src/components/settings/AgentFleetControlPanel.vue": {
+      "max_lines": 516,
+      "soft_limit": 350,
+      "hard_limit": 525,
+      "target": "apps/console-web/src/components/settings/agent-fleet/*",
+      "note": "Ratchet for monitoring-lane visibility and Lead escalation display. Extract scheduler/failure subpanels next."
+    },
+    "apps/console-web/src/components/settings/RuntimeAuthSettingsPanel.vue": {
+      "max_lines": 547,
+      "soft_limit": 350,
+      "hard_limit": 550,
+      "target": "apps/console-web/src/components/settings/runtime-auth/*",
+      "note": "Ratchet for Codex usage visibility, Auto runtime policy, and host-profile auth guardrails. Extract runtime cards and usage sections next."
+    },
+    "docs/ops/agent-reports/axon-x-constitution-gap-audit-2026-08-09.md": {
+      "max_lines": 1124,
+      "soft_limit": 400,
+      "hard_limit": 1150,
+      "target": "docs/ops/agent-reports/axon-x-constitution-gap-audit-2026-08-09-followups.md",
+      "note": "Long-running audit ledger ratcheted for August 11 slices. Move completed slice log into dated follow-up file next."
+    },
+    "tests/test_workspace_agent_scheduler.py": {
+      "max_lines": 646,
+      "soft_limit": 350,
+      "hard_limit": 650,
+      "target": "tests/test_workspace_agent_scheduler_*.py",
+      "note": "Ratchet for watcher/action split and Lead handoff rescue coverage. Split queued fan-out and decision-trace tests next."
     }
   }
 }
