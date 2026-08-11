@@ -311,6 +311,7 @@ async function copyTerminalOutput(output: string): Promise<void> {
   <p
     v-else-if="message.role !== 'agent'"
     class="conversation-seam__content"
+    :class="{ 'conversation-seam__content--operator': message.role === 'operator' }"
   >
     {{ message.content }}
   </p>

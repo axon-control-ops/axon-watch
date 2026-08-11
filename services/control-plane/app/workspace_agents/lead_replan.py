@@ -206,6 +206,7 @@ def synthesize_lead_plan(plan_id: str) -> dict[str, Any]:
     )
     if blocked is not None:
         return blocked
+    plan = lead_plan_store.get_plan(plan_id) or plan
 
     plan_status = str(plan.get("status") or "").strip().lower()
     if plan_status in {"completed", "awaiting_engagement"}:

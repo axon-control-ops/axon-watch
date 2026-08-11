@@ -70,6 +70,34 @@ export interface PostChatMessageResponse {
   agent_terminal_session?: TerminalSessionRecord | null;
 }
 
+export interface GenerateInstructionsRequest {
+  workspace_id: string;
+  content: string;
+  runtime_target?: string | null;
+  runtime_model?: string | null;
+}
+
+export interface GenerateInstructionsResponse {
+  content: string;
+  runtime_id: string;
+  runtime_label: string;
+}
+
+export async function generateInstructions(
+  body: GenerateInstructionsRequest,
+): Promise<GenerateInstructionsResponse> {
+  return fetchJson<GenerateInstructionsResponse>(
+    '/api/composer/instructions',
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    },
+    'instruction generation failed',
+    CHAT_MESSAGE_FETCH_TIMEOUT_MS,
+  );
+}
+
 export interface WorkspaceChatThreadListItem {
   thread_id: string;
   workspace_id: string;

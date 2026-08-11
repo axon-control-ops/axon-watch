@@ -14,6 +14,7 @@ from app.workspace_agents.ops_delivery import no_change_delivery_is_successful_o
 
 
 _IMPLEMENTATION_ROLES = frozenset({"frontend", "backend", "integrations"})
+_REPORTING_ROLES = frozenset({"lead", "watcher"})
 _IMPLEMENTATION_WORDS = frozenset(
     {
         "add",
@@ -34,6 +35,21 @@ _IMPLEMENTATION_WORDS = frozenset(
 )
 _VALIDATION_WORDS = frozenset(
     {"check", "command", "lint", "test", "typecheck", "validate", "validation", "verification", "verify"}
+)
+_REPORT_ONLY_WORDS = frozenset(
+    {
+        "audit",
+        "check",
+        "confirm",
+        "inspect",
+        "monitor",
+        "report",
+        "review",
+        "triage",
+        "validate",
+        "verification",
+        "verify",
+    }
 )
 _STOP_WORDS = frozenset(
     {
@@ -83,13 +99,20 @@ def implementation_requested(task: dict[str, Any] | None) -> bool:
     if no_change_delivery_is_successful_ops_task(task):
         return False
     role = str(task.get("owner_role") or "").strip().lower()
-    blob = " ".join(
-        str(task.get(key) or "")
-        for key in ("goal", "acceptance_criteria", "terminal_outcome")
+    # Leads coordinate and watchers verify. Their inherited parent-plan text
+    # can mention a fix, but their own delivery is a report/decision rather
+    # than a product diff. Requiring changed files here falsely fails a valid
+    # monitoring shift and leaves the fleet stuck in an error state.
+    if role in _REPORTING_ROLES:
+        return False
+    assigned_blob = " ".join(
+        str(task.get(key) or "") for key in ("goal", "acceptance_criteria")
     ).lower()
     if role in _IMPLEMENTATION_ROLES:
-        return True
-    return any(word in blob for word in _IMPLEMENTATION_WORDS)
+        return any(word in assigned_blob for word in _IMPLEMENTATION_WORDS) or not any(
+            word in assigned_blob for word in _REPORT_ONLY_WORDS
+        )
+    return any(word in assigned_blob for word in _IMPLEMENTATION_WORDS)
 
 
 def expected_files_for_task(task: dict[str, Any] | None) -> list[str]:

@@ -12,6 +12,14 @@ from app.cli_runtime.approval_gate import (
     resolve_runtime_execution_tier,
 )
 from app.cli_runtime.catalog import runtime_status_snapshot
+from app.cli_runtime.claude_usage_probe import (
+    claude_usage_allows_agent_retry,
+    record_claude_usage_limit_hit,
+)
+from app.cli_runtime.codex_usage_probe import (
+    codex_usage_allows_agent_retry,
+    record_codex_usage_limit_hit,
+)
 from app.cli_runtime.codex_models import default_codex_model
 from app.cli_runtime.mcp_registry import mcp_tools_for_composer_mode
 from app.cli_runtime.non_cursor_dispatch import run_non_cursor_local
@@ -20,6 +28,7 @@ from app.cli_runtime.runtime_failure import (
     fallback_reply as _fallback_reply,
     runtime_unready_reason as _runtime_unready_reason,
 )
+from app.workspace_agents.failure_detail import is_usage_limit_failure
 from app.cli_runtime.sentry_context import sentry_monitor_context
 from app.cli_runtime.subprocess_runner import RuntimeProcessStoppedError
 from app.cli_runtime.sandbox_policy_adapter import prepare_execution_sandbox
@@ -337,6 +346,18 @@ def dispatch_ide_composer(
         binary = str(record.get("binary") or "")
         family = str(record.get("family") or "")
         target_type = str(record.get("target_type") or "local")
+        usage = snapshot.get(f"{family}_usage")
+        allows_retry = (
+            claude_usage_allows_agent_retry(usage if isinstance(usage, dict) else None)
+            if family == "claude"
+            else codex_usage_allows_agent_retry(usage if isinstance(usage, dict) else None)
+            if family == "codex"
+            else True
+        )
+        if not allows_retry:
+            label = str(record.get("label") or runtime_id)
+            errors.append(f"{label} usage limit is still active")
+            continue
         candidate_runtime_model = runtime_model if family == preferred_family else ""
         model = effective_cli_model(family, str(candidate_runtime_model or ""))
         reasoning_effort = ""
@@ -443,6 +464,11 @@ def dispatch_ide_composer(
                     "failure_phase": "run_error",
                 })
             detail = str(exc)
+            if is_usage_limit_failure(detail):
+                if family == "claude":
+                    record_claude_usage_limit_hit(detail)
+                elif family == "codex":
+                    record_codex_usage_limit_hit(detail)
             logger.exception(
                 "lane_b_dispatch_failed runtime_id=%s family=%s composer_mode=%s "
                 "workspace_id=%s exc_type=%s",

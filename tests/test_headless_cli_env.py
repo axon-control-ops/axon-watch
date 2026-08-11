@@ -20,7 +20,16 @@ class HeadlessCliEnvTests(unittest.TestCase):
         self.assertEqual(env["TERM"], "xterm-256color")
         self.assertEqual(env["COLORTERM"], "truecolor")
         self.assertEqual(env["NO_COLOR"], "1")
-        self.assertEqual(env["PATH"], "/usr/bin")
+        self.assertTrue(env["PATH"].startswith("/usr/bin"))
+
+    def test_adds_user_local_bin_when_available(self) -> None:
+        with (
+            patch("app.cli_runtime.user_bin_path.Path.is_dir", return_value=True),
+            patch("app.cli_runtime.user_bin_path.Path.exists", return_value=True),
+        ):
+            env = headless_cli_env({"PATH": "/usr/bin", "HOME": "/tmp"})
+
+        self.assertIn("/home/vaxon/.local/bin", env["PATH"].split(":"))
 
     def test_preserves_existing_term(self) -> None:
         env = headless_cli_env({"TERM": "screen-256color", "COLORTERM": "yes"})

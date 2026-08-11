@@ -18,11 +18,49 @@ from app.chat.service import (
 )
 from app.chat.stream_events import chat_thread_stream_response
 from app.chat.thread_service import sync_thread_execution_access_notices
+from app.chat.lane_b_agent import LaneBContext, generate_lane_b_result
 from app.cli_runtime.approval_gate import full_access_requested
 from app.persistence import attachment_store, chat_store
-from app.routes.schemas import PostChatMessageRequest, SyncThreadExecutionAccessRequest
+from app.routes.schemas import (
+    GenerateInstructionsRequest,
+    PostChatMessageRequest,
+    SyncThreadExecutionAccessRequest,
+)
 
 router = APIRouter()
+
+_INSTRUCTION_ENGINE_PROMPT = """Turn the source request below into a complete, precise Markdown instruction brief.
+
+Return only the final Markdown beginning with `# Instructions`; no commentary, analysis, tool calls, or implementation. This is drafting only: do not inspect files, change code, run commands, create commits, or claim that work was completed.
+
+Preserve every stated requirement. Infer concrete, domain-appropriate scope, safeguards, ordered steps, acceptance checks, verification, and handoff requirements from the request. Do not use boilerplate such as “Do only what the request states” as a substitute for understanding the request. Keep the source request verbatim in a `## Source request` section. Do not invent unrelated product, release, data, or destructive work.
+
+Source request:
+"""
+
+
+@router.post("/api/composer/instructions")
+def composer_instructions_generate(body: GenerateInstructionsRequest) -> dict[str, object]:
+    source = body.content.strip()
+    if not source:
+        raise HTTPException(status_code=400, detail="A source request is required")
+    result = generate_lane_b_result(
+        context=LaneBContext(workspace_id=body.workspace_id, composer_mode="ask"),
+        user_prompt=f"{_INSTRUCTION_ENGINE_PROMPT}{source}",
+        runtime_target=body.runtime_target,
+        runtime_model=body.runtime_model,
+        execution_access="consultative",
+        allow_git_dispatch=False,
+    )
+    content = str(result.get("content") or "").strip()
+    if not result.get("dispatched") or not content.startswith("# Instructions"):
+        reason = str(result.get("reason") or "The instruction model did not return valid Instructions markdown")
+        raise HTTPException(status_code=503, detail=reason)
+    return {
+        "content": content if content.endswith("\n") else f"{content}\n",
+        "runtime_id": str(result.get("runtime_id") or ""),
+        "runtime_label": str(result.get("runtime_label") or ""),
+    }
 
 
 @router.post("/api/chat/messages")

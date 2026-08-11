@@ -85,6 +85,111 @@ class WorkerCompletionGateTests(unittest.TestCase):
         self.assertFalse(result.passed)
         self.assertIn("no changed files", result.reason)
 
+    def test_watcher_report_does_not_require_a_product_diff(self) -> None:
+        opened = task_store.create_task(
+            workspace_id="workspace_dashpro",
+            owner_role="watcher",
+            goal="Verify the dashboard fix and report any remaining issue.",
+            acceptance_criteria="Check the flow and report results.",
+            allowed_paths=[],
+        )
+        task = task_store.lease_task(
+            opened["task_id"],
+            lease_holder="employee-workspace_dashpro-watcher",
+        )
+        run_id = create_run(
+            workspace_id="workspace_dashpro",
+            mode="agent",
+            summary="Watcher verification",
+            employee_role="watcher",
+            task_id=str(task["task_id"]),
+            require_leased_task=True,
+        )["run_id"]
+        self._pass_acceptance(str(run_id), with_checks=True)
+
+        with tempfile.TemporaryDirectory() as tempdir:
+            result = evaluate_pre_publish_completion_gate(
+                run_id=str(run_id),
+                task=task,
+                isolation_root=Path(tempdir),
+                reply_text="Verified the dashboard flow and recorded the results.",
+                changed_paths=[],
+            )
+
+        self.assertTrue(result.passed, result)
+        self.assertEqual("non-implementation task", result.reason)
+
+    def test_integrations_verification_report_does_not_require_a_product_diff(self) -> None:
+        opened = task_store.create_task(
+            workspace_id="workspace_dashpro",
+            owner_role="integrations",
+            goal="Verify workflow files and self-hosted runner health; report blockers.",
+            acceptance_criteria="Report workflow evidence and runner health status.",
+            allowed_paths=[".github", "config", "scripts"],
+        )
+        task = task_store.lease_task(
+            opened["task_id"],
+            lease_holder="employee-workspace_dashpro-integrations",
+        )
+        run_id = create_run(
+            workspace_id="workspace_dashpro",
+            mode="agent",
+            summary="Integrations verification",
+            employee_role="integrations",
+            task_id=str(task["task_id"]),
+            require_leased_task=True,
+        )["run_id"]
+        self._pass_acceptance(str(run_id), with_checks=True)
+
+        with tempfile.TemporaryDirectory() as tempdir:
+            result = evaluate_pre_publish_completion_gate(
+                run_id=str(run_id),
+                task=task,
+                isolation_root=Path(tempdir),
+                reply_text=(
+                    "Changed files: none. Verified workflow files and reported "
+                    "that live runner health remains blocked."
+                ),
+                changed_paths=[],
+            )
+
+        self.assertTrue(result.passed, result)
+        self.assertEqual("non-implementation task", result.reason)
+
+    def test_integrations_fix_still_requires_a_product_diff(self) -> None:
+        opened = task_store.create_task(
+            workspace_id="workspace_dashpro",
+            owner_role="integrations",
+            goal="Fix GitHub Actions npm cache wiring.",
+            acceptance_criteria="Validation command passes.",
+            allowed_paths=[".github", "config", "scripts"],
+        )
+        task = task_store.lease_task(
+            opened["task_id"],
+            lease_holder="employee-workspace_dashpro-integrations",
+        )
+        run_id = create_run(
+            workspace_id="workspace_dashpro",
+            mode="agent",
+            summary="Integrations fix",
+            employee_role="integrations",
+            task_id=str(task["task_id"]),
+            require_leased_task=True,
+        )["run_id"]
+        self._pass_acceptance(str(run_id), with_checks=True)
+
+        with tempfile.TemporaryDirectory() as tempdir:
+            result = evaluate_pre_publish_completion_gate(
+                run_id=str(run_id),
+                task=task,
+                isolation_root=Path(tempdir),
+                reply_text="Changed files: none. No integrations change was required.",
+                changed_paths=[],
+            )
+
+        self.assertFalse(result.passed)
+        self.assertIn("no changed files", result.reason)
+
     def test_wrong_objective_diff_is_rejected(self) -> None:
         task = self._leased_frontend_task(goal="Redesign the Student Management header UI.")
         run_id = self._run_for_task(task)

@@ -10,6 +10,7 @@ from pathlib import Path
 from app.cli_runtime.agent_sandbox import AgentSandboxPolicy, wrap_command_in_agent_sandbox
 from app.cli_runtime.process_registry import register, unregister
 from app.cli_runtime.agent_process_scope import wrap_command_in_agent_scope
+from app.cli_runtime.user_bin_path import runtime_path_with_user_bins
 
 # Match workspace PTY defaults so headless Cursor/agent shell tools can run
 # ``tput`` / color-aware scripts without ``No value for $TERM``.
@@ -30,6 +31,7 @@ def headless_cli_env(subprocess_env: dict[str, str] | None = None) -> dict[str, 
     """
     env = {**(subprocess_env or os.environ)}
     env["NO_COLOR"] = "1"
+    env["PATH"] = runtime_path_with_user_bins(str(env.get("PATH") or ""))
     if not str(env.get("TERM") or "").strip():
         env["TERM"] = _HEADLESS_TERM
     if not str(env.get("COLORTERM") or "").strip():

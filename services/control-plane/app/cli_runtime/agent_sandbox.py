@@ -14,22 +14,17 @@ from pathlib import Path
 from typing import Sequence
 
 from app.cli_runtime.agent_sandbox_paths import append_hidden_mounts, hidden_workspace_paths
+from app.cli_runtime.user_bin_path import existing_user_local_bin, sandbox_path_with_user_bins
 
 _SANDBOX_HOME = Path("/run/axon-agent-home")
 _SANDBOX_POLICY_ROOT = Path("/run/axon-agent-policy")
 _HOOK_TIMEOUT_SECONDS = 5
 _SYSTEM_DIRS = ("/usr", "/bin", "/sbin", "/lib", "/lib64")
 _SYSTEM_FILES = (
-    "/etc/group",
-    "/etc/hosts",
-    "/etc/ld.so.cache",
-    "/etc/localtime",
-    "/etc/nsswitch.conf",
-    "/etc/passwd",
-    "/etc/resolv.conf",
+    "/etc/group", "/etc/hosts", "/etc/ld.so.cache", "/etc/localtime",
+    "/etc/nsswitch.conf", "/etc/passwd", "/etc/resolv.conf",
 )
 _SYSTEM_CONFIG_DIRS = ("/etc/ssl", "/etc/ca-certificates")
-
 
 class SandboxConfigurationError(RuntimeError):
     """Raised instead of running without a requested sandbox boundary."""
@@ -484,6 +479,7 @@ def build_bwrap_command(
     cursor_paths = tuple(dict.fromkeys((*cursor_paths, *(
         source for source in wrapper_sources if _is_relative_to(source, home)
     ))))
+    user_local_bin = existing_user_local_bin(home)
 
     arguments = [
         str(bwrap),
@@ -523,6 +519,8 @@ def build_bwrap_command(
     )
 
     destination_paths = [workspace, _SANDBOX_HOME / ".cursor" / "hooks.json"]
+    if user_local_bin is not None:
+        destination_paths.append(user_local_bin)
     destination_paths.extend(cursor_paths)
     destination_paths.extend(
         _SANDBOX_HOME / path.relative_to(home) for path in cursor_paths
@@ -550,6 +548,8 @@ def build_bwrap_command(
         arguments.extend(["--ro-bind", str(cursor_path), str(cursor_path)])
         home_destination = _SANDBOX_HOME / cursor_path.relative_to(home)
         arguments.extend(["--ro-bind", str(cursor_path), str(home_destination)])
+    if user_local_bin is not None:
+        arguments.extend(["--ro-bind", str(user_local_bin), str(user_local_bin)])
 
     arguments.extend(
         [
@@ -558,7 +558,7 @@ def build_bwrap_command(
             str(_SANDBOX_HOME),
             "--setenv",
             "PATH",
-            f"{_SANDBOX_POLICY_ROOT}/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+            sandbox_path_with_user_bins(user_local_bin),
             "--setenv",
             "TMPDIR",
             "/tmp",

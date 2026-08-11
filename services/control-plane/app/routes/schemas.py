@@ -61,6 +61,15 @@ class PostChatMessageRequest(BaseModel):
     kairo_session_id: str | None = None
 
 
+class GenerateInstructionsRequest(BaseModel):
+    """A model-authored, non-executing expansion of a composer draft."""
+
+    workspace_id: str
+    content: str
+    runtime_target: str | None = None
+    runtime_model: str | None = None
+
+
 class CreateWorkspaceChatThreadRequest(BaseModel):
     surface: str = "ide"
     run_id: str | None = None

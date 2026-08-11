@@ -1,4 +1,4 @@
-import { computed, nextTick, type Ref } from 'vue';
+import { computed, nextTick, ref, type Ref } from 'vue';
 
 import { resolveActiveIdeAgentMessage } from '../../lib/ide-agent-center-view';
 import {
@@ -7,7 +7,7 @@ import {
 } from '../../lib/ide-agent-activity-view';
 import { filterMcpToolsForComposerMode } from '../../lib/composer-mcp-tools-view';
 import { isToolCapableComposerMode } from '../../lib/composer-tool-modes';
-import { plainTextToInstructionsMarkdown } from '../../lib/plain-text-to-instructions';
+import { generateInstructions } from '../../api/chat-api';
 import {
   extractDebugReproduceRequest,
   shouldShowDebugReproduceBanner,
@@ -193,12 +193,27 @@ export function useComposerDisplayState(options: UseComposerDisplayStateOptions)
       shell.ideComposerDraft = value;
     },
   });
-  const canConvertInstructions = computed(() => Boolean(composerDraftModel.value.trim()));
+  const instructionsGenerating = ref(false);
+  const canConvertInstructions = computed(
+    () => Boolean(composerDraftModel.value.trim()) && !instructionsGenerating.value,
+  );
 
-  function convertDraftToInstructions(): void {
-    const next = plainTextToInstructionsMarkdown(composerDraftModel.value);
-    composerDraftModel.value = next;
-    void nextTick(syncComposerHeight);
+  async function convertDraftToInstructions(): Promise<void> {
+    const source = composerDraftModel.value.trim();
+    const workspaceId = shell.currentWorkspace?.workspace_id;
+    if (!source || !workspaceId || instructionsGenerating.value) return;
+    instructionsGenerating.value = true;
+    try {
+      const result = await generateInstructions({ workspace_id: workspaceId, content: source });
+      composerDraftModel.value = result.content;
+      await nextTick(syncComposerHeight);
+    } catch (error) {
+      shell.commandMutationError = error instanceof Error
+        ? error.message
+        : 'instruction generation failed';
+    } finally {
+      instructionsGenerating.value = false;
+    }
   }
 
   const canSubmitComposer = computed(() => {
@@ -245,6 +260,7 @@ export function useComposerDisplayState(options: UseComposerDisplayStateOptions)
     composerActivityChips,
     composerDraftModel,
     canConvertInstructions,
+    instructionsGenerating,
     convertDraftToInstructions,
     composerPlaceholder,
     composerQueueHint,
