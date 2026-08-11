@@ -38,6 +38,9 @@ class AgentSandboxPolicy:
     approved_wrappers: tuple[str, ...] = ()
     approved_command_prefixes: tuple[tuple[str, ...], ...] = ()
     cursor_readonly_paths: tuple[str, ...] = ()
+    # Codex can use an Axon-X profile outside the desktop user's home.  Its
+    # auth file is mounted only at the sandbox's private CODEX_HOME.
+    codex_auth_path: str = ""
     forbidden_path_globs: tuple[str, ...] = ()
 
 
@@ -475,6 +478,17 @@ def build_bwrap_command(
             for path in policy.cursor_readonly_paths
         )
     )
+    codex_auth_path: Path | None = None
+    if policy.codex_auth_path:
+        try:
+            candidate = Path(policy.codex_auth_path).expanduser().resolve(strict=True)
+        except OSError as exc:
+            raise SandboxConfigurationError("Codex profile auth file does not exist.") from exc
+        if not candidate.is_file() or candidate.is_symlink():
+            raise SandboxConfigurationError("Codex profile auth must be a regular file.")
+        if _is_relative_to(candidate, workspace) or _is_relative_to(workspace, candidate):
+            raise SandboxConfigurationError("Codex profile auth cannot overlap the workspace.")
+        codex_auth_path = candidate
     wrapper_sources = tuple(_trusted_wrapper_sources(policy, workspace).values())
     cursor_paths = tuple(dict.fromkeys((*cursor_paths, *(
         source for source in wrapper_sources if _is_relative_to(source, home)
@@ -518,7 +532,11 @@ def build_bwrap_command(
         ]
     )
 
-    destination_paths = [workspace, _SANDBOX_HOME / ".cursor" / "hooks.json"]
+    destination_paths = [
+        workspace,
+        _SANDBOX_HOME / ".cursor" / "hooks.json",
+        _SANDBOX_HOME / ".codex" / "auth.json",
+    ]
     if user_local_bin is not None:
         destination_paths.append(user_local_bin)
     destination_paths.extend(cursor_paths)
@@ -548,6 +566,14 @@ def build_bwrap_command(
         arguments.extend(["--ro-bind", str(cursor_path), str(cursor_path)])
         home_destination = _SANDBOX_HOME / cursor_path.relative_to(home)
         arguments.extend(["--ro-bind", str(cursor_path), str(home_destination)])
+    if codex_auth_path is not None:
+        arguments.extend(
+            [
+                "--ro-bind",
+                str(codex_auth_path),
+                str(_SANDBOX_HOME / ".codex" / "auth.json"),
+            ]
+        )
     if user_local_bin is not None:
         arguments.extend(["--ro-bind", str(user_local_bin), str(user_local_bin)])
 

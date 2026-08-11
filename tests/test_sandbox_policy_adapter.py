@@ -137,6 +137,23 @@ class SandboxPolicyAdapterTests(unittest.TestCase):
         self.assertIs(env, unchanged)
         self.assertIsNone(sandbox)
 
+    def test_codex_uses_a_private_sandbox_home_not_a_hidden_host_path(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            binary = Path(directory) / "codex"
+            binary.write_text("#!/bin/sh\n", encoding="utf-8")
+            env, sandbox = prepare_execution_sandbox(
+                role_execution_policy("lead"),
+                family="codex",
+                runtime_binary=str(binary),
+                env={"CODEX_HOME": str(Path(directory) / "missing-profile")},
+                workspace_id="workspace_demo",
+                run_id="run_demo",
+            )
+
+        self.assertEqual("/run/axon-agent-home/.codex", env["CODEX_HOME"])
+        self.assertIsNotNone(sandbox)
+        self.assertEqual("", sandbox.codex_auth_path)  # type: ignore[union-attr]
+
 
 if __name__ == "__main__":
     unittest.main()

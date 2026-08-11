@@ -46,11 +46,23 @@ def _runtime_paths(binary: str, *, family: str) -> tuple[str, ...]:
     return tuple(str(path) for path in paths)
 
 
+def _codex_profile_auth_path(env: dict[str, str]) -> str:
+    raw_home = str(env.get("CODEX_HOME") or "").strip()
+    if not raw_home:
+        return ""
+    try:
+        candidate = (Path(raw_home).expanduser() / "auth.json").resolve(strict=True)
+    except OSError:
+        return ""
+    return str(candidate) if candidate.is_file() and not candidate.is_symlink() else ""
+
+
 def adapt_execution_policy(
     policy: AgentExecutionPolicy,
     *,
     runtime_binary: str,
     family: str = "",
+    env: dict[str, str] | None = None,
 ) -> AgentSandboxPolicy:
     return AgentSandboxPolicy(
         writable_roots=policy.write_paths,
@@ -58,6 +70,7 @@ def adapt_execution_policy(
         approved_command_prefixes=policy.approved_command_prefixes,
         forbidden_path_globs=policy.forbidden_path_globs,
         cursor_readonly_paths=_runtime_paths(runtime_binary, family=family),
+        codex_auth_path=_codex_profile_auth_path(env or {}) if family == "codex" else "",
     )
 
 
@@ -86,14 +99,20 @@ def prepare_execution_sandbox(
 ) -> tuple[dict[str, str], AgentSandboxPolicy | None]:
     if policy is None:
         return env, None
-    return (
-        sandbox_agent_env(env, workspace_id=workspace_id, run_id=run_id),
-        adapt_execution_policy(
-            policy,
-            runtime_binary=runtime_binary,
-            family=family,
-        ),
+    sandbox_env = sandbox_agent_env(env, workspace_id=workspace_id, run_id=run_id)
+    policy_value = adapt_execution_policy(
+        policy,
+        runtime_binary=runtime_binary,
+        family=family,
+        env=sandbox_env,
     )
+    if family == "codex":
+        # Bubblewrap hides host paths, including the persistent Axon-X profile.
+        # Codex must therefore use the actual private directory that the
+        # sandbox materializes below. Its optional auth.json is read-only bound
+        # there by AgentSandboxPolicy.codex_auth_path.
+        sandbox_env["CODEX_HOME"] = "/run/axon-agent-home/.codex"
+    return sandbox_env, policy_value
 
 
 __all__ = [

@@ -232,6 +232,23 @@ class AgentSandboxTests(unittest.TestCase):
         self.assertIn("/run/axon-agent-home/.cursor/hooks.json", command)
         self.assertEqual(["/bin/echo", "ok"], command[-2:])
 
+    def test_codex_auth_file_mounts_only_into_private_codex_home(self) -> None:
+        auth = self.temp_root / "profiles" / "codex" / "auth.json"
+        auth.parent.mkdir(parents=True)
+        auth.write_text("{}", encoding="utf-8")
+        policy = self._policy(codex_auth_path=str(auth))
+        command = build_bwrap_command(
+            ["/bin/true"],
+            policy=policy,
+            workspace_root=self.workspace,
+            hook_material=self._material(policy),
+            bwrap_path="/usr/bin/bwrap",
+            user_home=self.home,
+        )
+        destination = "/run/axon-agent-home/.codex/auth.json"
+        self.assertIn(str(auth), command)
+        self.assertIn(destination, command)
+
     def test_symlinked_binary_resolves_to_its_real_target(self) -> None:
         """npm/nvm-managed CLIs are commonly invoked via a symlink (e.g.
         ~/.local/bin/cursor-agent -> .../versions/<ver>/cursor-agent).
