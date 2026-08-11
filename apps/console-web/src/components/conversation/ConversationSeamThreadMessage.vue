@@ -237,7 +237,7 @@ async function copyTerminalOutput(output: string): Promise<void> {
   <div class="conversation-seam__meta">
     <div class="conversation-seam__meta-leading">
       <span
-        v-if="message.role === 'agent'"
+        v-if="message.role === 'agent' || message.speaker_name"
         class="conversation-seam__speaker-chip"
         :style="threadMessageSpeakerStyle(message)"
         :aria-label="threadMessageSpeakerLabel(message)"

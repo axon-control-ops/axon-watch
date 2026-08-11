@@ -47,7 +47,7 @@ function badgeCaseLabel(value: string): string {
 }
 
 export function threadMessageSpeakerLabel(message: Pick<OperatorThreadEntry, 'role' | 'speaker_name' | 'speaker_role'>): string {
-  if (message.role !== 'agent') {
+  if (message.role !== 'agent' && !String(message.speaker_name || '').trim()) {
     return formatThreadRole(message.role);
   }
   const name = String(message.speaker_name || '').trim();
@@ -61,7 +61,7 @@ export function threadMessageSpeakerLabel(message: Pick<OperatorThreadEntry, 'ro
 export function threadMessageSpeakerStyle(
   message: Pick<OperatorThreadEntry, 'role' | 'speaker_role' | 'speaker_employee_id'>,
 ): Record<string, string> {
-  if (message.role !== 'agent') {
+  if (message.role !== 'agent' && !String(message.speaker_name || '').trim()) {
     return {};
   }
   const role = normalizeSpeakerRole(message.speaker_role) || 'agent';

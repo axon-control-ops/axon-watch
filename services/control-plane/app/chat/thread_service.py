@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+import re
 
 from app.cli_runtime.approval_gate import (
     agent_tool_execution_enabled,
@@ -128,6 +129,27 @@ def _legacy_assignment_message(
     return None
 
 
+def _report_speaker(record: dict[str, object]) -> dict[str, str | None] | None:
+    """Tag legacy worker reports that were saved as system text.
+
+    Older runs wrote lines such as ``Cass (watcher) reported in`` without
+    speaker columns.  Preserve their content but give the transcript a real
+    roster identity so it renders with the same role chip as current agents.
+    """
+    content = str(record.get("content") or "").strip()
+    match = re.match(r"^([A-Za-z][A-Za-z .'-]{0,48})\s*\((lead|watcher|frontend|backend|integrations)\)\s+(?:reported|completed|handoff)", content, re.I)
+    if not match:
+        return None
+    workspace_id = str(record.get("workspace_id") or "").strip()
+    role = match.group(2).lower()
+    employee = _company_employee(workspace_id, role=role)
+    return {
+        "speaker_name": match.group(1).strip(),
+        "speaker_role": role,
+        "speaker_employee_id": str((employee or {}).get("employee_id") or "") or None,
+    }
+
+
 def _enrich_message_records(
     records: list[dict[str, object]],
     *,
@@ -143,6 +165,10 @@ def _enrich_message_records(
             thread=thread,
             fallback_speaker=fallback_speaker,
         ) or dict(record)
+        if not str(next_record.get("speaker_name") or "").strip():
+            inferred = _report_speaker(next_record)
+            if inferred:
+                next_record.update(inferred)
         message_id = str(record.get("message_id") or "")
         attachments = grouped.get(message_id, [])
         if attachments:
