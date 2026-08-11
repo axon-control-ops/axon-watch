@@ -179,7 +179,7 @@ function assignmentDuplicatePlan(plain: string): Partial<InstructionsSections> |
     steps: [
       'Inspect assignment creation, dashboard queries, and parent delivery before changing code',
       'Verify a repeated assignment attempt and add idempotency protection if required',
-      'Identify existing duplicates and retain only the valid active assignment record',
+      'Identify existing records, confirm which are true duplicates, then retain one canonical active record for each confirmed duplicate set',
       'Verify teacher dashboard cards and the parent assignment experience after cleanup',
     ],
     acceptance: [
