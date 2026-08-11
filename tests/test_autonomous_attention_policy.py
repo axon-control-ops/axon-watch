@@ -84,6 +84,18 @@ class AutonomousAttentionPolicyTests(unittest.TestCase):
         self.assertEqual(decision.reason, "email_ci_noise_no_dispatch")
         self.assertFalse(decision.ask_operator)
 
+    def test_account_security_email_is_review_only(self) -> None:
+        decision = classify_attention_item(
+            kind="warning_signal",
+            title="Email needs follow-up: New sign-in to your OpenAI account",
+            detail="Review your account security if this was not you.",
+            severity="warning",
+            dedupe_key="signal:workspace_axon_watch:signal_email_login:warning",
+        )
+        self.assertEqual(decision.decision, "skip")
+        self.assertEqual(decision.reason, "account_security_email_operator_review")
+        self.assertTrue(decision.ask_operator)
+
     def test_unknown_risk_normalizes_fail_closed(self) -> None:
         self.assertEqual(normalize_task_risk("mystery"), "high")
         self.assertEqual(normalize_task_risk("normal"), "normal")

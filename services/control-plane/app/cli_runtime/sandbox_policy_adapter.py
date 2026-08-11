@@ -22,7 +22,8 @@ _AUTH_PATH_CANDIDATES: dict[str, tuple[str, ...]] = {
         ".config/cursor/auth.json",
     ),
     "claude": (".claude/.credentials.json",),
-    "codex": (".codex/auth.json",),
+    # Codex uses the isolated CODEX_HOME supplied below; never mount desktop auth.
+    "codex": (),
 }
 
 

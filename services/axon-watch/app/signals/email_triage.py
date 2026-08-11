@@ -58,6 +58,10 @@ _BILLING_NOTICE_PATTERNS = (
     ),
 )
 _LOW_ATTENTION_PRIORITY_CAP = 40
+_DEV_NOTIFICATION_PATTERNS = (
+    re.compile(r"\b(run failed|workflow run|check[- ]suite|github actions)\b", re.I),
+    re.compile(r"\bvercel\[bot\].*\b(?:pull|pr)\b", re.I | re.S),
+)
 
 
 def _is_promotional_email(*, subject: str, sender: str, snippet: str) -> bool:
@@ -71,6 +75,15 @@ def _is_automated_billing_notice(*, subject: str, sender: str, snippet: str) -> 
     has_automated_sender = any(pattern.search(sender) for pattern in _AUTOMATED_SENDER_PATTERNS)
     has_billing_copy = any(pattern.search(combined) for pattern in _BILLING_NOTICE_PATTERNS)
     return has_automated_sender and has_billing_copy
+
+
+def _is_automated_dev_notification(*, subject: str, sender: str, snippet: str) -> bool:
+    """Detect CI/deploy mail already represented by native engineering signals."""
+    combined = f"{sender}\n{subject}\n{snippet}"
+    automated = any(pattern.search(sender) for pattern in _AUTOMATED_SENDER_PATTERNS) or any(
+        marker in sender.lower() for marker in ("notifications@github.com", "vercel[bot]")
+    )
+    return automated and any(pattern.search(combined) for pattern in _DEV_NOTIFICATION_PATTERNS)
 
 
 def _sentence_candidates(text: str) -> list[str]:
@@ -99,7 +112,10 @@ def analyze_email_message(
         sender=sender,
         snippet=snippet,
     )
-    low_attention = promotional or automated_billing
+    automated_dev_notification = _is_automated_dev_notification(
+        subject=subject, sender=sender, snippet=snippet
+    )
+    low_attention = promotional or automated_billing or automated_dev_notification
     risk_patterns = _HARD_RISK_PATTERNS if low_attention else (_HARD_RISK_PATTERNS + _SOFT_RISK_PATTERNS)
 
     actions = [
@@ -144,7 +160,7 @@ def analyze_email_message(
         priority = min(priority, _LOW_ATTENTION_PRIORITY_CAP)
         risks = []
         commitments = []
-    elif automated_billing:
+    elif automated_billing or automated_dev_notification:
         # Vendor noreply invoices use "review" boilerplate — not a human follow-up.
         priority = min(priority, _LOW_ATTENTION_PRIORITY_CAP)
         risks = []
@@ -168,6 +184,9 @@ def analyze_email_message(
         recommended_detail = (
             "Automated billing or invoice notice — check your vendor portal; no reply expected."
         )
+    elif automated_dev_notification:
+        recommended_action = "monitor_engineering_signal"
+        recommended_detail = "Automated CI/deploy mail is covered by the native engineering signal."
     elif risks:
         recommended_action = "reply_or_investigate"
         recommended_detail = (
@@ -200,6 +219,7 @@ def analyze_email_message(
         "risk_level": risk_level,
         "promotional": promotional,
         "automated_billing": automated_billing,
+        "automated_dev_notification": automated_dev_notification,
         "action_requests": actions[:5],
         "risks": risks[:5],
         "commitments": commitments[:5],

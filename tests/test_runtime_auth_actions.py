@@ -119,20 +119,31 @@ class RuntimeAuthActionsTests(unittest.TestCase):
         },
     )
     @patch("app.cli_runtime.runtime_auth_actions.subprocess.run")
-    def test_logout_codex_chatgpt_returns_host_scoped_help_without_running_logout(
+    @patch("app.cli_runtime.runtime_auth_actions.codex_profile_env", return_value={"CODEX_HOME": "/tmp/axon-codex"})
+    def test_logout_codex_chatgpt_only_logs_out_isolated_profile(
         self,
+        _profile_env,
         mock_run,
         _target,
         _find,
         _snapshot,
         _cursor_snapshot,
     ) -> None:
-        result = runtime_auth_actions.logout_codex_runtime()
-        self.assertEqual("manual_required", result["status"])
-        self.assertIn("will not run", result["message"])
-        self.assertIn("host-profile scoped", result["account_scope_notice"])
-        self.assertEqual("/usr/bin/codex logout", result["command_preview"])
-        mock_run.assert_not_called()
+        mock_run.return_value.returncode = 0
+        mock_run.return_value.stdout = "Logged out"
+        with patch(
+            "app.cli_runtime.runtime_auth_actions._runtime_target",
+            side_effect=[
+                {
+                    "family": "codex",
+                    "auth": {"logged_in": True, "auth_method": "chatgpt"},
+                },
+                {"family": "codex", "auth": {"logged_in": False}},
+            ],
+        ):
+            result = runtime_auth_actions.logout_codex_runtime()
+        self.assertEqual("completed", result["status"])
+        self.assertEqual("/tmp/axon-codex", mock_run.call_args.kwargs["env"]["CODEX_HOME"])
 
     @patch("app.cli_runtime.runtime_auth_actions.cursor_runtime_snapshot", return_value={})
     @patch("app.cli_runtime.runtime_auth_actions.runtime_status_snapshot", return_value={})

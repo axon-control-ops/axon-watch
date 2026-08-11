@@ -63,6 +63,28 @@ class AutonomousAttentionLoopTests(unittest.TestCase):
             any(item.get("reason") == "email_ci_noise_no_dispatch" for item in result["skipped"])
         )
 
+    def test_account_security_email_does_not_create_attend_task(self) -> None:
+        finding = LeadCheckinFinding(
+            kind="warning_signal",
+            workspace_id="workspace_axon_watch",
+            owner_role="integrations",
+            title="Email needs follow-up: Your two-factor authentication recovery codes were viewed",
+            detail="Review the account security log if this was not you.",
+            dedupe_key="signal:workspace_axon_watch:signal_email_recovery_codes:warning",
+        )
+        result = enqueue_attend_actions(
+            workspace_id="workspace_axon_watch",
+            findings=[finding],
+        )
+        self.assertEqual(result["created_tasks"], [])
+        self.assertEqual(result["escalated"], [])
+        self.assertTrue(
+            any(
+                item.get("reason") == "account_security_email_operator_review"
+                for item in result["skipped"]
+            )
+        )
+
     def test_lead_assignment_sees_existing_attend_task_dedupe(self) -> None:
         dedupe = "failed_shift:workspace_axon_watch:watcher:run_dup"
         task_store.create_task(

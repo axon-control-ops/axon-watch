@@ -15,6 +15,7 @@ from app.cli_runtime.catalog import (
 )
 from app.cli_runtime.catalog_discovery import cursor_cli_argv
 from app.cli_runtime.cursor_models import cursor_runtime_snapshot
+from app.cli_runtime.runtime_profiles import codex_profile_env
 
 StatusRecord = dict[str, Any]
 
@@ -149,19 +150,6 @@ def logout_codex_runtime() -> StatusRecord:
             message="Codex is authenticated via API key. Remove Codex/OpenAI keys from /vault or the shell env to sign out.",
             command_preview=f"{binary} login status",
         )
-    if auth.get("auth_method") in {"oauth", "chatgpt"}:
-        notice = _host_cli_oauth_notice("Codex CLI")
-        return _action_result(
-            status="manual_required",
-            message=(
-                "Codex CLI sign-out is host-profile scoped, so Axon-X will not run "
-                "`codex logout` from the console. Run it manually only if you intend "
-                "to sign this host profile out of Codex in Cursor/IDE/CLI."
-            ),
-            command_preview=f"{binary} logout",
-            account_scope_notice=notice,
-            force_refresh=False,
-        )
     if not auth.get("logged_in"):
         return _action_result(
             status="completed",
@@ -174,7 +162,7 @@ def logout_codex_runtime() -> StatusRecord:
             capture_output=True,
             text=True,
             timeout=12,
-            env={**os.environ, "NO_COLOR": "1"},
+            env={**codex_profile_env(), "NO_COLOR": "1"},
         )
     except subprocess.TimeoutExpired:
         return _action_result(
@@ -286,7 +274,7 @@ def start_codex_runtime_login() -> StatusRecord:
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
             start_new_session=True,
-            env={**os.environ, "NO_COLOR": "1"},
+            env={**codex_profile_env(), "NO_COLOR": "1"},
         )
     except OSError as exc:
         return _action_result(
@@ -297,8 +285,9 @@ def start_codex_runtime_login() -> StatusRecord:
         )
     return _action_result(
         status="browser_opened",
-        message="Codex login started — complete the browser flow on this host, then refresh status.",
+        message="Codex login started in Axon-X's isolated profile — complete the browser flow, then refresh status.",
         command_preview=" ".join(command),
+        account_scope_notice="This Axon-X Codex profile is isolated from Cursor and other desktop sessions.",
         force_refresh=False,
     )
 

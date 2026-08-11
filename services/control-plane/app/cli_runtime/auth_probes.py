@@ -6,18 +6,21 @@ import json
 import os
 import subprocess
 import base64
+from pathlib import Path
 from typing import Any
 
 from app.cli_runtime.catalog_discovery import cursor_cli_argv
 from app.cli_runtime.runtime_auth import env_without_api_keys
+from app.cli_runtime.runtime_profiles import codex_profile_env
 
 StatusRecord = dict[str, Any]
 
 
-def _codex_account_email() -> str:
+def _codex_account_email(env: dict[str, str] | None = None) -> str:
     """Return only the local Codex ID-token email claim; never expose its token."""
     try:
-        with open(os.path.expanduser("~/.codex/auth.json"), encoding="utf-8") as handle:
+        runtime_env = codex_profile_env(env)
+        with open(Path(runtime_env["CODEX_HOME"]) / "auth.json", encoding="utf-8") as handle:
             token = str((json.load(handle).get("tokens") or {}).get("id_token") or "")
         payload = token.split(".")[1]
         decoded = base64.urlsafe_b64decode(payload + "=" * (-len(payload) % 4))
@@ -263,7 +266,7 @@ def _probe_codex_cli(
         "logged_in": True,
         "auth_method": method,
         "provider_label": "Codex",
-        "account_label": _codex_account_email() or raw.splitlines()[0].strip(),
+        "account_label": _codex_account_email(env) or raw.splitlines()[0].strip(),
         "vault_posture": "ready",
         "message": "Authenticated with Codex CLI.",
     }
@@ -276,7 +279,7 @@ def codex_auth_status(
     env_keys: dict[str, str],
     probe_env: dict[str, str] | None = None,
 ) -> StatusRecord:
-    runtime_env = probe_env or {**os.environ, **env_keys}
+    runtime_env = codex_profile_env(probe_env or {**os.environ, **env_keys})
     vault_overlay = vault_auth_overlay("codex_local", vault_posture=vault_posture, env_keys=env_keys)
     has_api_key = bool(
         runtime_env.get("CODEX_API_KEY", "").strip() or runtime_env.get("OPENAI_API_KEY", "").strip()

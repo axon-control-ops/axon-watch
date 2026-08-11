@@ -1,5 +1,4 @@
 from __future__ import annotations
-
 import json
 import os
 import shutil
@@ -10,10 +9,8 @@ import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import patch
-
 CONTROL_PLANE_ROOT = Path(__file__).resolve().parents[1] / "services" / "control-plane"
 sys.path.insert(0, str(CONTROL_PLANE_ROOT))
-
 from app.cli_runtime.agent_sandbox import (  # noqa: E402
     AgentSandboxPolicy,
     SandboxConfigurationError,
@@ -22,7 +19,6 @@ from app.cli_runtime.agent_sandbox import (  # noqa: E402
     wrap_command_in_agent_sandbox,
 )
 from app.cli_runtime.agent_shell_hook import evaluate_hook_payload, run_hook  # noqa: E402
-
 
 def _make_tree_removable(root: Path) -> None:
     if not root.exists():
@@ -33,7 +29,6 @@ def _make_tree_removable(root: Path) -> None:
             os.chmod(Path(current) / directory, 0o700)
         for filename in files:
             os.chmod(Path(current) / filename, 0o600)
-
 
 class AgentSandboxTests(unittest.TestCase):
     def setUp(self) -> None:

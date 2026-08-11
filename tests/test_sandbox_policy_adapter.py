@@ -53,10 +53,7 @@ class SandboxPolicyAdapterTests(unittest.TestCase):
         bind-mounted into the sandbox's rewritten HOME — the CLI was fully
         authenticated on the host but the sandbox exposed no credentials.
         """
-        for family, relative in (
-            ("claude", ".claude/.credentials.json"),
-            ("codex", ".codex/auth.json"),
-        ):
+        for family, relative in (("claude", ".claude/.credentials.json"), ("codex", ".axon-codex/auth.json")):
             with self.subTest(family=family):
                 with tempfile.TemporaryDirectory() as directory:
                     home = Path(directory) / "home"
@@ -74,9 +71,14 @@ class SandboxPolicyAdapterTests(unittest.TestCase):
                             role_execution_policy("lead"),
                             runtime_binary=str(binary),
                             family=family,
+                            env={"CODEX_HOME": str(creds.parent)} if family == "codex" else {},
                         )
                 mounted = set(sandbox.cursor_readonly_paths)
-                self.assertIn(str(creds), mounted)
+                if family == "codex":
+                    self.assertEqual(sandbox.codex_auth_path, str(creds))
+                    self.assertNotIn(str(home / ".codex/auth.json"), mounted)
+                else:
+                    self.assertIn(str(creds), mounted)
 
     def test_missing_credentials_file_is_not_mounted(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

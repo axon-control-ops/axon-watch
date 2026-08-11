@@ -1,4 +1,5 @@
 import unittest
+import tempfile
 
 import sys
 from pathlib import Path
@@ -18,6 +19,15 @@ from app.cli_runtime.runtime_auth import (  # noqa: E402
 
 
 class RuntimeAuthTests(unittest.TestCase):
+    def test_codex_dispatch_uses_isolated_profile(self) -> None:
+        with tempfile.TemporaryDirectory() as root:
+            shaped = codex_dispatch_env(
+                {"AXON_WATCH_RUNTIME_PROFILE_ROOT": root},
+                auth={"auth_method": ""},
+            )
+            self.assertEqual(str(Path(root) / "codex"), shaped["CODEX_HOME"])
+            self.assertEqual("isolated", shaped["AXON_WATCH_AUTH_PROFILE"])
+
     def test_looks_like_auth_error(self) -> None:
         self.assertTrue(looks_like_auth_error("401 Unauthorized: invalid API key"))
         self.assertFalse(looks_like_auth_error("workspace root unavailable"))

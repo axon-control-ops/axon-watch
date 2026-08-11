@@ -14,6 +14,7 @@ from app.cli_runtime.catalog import (
     find_codex_cli,
 )
 from app.cli_runtime.runtime_auth import codex_dispatch_env
+from app.cli_runtime.runtime_profiles import codex_profile_env
 from app.cli_runtime.vault_keys import fetch_runtime_context
 
 ModelRecord = dict[str, Any]
@@ -109,7 +110,7 @@ def default_codex_model(binary: str, *, env: dict[str, str]) -> str:
 def codex_runtime_snapshot(*, force_refresh: bool = False) -> StatusPayload:
     context = fetch_runtime_context(force_refresh=force_refresh)
     vault_posture = dict(context.get("vault_runtime") or {})
-    merged_env = dict(os.environ)
+    merged_env = codex_profile_env(dict(os.environ))
     for key, value in dict(context.get("env") or {}).items():
         if not str(merged_env.get(key, "")).strip():
             merged_env[key] = value

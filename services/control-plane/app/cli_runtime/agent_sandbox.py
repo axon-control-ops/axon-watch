@@ -1,5 +1,4 @@
 """Fail-closed Bubblewrap launcher and immutable per-run Cursor hook material."""
-
 from __future__ import annotations
 
 import hashlib
@@ -12,8 +11,8 @@ import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Sequence
-
 from app.cli_runtime.agent_sandbox_paths import append_hidden_mounts, hidden_workspace_paths
+from app.cli_runtime.codex_profile_mount import append_codex_auth_mount, resolve_codex_auth_path
 from app.cli_runtime.user_bin_path import existing_user_local_bin, sandbox_path_with_user_bins
 
 _SANDBOX_HOME = Path("/run/axon-agent-home")
@@ -25,10 +24,8 @@ _SYSTEM_FILES = (
     "/etc/nsswitch.conf", "/etc/passwd", "/etc/resolv.conf",
 )
 _SYSTEM_CONFIG_DIRS = ("/etc/ssl", "/etc/ca-certificates")
-
 class SandboxConfigurationError(RuntimeError):
     """Raised instead of running without a requested sandbox boundary."""
-
 
 @dataclass(frozen=True)
 class AgentSandboxPolicy:
@@ -478,21 +475,12 @@ def build_bwrap_command(
             for path in policy.cursor_readonly_paths
         )
     )
-    codex_auth_path: Path | None = None
-    if policy.codex_auth_path:
-        try:
-            candidate = Path(policy.codex_auth_path).expanduser().resolve(strict=True)
-        except OSError as exc:
-            raise SandboxConfigurationError("Codex profile auth file does not exist.") from exc
-        if not candidate.is_file() or candidate.is_symlink():
-            raise SandboxConfigurationError("Codex profile auth must be a regular file.")
-        if _is_relative_to(candidate, workspace) or _is_relative_to(workspace, candidate):
-            raise SandboxConfigurationError("Codex profile auth cannot overlap the workspace.")
-        codex_auth_path = candidate
+    try:
+        codex_auth_path = resolve_codex_auth_path(policy.codex_auth_path, workspace=workspace)
+    except ValueError as exc:
+        raise SandboxConfigurationError(str(exc)) from exc
     wrapper_sources = tuple(_trusted_wrapper_sources(policy, workspace).values())
-    cursor_paths = tuple(dict.fromkeys((*cursor_paths, *(
-        source for source in wrapper_sources if _is_relative_to(source, home)
-    ))))
+    cursor_paths = tuple(dict.fromkeys((*cursor_paths, *(source for source in wrapper_sources if _is_relative_to(source, home)))))
     user_local_bin = existing_user_local_bin(home)
 
     arguments = [
@@ -566,14 +554,7 @@ def build_bwrap_command(
         arguments.extend(["--ro-bind", str(cursor_path), str(cursor_path)])
         home_destination = _SANDBOX_HOME / cursor_path.relative_to(home)
         arguments.extend(["--ro-bind", str(cursor_path), str(home_destination)])
-    if codex_auth_path is not None:
-        arguments.extend(
-            [
-                "--ro-bind",
-                str(codex_auth_path),
-                str(_SANDBOX_HOME / ".codex" / "auth.json"),
-            ]
-        )
+    append_codex_auth_mount(arguments, codex_auth_path, _SANDBOX_HOME / ".codex" / "auth.json")
     if user_local_bin is not None:
         arguments.extend(["--ro-bind", str(user_local_bin), str(user_local_bin)])
 
@@ -632,14 +613,7 @@ def wrap_command_in_agent_sandbox(
     return SandboxLaunch(command=tuple(wrapped), hook_material=material)
 
 
-__all__ = [
-    "AgentSandboxPolicy",
-    "CursorHookMaterial",
-    "SandboxConfigurationError",
-    "SandboxLaunch",
-    "build_bwrap_command",
-    "default_policy_root",
-    "materialize_cursor_hook_policy",
-    "require_bubblewrap",
-    "wrap_command_in_agent_sandbox",
-]
+__all__ = ["AgentSandboxPolicy", "CursorHookMaterial", "SandboxConfigurationError",
+           "SandboxLaunch", "build_bwrap_command", "default_policy_root",
+           "materialize_cursor_hook_policy", "require_bubblewrap",
+           "wrap_command_in_agent_sandbox"]
