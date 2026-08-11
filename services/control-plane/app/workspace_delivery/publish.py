@@ -63,7 +63,20 @@ def _combined(result: subprocess.CompletedProcess[str]) -> str:
     ).strip() or "(no output)"
 
 
-def list_isolation_changed_paths(isolation_root: Path) -> list[str]:
+def list_isolation_changed_paths(
+    isolation_root: Path,
+    *,
+    include_ignored_pathspecs: list[str] | None = None,
+) -> list[str]:
+    """Return worker-authored paths, including explicitly scoped ignored files.
+
+    Worker checkouts must remain disposable, but a repository is allowed to
+    ignore generated/docs areas that a task explicitly authorizes.  Git's
+    normal ``--exclude-standard`` listing omits those files completely, which
+    previously turned real agent work into a misleading "no changes" result.
+    Only request ignored paths below the task's allowed roots; they still pass
+    the normal scope and secret gates before they can be staged or delivered.
+    """
     paths: list[str] = []
     for args in (
         ["git", "diff", "--name-only", "HEAD"],
@@ -77,12 +90,38 @@ def list_isolation_changed_paths(isolation_root: Path) -> list[str]:
             cleaned = line.strip()
             if cleaned and cleaned not in paths and not is_control_plane_owned_path(cleaned):
                 paths.append(cleaned)
+    allowed_ignored = [
+        str(path).strip().lstrip("./")
+        for path in (include_ignored_pathspecs or [])
+        if str(path).strip().lstrip("./")
+    ]
+    if allowed_ignored:
+        result = _run(
+            [
+                "git",
+                "ls-files",
+                "--others",
+                "--ignored",
+                "--exclude-standard",
+                "--",
+                *allowed_ignored,
+            ],
+            cwd=isolation_root,
+        )
+        if result.returncode == 0:
+            for line in (result.stdout or "").splitlines():
+                cleaned = line.strip()
+                if cleaned and cleaned not in paths and not is_control_plane_owned_path(cleaned):
+                    paths.append(cleaned)
     return paths
 
 
 def _stage_isolation_paths(isolation_root: Path, paths: list[str]) -> subprocess.CompletedProcess[str]:
     """Stage only the path set that passed delivery scope and secret review."""
-    return _run(["git", "add", "--", *paths], cwd=isolation_root)
+    # ``-f`` is intentional: ignored files make it this far only when the task
+    # explicitly scoped their parent path and the delivery policy/secret scans
+    # approved them. Without it, Git silently drops the exact work we audited.
+    return _run(["git", "add", "-f", "--", *paths], cwd=isolation_root)
 
 
 def _derive_commit_message(paths: list[str], turn_subject: str | None) -> str:
@@ -339,7 +378,11 @@ def publish_worker_isolation(
             cleanup_isolation=False,
         )
 
-    paths = list_isolation_changed_paths(isolation_root)
+    task_allowed_paths = _task_allowed_paths(task_id)
+    paths = list_isolation_changed_paths(
+        isolation_root,
+        include_ignored_pathspecs=task_allowed_paths,
+    )
     delivery = delivery_store.create_delivery(
         workspace_id=workspace_id,
         run_id=run_id,
