@@ -15,9 +15,9 @@ from app.chat.service import (
     get_chat_thread,
     get_chat_thread_history,
     post_chat_message,
-    sync_thread_execution_access_notices,
 )
 from app.chat.stream_events import chat_thread_stream_response
+from app.chat.thread_service import sync_thread_execution_access_notices
 from app.cli_runtime.approval_gate import full_access_requested
 from app.persistence import attachment_store, chat_store
 from app.routes.schemas import PostChatMessageRequest, SyncThreadExecutionAccessRequest

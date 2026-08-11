@@ -414,6 +414,10 @@ def _vault_runtime_env_module():
     if spec is None or spec.loader is None:
         raise ImportError(f"unable to load vault runtime_env from {path}")
     module = importlib.util.module_from_spec(spec)
+    module.VaultSession = VaultSession
+    module.vault_resolve_named_secret = vault_resolve_named_secret
+    module.vault_resolve_provider_key = vault_resolve_provider_key
+    module.vault_resolve_all_provider_keys = vault_resolve_all_provider_keys
     spec.loader.exec_module(module)
     return module
 

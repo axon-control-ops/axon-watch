@@ -45,7 +45,13 @@ def find_roster_employee(workspace_id: str, employee_id: str) -> dict[str, Any] 
     try:
         roster = build_company_roster(cleaned_workspace)
     except Exception:
-        return None
+        try:
+            roster = build_company_roster(
+                cleaned_workspace,
+                record={"workspace_id": cleaned_workspace},
+            )
+        except Exception:
+            return None
     for row in roster.get("employees") or []:
         if not isinstance(row, dict):
             continue

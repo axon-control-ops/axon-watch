@@ -48,7 +48,6 @@ from app.chat.thread_service import (
     get_chat_thread_history,
     get_workspace_chat_thread,
     list_workspace_chat_threads,
-    sync_thread_execution_access_notices,
 )
 from app.chat.workspace_switch import (
     WorkspaceSwitchError,
@@ -407,4 +406,3 @@ def post_chat_message(
             else {}
         ),
     }
-

@@ -93,7 +93,7 @@ def build_company_roster(
         role = employee.role or "workspace_agent"
         schedule = employee.schedule or _normalize_schedule(None, role=role)
         emp_id = employee.employee_id or _employee_id(normalized_id, role, index)
-        name = employee.name or _default_employee_name(display_name, role)
+        name = employee.name or _default_employee_name(normalized_id, display_name, role)
         owns = employee.owns or _DEFAULT_OWNS.get(
             role,
             f"{_title_display_name(display_name)} assigned work only",
