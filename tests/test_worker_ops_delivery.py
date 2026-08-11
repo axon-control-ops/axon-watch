@@ -14,6 +14,7 @@ from app.persistence import run_store, task_store  # noqa: E402
 from app.runs.service import create_run, get_run  # noqa: E402
 from app.workspace_agents.config_loader import EmployeeConfig  # noqa: E402
 from app.workspace_agents.execution_policy import role_execution_policy  # noqa: E402
+from app.workspace_agents.ops_delivery import no_change_delivery_is_successful_ops_task  # noqa: E402
 from app.workspace_agents.worker_dispatch import dispatch_continuous_worker_run  # noqa: E402
 from app.workspace_delivery.publish import PublishResult  # noqa: E402
 
@@ -94,4 +95,28 @@ class WorkerOpsDeliveryTests(unittest.TestCase):
         self.assertEqual("completed", task["status"])  # type: ignore[index]
         history = run_store.list_history(get_run(str(created["run_id"]))["history_ref"])
         summaries = [str(item.get("receipt", {}).get("summary") or "").lower() for item in history]
-        self.assertTrue(any("receipt-backed ops task" in summary for summary in summaries), summaries)
+        self.assertTrue(any("receipt-backed ops/coordination task" in summary for summary in summaries), summaries)
+
+    def test_no_change_lead_plan_coordination_task_is_successful_delivery(self) -> None:
+        task = {
+            "owner_role": "lead",
+            "goal": (
+                'Lead: advance "Continue the interrupted run" toward Done '
+                "[plan lead-plan-98e0c2101c784265] — after Priya (frontend) completed."
+            ),
+            "acceptance_criteria": (
+                "Sole truth: advance plan lead-plan-98e0c2101c784265. "
+                "Decide whether to assign a specialist, escalate Decide, or report receipts."
+            ),
+        }
+
+        self.assertTrue(no_change_delivery_is_successful_ops_task(task))
+
+    def test_no_change_regular_implementation_task_is_not_successful_delivery(self) -> None:
+        task = {
+            "owner_role": "frontend",
+            "goal": "Fix the Student Management header UI.",
+            "acceptance_criteria": "Code changes and visual verification required.",
+        }
+
+        self.assertFalse(no_change_delivery_is_successful_ops_task(task))

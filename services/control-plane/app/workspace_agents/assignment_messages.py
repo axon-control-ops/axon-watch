@@ -47,6 +47,12 @@ def assignment_card(
     lead_name: str | None = None,
 ) -> str:
     action = "started work on" if state == "started" else "queued"
+    role = str(assignee_role or "").strip().lower()
+    status_subject = (
+        "the Lead should decide, assign, escalate, or report back with receipts"
+        if role == "lead"
+        else "the specialist should implement, verify, and report back with receipts"
+    )
     title = (
         f"{assignee_name} started this {role_label(assignee_role)} assignment."
         if state == "started"
@@ -57,7 +63,7 @@ def assignment_card(
             title,
             "",
             f"Assignment: {readable_goal(goal)}",
-            f"Status: {action}; the specialist should implement, verify, and report back with receipts.",
+            f"Status: {action}; {status_subject}.",
             f"Receipt: {task_id} · {run_id}",
         ]
     )

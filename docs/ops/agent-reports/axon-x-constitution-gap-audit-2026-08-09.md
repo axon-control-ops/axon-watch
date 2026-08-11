@@ -1070,9 +1070,18 @@ Implemented:
 - Added runtime-auth warnings that CLI browser login is host-profile scoped.
   This prevents operators from assuming Axon-X can hold two simultaneous
   terminal OAuth accounts in the same host config.
+- Exposed CLI sign-in and sign-out-help controls even when a runtime is
+  Vault/API-key backed. The UI no longer hides the account-switching path behind
+  a passive Connected chip.
 - Added a Codex usage card to Runtime settings using the existing local Codex
   telemetry contract. The card explicitly says it is not a live provider quota
   percentage.
+- Classified Lead plan-advance/rollup/decision tasks as receipt-backed
+  coordination deliveries, so Dana is not marked failed solely because a Lead
+  decision/report produced no publishable code diff.
+- Updated Lead assignment cards so Lead-owned tasks say the Lead should decide,
+  assign, escalate, or report back, instead of saying “the specialist should
+  implement.”
 
 Why this improves AXON-X:
 
@@ -1084,6 +1093,8 @@ Why this improves AXON-X:
   of being explainable only by logs.
 - Runtime authentication now communicates the real host-account constraint and
   points operators toward Vault/API-key auth for secondary accounts.
+- Lead self-advance loops no longer need fake file edits to satisfy the delivery
+  gate; a real decision/report receipt is enough.
 
 Verification:
 

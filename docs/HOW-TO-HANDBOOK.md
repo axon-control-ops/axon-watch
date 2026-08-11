@@ -1766,9 +1766,14 @@ A good next slice should:
   starting no longer leaves specialists stranded in Manual/Semi
 - runtime account-scope warning: Runtime settings now explain that local CLI
   browser login is host-profile scoped; use sign-out or Vault/API-key auth for a
-  second account until true isolated runtime profiles land
+  second account until true isolated runtime profiles land. Vault-backed
+  runtimes still show CLI sign-in / sign-out-help actions so account switching
+  is not hidden behind a passive “Connected” chip
 - Codex usage visibility: Runtime settings expose Codex local usage telemetry,
   matching the status-bar behavior when Codex is the selected runtime
+- Lead coordination delivery: Lead plan-advance/rollup/decision tasks can
+  complete from receipts without code diffs, while ordinary implementation
+  tasks still fail if no publishable changes were produced
 - Lead failure escalation: Lead roles must not remain inert in Error; failed
   Lead shifts become VAXON/operator attention receipts instead of silent red
   roster state or incorrect specialist spam

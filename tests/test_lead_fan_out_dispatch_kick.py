@@ -17,6 +17,7 @@ from app.workspace_agents.scheduler import (  # noqa: E402
     kick_lead_fan_out_dispatch,
     run_continuous_worker_tick,
 )
+from app.workspace_agents.assignment_messages import assignment_card  # noqa: E402
 from app.workspace_agents.scheduler_queued_fan_out import (  # noqa: E402
     dispatch_queued_lead_fan_out_runs,
 )
@@ -67,6 +68,20 @@ class LeadFanOutDispatchKickTests(unittest.TestCase):
         self.assertEqual(2, mock_dispatch.call_args_list[0].kwargs["starts_bound"])
         self.assertIsNone(mock_dispatch.call_args_list[0].kwargs["target_run_id"])
         self.assertEqual([], tick)
+
+    def test_lead_assignment_card_uses_lead_action_language(self) -> None:
+        card = assignment_card(
+            assignee_name="Dana",
+            assignee_role="lead",
+            goal='Lead: advance "Ship canary" toward Done [plan lead-plan-demo]',
+            task_id="task-demo123456789",
+            run_id="run-demo",
+            state="queued",
+            lead_name="Dana",
+        )
+
+        self.assertIn("Lead should decide, assign, escalate, or report back", card)
+        self.assertNotIn("specialist should implement", card)
 
     def test_paused_tick_rescues_queued_lead_handoff_after_restart(self) -> None:
         """Restarted Manual/Semi sessions must not strand Dana→specialist handoffs."""

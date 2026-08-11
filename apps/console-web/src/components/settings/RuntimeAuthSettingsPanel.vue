@@ -38,7 +38,9 @@ type RuntimeCard = {
   statusCommand: string;
   loginCommand: string;
   canSignIn: boolean;
+  canStartCliLogin: boolean;
   canSignOut: boolean;
+  canShowSignOutHelp: boolean;
   managedByVault: boolean;
   accountScopeNote: string;
   statusTone: 'ready' | 'warn' | 'muted';
@@ -179,7 +181,9 @@ function buildCard(family: RuntimeFamily, target: RuntimeTargetRecord | null): R
     statusCommand,
     loginCommand,
     canSignIn: installed && !loggedIn,
+    canStartCliLogin: installed && managedByVault,
     canSignOut: installed && loggedIn && !managedByVault,
+    canShowSignOutHelp: installed && loggedIn && managedByVault,
     managedByVault,
     accountScopeNote:
       installed && loggedIn && oauthBacked
@@ -491,6 +495,15 @@ onMounted(() => {
             Connected
           </span>
           <button
+            v-if="card.canStartCliLogin"
+            type="button"
+            class="operator-settings-form__button operator-settings-form__button--ghost"
+            :disabled="actionPending !== null"
+            @click="runAction(card.family, 'login')"
+          >
+            {{ actionPending === card.family ? 'Opening login…' : 'CLI sign in' }}
+          </button>
+          <button
             v-if="card.canSignOut"
             type="button"
             class="operator-settings-form__button operator-settings-form__button--ghost"
@@ -498,6 +511,15 @@ onMounted(() => {
             @click="runAction(card.family, 'logout')"
           >
             {{ actionPending === card.family ? 'Signing out…' : 'Sign out' }}
+          </button>
+          <button
+            v-else-if="card.canShowSignOutHelp"
+            type="button"
+            class="operator-settings-form__button operator-settings-form__button--ghost"
+            :disabled="actionPending !== null"
+            @click="runAction(card.family, 'logout')"
+          >
+            {{ actionPending === card.family ? 'Checking…' : 'Sign-out help' }}
           </button>
         </div>
       </article>
