@@ -76,40 +76,93 @@ class RuntimeAuthActionsTests(unittest.TestCase):
 
     @patch("app.cli_runtime.runtime_auth_actions.cursor_runtime_snapshot", return_value={})
     @patch("app.cli_runtime.runtime_auth_actions.runtime_status_snapshot", return_value={})
-    @patch("app.cli_runtime.runtime_auth_actions.invalidate_runtime_snapshot_cache")
-    @patch("app.cli_runtime.runtime_auth_actions._runtime_target")
     @patch("app.cli_runtime.runtime_auth_actions.find_cursor_cli", return_value="/usr/bin/cursor")
+    @patch(
+        "app.cli_runtime.runtime_auth_actions._runtime_target",
+        return_value={
+            "family": "cursor",
+            "auth": {
+                "logged_in": True,
+                "auth_method": "oauth",
+                "account_label": "dev@example.test",
+            },
+        },
+    )
     @patch("app.cli_runtime.runtime_auth_actions.subprocess.run")
-    def test_logout_cursor_clears_auth(
+    def test_logout_cursor_oauth_returns_host_scoped_help_without_running_logout(
         self,
         mock_run,
+        _target,
         _find,
-        mock_target,
-        _invalidate,
         _snapshot,
         _cursor_snapshot,
     ) -> None:
-        mock_target.side_effect = [
-            {
-                "family": "cursor",
-                "auth": {"logged_in": True, "auth_method": "oauth"},
-            },
-            {"family": "cursor", "auth": {"logged_in": False}},
-        ]
-        mock_run.return_value = type(
-            "Proc",
-            (),
-            {"returncode": 0, "stdout": "Signed out", "stderr": ""},
-        )()
         result = runtime_auth_actions.logout_cursor_runtime()
-        self.assertEqual("completed", result["status"])
-        mock_run.assert_any_call(
-            ["/usr/bin/cursor", "agent", "logout"],
-            capture_output=True,
-            text=True,
-            timeout=12,
-            env=mock_run.call_args.kwargs["env"],
-        )
+        self.assertEqual("manual_required", result["status"])
+        self.assertIn("will not run", result["message"])
+        self.assertIn("host-profile scoped", result["account_scope_notice"])
+        self.assertIn("logout", result["command_preview"])
+        mock_run.assert_not_called()
+
+    @patch("app.cli_runtime.runtime_auth_actions.cursor_runtime_snapshot", return_value={})
+    @patch("app.cli_runtime.runtime_auth_actions.runtime_status_snapshot", return_value={})
+    @patch("app.cli_runtime.runtime_auth_actions.find_codex_cli", return_value="/usr/bin/codex")
+    @patch(
+        "app.cli_runtime.runtime_auth_actions._runtime_target",
+        return_value={
+            "family": "codex",
+            "auth": {
+                "logged_in": True,
+                "auth_method": "chatgpt",
+                "account_label": "dev@example.test",
+            },
+        },
+    )
+    @patch("app.cli_runtime.runtime_auth_actions.subprocess.run")
+    def test_logout_codex_chatgpt_returns_host_scoped_help_without_running_logout(
+        self,
+        mock_run,
+        _target,
+        _find,
+        _snapshot,
+        _cursor_snapshot,
+    ) -> None:
+        result = runtime_auth_actions.logout_codex_runtime()
+        self.assertEqual("manual_required", result["status"])
+        self.assertIn("will not run", result["message"])
+        self.assertIn("host-profile scoped", result["account_scope_notice"])
+        self.assertEqual("/usr/bin/codex logout", result["command_preview"])
+        mock_run.assert_not_called()
+
+    @patch("app.cli_runtime.runtime_auth_actions.cursor_runtime_snapshot", return_value={})
+    @patch("app.cli_runtime.runtime_auth_actions.runtime_status_snapshot", return_value={})
+    @patch("app.cli_runtime.runtime_auth_actions.find_claude_cli", return_value="/usr/bin/claude")
+    @patch(
+        "app.cli_runtime.runtime_auth_actions._runtime_target",
+        return_value={
+            "family": "claude",
+            "auth": {
+                "logged_in": True,
+                "auth_method": "claude.ai",
+                "account_label": "dev@example.test",
+            },
+        },
+    )
+    @patch("app.cli_runtime.runtime_auth_actions.subprocess.run")
+    def test_logout_claude_oauth_returns_host_scoped_help_without_running_logout(
+        self,
+        mock_run,
+        _target,
+        _find,
+        _snapshot,
+        _cursor_snapshot,
+    ) -> None:
+        result = runtime_auth_actions.logout_claude_runtime()
+        self.assertEqual("manual_required", result["status"])
+        self.assertIn("will not run", result["message"])
+        self.assertIn("host-profile scoped", result["account_scope_notice"])
+        self.assertIn("auth logout", result["command_preview"])
+        mock_run.assert_not_called()
 
 
 if __name__ == "__main__":

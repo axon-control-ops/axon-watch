@@ -75,6 +75,19 @@ def logout_cursor_runtime() -> StatusRecord:
             message="Cursor is authenticated via API key. Remove CURSOR_API_KEY from /vault or the shell env to sign out.",
             command_preview=" ".join(cursor_cli_argv(binary, "status")),
         )
+    if auth.get("auth_method") == "oauth":
+        notice = _host_cli_oauth_notice("Cursor CLI")
+        return _action_result(
+            status="manual_required",
+            message=(
+                "Cursor CLI sign-out is host-profile scoped, so Axon-X will not run "
+                "`cursor agent logout` from the console. Run it manually only if you "
+                "intend to sign this host profile out of Cursor."
+            ),
+            command_preview=" ".join(cursor_cli_argv(binary, "logout")),
+            account_scope_notice=notice,
+            force_refresh=False,
+        )
     if not auth.get("logged_in"):
         return _action_result(
             status="completed",
@@ -135,6 +148,19 @@ def logout_codex_runtime() -> StatusRecord:
             status="manual_required",
             message="Codex is authenticated via API key. Remove Codex/OpenAI keys from /vault or the shell env to sign out.",
             command_preview=f"{binary} login status",
+        )
+    if auth.get("auth_method") in {"oauth", "chatgpt"}:
+        notice = _host_cli_oauth_notice("Codex CLI")
+        return _action_result(
+            status="manual_required",
+            message=(
+                "Codex CLI sign-out is host-profile scoped, so Axon-X will not run "
+                "`codex logout` from the console. Run it manually only if you intend "
+                "to sign this host profile out of Codex in Cursor/IDE/CLI."
+            ),
+            command_preview=f"{binary} logout",
+            account_scope_notice=notice,
+            force_refresh=False,
         )
     if not auth.get("logged_in"):
         return _action_result(
@@ -291,6 +317,19 @@ def logout_claude_runtime() -> StatusRecord:
             status="manual_required",
             message="Claude is authenticated via API key. Remove ANTHROPIC_API_KEY from /vault or the shell env to sign out.",
             command_preview=f"{binary} auth status",
+        )
+    if auth.get("auth_method") in {"oauth", "claude.ai"}:
+        notice = _host_cli_oauth_notice("Claude Code CLI")
+        return _action_result(
+            status="manual_required",
+            message=(
+                "Claude Code CLI sign-out is host-profile scoped, so Axon-X will not "
+                "run `claude auth logout` from the console. Run it manually only if "
+                "you intend to sign this host profile out of Claude Code."
+            ),
+            command_preview=f"{binary} auth logout",
+            account_scope_notice=notice,
+            force_refresh=False,
         )
     if not auth.get("logged_in"):
         return _action_result(

@@ -1070,9 +1070,12 @@ Implemented:
 - Added runtime-auth warnings that CLI browser login is host-profile scoped.
   This prevents operators from assuming Axon-X can hold two simultaneous
   terminal OAuth accounts in the same host config.
-- Exposed CLI sign-in and sign-out-help controls even when a runtime is
-  Vault/API-key backed. The UI no longer hides the account-switching path behind
-  a passive Connected chip.
+- Exposed CLI sign-in and host sign-out-help controls even when a runtime is
+  Vault/API-key backed. Host-profile OAuth/ChatGPT/Claude logout is now a
+  guarded manual action: Axon-X reports the command but does not execute it from
+  Settings, because the same host auth profile can be shared with Cursor/IDE/CLI
+  sessions. True isolated runtime profiles remain a follow-up architecture
+  slice.
 - Added a Codex usage card to Runtime settings using the existing local Codex
   telemetry contract. The card explicitly says it is not a live provider quota
   percentage.

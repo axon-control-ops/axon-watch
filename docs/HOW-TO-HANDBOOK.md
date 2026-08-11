@@ -1764,11 +1764,14 @@ A good next slice should:
 - restart-safe Lead handoff rescue: watcher ticks retry explicit queued Lead
   handoffs, so a control-plane restart between Dana queuing work and Priya/Marco
   starting no longer leaves specialists stranded in Manual/Semi
-- runtime account-scope warning: Runtime settings now explain that local CLI
-  browser login is host-profile scoped; use sign-out or Vault/API-key auth for a
-  second account until true isolated runtime profiles land. Vault-backed
-  runtimes still show CLI sign-in / sign-out-help actions so account switching
-  is not hidden behind a passive “Connected” chip
+- runtime account-scope warning/guardrail: Runtime settings now explain that
+  local CLI browser login and logout are host-profile scoped. Axon-X shows
+  host sign-out instructions but does not run OAuth/ChatGPT/Claude browser
+  logout from the console, because that can sign out Cursor/IDE/CLI sessions
+  sharing the same host profile. Use Vault/API-key auth for a second account
+  where supported until true isolated runtime profiles land. Vault-backed
+  runtimes still show CLI sign-in / host sign-out-help actions so account
+  switching is not hidden behind a passive “Connected” chip.
 - Codex usage visibility: Runtime settings expose Codex local usage telemetry,
   matching the status-bar behavior when Codex is the selected runtime
 - Lead coordination delivery: Lead plan-advance/rollup/decision tasks can

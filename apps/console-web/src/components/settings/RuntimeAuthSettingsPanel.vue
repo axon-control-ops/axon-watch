@@ -42,6 +42,7 @@ type RuntimeCard = {
   canSignOut: boolean;
   canShowSignOutHelp: boolean;
   managedByVault: boolean;
+  hostProfileAuth: boolean;
   accountScopeNote: string;
   statusTone: 'ready' | 'warn' | 'muted';
   statusLabel: string;
@@ -182,12 +183,13 @@ function buildCard(family: RuntimeFamily, target: RuntimeTargetRecord | null): R
     loginCommand,
     canSignIn: installed && !loggedIn,
     canStartCliLogin: installed && managedByVault,
-    canSignOut: installed && loggedIn && !managedByVault,
-    canShowSignOutHelp: installed && loggedIn && managedByVault,
+    canSignOut: false,
+    canShowSignOutHelp: installed && loggedIn && (managedByVault || oauthBacked),
     managedByVault,
+    hostProfileAuth: oauthBacked,
     accountScopeNote:
       installed && loggedIn && oauthBacked
-        ? `${title} browser login is shared by this host profile. To use another account, sign out first or configure the second account through Vault/API-key auth where supported.`
+        ? `${title} browser login is shared by this host profile. To use another account, manually sign out of the host profile first or configure the second account through Vault/API-key auth where supported.`
         : '',
     statusTone,
     statusLabel,
@@ -471,6 +473,10 @@ onMounted(() => {
           </button>
           instead of CLI sign-out.
         </p>
+        <p v-else-if="card.hostProfileAuth" class="runtime-auth-settings__note">
+          {{ card.accountScopeNote }} Axon-X shows sign-out help instead of running
+          host-global logout automatically.
+        </p>
         <p v-else-if="!card.installed" class="runtime-auth-settings__note">
           Install the CLI on the control-plane host, then refresh status.
         </p>
@@ -519,7 +525,7 @@ onMounted(() => {
             :disabled="actionPending !== null"
             @click="runAction(card.family, 'logout')"
           >
-            {{ actionPending === card.family ? 'Checking…' : 'Sign-out help' }}
+            {{ actionPending === card.family ? 'Checking…' : 'Host sign-out help' }}
           </button>
         </div>
       </article>
