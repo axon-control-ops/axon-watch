@@ -105,6 +105,20 @@ class WorkspaceProjectBindingsTests(unittest.TestCase):
             ):
                 self.assertIsNone(get_workspace_project_binding("workspace_missing"))
 
+    def test_stale_binding_does_not_hide_valid_workspaces(self) -> None:
+        with tempfile.TemporaryDirectory() as tempdir:
+            project_root = Path(tempdir) / "valid"
+            project_root.mkdir()
+            bindings_file = Path(tempdir) / "bindings.json"
+            bindings_file.write_text(json.dumps({"bindings": {
+                "workspace_valid": {"project_root": str(project_root)},
+                "workspace_stale": {"project_root": str(Path(tempdir) / "gone")},
+            }}), encoding="utf-8")
+            with patch.dict(os.environ, {"AXON_WATCH_PROJECT_ROOT_ALLOWLIST": str(tempdir)}, clear=False):
+                bindings = load_workspace_project_bindings(bindings_file)
+            self.assertIn("workspace_valid", bindings)
+            self.assertNotIn("workspace_stale", bindings)
+
     def test_upsert_workspace_project_binding_persists_and_reloads(self) -> None:
         from app.workspace_project_bindings import upsert_workspace_project_binding
 
