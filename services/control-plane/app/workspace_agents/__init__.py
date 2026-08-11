@@ -53,6 +53,22 @@ __all__ = [
 ]
 
 
+def _pending_decision_for_role(workspace_id: str, role: str) -> dict[str, object] | None:
+    """Return the newest unresolved VAXON decision owned by this role."""
+    try:
+        from app.persistence import autonomous_attention_store
+
+        for decision in autonomous_attention_store.list_pending_decisions(limit=100):
+            if str(decision.get("workspace_id") or "").strip() != workspace_id:
+                continue
+            payload = decision.get("payload") if isinstance(decision.get("payload"), dict) else {}
+            if str(payload.get("owner_role") or "").strip().lower() == role.lower():
+                return decision
+    except Exception:  # noqa: BLE001 — roster must stay available on attention-store issues
+        return None
+    return None
+
+
 def build_company_roster(
     workspace_id: str,
     *,
@@ -110,6 +126,12 @@ def build_company_roster(
             primary=employee.primary,
             role_run_status=active_role_run_status(normalized_id, role),
         )
+        pending_decision = _pending_decision_for_role(normalized_id, role)
+        # A Lead may have finished the safe portion of their run while a real
+        # operator choice remains. Showing idle hid that state in the employee
+        # strip; reflect the VAXON escalation until the decision is resolved.
+        if pending_decision is not None:
+            status = "waiting_approval"
         if employee.primary:
             primary_employee_id = emp_id
         outcome = latest_role_run_outcome(normalized_id, role)
@@ -135,6 +157,9 @@ def build_company_roster(
         active_run = active_role_run_id(normalized_id, role)
         if active_run:
             row["active_run_id"] = active_run
+        if pending_decision is not None:
+            row["pending_decision_id"] = pending_decision.get("receipt_id")
+            row["pending_decision_title"] = pending_decision.get("title")
         employee_rows.append(row)
 
     try:
