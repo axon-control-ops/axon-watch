@@ -40,6 +40,32 @@ class WorkspaceWorkerPromptTests(unittest.TestCase):
         self.assertIn("Vue shell and IDE polish", prompt)
         self.assertIn("busy-poll", prompt)
 
+    def test_prompt_includes_cross_role_receipts_for_specialist_handoffs(self) -> None:
+        with patch(
+            "app.workspace_agents.worker_prompt.build_team_roster_context",
+            return_value="",
+        ), patch(
+            "app.workspace_agents.worker_prompt._workspace_continuity_clause",
+            return_value=(
+                "Recent cross-role continuity packet (receipt summaries, not proof that your task is done):\n"
+                "- backend completed (run-marco-1) — parent assignment query fixed\n"
+                "Inspect the actual implementation and rerun the acceptance checks; report any contradiction to Lead."
+            ),
+        ):
+            prompt = build_continuous_worker_prompt(
+                workspace_id="workspace_dashpro",
+                employee=EmployeeConfig(
+                    name="Priya",
+                    role="frontend",
+                    owns="DashPro mobile UI",
+                    schedule="on_demand",
+                ),
+                task={"task_id": "task-priya-1", "goal": "Align the parent carousel."},
+            )
+        self.assertIn("Recent cross-role continuity packet", prompt)
+        self.assertIn("parent assignment query fixed", prompt)
+        self.assertIn("not proof that your task is done", prompt)
+
     def test_dashpro_ship_prompt_does_not_block_on_disposable_git(self) -> None:
         with patch(
             "app.workspace_agents.worker_prompt.build_team_roster_context",

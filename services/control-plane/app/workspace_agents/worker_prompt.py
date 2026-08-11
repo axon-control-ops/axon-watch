@@ -33,6 +33,78 @@ def _prior_failure_clause(*, workspace_id: str, role: str) -> str:
     )
 
 
+def _workspace_continuity_clause(*, workspace_id: str, current_role: str) -> str:
+    """Give every specialist a compact, durable cross-role handoff packet.
+
+    Team roster says *who* owns work, but it did not say what a neighbouring
+    specialist had actually changed or verified. That made a new Priya shift
+    re-discover work from a stale chat tab. Receipts are the control-plane
+    source of truth and survive disposable checkouts, so surface recent
+    terminal employee outcomes without treating them as completion evidence.
+    """
+    workspace = str(workspace_id or "").strip()
+    if not workspace:
+        return ""
+    try:
+        from app.domain.run_state import is_terminal_phase
+        from app.persistence import run_store
+        from app.runs.service import list_runs
+        from app.workspace_agents.run_outcome import _is_restart_interrupt_without_success
+
+        candidates = [
+            run
+            for run in list_runs()
+            if str(run.get("workspace_id") or "").strip() == workspace
+            and str(run.get("employee_role") or "").strip().lower()
+            and is_terminal_phase(str(run.get("phase") or ""))
+            and not _is_restart_interrupt_without_success(run)
+        ]
+        candidates.sort(
+            key=lambda run: (
+                str(run.get("updated_at") or run.get("ended_at") or run.get("started_at") or ""),
+                str(run.get("run_id") or ""),
+            ),
+            reverse=True,
+        )
+        lines: list[str] = []
+        seen_roles: set[str] = set()
+        for run in candidates:
+            role = str(run.get("employee_role") or "").strip().lower()
+            # One most-recent receipt per role is enough context and avoids a
+            # huge prompt made from historical chatter.
+            if not role or role == current_role.strip().lower() or role in seen_roles:
+                continue
+            summary = str(run.get("current_step") or "").strip()
+            history_ref = str(run.get("history_ref") or "").strip()
+            if history_ref:
+                for transition in reversed(run_store.list_history(history_ref)):
+                    receipt = transition.get("receipt") if isinstance(transition, dict) else None
+                    if isinstance(receipt, dict) and str(receipt.get("summary") or "").strip():
+                        summary = str(receipt.get("summary") or "").strip()
+                        break
+            # A process restart is not a specialist handoff and must never
+            # become the latest context for another teammate.
+            if "control-plane restart" in summary.lower():
+                continue
+            seen_roles.add(role)
+            phase = str(run.get("phase") or "unknown").strip()
+            run_id = str(run.get("run_id") or "").strip()
+            lines.append(
+                f"- {role} {phase} ({run_id or 'run'}) — {_truncate(summary or 'No receipt summary.', max_len=180)}"
+            )
+            if len(lines) == 4:
+                break
+        if not lines:
+            return ""
+        return (
+            " Recent cross-role continuity packet (receipt summaries, not proof that your task is done):\n"
+            + "\n".join(lines)
+            + "\nUse relevant receipts as your starting context. Inspect the actual implementation and rerun the acceptance checks; report any contradiction to Lead."
+        )
+    except Exception:  # noqa: BLE001 - prompts must remain available if receipt I/O fails
+        return ""
+
+
 def _auto_mode_ask_clause() -> str:
     return (
         " Auto-mode question discipline: do not stop on ask cards for safe, "
@@ -427,6 +499,11 @@ def build_continuous_worker_prompt(
     )
     roster_block = build_team_roster_context(workspace_id, viewer_role=role)
     roster_clause = f"\n\n{roster_block}" if roster_block else ""
+    continuity = _workspace_continuity_clause(
+        workspace_id=workspace_id,
+        current_role=role,
+    )
+    continuity_clause = f"\n\n{continuity}" if continuity else ""
     lead_clause = ""
     if role == "lead":
         lead_clause = (
@@ -478,6 +555,7 @@ def build_continuous_worker_prompt(
         "Do it with verified receipts and summarize what changed. "
         "Stay inside your role boundary. Never hallucinate outcomes."
         f"{scope_clause}"
+        f"{continuity_clause}"
         f"{lead_clause}"
         f"{delivery_clause}"
         f"{tools_clause}"
