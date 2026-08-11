@@ -193,6 +193,20 @@ def synthesize_lead_plan(plan_id: str) -> dict[str, Any]:
             "summary": "",
         }
 
+    from app.workspace_agents.lead_synthesis_gate import block_synthesis_if_needed
+
+    blocked = block_synthesis_if_needed(
+        plan_id=plan_id,
+        workspace_id=workspace_id,
+        tasks=tasks,
+        build_findings=lambda scope, rows: _build_synthesis_findings(
+            workspace_id=scope,
+            tasks=rows,
+        ),
+    )
+    if blocked is not None:
+        return blocked
+
     plan_status = str(plan.get("status") or "").strip().lower()
     if plan_status in {"completed", "awaiting_engagement"}:
         prior = next(

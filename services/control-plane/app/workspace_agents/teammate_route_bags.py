@@ -58,6 +58,12 @@ _ROLE_BAGS: list[tuple[str, int, list[re.Pattern[str]]]] = [
             re.compile(r"\bschema\b", re.I),
             re.compile(r"\bpostgres\b", re.I),
             re.compile(r"\bserver\b", re.I),
+            re.compile(r"\bdata(?:base)?\b", re.I),
+            re.compile(r"\bdata cleanup\b", re.I),
+            re.compile(r"\bidempotenc(?:y|e|ent)\b", re.I),
+            re.compile(r"\bduplicate assignments?\b", re.I),
+            re.compile(r"\bparent[- ]delivery data\b", re.I),
+            re.compile(r"\bassignment records?\b", re.I),
         ],
     ),
     (

@@ -123,6 +123,49 @@ class LeadReplanTests(unittest.TestCase):
         }
         self.assertIn("lead_synthesis_completed", kinds)
 
+    def test_synthesis_blocks_when_linked_specialist_failed(self) -> None:
+        from app.persistence import task_store
+        from app.workspace_agents import lead_plan_store
+        from app.workspace_agents.lead_fan_out import materialize_lead_fan_out
+        from app.workspace_agents.lead_replan import synthesize_lead_plan
+
+        result = materialize_lead_fan_out(
+            workspace_id="workspace_axon_watch",
+            goal="Fix dashboard UI and assignment idempotency/data cleanup",
+            mode="decompose",
+            create_runs=False,
+        )
+        self.assertEqual(["backend", "frontend"], sorted(t["owner_role"] for t in result["tasks"]))
+
+        for task in result["tasks"]:
+            leased = task_store.lease_task(
+                str(task["task_id"]),
+                lease_holder=f"test-{task['owner_role']}",
+            )
+            if task["owner_role"] == "frontend":
+                task_store.complete_task(
+                    str(leased["task_id"]),
+                    terminal_outcome="frontend diff and validation passed",
+                )
+            else:
+                task_store.cancel_task(
+                    str(leased["task_id"]),
+                    terminal_outcome="backend validation receipt missing",
+                )
+
+        blocked = synthesize_lead_plan(result["plan_id"])
+
+        self.assertEqual("blocked", blocked["status"])
+        self.assertEqual(1, len(blocked["blocked_task_ids"]))
+        plan = lead_plan_store.get_plan(result["plan_id"])
+        assert plan is not None
+        self.assertEqual("awaiting_engagement", plan["status"])
+        kinds = {
+            row["kind"] for row in lead_plan_store.list_receipts(result["plan_id"])
+        }
+        self.assertIn("lead_synthesis_blocked", kinds)
+        self.assertNotIn("lead_synthesis_completed", kinds)
+
     def test_replan_fails_closed_when_obsolete_run_cannot_stop(self) -> None:
         from app.persistence import task_store
         from app.workspace_agents import lead_plan_store

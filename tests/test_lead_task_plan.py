@@ -81,6 +81,22 @@ class LeadTaskPlanTests(unittest.TestCase):
         self.assertIn("Backend:", goals["backend"])
         self.assertNotEqual(goals["frontend"], goals["backend"])
 
+    def test_dashboard_plus_idempotency_data_cleanup_splits_frontend_and_backend(self) -> None:
+        plan = build_lead_task_plan(
+            goal=(
+                "Fix the dashboard UI and assignment idempotency/data cleanup so "
+                "duplicate assignments stop and parent-delivery data is correct."
+            ),
+            roster=DASHPRO_ROSTER,
+            mode="decompose",
+        )
+
+        roles = sorted(item.owner_role for item in plan.items)
+        self.assertEqual(["backend", "frontend"], roles)
+        goals = {item.owner_role: item.goal for item in plan.items}
+        self.assertIn("Frontend:", goals["frontend"])
+        self.assertIn("Backend:", goals["backend"])
+
     def test_decompose_then_clause_chains_dependencies(self) -> None:
         plan = build_lead_task_plan(
             goal="Fix the API quality-gate heap calc then update the Expo confirmation screen",
