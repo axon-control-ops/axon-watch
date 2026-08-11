@@ -43,8 +43,11 @@ const items = computed(() => {
     const paused = !employee.enabled && !failed && !liveBusy;
     const working = avatar.presence === 'working' || liveBusy;
     const handoff = avatar.presence === 'handoff' || handoffWaiting;
+    const approval = avatar.presence === 'approval';
     let presenceLabel = 'Idle';
-    if (working) {
+    if (approval) {
+      presenceLabel = 'Action needed';
+    } else if (working) {
       presenceLabel = 'Busy';
     } else if (handoff) {
       presenceLabel = 'Handoff';
@@ -65,6 +68,7 @@ const items = computed(() => {
       paused,
       working,
       handoff,
+      approval,
       presenceLabel,
       optionId: presenceStripOptionId(employee.employee_id),
     };
@@ -195,6 +199,7 @@ function onKeydown(event: KeyboardEvent): void {
             selectedEmployeeId === item.employee.employee_id,
           'company-presence-strip__btn--busy': item.working,
           'company-presence-strip__btn--handoff': item.handoff,
+          'company-presence-strip__btn--approval': item.approval,
           'company-presence-strip__btn--lead': item.avatar.lead,
         }"
         :data-presence="item.avatar.presence"
@@ -215,9 +220,12 @@ function onKeydown(event: KeyboardEvent): void {
           :data-lead="item.avatar.lead ? 'true' : undefined"
         >
           <span
-            v-if="item.working || item.handoff"
+            v-if="item.working || item.handoff || item.approval"
             class="company-presence-strip__busy-ring"
-            :class="{ 'company-presence-strip__busy-ring--handoff': item.handoff && !item.working }"
+            :class="{
+              'company-presence-strip__busy-ring--handoff': item.handoff && !item.working,
+              'company-presence-strip__busy-ring--approval': item.approval,
+            }"
             aria-hidden="true"
           />
           <img
@@ -237,7 +245,15 @@ function onKeydown(event: KeyboardEvent): void {
             ★
           </span>
           <span
-            v-if="item.working"
+            v-if="item.approval"
+            class="company-presence-strip__approval-mark"
+            aria-hidden="true"
+            title="Action needed"
+          >
+            !
+          </span>
+          <span
+            v-else-if="item.working"
             class="company-presence-strip__busy-mark"
             aria-hidden="true"
             title="Busy"

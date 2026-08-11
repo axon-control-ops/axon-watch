@@ -41,6 +41,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   action: [action: TeamMemberQuickAction];
   talk: [];
+  decision: [];
 }>();
 
 const avatar = computed(() =>
@@ -87,6 +88,7 @@ const receiptsAction = computed(() =>
 const displayActions = computed(() =>
   employeeDockDisplayActions(props.actions, props.employee),
 );
+const pendingDecision = computed(() => Boolean(props.employee.pending_decision_id));
 
 const transcriptRef = ref<HTMLElement | null>(null);
 
@@ -184,6 +186,21 @@ watch(
         {{ employeeStatusLabel(employeeDisplayStatus(employee)) }}
       </span>
     </header>
+
+    <button
+      v-if="pendingDecision"
+      type="button"
+      class="agent-persona-dock__decision-alert"
+      :title="employee.pending_decision_title || 'Open this agent’s pending decision'"
+      @click="emit('decision')"
+    >
+      <span aria-hidden="true">●</span>
+      <span>
+        <strong>Action needed</strong>
+        <small>{{ employee.pending_decision_title || 'Open the pending decision' }}</small>
+      </span>
+      <span aria-hidden="true">Open →</span>
+    </button>
 
     <p
       class="agent-persona-dock__beat"

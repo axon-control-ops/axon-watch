@@ -97,6 +97,31 @@
   animation: none;
 }
 
+.company-roster__decision-badge {
+  border: 1px solid rgba(255, 202, 82, 0.7);
+  border-radius: 999px;
+  padding: 0.14rem 0.42rem;
+  color: rgba(255, 230, 164, 0.98);
+  background: rgba(104, 65, 15, 0.42);
+  cursor: pointer;
+  font: 700 0.56rem/1 var(--font-mono, ui-monospace, monospace);
+  letter-spacing: 0.06em;
+  animation: company-roster-decision-pulse 1.55s ease-in-out infinite;
+}
+
+.company-roster__decision-badge:focus-visible {
+  outline: 2px solid rgba(255, 221, 126, 0.95);
+  outline-offset: 2px;
+}
+
+@keyframes company-roster-decision-pulse {
+  50% { box-shadow: 0 0 0.8rem rgba(255, 185, 45, 0.65); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .company-roster__decision-badge { animation: none; }
+}
+
 @keyframes company-roster-busy-pulse {
   0%,
   100% {

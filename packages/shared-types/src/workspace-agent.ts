@@ -73,6 +73,10 @@ export interface CompanyEmployeeRecord {
   last_run_id?: string | null;
   /** Newest non-terminal role-tagged run, when a shift is in progress. */
   active_run_id?: string | null;
+  /** A durable operator choice is waiting for this teammate. */
+  pending_decision_id?: string | null;
+  /** Short operator-facing summary of the pending decision. */
+  pending_decision_title?: string | null;
   /** Optional Azure neural voice for Talk / teammate TTS (falls back to operator voice). */
   azure_voice_id?: string | null;
   /** Latest worker delivery stage for this role (git/PR/CI pipeline). */

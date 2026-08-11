@@ -208,6 +208,15 @@ const rosterAlertBadge = computed(() =>
 
 const busyCount = computed(() => liveBusyEmployeeIds.value.length);
 
+const pendingDecisionEmployees = computed(() =>
+  employees.value.filter((employee) => Boolean(employee.pending_decision_id)),
+);
+
+const pendingDecisionLabel = computed(() => {
+  const count = pendingDecisionEmployees.value.length;
+  return count ? `${count} NEED${count === 1 ? 'S' : ''} YOU` : null;
+});
+
 const busyBadgeLabel = computed(() => {
   if (!employees.value.length) {
     return null;
@@ -355,6 +364,17 @@ async function focusFailedEmployee(): Promise<void> {
   scrollDockIntoView();
 }
 
+async function focusPendingDecisionEmployee(): Promise<void> {
+  const target = pendingDecisionEmployees.value[0];
+  if (!target) {
+    return;
+  }
+  selectEmployee(target);
+  presenceStripRef.value?.focusEmployee(target.employee_id);
+  await shell.openOrFocusEmployeeIdeThread(target);
+  scrollDockIntoView();
+}
+
 async function onPresenceSelect(employee: CompanyEmployeeRecord): Promise<void> {
   selectEmployee(employee);
   // Busy fan-out specialists write into their own IDE thread — selecting them must
@@ -400,6 +420,16 @@ async function onPresenceSelect(employee: CompanyEmployeeRecord): Promise<void> 
             >
               {{ busyBadgeLabel }}
             </span>
+            <button
+              v-if="pendingDecisionLabel"
+              type="button"
+              class="company-roster__decision-badge"
+              aria-live="polite"
+              :aria-label="`${pendingDecisionLabel}: open the agent awaiting your decision`"
+              @click="focusPendingDecisionEmployee"
+            >
+              {{ pendingDecisionLabel }}
+            </button>
           </h3>
         </div>
         <button
@@ -476,6 +506,7 @@ async function onPresenceSelect(employee: CompanyEmployeeRecord): Promise<void> 
           :reporting="selectedEmployeeIsReporting"
           :transcript="selectedEmployeeIsReporting ? shell.latestWorkspaceAgentOutput ?? '' : ''"
           @talk="void startChat(selectedEmployee, 'talk')"
+          @decision="void focusPendingDecisionEmployee()"
           @action="onQuickAction(selectedEmployee, $event)"
         />
       </div>

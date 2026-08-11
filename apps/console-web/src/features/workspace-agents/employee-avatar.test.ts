@@ -80,6 +80,16 @@ describe('employee-avatar', () => {
     expect(
       employeePresenceTone(
         employee({
+          role: 'lead',
+          primary: true,
+          status: 'waiting_approval',
+          pending_decision_id: 'auton-ask-1',
+        }),
+      ),
+    ).toBe('approval');
+    expect(
+      employeePresenceTone(
+        employee({
           enabled: false,
           status: 'idle',
           last_outcome: 'failed',
