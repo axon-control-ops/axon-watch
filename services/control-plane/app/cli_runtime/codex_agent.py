@@ -107,6 +107,9 @@ def _codex_item_block(item: dict[str, object], workspace_root: Path) -> str:
             added, removed = _diff_counts(diff)
             blocks.append(f"\n:::edit {path} +{added} -{removed}\n{diff}\n:::\n")
         return "".join(blocks) or ":::tool File change\n"
+    if item_type == "error":
+        detail = str(item.get("message") or "Codex reported an unspecified runtime error.").strip()
+        return f":::tool Error\n{detail}\n:::\n"
     if item_type and item_type not in {"agent_message", "reasoning"}:
         return f":::tool {item_type.replace('_', ' ').capitalize()}\n"
     return ""
@@ -120,6 +123,11 @@ def _extract_codex_text(stream_text: str, workspace_root: Path | None = None) ->
     root = workspace_root or Path.cwd()
     for payload in _iter_codex_payloads(stream_text):
         saw_json = True
+        if payload.get("type") == "error":
+            message = str(payload.get("message") or "").strip()
+            if message:
+                anonymous_items.append({"type": "error", "message": message})
+            continue
         if payload.get("type") not in {"item.started", "item.updated", "item.completed"}:
             continue
         raw_item = payload.get("item")

@@ -212,6 +212,17 @@ class CliRuntimeAgentTests(unittest.TestCase):
         self.assertIn(":::terminal npm test", transcript)
         self.assertIn("# Running…", transcript)
 
+    def test_codex_preserves_structured_runtime_error_details(self) -> None:
+        stream = (
+            '{"type":"error","message":"401 Unauthorized: invalid API key"}\n'
+            '{"type":"item.completed","item":{"type":"error",'
+            '"message":"Falling back to HTTPS failed"}}\n'
+        )
+        transcript = _extract_codex_text(stream, Path("/tmp/ws"))
+        self.assertIn(":::tool Error", transcript)
+        self.assertIn("401 Unauthorized: invalid API key", transcript)
+        self.assertIn("Falling back to HTTPS failed", transcript)
+
     @patch("app.cli_runtime.claude_agent.communicate_registered_process")
     def test_claude_parses_stream_json_reply(self, mock_communicate) -> None:
         mock_communicate.return_value = (_stream_json_stdout("PONG"), "", 0)
