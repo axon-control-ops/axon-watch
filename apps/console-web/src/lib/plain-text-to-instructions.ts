@@ -9,6 +9,9 @@ export type InstructionsSections = {
   outOfScope: string[];
   steps: string[];
   constraints: string[];
+  acceptance: string[];
+  verification: string[];
+  handoff: string[];
   /** Full original request — never truncated away. */
   sourceRequest: string;
 };
@@ -132,6 +135,31 @@ function inferConstraints(): string[] {
   ];
 }
 
+function inferAcceptance(plain: string): string[] {
+  const explicit = splitSentences(plain).filter((line) => /\b(?:acceptance|must|should|success|done when)\b/i.test(line));
+  return [...new Set([
+    ...explicit,
+    'The requested outcome works in the affected user flow',
+    'No unrelated behaviour, data, or release setting is changed',
+  ])];
+}
+
+function inferVerification(): string[] {
+  return [
+    'Inspect the existing implementation before changing it',
+    'Run the focused validation appropriate to the changed code',
+    'Report any remaining unverified behaviour or blocker plainly',
+  ];
+}
+
+function inferHandoff(): string[] {
+  return [
+    'Report the changed files, validation run, and result',
+    'For implementation work, include the commit hash',
+    'Do not claim completion unless the Goal and acceptance checks are met',
+  ];
+}
+
 export function projectInstructionsSections(plainText: string): InstructionsSections {
   const plain = plainText.replace(/\r\n/g, '\n').trim();
   const sentences = splitSentences(plain);
@@ -142,6 +170,9 @@ export function projectInstructionsSections(plainText: string): InstructionsSect
     outOfScope: inferOutOfScope(plain),
     steps: inferSteps(plain),
     constraints: inferConstraints(),
+    acceptance: inferAcceptance(plain),
+    verification: inferVerification(),
+    handoff: inferHandoff(),
     sourceRequest: plain,
   };
 }
@@ -203,6 +234,15 @@ export function plainTextToInstructionsMarkdown(plainText: string): string {
     '',
     '## Constraints',
     renderList(sections.constraints),
+    '',
+    '## Acceptance checks',
+    renderList(sections.acceptance),
+    '',
+    '## Verification',
+    renderNumbered(sections.verification),
+    '',
+    '## Handoff',
+    renderList(sections.handoff),
     '',
     '## Source request',
     sections.sourceRequest,
