@@ -31,6 +31,10 @@ class WorkerSchedulerRouteTests(unittest.TestCase):
         response = self.client.get("/api/worker-scheduler")
         self.assertEqual(200, response.status_code)
         payload = response.json()
+        self.assertTrue(payload["watcher_scheduler_enabled"])
+        self.assertTrue(payload["watcher_effective_enabled"])
+        self.assertTrue(payload["watcher_env_allowed"])
+        self.assertFalse(payload["watcher_blocked_by_env"])
         self.assertFalse(payload["scheduler_enabled"])
         self.assertFalse(payload["effective_enabled"])
         # Test DB isolation disables the env brake so the scheduler loop never starts.
@@ -65,6 +69,27 @@ class WorkerSchedulerRouteTests(unittest.TestCase):
             payload = response.json()
             self.assertTrue(payload["scheduler_enabled"])
             self.assertTrue(payload["effective_enabled"])
+
+    def test_watcher_scheduler_stays_independent_from_worker_action_mode(self) -> None:
+        with patch.dict(
+            os.environ,
+            {
+                "AXON_WATCH_OBSERVATION_SCHEDULER": "1",
+                "AXON_WATCH_WORKER_SCHEDULER": "1",
+            },
+            clear=False,
+        ):
+            response = self.client.patch(
+                "/api/worker-scheduler",
+                json={
+                    "watcher_scheduler_enabled": True,
+                    "scheduler_enabled": False,
+                },
+            )
+            self.assertEqual(200, response.status_code)
+            payload = response.json()
+            self.assertTrue(payload["watcher_effective_enabled"])
+            self.assertFalse(payload["effective_enabled"])
 
     def test_worker_scheduler_patch_empty_body_rejected(self) -> None:
         response = self.client.patch("/api/worker-scheduler", json={})

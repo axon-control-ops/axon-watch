@@ -1753,6 +1753,11 @@ A good next slice should:
 - Conversation and Command dock seams backed by control-plane chat endpoints
   (`POST /api/chat/messages`, `GET /api/workspaces/{workspace_id}/chat/thread`,
   `GET /api/chat/threads/{thread_id}/history`)
+- always-on watcher/action split: company watchers can keep polling and
+  escalating health while worker dispatch stays governed by Auto/Semi/Manual
+- Lead failure escalation: Lead roles must not remain inert in Error; failed
+  Lead shifts become VAXON/operator attention receipts instead of silent red
+  roster state or incorrect specialist spam
 
 **Suggested next slices (2026-07-04):**
 

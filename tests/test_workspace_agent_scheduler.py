@@ -21,6 +21,7 @@ from app.persistence import (  # noqa: E402
 from app.runs.service import create_run, fail_run, get_run, stop_run  # noqa: E402
 from app.workspace_agents import build_company_roster  # noqa: E402
 from app.workspace_agents.scheduler import run_continuous_worker_tick  # noqa: E402
+from app.workspace_agents.scheduler import run_observation_tick  # noqa: E402
 from app.workspace_agents.status import active_role_run_id, active_role_run_status  # noqa: E402
 
 
@@ -233,6 +234,37 @@ class WorkspaceAgentSchedulerTests(unittest.TestCase):
                 started = run_continuous_worker_tick()
 
         self.assertEqual([], started)
+
+    def test_observation_tick_runs_watch_sources_when_worker_scheduler_off(self) -> None:
+        with (
+            patch.dict(
+                os.environ,
+                {
+                    "AXON_WATCH_OBSERVATION_SCHEDULER": "1",
+                    "AXON_WATCH_WORKER_SCHEDULER": "1",
+                },
+                clear=False,
+            ),
+            patch(
+                "app.workspace_agents.company_work_sources.run_scheduled_work_sources",
+                return_value={
+                    "recovered_leases": [],
+                    "sources": {"ci_stale_signal_sweep": {"checked": 1}},
+                },
+            ) as work_sources,
+        ):
+            worker_scheduler_settings_store.patch_settings(
+                {
+                    "watcher_scheduler_enabled": True,
+                    "scheduler_enabled": False,
+                }
+            )
+            observed = run_observation_tick()
+            started = run_continuous_worker_tick()
+
+        self.assertTrue(observed["enabled"])
+        self.assertEqual([], started)
+        work_sources.assert_any_call(observation_only=True)
 
     def test_dispatch_crash_fails_run_instead_of_leaving_executing(self) -> None:
         from app.workspace_agents.config_loader import EmployeeConfig

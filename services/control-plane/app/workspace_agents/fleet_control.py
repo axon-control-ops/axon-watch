@@ -10,7 +10,9 @@ from app.runs.service import RunLifecycleError, RunNotFoundError, stop_run
 from app.workspace_agents.scheduler import (
     DEFAULT_MAX_ACTIVE_EXECUTING,
     DEFAULT_MAX_STARTS_PER_TICK,
+    env_observation_scheduler_allowed,
     env_scheduler_allowed,
+    observation_scheduler_enabled,
     run_continuous_worker_tick,
     scheduler_enabled,
     tick_interval_seconds,
@@ -21,6 +23,8 @@ from app.workspace_agents.scheduler import (
 def build_scheduler_status() -> dict[str, Any]:
     settings = worker_scheduler_settings_store.load_settings()
     env_allowed = env_scheduler_allowed()
+    watcher_env_allowed = env_observation_scheduler_allowed()
+    watcher_store_enabled = bool(settings.get("watcher_scheduler_enabled", True))
     store_enabled = bool(settings.get("scheduler_enabled"))
     effective = scheduler_enabled()
     active_runs = list_active_employee_runs()
@@ -30,6 +34,10 @@ def build_scheduler_status() -> dict[str, Any]:
     return {
         "scheduler_enabled": store_enabled,
         "effective_enabled": effective,
+        "watcher_scheduler_enabled": watcher_store_enabled,
+        "watcher_effective_enabled": observation_scheduler_enabled(),
+        "watcher_env_allowed": watcher_env_allowed,
+        "watcher_blocked_by_env": not watcher_env_allowed,
         "env_allowed": env_allowed,
         "blocked_by_env": not env_allowed,
         "max_active": int(settings.get("max_active") or DEFAULT_MAX_ACTIVE_EXECUTING),

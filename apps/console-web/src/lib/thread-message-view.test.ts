@@ -26,7 +26,7 @@ describe('thread-message-view', () => {
       speaker_employee_id: 'employee-priya',
     };
 
-    expect(threadMessageSpeakerLabel(message)).toBe('Priya · Frontend');
+    expect(threadMessageSpeakerLabel(message)).toBe('PRIYA · FRONTEND');
     expect(threadMessageSpeakerStyle(message)['--thread-speaker-bg']).toBe('#1f4f6e');
   });
 

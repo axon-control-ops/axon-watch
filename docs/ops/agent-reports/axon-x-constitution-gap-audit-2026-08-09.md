@@ -949,3 +949,52 @@ python -m pytest tests/test_autonomous_attention_loop.py tests/test_autonomous_a
 Confidence: 8/10
 
 The audit is based on direct source/schema inspection and current DB table inspection. It may miss behavior implemented only in generated assets, external watch-service code, or runtime-only Claude/Cursor state not stored in this repo.
+
+### 2026-08-10 — Codex watcher/action scheduler split slice completed
+
+Status: completed; not committed yet.
+
+Files changed:
+
+- `services/control-plane/app/persistence/worker_scheduler_settings_store.py`
+- `services/control-plane/app/workspace_agents/company_work_sources.py`
+- `services/control-plane/app/workspace_agents/fleet_control.py`
+- `services/control-plane/app/workspace_agents/lead_team_checkin.py`
+- `services/control-plane/app/workspace_agents/scheduler.py`
+- `services/control-plane/app/routes/worker_scheduler.py`
+- `tests/test_workspace_agent_scheduler.py`
+- `tests/test_worker_scheduler_routes.py`
+- `tests/test_lead_team_checkin.py`
+- `docs/HOW-TO-HANDBOOK.md`
+
+Implemented:
+
+- Split always-on watcher observation from worker/action dispatch.
+- Added `watcher_scheduler_enabled` settings state, defaulting on while worker
+  dispatch remains off by default.
+- Added `AXON_WATCH_OBSERVATION_SCHEDULER` as the hard emergency brake for
+  read-mostly watcher ticks.
+- Added `run_observation_tick()` so CI/watch/delivery/fleet observation can run
+  independently from Auto/Semi/Manual worker dispatch.
+- Added `observation_only=True` handling to scheduled work sources so watcher
+  ticks can reconcile/poll/escalate without creating file-size/autonomous repair
+  tasks or dispatching fleet self-heal fixes.
+- Changed Lead team check-in so failed Lead shifts are no longer skipped.
+- Failed Lead shifts now become VAXON/operator attention receipts and do not
+  auto-spam specialists with the wrong work.
+
+Why this improves AXON-X:
+
+- Company watchers act like a night watch: they keep observing and reporting even
+  when the operator has paused autonomous action.
+- Auto/Semi/Manual now cleanly describes action authority, not whether the system
+  is allowed to notice problems.
+- Team Leads cannot remain silently stuck in Error; their failure becomes an
+  actionable VAXON/operator blocker with receipts.
+
+Verification:
+
+```bash
+python -m pytest tests/test_workspace_agent_scheduler.py tests/test_worker_scheduler_routes.py tests/test_lead_team_checkin.py -q
+# 34 passed
+```

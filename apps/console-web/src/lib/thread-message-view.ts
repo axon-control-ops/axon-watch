@@ -42,6 +42,10 @@ function titleCaseRole(role: string): string {
   return role.replace(/_/g, ' ').replace(/\b\w/g, (value) => value.toUpperCase());
 }
 
+function badgeCaseLabel(value: string): string {
+  return value.trim().replace(/\s+/g, ' ').toUpperCase();
+}
+
 export function threadMessageSpeakerLabel(message: Pick<OperatorThreadEntry, 'role' | 'speaker_name' | 'speaker_role'>): string {
   if (message.role !== 'agent') {
     return formatThreadRole(message.role);
@@ -49,7 +53,9 @@ export function threadMessageSpeakerLabel(message: Pick<OperatorThreadEntry, 'ro
   const name = String(message.speaker_name || '').trim();
   const role = normalizeSpeakerRole(message.speaker_role);
   const label = role ? titleCaseRole(role) : 'Agent';
-  return name ? `${name} · ${label}` : label;
+  return name
+    ? `${badgeCaseLabel(name)} · ${badgeCaseLabel(label)}`
+    : badgeCaseLabel(label);
 }
 
 export function threadMessageSpeakerStyle(
