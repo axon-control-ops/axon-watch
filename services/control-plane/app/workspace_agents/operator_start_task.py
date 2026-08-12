@@ -145,6 +145,13 @@ def operator_start_task(task_id: str) -> dict[str, Any]:
             f"only open/waiting tasks can be started (status={status or 'unknown'})"
         )
 
+    attempts_used = int(task.get("attempts_used") or 0)
+    attempt_budget = int(task.get("attempt_budget") or 0)
+    if attempt_budget <= 0 or attempts_used >= attempt_budget:
+        raise OperatorStartTaskError(
+            "task attempt budget is exhausted; cancel it or create a fresh handoff"
+        )
+
     if not _deps_completed(task):
         raise OperatorStartTaskError(
             "task is still blocked by unfinished dependencies"

@@ -97,6 +97,23 @@ class OperatorStartTaskTests(unittest.TestCase):
         with self.assertRaisesRegex(OperatorStartTaskError, "blocked"):
             operator_start_task(str(blocked["task_id"]))
 
+    @patch("app.workspace_agents.operator_start_task.task_store.get_task")
+    def test_operator_start_rejects_open_task_with_exhausted_attempt_budget(
+        self, get_task
+    ) -> None:
+        get_task.return_value = {
+            "task_id": "task_stale",
+            "workspace_id": "workspace_young_eagles_day_care",
+            "owner_role": "lead",
+            "status": "open",
+            "attempt_budget": 2,
+            "attempts_used": 2,
+            "dependencies": [],
+        }
+
+        with self.assertRaisesRegex(OperatorStartTaskError, "attempt budget is exhausted"):
+            operator_start_task("task_stale")
+
     @patch(
         "app.workspace_agents.operator_start_task._employee_for_role",
         return_value=None,

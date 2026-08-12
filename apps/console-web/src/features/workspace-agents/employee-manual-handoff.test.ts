@@ -67,6 +67,16 @@ describe('resolveEmployeeManualHandoff', () => {
     ).toBe(false);
   });
 
+  it('hides Start now when an open task has exhausted its attempt budget', () => {
+    expect(
+      resolveEmployeeManualHandoff({
+        employee: employee({ role: 'lead', name: 'Imani' }),
+        autonomyMode: 'manual',
+        tasks: [task({ owner_role: 'lead', attempt_budget: 2, attempts_used: 2 })],
+      }),
+    ).toEqual({ waiting: false, taskId: null, reason: null });
+  });
+
   it('hides Semi Start now for ordinary open tasks without handoff provenance', () => {
     expect(
       resolveEmployeeManualHandoff({

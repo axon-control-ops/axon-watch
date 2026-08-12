@@ -28,6 +28,11 @@ function taskIsUnblocked(
   });
 }
 
+/** A task with an exhausted attempt budget cannot be leased by Operator Start. */
+function taskHasAttemptCapacity(task: WorkspaceTaskRecord): boolean {
+  return task.attempts_used < task.attempt_budget;
+}
+
 /** Matches control-plane cross-workspace handoff acceptance prefix. */
 export function taskLooksLikeCrossWorkspaceHandoff(task: WorkspaceTaskRecord): boolean {
   const acceptance = String(task.acceptance_criteria || '')
@@ -130,6 +135,7 @@ export function resolveEmployeeManualHandoff(input: {
       (task) =>
         roleKey(task.owner_role) === role &&
         task.status === 'open' &&
+        taskHasAttemptCapacity(task) &&
         taskIsUnblocked(task, byId) &&
         allowsTask(task),
     )
