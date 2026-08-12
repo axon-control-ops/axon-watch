@@ -357,8 +357,8 @@ async function focusFailedEmployee(): Promise<void> {
   scrollDockIntoView();
 }
 
-async function focusPendingDecisionEmployee(): Promise<void> {
-  const target = pendingDecisionEmployees.value[0];
+async function focusPendingDecisionEmployee(employee?: CompanyEmployeeRecord): Promise<void> {
+  const target = employee?.pending_decision_id ? employee : pendingDecisionEmployees.value[0];
   if (!target) return;
   selectEmployee(target);
   presenceStripRef.value?.focusEmployee(target.employee_id);
@@ -491,7 +491,7 @@ async function onPresenceSelect(employee: CompanyEmployeeRecord): Promise<void> 
           :reporting="selectedEmployeeIsReporting"
           :transcript="selectedEmployeeIsReporting ? shell.latestWorkspaceAgentOutput ?? '' : ''"
           @talk="void startChat(selectedEmployee, 'talk')"
-          @decision="void focusPendingDecisionEmployee()"
+          @decision="void focusPendingDecisionEmployee(selectedEmployee)"
           @action="onQuickAction(selectedEmployee, $event)"
         />
       </div>

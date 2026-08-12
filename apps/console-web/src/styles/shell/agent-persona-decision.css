@@ -50,6 +50,9 @@
   cursor: pointer;
   text-align: left;
   overflow: hidden;
+  flex: 0 0 auto;
+  min-height: 5.1rem;
+  box-sizing: border-box;
 }
 
 .agent-persona-dock__decision-icon {
@@ -101,16 +104,27 @@
   grid-column: 2;
   justify-self: end;
   margin-top: 0.35rem;
+  padding: 0.32rem 0.48rem;
+  border: 1px solid rgba(255, 211, 102, 0.62);
+  border-radius: 0.32rem;
   color: rgba(255, 220, 132, 0.94);
+  background: rgba(24, 17, 7, 0.5);
   font: 700 0.64rem/1 var(--font-mono, ui-monospace, monospace);
+  cursor: pointer;
 }
 
-.agent-persona-dock__decision-alert:hover {
+.agent-persona-dock__decision-alert:focus-within {
   border-color: rgba(255, 220, 125, 0.92);
   background: rgba(112, 69, 17, 0.46);
 }
 
-.agent-persona-dock__decision-alert:focus-visible {
+.agent-persona-dock__decision-open:hover,
+.agent-persona-dock__decision-open:focus-visible {
+  color: rgba(255, 244, 212, 1);
+  background: rgba(119, 74, 17, 0.58);
+}
+
+.agent-persona-dock__decision-open:focus-visible {
   outline: 2px solid rgba(255, 221, 126, 0.95);
   outline-offset: 2px;
 }

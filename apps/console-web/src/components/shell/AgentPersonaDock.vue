@@ -195,23 +195,28 @@ watch(
       </span>
     </header>
 
-    <button
+    <section
       v-if="pendingDecision"
-      type="button"
       class="agent-persona-dock__decision-alert"
-      :title="pendingDecisionPrompt"
-      @click="emit('decision')"
+      aria-labelledby="agent-pending-decision-title"
     >
       <span class="agent-persona-dock__decision-icon" aria-hidden="true">!</span>
       <span class="agent-persona-dock__decision-copy">
         <span class="agent-persona-dock__decision-kicker">Decision required</span>
-        <strong>{{ pendingDecisionPrompt }}</strong>
+        <strong id="agent-pending-decision-title">{{ pendingDecisionPrompt }}</strong>
         <small v-if="pendingDecisionOptions.length">
           {{ pendingDecisionOptions.map((option) => option.label).join(' · ') }}
         </small>
       </span>
-      <span class="agent-persona-dock__decision-open" aria-hidden="true">Review →</span>
-    </button>
+      <button
+        type="button"
+        class="agent-persona-dock__decision-open"
+        :aria-label="`Review ${employee.name}’s pending decision`"
+        @click="emit('decision')"
+      >
+        Review decision →
+      </button>
+    </section>
 
     <p
       class="agent-persona-dock__beat"
