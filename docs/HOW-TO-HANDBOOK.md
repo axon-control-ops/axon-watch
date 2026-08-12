@@ -262,6 +262,12 @@ See [Auto-loop status & credits](how-to/auto-loop-and-credits.md) for the comple
 
 After unattended AUTO work, use [Isolated worker delivery & morning AUTO briefing](how-to/isolated-worker-delivery-and-auto-briefing.md) before merging, committing host WIP, or releasing.
 
+If DashPro Actions remain queued, use the self-hosted CI recovery section in
+that runbook. First distinguish an offline runner from a busy runner; do not
+create retry storms. After a host reinstall, restore the official runner on
+persistent storage, cancel obsolete queued runs, and verify a fresh run before
+declaring CI healthy.
+
 ### “2 runs are ready for operator review” — what that means
 
 This is a **count of paused jobs**, not a failure. Each command you ran (`health`,

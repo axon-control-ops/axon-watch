@@ -115,7 +115,58 @@ opened draft PR #87 containing documentation only. The safe recovery was:
 4. Add guards so host-WIP delivery requests cannot be delegated into isolation,
    out-of-scope control-plane work cannot reach product agents, and verification
    cannot pass without evidence.
-5. Continue by grouping and proving the 29 host changes before any commit.
+5. Group the host changes into messaging, QA-account guardrails, CI wiring,
+   migration formatting, and schema-contract tests. Run targeted tests, the
+   contract gate, full typecheck, and SQL lint; fix any discovered defect.
+6. Commit each proven group separately and push the integration branch only
+   after the real checkout is clean.
+
+The consolidation produced a clean `development` checkout at `1b21318`. No
+OTA, migration deployment, Vercel deployment, or production action was run.
+
+## When self-hosted CI stays queued
+
+`Queued` is not the same as `running slowly`. Check the runner before retrying
+workflows:
+
+```bash
+gh api repos/axon-control-ops/dashpro/actions/runners \
+  --jq '.runners[] | {name,status,busy,labels:[.labels[].name]}'
+gh run list --repo axon-control-ops/dashpro --limit 30
+systemctl --user status github-actions-runner-dashpro.service
+```
+
+Interpret the result:
+
+- `status: offline`: fix the runner service; workflow retries only add noise.
+- `status: online, busy: true`: inspect the active run before intervening.
+- `status: online, busy: false` with queued matching-label jobs: inspect labels,
+  workflow concurrency, repository Actions policy, and runner diagnostics.
+
+After a reinstall, the runner binary and service may be gone even though
+GitHub still lists the old runner record. Restore it from the official GitHub
+Actions runner release, replace the same runner registration, preserve the
+`self-hosted` and `dashpro` labels, and run it from persistent storage. Never
+store a registration token in source or the unit file; it is used only during
+registration.
+
+Before starting a restored runner, review the queued backlog. Cancel obsolete
+superseded runs so a single self-hosted machine does not spend hours validating
+old disposable worker PRs. Then start the runner and verify GitHub reports it
+online and that a fresh integration-branch run begins.
+
+Current host service:
+
+```bash
+systemctl --user status github-actions-runner-dashpro.service
+journalctl --user -u github-actions-runner-dashpro.service -n 100 --no-pager
+```
+
+The service is enabled for the current user manager. Because this host reports
+`Linger=no`, an administrator should run `sudo loginctl enable-linger vaxon`
+once if the runner must survive a full logout/reboot without an interactive
+user session. This needs administrator approval/password; Axon-X must not
+pretend it completed that step.
 
 ## Copy-paste prompts
 
@@ -141,4 +192,3 @@ Do not send this to a continuous worker when the real host is dirty:
 ```text
 Review the existing working tree, commit everything, push, and run OTA.
 ```
-
