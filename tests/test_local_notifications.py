@@ -29,6 +29,17 @@ class LocalNotificationTests(unittest.TestCase):
         self.assertTrue(notify_run_transition({"phase": "review_ready", "summary": "Ready"}))
         self.assertIn("--hint=string:sound-name:message-new-instant", run.call_args.args[0])
 
+    @patch("app.local_notifications.notification_capability", return_value={"enabled": True})
+    @patch("app.local_notifications.shutil.which", return_value="/usr/bin/notify-send")
+    @patch("app.local_notifications.subprocess.run")
+    def test_notification_cleans_prompt_headings_and_names_role(self, run, _which, _capability) -> None:
+        run.return_value.returncode = 0
+        notify_run_transition({
+            "phase": "failed", "role": "frontend",
+            "summary": "# Instructions\n## Objective\nFix the dashboard layout",
+        })
+        self.assertEqual("Frontend: Fix the dashboard layout", run.call_args.args[0][-1])
+
     @patch("app.local_notifications.subprocess.run")
     def test_executing_phase_does_not_notify(self, run) -> None:
         self.assertFalse(notify_run_transition({"phase": "executing"}))

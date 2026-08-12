@@ -3,6 +3,7 @@ from __future__ import annotations
 import sys
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 CONTROL_PLANE_ROOT = Path(__file__).resolve().parents[1] / "services" / "control-plane"
 sys.path.insert(0, str(CONTROL_PLANE_ROOT))
@@ -10,6 +11,7 @@ sys.path.insert(0, str(CONTROL_PLANE_ROOT))
 from app.workspace_agents.ask_autopilot import (  # noqa: E402
     maybe_resolve_safe_ask,
     parse_latest_ask_card,
+    resolve_answered_operator_ask,
     unresolved_operator_ask,
 )
 from app.workspace_agents.worker_prompt import build_continuous_worker_prompt  # noqa: E402
@@ -107,6 +109,51 @@ Confidence: 9/10
         assert escalation is not None
         self.assertIn("Auto mode did not choose", escalation.reason)
         self.assertIn("2. Authorize new synthetic accounts", escalation.detail)
+
+    def test_exact_operator_answer_closes_matching_pending_receipt(self) -> None:
+        pending = {
+            "receipt_id": "auton-1",
+            "payload": {
+                "prompt": "Which target should I publish?",
+                "options": [{"id": "2", "label": "Operator canary"}],
+            },
+        }
+        with patch(
+            "app.persistence.autonomous_attention_store.list_pending_decisions",
+            return_value=[pending],
+        ) as list_pending, patch(
+            "app.persistence.autonomous_attention_store.resolve_decision"
+        ) as resolve:
+            receipt_id = resolve_answered_operator_ask(
+                "Selected option 2: Operator canary\n"
+                "(answer to: Which target should I publish?)",
+                workspace_id="workspace_dashpro",
+            )
+
+        self.assertEqual("auton-1", receipt_id)
+        list_pending.assert_called_once_with(workspace_id="workspace_dashpro", limit=100)
+        resolve.assert_called_once_with("auton-1", resolution="approved")
+
+    def test_operator_answer_does_not_close_a_different_or_tampered_choice(self) -> None:
+        pending = {
+            "receipt_id": "auton-1",
+            "payload": {
+                "prompt": "Which target should I publish?",
+                "options": [{"id": "2", "label": "Operator canary"}],
+            },
+        }
+        with patch(
+            "app.persistence.autonomous_attention_store.list_pending_decisions",
+            return_value=[pending],
+        ), patch("app.persistence.autonomous_attention_store.resolve_decision") as resolve:
+            receipt_id = resolve_answered_operator_ask(
+                "Selected option 2: Production\n"
+                "(answer to: Which target should I publish?)",
+                workspace_id="workspace_dashpro",
+            )
+
+        self.assertIsNone(receipt_id)
+        resolve.assert_not_called()
 
     def test_worker_prompt_tells_agents_not_to_stop_on_safe_auto_asks(self) -> None:
         prompt = build_continuous_worker_prompt(

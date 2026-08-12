@@ -89,6 +89,14 @@ const displayActions = computed(() =>
   employeeDockDisplayActions(props.actions, props.employee),
 );
 const pendingDecision = computed(() => Boolean(props.employee.pending_decision_id));
+const pendingDecisionPrompt = computed(() =>
+  props.employee.pending_decision_prompt?.trim()
+  || props.employee.pending_decision_title?.replace(/^.+? needs a decision:\s*/i, '').trim()
+  || 'Review the pending decision',
+);
+const pendingDecisionOptions = computed(() =>
+  (props.employee.pending_decision_options ?? []).filter((option) => option.id && option.label).slice(0, 3),
+);
 
 const transcriptRef = ref<HTMLElement | null>(null);
 
@@ -191,15 +199,18 @@ watch(
       v-if="pendingDecision"
       type="button"
       class="agent-persona-dock__decision-alert"
-      :title="employee.pending_decision_title || 'Open this agent’s pending decision'"
+      :title="pendingDecisionPrompt"
       @click="emit('decision')"
     >
-      <span aria-hidden="true">●</span>
-      <span>
-        <strong>Action needed</strong>
-        <small>{{ employee.pending_decision_title || 'Open the pending decision' }}</small>
+      <span class="agent-persona-dock__decision-icon" aria-hidden="true">!</span>
+      <span class="agent-persona-dock__decision-copy">
+        <span class="agent-persona-dock__decision-kicker">Decision required</span>
+        <strong>{{ pendingDecisionPrompt }}</strong>
+        <small v-if="pendingDecisionOptions.length">
+          {{ pendingDecisionOptions.map((option) => option.label).join(' · ') }}
+        </small>
       </span>
-      <span aria-hidden="true">Open →</span>
+      <span class="agent-persona-dock__decision-open" aria-hidden="true">Review →</span>
     </button>
 
     <p

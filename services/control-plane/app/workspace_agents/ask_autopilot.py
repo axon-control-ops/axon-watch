@@ -18,6 +18,8 @@ _ASK_FENCE_RE = re.compile(
 _OPTION_PIPE_RE = re.compile(r"^\s*[-*]\s+(\d+)\s*\|\s+(.+?)\s*$")
 _OPTION_DASH_RE = re.compile(r"^\s*[-*]\s+(\d+)[.)]\s+(.+?)\s*$")
 _OPTION_NUMBER_RE = re.compile(r"^\s*(\d+)[.)]\s+(.+?)\s*$")
+_SELECTED_OPTION_RE = re.compile(r"(?im)^Selected option\s+(?P<id>\d+)\s*:\s*(?P<label>.+?)\s*$")
+_ANSWER_PROMPT_RE = re.compile(r"(?im)^\(answer to:\s*(?P<prompt>.+?)\s*\)\s*$")
 
 _UNSAFE_MARKERS = (
     "production",
@@ -258,6 +260,38 @@ def unresolved_operator_ask(
     return OperatorAskEscalation(prompt=prompt, options=tuple(options), reason=reason)
 
 
+def resolve_answered_operator_ask(content: str, *, workspace_id: str) -> str | None:
+    """Close the exact durable ask receipt represented by an operator answer."""
+    selected = _SELECTED_OPTION_RE.search(str(content or ""))
+    answered = _ANSWER_PROMPT_RE.search(str(content or ""))
+    if selected is None or answered is None:
+        return None
+    selected_id = _clean(selected.group("id"))
+    selected_label = _clean(selected.group("label"))
+    answered_prompt = _clean(answered.group("prompt"))
+    from app.persistence import autonomous_attention_store
+
+    for receipt in autonomous_attention_store.list_pending_decisions(
+        workspace_id=workspace_id, limit=100
+    ):
+        payload = receipt.get("payload") if isinstance(receipt.get("payload"), dict) else {}
+        if _clean(payload.get("prompt")) != answered_prompt:
+            continue
+        options = payload.get("options") if isinstance(payload.get("options"), list) else []
+        matched = any(
+            isinstance(option, dict)
+            and _clean(option.get("id")) == selected_id
+            and _clean(option.get("label")) == selected_label
+            for option in options
+        )
+        if not matched:
+            continue
+        receipt_id = _clean(receipt.get("receipt_id"))
+        autonomous_attention_store.resolve_decision(receipt_id, resolution="approved")
+        return receipt_id
+    return None
+
+
 def escalate_unresolved_operator_ask(
     content: str,
     *,
@@ -279,6 +313,22 @@ def escalate_unresolved_operator_ask(
     )
     if operator_ask is None:
         return False
+    for pending in autonomous_attention_store.list_pending_decisions(
+        workspace_id=workspace_id, limit=100
+    ):
+        payload = pending.get("payload") if isinstance(pending.get("payload"), dict) else {}
+        if str(payload.get("owner_role") or "").strip().lower() != employee_role.strip().lower():
+            continue
+        same_task = _clean(pending.get("task_id")) == _clean(task_id)
+        same_prompt = _clean(payload.get("prompt")) == operator_ask.prompt
+        if not same_task and not same_prompt:
+            continue
+        try:
+            autonomous_attention_store.resolve_decision(
+                str(pending.get("receipt_id") or ""), resolution="rejected"
+            )
+        except ValueError:
+            continue
     autonomous_attention_store.append_receipt(
         kind="worker_ask",
         decision="escalate",

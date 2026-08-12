@@ -158,8 +158,21 @@ def build_company_roster(
         if active_run:
             row["active_run_id"] = active_run
         if pending_decision is not None:
+            decision_payload = (
+                pending_decision.get("payload")
+                if isinstance(pending_decision.get("payload"), dict)
+                else {}
+            )
+            decision_options = (
+                decision_payload.get("options")
+                if isinstance(decision_payload.get("options"), list)
+                else []
+            )
             row["pending_decision_id"] = pending_decision.get("receipt_id")
             row["pending_decision_title"] = pending_decision.get("title")
+            row["pending_decision_prompt"] = decision_payload.get("prompt")
+            row["pending_decision_reason"] = pending_decision.get("detail")
+            row["pending_decision_options"] = decision_options
         employee_rows.append(row)
 
     try:

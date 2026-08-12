@@ -3,11 +3,20 @@
 from __future__ import annotations
 
 import os
+import re
 import shutil
 import subprocess
 from typing import Any
 
 _NOTIFIABLE_PHASES = frozenset({"approval_required", "blocked", "failed", "review_ready"})
+_MARKDOWN_HEADING_RE = re.compile(r"(?m)^#{1,6}\s+.*$")
+
+
+def _notification_detail(record: dict[str, Any]) -> str:
+    raw = str(record.get("operator_summary") or record.get("summary") or record.get("current_step") or record.get("run_id") or "")
+    cleaned = " ".join(_MARKDOWN_HEADING_RE.sub(" ", raw).replace("```", " ").split()).strip()
+    role = str(record.get("role") or "").strip().capitalize()
+    return (f"{role}: {cleaned}" if role and cleaned else cleaned)[:240]
 
 
 def notification_capability(env: dict[str, str] | None = None) -> dict[str, object]:
@@ -33,13 +42,13 @@ def notify_run_transition(record: dict[str, Any]) -> bool:
         "blocked": "Axon-X run is blocked",
         "failed": "Axon-X run failed",
     }[phase]
-    detail = str(record.get("summary") or record.get("current_step") or record.get("run_id") or "").strip()
+    detail = _notification_detail(record)
     urgency = "critical" if phase in {"approval_required", "blocked", "failed"} else "normal"
     try:
         result = subprocess.run(
             [
                 str(shutil.which("notify-send")), "--app-name=Axon-X", f"--urgency={urgency}",
-                "--hint=string:sound-name:message-new-instant", title, detail[:240],
+                "--hint=string:sound-name:message-new-instant", title, detail,
             ],
             capture_output=True,
             timeout=5,

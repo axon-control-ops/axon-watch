@@ -77,6 +77,12 @@ export interface CompanyEmployeeRecord {
   pending_decision_id?: string | null;
   /** Short operator-facing summary of the pending decision. */
   pending_decision_title?: string | null;
+  /** Exact question requiring an operator answer, without agent-name boilerplate. */
+  pending_decision_prompt?: string | null;
+  /** Why work cannot safely continue without the decision. */
+  pending_decision_reason?: string | null;
+  /** Human-readable choices supplied by the worker. */
+  pending_decision_options?: Array<{ id: string; label: string }> | null;
   /** Optional Azure neural voice for Talk / teammate TTS (falls back to operator voice). */
   azure_voice_id?: string | null;
   /** Latest worker delivery stage for this role (git/PR/CI pipeline). */
