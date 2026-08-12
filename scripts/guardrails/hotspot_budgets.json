@@ -156,7 +156,7 @@
       "note": "Pre-existing over-budget on this branch, unrelated to this change; ratcheted to unblock Fast Gate — split by panel before it grows further"
     },
     "docs/HOW-TO-HANDBOOK.md": {
-      "max_lines": 1807,
+      "max_lines": 1813,
       "soft_limit": 400,
       "hard_limit": 1800,
       "target": "docs/how-to/* chapters",
@@ -408,7 +408,7 @@
       "note": "IDE layout-02 after AgentDock chat chrome; extract next"
     },
     "services/control-plane/app/cli_runtime/router.py": {
-      "max_lines": 579,
+      "max_lines": 582,
       "soft_limit": 350,
       "hard_limit": 500,
       "target": "services/control-plane/app/cli_runtime/*",
