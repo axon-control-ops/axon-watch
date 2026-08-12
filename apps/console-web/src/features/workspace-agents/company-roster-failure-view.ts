@@ -22,12 +22,21 @@ import { humanizeEmployeeDeliveryHandoff } from './employee-delivery-handoff-vie
 
 const DOCK_RECEIPT_DETAIL_MAX = 180;
 
+function isCorrectOutOfScopeRefusal(detail: string | null | undefined): boolean {
+  return /continuous worker scope guard tripped|\bout_of_scope_guard\b/i.test(detail ?? '');
+}
+
 export function employeeFailureLine(
   employee: CompanyEmployeeRecord,
   options?: { liveBusy?: boolean },
 ): string | null {
   const outcome = (employee.last_outcome ?? '').trim().toLowerCase();
   if (outcome !== 'failed') {
+    return null;
+  }
+  // Preserve the failed run receipt, but do not brand a worker failed for
+  // correctly refusing work outside its repository or leased scope.
+  if (isCorrectOutOfScopeRefusal(employee.last_outcome_detail)) {
     return null;
   }
   // Active jobs / live IDE streams supersede the last failure banner.

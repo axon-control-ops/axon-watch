@@ -22,11 +22,8 @@ from app.workspace_agents.lead_task_plan import (
     topo_order,
 )
 from app.workspace_agents.lead_plan_model import resolve_lead_task_plan
-from app.workspace_agents.task_goal_overlap import (
-    goals_overlap,
-    normalize_goal_core,
-    token_set,
-)
+from app.workspace_agents.task_goal_overlap import goals_overlap, normalize_goal_core, token_set
+from app.workspace_agents.task_workspace_scope import cross_workspace_mutation_blocker
 
 
 class LeadFanOutError(ValueError):
@@ -509,6 +506,8 @@ def materialize_lead_fan_out(
         raise LeadFanOutError("workspace_id is required")
     if not cleaned_goal:
         raise LeadFanOutError("goal is required")
+    if scope_blocker := cross_workspace_mutation_blocker(workspace_id=workspace, goal=cleaned_goal):
+        raise LeadFanOutError(scope_blocker)
 
     explicit_task_ids = _extract_task_ids(cleaned_goal)
     if explicit_task_ids:
