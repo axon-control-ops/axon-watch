@@ -257,9 +257,10 @@ finished; Mission Control is asking you to **COMPLETE** (usual) or **RESUME** (i
 steps expected).
 
 ### Mission Control AUTONOMOUS (bounded)
-
 In **OPERATOR → Mission Control**, use **AUTONOMOUS ON/OFF** for bounded worker control.
 See [Auto-loop status & credits](how-to/auto-loop-and-credits.md) for the complete safety matrix, approval behavior, dedupe rules, and emergency procedure.
+
+After unattended AUTO work, use [Isolated worker delivery & morning AUTO briefing](how-to/isolated-worker-delivery-and-auto-briefing.md) before merging, committing host WIP, or releasing.
 
 ### “2 runs are ready for operator review” — what that means
 
