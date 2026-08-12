@@ -169,6 +169,32 @@ class WorkerCompletionGateTests(unittest.TestCase):
         self.assertTrue(result.passed, result)
         self.assertEqual("non-implementation task", result.reason)
 
+    def test_verification_refusal_without_command_receipts_cannot_pass(self) -> None:
+        opened = task_store.create_task(
+            workspace_id="workspace_dashpro",
+            owner_role="watcher",
+            goal="Review the working tree and verify runtime health before delivery.",
+            acceptance_criteria="Report verified command results.",
+            allowed_paths=[],
+        )
+        task = task_store.lease_task(
+            opened["task_id"], lease_holder="employee-workspace_dashpro-watcher"
+        )
+        run_id = create_run(
+            workspace_id="workspace_dashpro", mode="agent", summary="Release review",
+            employee_role="watcher", task_id=str(task["task_id"]), require_leased_task=True,
+        )["run_id"]
+
+        with tempfile.TemporaryDirectory() as tempdir:
+            result = evaluate_pre_publish_completion_gate(
+                run_id=str(run_id), task=task, isolation_root=Path(tempdir),
+                reply_text="I cannot complete the gate; command receipts are missing.",
+                changed_paths=[],
+            )
+
+        self.assertFalse(result.passed)
+        self.assertIn("required evidence", result.reason)
+
     def test_integrations_fix_still_requires_a_product_diff(self) -> None:
         opened = task_store.create_task(
             workspace_id="workspace_dashpro",

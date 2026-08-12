@@ -223,12 +223,23 @@ def evaluate_pre_publish_completion_gate(
         paths = strip_control_plane_owned_paths(list_isolation_changed_paths(isolation_root))
 
     if not implementation_requested(task):
+        if not isinstance(task, dict) or not str(task.get("goal") or "").strip():
+            return CompletionGateResult(False, "assigned objective missing", paths, expected, "missing")
+        validation_ok, validation = _validation_status(run_id, task)
+        if not validation_ok:
+            return CompletionGateResult(
+                False,
+                f"verification task did not provide required evidence: {validation}",
+                paths,
+                expected,
+                validation,
+            )
         return CompletionGateResult(
             passed=True,
             reason="non-implementation task",
             changed_paths=paths,
             expected_files=expected,
-            validation_status="not required",
+            validation_status=validation,
         )
     if not isinstance(task, dict) or not str(task.get("goal") or "").strip():
         return CompletionGateResult(False, "assigned objective missing", paths, expected, "missing")
