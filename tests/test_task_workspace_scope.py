@@ -48,6 +48,17 @@ class TaskWorkspaceScopeTests(unittest.TestCase):
             goal="Check control-plane health and report the current status",
         ))
 
+    def test_rejects_host_worktree_delivery_before_creating_worker_task(self) -> None:
+        from app.persistence import task_store
+        from app.workspace_agents.lead_fan_out import LeadFanOutError, materialize_lead_fan_out
+
+        with self.assertRaisesRegex(LeadFanOutError, "workspace-git/operator delivery lane"):
+            materialize_lead_fan_out(
+                workspace_id="workspace_dashpro",
+                goal="Review the current working tree and prepare existing changes for delivery; commit and push.",
+            )
+        self.assertEqual([], task_store.list_tasks(workspace_id="workspace_dashpro"))
+
 
 if __name__ == "__main__":
     unittest.main()

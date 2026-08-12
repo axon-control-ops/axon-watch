@@ -12,6 +12,14 @@ _CONTROL_PLANE_TARGET = re.compile(
 _MUTATION_INTENT = re.compile(
     r"\b(?:add|change|edit|fix|implement|patch|repair|update|upgrade|wire)\b", re.IGNORECASE
 )
+_HOST_TREE_TARGET = re.compile(
+    r"\b(?:current|existing|host|real)\b.{0,30}\b(?:working tree|uncommitted|dirty (?:files|changes))\b",
+    re.IGNORECASE,
+)
+_DELIVERY_INTENT = re.compile(
+    r"\b(?:commit|push|prepare.{0,20}(?:delivery|release)|review.{0,20}(?:diff|changes))\b",
+    re.IGNORECASE,
+)
 
 
 def cross_workspace_mutation_blocker(*, workspace_id: str, goal: str) -> str | None:
@@ -29,4 +37,17 @@ def cross_workspace_mutation_blocker(*, workspace_id: str, goal: str) -> str | N
     )
 
 
-__all__ = ["cross_workspace_mutation_blocker"]
+def isolated_worker_task_blocker(*, goal: str) -> str | None:
+    """Reject tasks that require uncommitted state absent from worker isolation."""
+    text = " ".join((goal or "").split())
+    if not _HOST_TREE_TARGET.search(text) or not _DELIVERY_INTENT.search(text):
+        return None
+    return (
+        "This request requires the real workspace's existing uncommitted changes, "
+        "which are intentionally absent from disposable worker checkouts. Use the "
+        "audited workspace-git/operator delivery lane with explicit paths; do not "
+        "delegate it as a continuous company-worker task."
+    )
+
+
+__all__ = ["cross_workspace_mutation_blocker", "isolated_worker_task_blocker"]
