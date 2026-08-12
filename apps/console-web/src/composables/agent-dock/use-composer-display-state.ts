@@ -204,7 +204,12 @@ export function useComposerDisplayState(options: UseComposerDisplayStateOptions)
     if (!source || !workspaceId || instructionsGenerating.value) return;
     instructionsGenerating.value = true;
     try {
-      const result = await generateInstructions({ workspace_id: workspaceId, content: source });
+      const result = await generateInstructions({
+        workspace_id: workspaceId,
+        content: source,
+        runtime_target: shell.selectedRuntimeTargetId || null,
+        runtime_model: shell.selectedComposerModel || null,
+      });
       composerDraftModel.value = result.content;
       await nextTick(syncComposerHeight);
     } catch (error) {

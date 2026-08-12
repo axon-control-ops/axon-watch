@@ -52,6 +52,7 @@ from app.chat.scanned_workbook_gate import assignment_workbook_policy_appendix
 from app.debug_prompt import build_debug_system_prompt
 from app.kairo_ask_prompt import build_ask_system_prompt
 from app.cli_runtime.long_running_shell_prompt import LONG_RUNNING_SHELL_CLAUSE
+from app.instructions_engine import build_instructions_system_prompt
 from app.cli_runtime.plan_system_prompt import (
     ask_fence_instruction,
     build_plan_system_prompt,
@@ -114,6 +115,8 @@ def _system_prompt(
     if composer_mode == "ask":
         enabled = persona_enabled if persona_enabled is not None else _operator_persona_enabled()
         return f"{build_ask_system_prompt(persona_enabled=enabled)} {research_line}"
+    if composer_mode == "instructions":
+        return build_instructions_system_prompt()
     if composer_mode == "plan":
         offline_clause = (
             "Ground the plan in the local repo and provided context. "
