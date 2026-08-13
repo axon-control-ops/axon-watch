@@ -100,6 +100,19 @@ export function looksLikeSuccessfulOutcomeDetail(detail: string | null | undefin
   );
 }
 
+/** Worker shift blocked because implementation was requested but no workspace files changed. */
+export function isCompletionGateFailure(detail: string | null | undefined): boolean {
+  const normalized = normalizeOperatorFailureDetail(detail).toLowerCase();
+  if (!normalized) {
+    return false;
+  }
+  return (
+    normalized.includes('completion gate') ||
+    normalized.includes('no changed files') ||
+    normalized.includes('produced no changed files')
+  );
+}
+
 /** Strip Lane B fallback wrappers so dock and retry drafts show the root cause. */
 export function normalizeOperatorFailureDetail(detail: string | null | undefined): string {
   const cleaned = (detail ?? '').replace(/\s+/g, ' ').trim();

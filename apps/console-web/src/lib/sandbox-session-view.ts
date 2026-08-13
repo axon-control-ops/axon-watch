@@ -80,13 +80,16 @@ export function composerAccessBannerCopy(input: {
 export function composerAccessMenuStatus(input: {
   fullAccess: boolean;
   sandboxEnabled: boolean;
-}): { executionLine: string; sandboxLine: string } {
+}): { executionLine: string; sandboxLine: string; workerIsolationLine: string } {
   return {
     executionLine: input.fullAccess
       ? 'Full Access active — tools after approval'
       : 'Consultative — read-only tools',
     sandboxLine: input.sandboxEnabled
-      ? 'Sandbox on — disposable copy'
+      ? 'Sandbox on — disposable session copy'
       : 'Sandbox off — live project',
+    workerIsolationLine: input.sandboxEnabled
+      ? 'Company workers still use isolated git checkouts for AUTO shifts'
+      : 'Company workers use isolated checkouts — not Composer Sandbox',
   };
 }

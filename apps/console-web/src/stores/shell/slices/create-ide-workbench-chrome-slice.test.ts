@@ -73,6 +73,25 @@ beforeEach(() => {
   localStorageMock.clear();
 });
 
+function createChromeSlice(
+  overrides: Partial<Parameters<typeof createIdeWorkbenchChromeSlice>[0]> = {},
+) {
+  return createIdeWorkbenchChromeSlice({
+    ideTerminalRevealToken: ref(0),
+    ideTerminalProblemsRevealToken: ref(0),
+    ideTerminalToggleToken: ref(0),
+    ideExplorerInlineCreateToken: ref(0),
+    ideExplorerInlineCreateKind: ref('file'),
+    teamRosterRevealToken: ref(0),
+    ideActivityView: ref('explorer'),
+    ideExplorerCollapsed: ref(false),
+    agentDockCollapsed: ref(false),
+    ideAttentionPanelOpen: ref(false),
+    ideBriefingPanelOpen: ref(false),
+    ...overrides,
+  });
+}
+
 describe('createIdeWorkbenchChromeSlice terminal reveal', () => {
   it('reveals via token without writing IDE session visibility', () => {
     const ideKey = workbenchTerminalPanelVisibleStorageKey('ide');
@@ -81,15 +100,10 @@ describe('createIdeWorkbenchChromeSlice terminal reveal', () => {
     sessionStorage.removeItem(operatorKey);
 
     const ideTerminalRevealToken = ref(0);
-    const slice = createIdeWorkbenchChromeSlice({
+    const ideTerminalProblemsRevealToken = ref(0);
+    const slice = createChromeSlice({
       ideTerminalRevealToken,
-      ideTerminalToggleToken: ref(0),
-      teamRosterRevealToken: ref(0),
-      ideActivityView: ref('explorer'),
-      ideExplorerCollapsed: ref(false),
-      agentDockCollapsed: ref(false),
-      ideAttentionPanelOpen: ref(false),
-      ideBriefingPanelOpen: ref(false),
+      ideTerminalProblemsRevealToken,
     });
 
     slice.revealIdeTerminalPanel();
@@ -103,19 +117,27 @@ describe('createIdeWorkbenchChromeSlice terminal reveal', () => {
     expect(readStoredWorkbenchTerminalPanelVisible('operator')).toBe(true);
     expect(readStoredWorkbenchTerminalPanelVisible('ide')).toBe(false);
   });
+
+  it('reveals terminal and bumps problems tab token together', () => {
+    const ideTerminalRevealToken = ref(0);
+    const ideTerminalProblemsRevealToken = ref(0);
+    const slice = createChromeSlice({
+      ideTerminalRevealToken,
+      ideTerminalProblemsRevealToken,
+    });
+
+    slice.revealIdeWorkbenchProblems();
+
+    expect(ideTerminalRevealToken.value).toBe(1);
+    expect(ideTerminalProblemsRevealToken.value).toBe(1);
+  });
 });
 
 describe('createIdeWorkbenchChromeSlice sidebar focus', () => {
   function createSlice(overrides: Partial<Parameters<typeof createIdeWorkbenchChromeSlice>[0]> = {}) {
-    return createIdeWorkbenchChromeSlice({
-      ideTerminalRevealToken: ref(0),
-      ideTerminalToggleToken: ref(0),
-      teamRosterRevealToken: ref(0),
-      ideActivityView: ref('explorer'),
+    return createChromeSlice({
       ideExplorerCollapsed: ref(true),
       agentDockCollapsed: ref(true),
-      ideAttentionPanelOpen: ref(false),
-      ideBriefingPanelOpen: ref(false),
       ...overrides,
     });
   }
@@ -192,5 +214,25 @@ describe('createIdeWorkbenchChromeSlice sidebar focus', () => {
     expect(ideActivityView.value).toBe('team');
     expect(ideExplorerCollapsed.value).toBe(false);
     expect(teamRosterRevealToken.value).toBe(1);
+  });
+
+  it('requestIdeExplorerInlineCreate focuses explorer and bumps inline create token', () => {
+    const ideActivityView = ref<'explorer' | 'team'>('team');
+    const ideExplorerCollapsed = ref(true);
+    const ideExplorerInlineCreateToken = ref(0);
+    const ideExplorerInlineCreateKind = ref<'file' | 'folder'>('file');
+    const slice = createSlice({
+      ideActivityView,
+      ideExplorerCollapsed,
+      ideExplorerInlineCreateToken,
+      ideExplorerInlineCreateKind,
+    });
+
+    slice.requestIdeExplorerInlineCreate('file');
+
+    expect(ideActivityView.value).toBe('explorer');
+    expect(ideExplorerCollapsed.value).toBe(false);
+    expect(ideExplorerInlineCreateToken.value).toBe(1);
+    expect(ideExplorerInlineCreateKind.value).toBe('file');
   });
 });

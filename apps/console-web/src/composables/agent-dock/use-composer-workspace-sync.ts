@@ -7,6 +7,7 @@ import {
 import { useShellStore } from '../../stores/shell';
 import type { ComposerMode } from './use-composer-menus';
 import type { PlanSoftSwitchNotice, TeammateRouteNotice } from './use-composer-actions';
+import { clearWorkspaceScopeNotice } from '../../lib/workspace-scope-notice';
 import { useComposerRestoreModeFocus } from './use-composer-restore-mode-focus';
 
 type ShellStore = ReturnType<typeof useShellStore>;
@@ -127,6 +128,7 @@ export function useComposerWorkspaceSync(options: UseComposerWorkspaceSyncOption
       planSoftSwitchNotice.value = null;
       if (hasSyncedContext && workspaceChanged) {
         teammateRouteNotice.value = null;
+        clearWorkspaceScopeNotice();
       }
       hasSyncedContext = true;
       if (workspaceChanged) {

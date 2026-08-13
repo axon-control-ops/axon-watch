@@ -46,6 +46,8 @@ class SandboxPolicyAdapterTests(unittest.TestCase):
         self.assertIn(str(home / ".config/cursor/auth.json"), mounted)
         self.assertNotIn(str(home / ".config"), mounted)
         self.assertNotIn(str(home / ".cursor"), mounted)
+        self.assertNotIn(str(home / ".cursor/cli-config.json"), mounted)
+        self.assertNotIn(str(home / ".cursor/agent-cli-state.json"), mounted)
 
     def test_claude_and_codex_mount_their_own_subscription_credentials(self) -> None:
         """Regression: sandboxed claude/codex dispatch always reported "not

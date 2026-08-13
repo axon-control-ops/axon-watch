@@ -14,6 +14,7 @@ import { useComposerWorkspaceSync } from './use-composer-workspace-sync';
 import { readWorkspaceComposerMode } from '../../lib/composer-mode-prefs';
 import { persistIdeComposerDraft } from '../../lib/ide-composer-draft-prefs';
 import { teammateRouteNotice } from '../../lib/teammate-route-notice';
+import { workspaceScopeNotice } from '../../lib/workspace-scope-notice';
 import { buildAgentDockComposerApi } from './build-agent-dock-composer-api';
 export function useAgentDockComposerSetup() {
   const shell = useShellStore();
@@ -241,6 +242,8 @@ export function useAgentDockComposerSetup() {
     declinePlanSoftSwitchOffer,
     dismissPlanSoftSwitch,
     dismissTeammateRoute,
+    dismissWorkspaceScopeNotice,
+    switchComposerWorkspaceScope,
     handleApproveRun,
     handleComposerKeydown,
     handleDebugReproduceProceed,
@@ -411,6 +414,8 @@ export function useAgentDockComposerSetup() {
     debugReproduceRequest,
     dismissPlanSoftSwitch,
     dismissTeammateRoute,
+    dismissWorkspaceScopeNotice,
+    switchComposerWorkspaceScope,
     enlargedComposerImage,
     executionAccessHint,
     extraPinnedRows,
@@ -444,6 +449,7 @@ export function useAgentDockComposerSetup() {
     openVaultSurface,
     planSoftSwitchNotice,
     teammateRouteNotice,
+    workspaceScopeNotice,
     removeChip,
     removeComposerImage,
     editQueuedMessage,

@@ -103,7 +103,7 @@ onMounted(() => {
       <TresCanvas
         class="hud-holo-shell__canvas"
         :alpha="true"
-        :clear-color="'#00000000'"
+        :clear-color="'#000000'"
         :window-size="false"
         render-mode="always"
       >

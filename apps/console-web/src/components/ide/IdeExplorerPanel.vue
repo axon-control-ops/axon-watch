@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted, ref, watch } from 'vue';
+import { onMounted, onUnmounted, ref, watch, nextTick } from 'vue';
 
 import WorkspaceFileTree from '../WorkspaceFileTree.vue';
 import WorkbenchIcon from '../WorkbenchIcon.vue';
@@ -93,6 +93,18 @@ watch(
     }
   },
   { immediate: true },
+);
+
+watch(
+  () => shell.ideExplorerInlineCreateToken,
+  async () => {
+    await nextTick();
+    if (shell.ideExplorerInlineCreateKind === 'folder') {
+      createNewFolder();
+      return;
+    }
+    createNewFile();
+  },
 );
 </script>
 

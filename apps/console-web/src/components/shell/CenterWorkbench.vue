@@ -11,6 +11,7 @@ import EditorCsvToolbar from './EditorCsvToolbar.vue';
 import CenterWorkbenchIdeQuickGuide from './CenterWorkbenchIdeQuickGuide.vue';
 import CenterWorkbenchEditorChrome from './CenterWorkbenchEditorChrome.vue';
 import CenterWorkbenchEditorFooter from './CenterWorkbenchEditorFooter.vue';
+import CenterWorkbenchEmptyEditor from './CenterWorkbenchEmptyEditor.vue';
 import EditorPdfPreview from './EditorPdfPreview.vue';
 import OperatorStatusRadarPanel from './OperatorStatusRadarPanel.vue';
 import {
@@ -90,6 +91,7 @@ const {
   ideEditorStatusGitChip,
   ideEditorStatusSearchChip,
   ideEditorStatusTeamChip,
+  ideEditorStatusProblemsChip,
   ideQuickGuide,
 } = useIdeEditorStatusBar({
   shell,
@@ -351,6 +353,9 @@ const onIdeQuickGuideAction = (actionId: IdeQuickGuideActionId): void =>
 const onOpenWatchConnectors = (): void => openWatchConnectors(shell);
 const onOpenSourceControl = (): void => openIdeSourceControl(shell);
 const onOpenSearch = (): void => openIdeSearch(shell);
+const onShowProblems = (): void => shell.revealIdeWorkbenchProblems();
+const onOpenExplorer = (): void => shell.focusIdeSidebarView('explorer');
+const onCreateNewFile = (): void => shell.requestIdeExplorerInlineCreate('file');
 
 function startTerminalResize(event: MouseEvent): void {
   if (event.button !== 0) {
@@ -580,8 +585,16 @@ watch(
           v-if="shell.activeEditorDocument && showAgentDiffReviewViewer"
           :content="shell.activeEditorDocument.value"
         />
+        <CenterWorkbenchEmptyEditor
+          v-else-if="!shell.activeEditorDocument"
+          :has-workspace="Boolean(shell.currentWorkspace?.workspace_id)"
+          @open-explorer="onOpenExplorer"
+          @open-search="onOpenSearch"
+          @create-new-file="onCreateNewFile"
+          @show-agent="showAgentDock"
+        />
         <EditorHost
-          v-else-if="shell.activeEditorDocument && (!isMarkdownEditorDocument || !editorPreviewEnabled) && (!isCsvEditorDocument || !csvTablePreviewEnabled) && !isImageEditorDocument && !isPdfEditorDocument && !isBinaryEditorDocument"
+          v-else-if="(!isMarkdownEditorDocument || !editorPreviewEnabled) && (!isCsvEditorDocument || !csvTablePreviewEnabled) && !isImageEditorDocument && !isPdfEditorDocument && !isBinaryEditorDocument"
           :key="shell.activeEditorDocument.id"
           :document-key="shell.activeEditorDocument.id"
           variant="mockup"
@@ -637,8 +650,10 @@ watch(
           :git-chip="ideEditorStatusGitChip"
           :search-chip="ideEditorStatusSearchChip"
           :team-chip="ideEditorStatusTeamChip"
+          :problems-chip="ideEditorStatusProblemsChip"
           :agent-chip="ideEditorStatusAgentChip"
           @show-terminal="showTerminalPanel"
+          @show-problems="onShowProblems"
           @open-connectors="onOpenWatchConnectors"
           @open-source-control="onOpenSourceControl"
           @open-search="onOpenSearch"

@@ -144,6 +144,28 @@ class EffectiveExecutionPolicyTests(unittest.TestCase):
         self.assertEqual((), missing_contract.write_paths)
         self.assertEqual((), disjoint_task.write_paths)
 
+    def test_ops_dashboard_contract_grants_frontend_command_centre_writes(self) -> None:
+        allowed = (
+            "package.json",
+            "scripts/",
+            "server/",
+            "command-centre/",
+            "data/live/",
+            "data/exports/",
+            "docs/ops/",
+            "output/homework/",
+            "output/poems/",
+        )
+        policy = resolve_effective_policy(
+            role="frontend",
+            workspace_allowed_paths=allowed,
+            task_allowed_paths=None,
+        )
+
+        self.assertIn("command-centre", policy.write_paths)
+        self.assertTrue(any(path.startswith("output/") for path in policy.write_paths))
+        self.assertEqual("full", policy.execution_access)
+
     def test_employee_override_can_only_reduce_authority(self) -> None:
         override = AgentExecutionPolicyOverride(
             approved_wrapper_names=("console-web.sh", "curl"),

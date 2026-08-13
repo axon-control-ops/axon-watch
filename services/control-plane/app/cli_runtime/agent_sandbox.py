@@ -18,6 +18,13 @@ from app.cli_runtime.user_bin_path import existing_user_local_bin, sandbox_path_
 _SANDBOX_HOME = Path("/run/axon-agent-home")
 _SANDBOX_POLICY_ROOT = Path("/run/axon-agent-policy")
 _HOOK_TIMEOUT_SECONDS = 5
+# Cursor CLI atomically renames these under $HOME on startup. Bind-mounting the
+# host copies read-only (or sharing one mount across concurrent agents) surfaces
+# as EBUSY and fails every dispatch before work begins.
+CURSOR_WRITABLE_STATE_RELATIVE = (
+    ".cursor/cli-config.json",
+    ".cursor/agent-cli-state.json",
+)
 _SYSTEM_DIRS = ("/usr", "/bin", "/sbin", "/lib", "/lib64")
 _SYSTEM_FILES = (
     "/etc/group", "/etc/hosts", "/etc/ld.so.cache", "/etc/localtime",
@@ -50,6 +57,7 @@ class CursorHookMaterial:
     hook_script: Path
     workspace_scratch: Path
     workspace_codex_scratch: Path
+    sandbox_home: Path
 
 
 @dataclass(frozen=True)
@@ -237,12 +245,26 @@ def _write_immutable(path: Path, content: bytes, *, executable: bool = False) ->
     path.chmod(mode)
 
 
+def _seed_cursor_writable_state(*, user_home: Path, cursor_dir: Path) -> None:
+    """Copy host Cursor state into the per-run sandbox HOME as writable files."""
+    for relative in CURSOR_WRITABLE_STATE_RELATIVE:
+        source = user_home / relative
+        if not source.is_file():
+            continue
+        destination = cursor_dir / Path(relative).name
+        if destination.exists():
+            continue
+        shutil.copy2(source, destination)
+        destination.chmod(0o600)
+
+
 def materialize_cursor_hook_policy(
     *,
     policy: AgentSandboxPolicy,
     run_id: str,
     workspace_root: Path,
     policy_root: Path | None = None,
+    user_home: Path | None = None,
 ) -> CursorHookMaterial:
     """Create deterministic read-only hook files in host state, never the checkout."""
     cleaned_run_id = str(run_id or "").strip()
@@ -268,6 +290,8 @@ def materialize_cursor_hook_policy(
     generated_home = target / "home"
     cursor_dir = generated_home / ".cursor"
     cursor_dir.mkdir(mode=0o700, parents=True, exist_ok=True)
+    if user_home is not None:
+        _seed_cursor_writable_state(user_home=user_home.expanduser().resolve(), cursor_dir=cursor_dir)
     if (
         generated_home.is_symlink()
         or cursor_dir.is_symlink()
@@ -305,8 +329,8 @@ def materialize_cursor_hook_policy(
         _write_immutable(wrapper_dir / wrapper, proxy, executable=True)
 
     wrapper_dir.chmod(0o555)
-    cursor_dir.chmod(0o555)
-    generated_home.chmod(0o555)
+    cursor_dir.chmod(0o700)
+    generated_home.chmod(0o700)
     target.chmod(0o555)
     return CursorHookMaterial(
         policy_id=policy_id,
@@ -316,6 +340,7 @@ def materialize_cursor_hook_policy(
         hook_script=hook_path,
         workspace_scratch=workspace_scratch,
         workspace_codex_scratch=workspace_codex_scratch,
+        sandbox_home=generated_home,
     )
 
 
@@ -545,6 +570,12 @@ def build_bwrap_command(
             "--ro-bind",
             str(material_root),
             str(_SANDBOX_POLICY_ROOT),
+        ]
+    )
+    sandbox_home = hook_material.sandbox_home.resolve(strict=True)
+    arguments.extend(["--bind", str(sandbox_home), str(_SANDBOX_HOME)])
+    arguments.extend(
+        [
             "--ro-bind",
             str(hook_material.hooks_json),
             str(_SANDBOX_HOME / ".cursor" / "hooks.json"),
@@ -601,6 +632,7 @@ def wrap_command_in_agent_sandbox(
         run_id=run_id,
         workspace_root=workspace,
         policy_root=policy_root,
+        user_home=user_home,
     )
     wrapped = build_bwrap_command(
         cleaned,
@@ -613,7 +645,7 @@ def wrap_command_in_agent_sandbox(
     return SandboxLaunch(command=tuple(wrapped), hook_material=material)
 
 
-__all__ = ["AgentSandboxPolicy", "CursorHookMaterial", "SandboxConfigurationError",
+__all__ = ["AgentSandboxPolicy", "CURSOR_WRITABLE_STATE_RELATIVE", "CursorHookMaterial", "SandboxConfigurationError",
            "SandboxLaunch", "build_bwrap_command", "default_policy_root",
            "materialize_cursor_hook_policy", "require_bubblewrap",
            "wrap_command_in_agent_sandbox"]

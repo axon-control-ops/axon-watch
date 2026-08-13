@@ -161,6 +161,21 @@ describe('company-roster-failure-view', () => {
     ).toMatch(/usage/i);
   });
 
+  it('maps completion-gate failures to operator-friendly copy', () => {
+    const sorenLike = employee({
+      name: 'Soren',
+      role: 'integrations',
+      status: 'idle',
+      last_outcome: 'failed',
+      last_outcome_detail:
+        'Workspace delivery blocked by completion gate: Implementation requested but worker produced no changed files',
+    });
+    expect(employeeFailureLine(sorenLike)).toBe(
+      'Last job produced no file changes in the worker isolation checkout — not Composer Sandbox. Tap Try again with a narrower task, or reassign as report-only audit.',
+    );
+    expect(employeeDisplayStatus(sorenLike)).toBe('failed');
+  });
+
   it('maps restart-interrupted failures to operator-friendly copy', () => {
     const interrupted = employee({
       status: 'idle',
@@ -443,7 +458,9 @@ describe('company-roster-failure-view', () => {
           last_outcome_detail: 'vitest',
         }),
       ]),
-    ).toBe('Shell Craft — Last job failed: vitest');
+    ).toBe(
+      'Shell Craft — Last job failed: vitest Tap to open their dock and Try again.',
+    );
     expect(
       companyFailedEmployeesHint([
         employee({
@@ -487,7 +504,7 @@ describe('company-roster-failure-view', () => {
         }),
       ]),
     ).toBe(
-      '2 teammates need attention after a failed job — select one and tap Try again, or click to talk it through.',
+      '2 teammates need attention after a failed job — tap to open a failed teammate\'s dock and Try again.',
     );
   });
 

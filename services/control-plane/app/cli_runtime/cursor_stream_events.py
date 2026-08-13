@@ -103,6 +103,66 @@ def image_block_from_event(
     return "".join(blocks)
 
 
+_EDIT_FAILURE_FALLBACK = (
+    "Edit was rejected — the path may be outside your sandbox write scope, "
+    "the patch may not apply cleanly, or the file may be read-only."
+)
+
+
+def _edit_failure_reason(result: dict[str, Any]) -> str:
+    """Extract a human-readable edit failure from Cursor stream-json result shapes."""
+    reasons: list[str] = []
+    error = result.get("error")
+    if isinstance(error, dict):
+        for key in ("userMessage", "user_message", "agentMessage", "agent_message", "message"):
+            value = error.get(key)
+            if isinstance(value, str) and value.strip():
+                reasons.append(value.strip())
+                break
+        if not reasons:
+            nested = str(error.get("detail") or error.get("reason") or "").strip()
+            if nested:
+                reasons.append(nested)
+    elif isinstance(error, str) and error.strip():
+        reasons.append(error.strip())
+
+    for key in ("userMessage", "user_message", "agentMessage", "agent_message", "message", "reason", "detail"):
+        value = result.get(key)
+        if isinstance(value, str) and value.strip():
+            reasons.append(value.strip())
+
+    rejected = result.get("rejected")
+    if isinstance(rejected, dict):
+        for key in ("reason", "message", "detail"):
+            value = rejected.get(key)
+            if isinstance(value, str) and value.strip():
+                reasons.append(value.strip())
+
+    deduped: list[str] = []
+    seen: set[str] = set()
+    for reason in reasons:
+        normalized = " ".join(reason.split())
+        if normalized and normalized not in seen:
+            seen.add(normalized)
+            deduped.append(normalized)
+    return deduped[0] if deduped else _EDIT_FAILURE_FALLBACK
+
+
+def edit_block_from_tool_call(edit: dict[str, Any], workspace_root: str) -> str:
+    """Render a completed editToolCall as an edit or edit-failed fence."""
+    args = edit.get("args") if isinstance(edit.get("args"), dict) else {}
+    result = edit.get("result") if isinstance(edit.get("result"), dict) else {}
+    success = result.get("success") if isinstance(result.get("success"), dict) else None
+    path = _relative_path(str((success or args).get("path") or args.get("path") or ""), workspace_root)
+    if not isinstance(success, dict):
+        reason = _edit_failure_reason(result)
+        return f"\n:::edit-failed {path}\n{reason}\n:::\n"
+    added = int(success.get("linesAdded") or 0)
+    removed = int(success.get("linesRemoved") or 0)
+    diff = str(success.get("diffString") or "").strip()
+    return f"\n:::edit {path} +{added} -{removed}\n{diff}\n:::\n"
+
+
 def tool_block_from_event(
     event: dict[str, Any],
     workspace_root: str,
@@ -126,15 +186,7 @@ def tool_block_from_event(
 
     edit = tool_call.get("editToolCall")
     if isinstance(edit, dict):
-        args = edit.get("args") if isinstance(edit.get("args"), dict) else {}
-        success = (edit.get("result") or {}).get("success") if isinstance(edit.get("result"), dict) else None
-        path = _relative_path(str((success or args).get("path") or ""), workspace_root)
-        if not isinstance(success, dict):
-            return f"\n:::tool Edit failed {path}\n"
-        added = int(success.get("linesAdded") or 0)
-        removed = int(success.get("linesRemoved") or 0)
-        diff = str(success.get("diffString") or "").strip()
-        return f"\n:::edit {path} +{added} -{removed}\n{diff}\n:::\n"
+        return edit_block_from_tool_call(edit, workspace_root)
 
     read = tool_call.get("readToolCall")
     if isinstance(read, dict):
@@ -157,80 +209,10 @@ def tool_block_from_event(
         suffix = f" {target}" if target else ""
         return f"\n:::tool {label}{suffix}\n"
     return ""
-
-
-
 
 
 def collapse_echo_text(text: str) -> str:
     return collapse_duplicated_body(text)
-
-
-def _image_block_from_event(event: dict[str, Any], workspace_root: str) -> str:
-    paths = image_paths_from_tool_call_event(event)
-    if not paths:
-        return ""
-    blocks: list[str] = []
-    for raw_path in paths:
-        path = _relative_path(raw_path, workspace_root)
-        if path:
-            blocks.append(f"\n:::image {path}\n:::\n")
-    return "".join(blocks)
-
-
-def tool_block_from_event(
-    event: dict[str, Any],
-    workspace_root: str,
-    *,
-    open_query: str | None = None,
-) -> str:
-    if event.get("type") != "tool_call" or event.get("subtype") != "completed":
-        return ""
-    tool_call = event.get("tool_call")
-    if not isinstance(tool_call, dict):
-        return ""
-
-    research_block = research_completed_block_from_event(event, open_query=open_query)
-    if research_block:
-        return research_block
-
-    image_block = _image_block_from_event(event, workspace_root)
-    if image_block:
-        return image_block
-
-    edit = tool_call.get("editToolCall")
-    if isinstance(edit, dict):
-        args = edit.get("args") if isinstance(edit.get("args"), dict) else {}
-        success = (edit.get("result") or {}).get("success") if isinstance(edit.get("result"), dict) else None
-        path = _relative_path(str((success or args).get("path") or ""), workspace_root)
-        if not isinstance(success, dict):
-            return f"\n:::tool Edit failed {path}\n"
-        added = int(success.get("linesAdded") or 0)
-        removed = int(success.get("linesRemoved") or 0)
-        diff = str(success.get("diffString") or "").strip()
-        return f"\n:::edit {path} +{added} -{removed}\n{diff}\n:::\n"
-
-    read = tool_call.get("readToolCall")
-    if isinstance(read, dict):
-        args = read.get("args") if isinstance(read.get("args"), dict) else {}
-        path = _relative_path(str(args.get("path") or ""), workspace_root)
-        return f"\n:::tool Read {path}\n"
-
-    shell_completion = shell_completion_from_event(event)
-    if shell_completion is not None:
-        command, output = shell_completion
-        return terminal_block(command, output)
-
-    for key, value in tool_call.items():
-        if not key.endswith("ToolCall") or not isinstance(value, dict):
-            continue
-        label = key[: -len("ToolCall")].replace("_", " ").capitalize()
-        args = value.get("args") if isinstance(value.get("args"), dict) else {}
-        target = str(args.get("path") or args.get("command") or "").strip()
-        target = _relative_path(target, workspace_root)
-        suffix = f" {target}" if target else ""
-        return f"\n:::tool {label}{suffix}\n"
-    return ""
 
 
 

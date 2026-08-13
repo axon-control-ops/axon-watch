@@ -22,7 +22,15 @@ import {
   employeeTalkLine,
   employeeTalkLineDetailTooltip,
 } from '../../features/workspace-agents/company-roster-view';
+import {
+  failedShiftSubjectFromDecisionTitle,
+  pendingDecisionPrompt as resolvePendingDecisionPrompt,
+} from '../../features/workspace-agents/company-roster-focus';
 import { resolveEmployeeDeliveryLinks } from '../../features/workspace-agents/employee-delivery-handoff-view';
+import {
+  buildTeamPanelTranscriptLines,
+  type TeamPanelTranscriptLine,
+} from '../../lib/team-panel-transcript-view';
 
 const props = defineProps<{
   employee: CompanyEmployeeRecord;
@@ -42,6 +50,8 @@ const emit = defineEmits<{
   action: [action: TeamMemberQuickAction];
   talk: [];
   decision: [];
+  decisionOption: [option: { id: string; label: string }];
+  recoverFailure: [];
 }>();
 
 const avatar = computed(() =>
@@ -71,6 +81,9 @@ const deliveryLinks = computed(() =>
   }),
 );
 const liveBeat = computed(() => {
+  if (props.reporting) {
+    return 'Live shift in progress — activity streams below. Open the agent dock for full detail.';
+  }
   if (failure.value) {
     return failure.value;
   }
@@ -79,6 +92,19 @@ const liveBeat = computed(() => {
   }
   return employeeTalkLine(props.employee) || `${employeeStatusLabel(employeeDisplayStatus(props.employee))} on ${props.employee.owns || 'assigned work'}.`;
 });
+const transcriptLines = computed((): TeamPanelTranscriptLine[] => {
+  if (!props.reporting || !props.transcript?.trim()) {
+    return [];
+  }
+  return buildTeamPanelTranscriptLines(props.transcript, {
+    streaming: true,
+    maxLines: 14,
+  });
+});
+const showReceipt = computed(
+  () => Boolean(receiptDetail.value || receiptRunId.value) && !props.reporting,
+);
+const showDeliveryLinks = computed(() => Boolean(deliveryLinks.value) && !props.reporting);
 const receiptDetail = computed(() => employeeDockReceiptDetail(props.employee));
 const receiptRunId = computed(() => employeeDockReceiptRunId(props.employee));
 const receiptRunLabel = computed(() => employeeDockReceiptRunLabel(receiptRunId.value));
@@ -89,13 +115,17 @@ const displayActions = computed(() =>
   employeeDockDisplayActions(props.actions, props.employee),
 );
 const pendingDecision = computed(() => Boolean(props.employee.pending_decision_id));
-const pendingDecisionPrompt = computed(() =>
-  props.employee.pending_decision_prompt?.trim()
-  || props.employee.pending_decision_title?.replace(/^.+? needs a decision:\s*/i, '').trim()
-  || 'Review the pending decision',
+const pendingDecisionCopy = computed(
+  () => resolvePendingDecisionPrompt(props.employee) || 'Review the pending decision',
+);
+const pendingDecisionSubject = computed(() =>
+  failedShiftSubjectFromDecisionTitle(props.employee.pending_decision_title),
 );
 const pendingDecisionOptions = computed(() =>
   (props.employee.pending_decision_options ?? []).filter((option) => option.id && option.label).slice(0, 3),
+);
+const retryActionLabel = computed(
+  () => displayActions.value.find((action) => action.id === 'retry')?.label ?? 'Try again',
 );
 
 const transcriptRef = ref<HTMLElement | null>(null);
@@ -195,53 +225,97 @@ watch(
       </span>
     </header>
 
+    <div class="agent-persona-dock__body">
     <section
       v-if="pendingDecision"
       class="agent-persona-dock__decision-alert"
       aria-labelledby="agent-pending-decision-title"
     >
-      <span class="agent-persona-dock__decision-icon" aria-hidden="true">!</span>
-      <span class="agent-persona-dock__decision-copy">
-        <span class="agent-persona-dock__decision-kicker">Decision required</span>
-        <strong id="agent-pending-decision-title">{{ pendingDecisionPrompt }}</strong>
-        <small v-if="pendingDecisionOptions.length">
-          {{ pendingDecisionOptions.map((option) => option.label).join(' · ') }}
-        </small>
-      </span>
       <button
         type="button"
-        class="agent-persona-dock__decision-open"
-        :aria-label="`Review ${employee.name}’s pending decision`"
+        class="agent-persona-dock__decision-main"
+        :aria-label="`Review ${employee.name}'s pending decision in the agent composer`"
         @click="emit('decision')"
       >
-        Review decision →
+        <span class="agent-persona-dock__decision-icon" aria-hidden="true">!</span>
+        <span class="agent-persona-dock__decision-copy">
+          <span class="agent-persona-dock__decision-kicker">Decision required</span>
+          <strong id="agent-pending-decision-title">{{ pendingDecisionCopy }}</strong>
+          <small v-if="pendingDecisionSubject && pendingDecisionSubject.role !== (employee.role ?? '').trim().toLowerCase()">
+            {{ employee.name }} is holding this decision for {{ pendingDecisionSubject.name }} ({{ pendingDecisionSubject.role }})
+          </small>
+          <small v-else-if="pendingDecisionSubject">
+            Shift failure · {{ pendingDecisionSubject.name }} ({{ pendingDecisionSubject.role }})
+          </small>
+          <small v-else-if="pendingDecisionOptions.length">
+            {{ pendingDecisionOptions.map((option) => option.label).join(' · ') }}
+          </small>
+        </span>
+        <span class="agent-persona-dock__decision-open">Review in composer →</span>
       </button>
+      <div
+        v-if="pendingDecisionOptions.length"
+        class="agent-persona-dock__decision-options"
+        role="group"
+        :aria-label="`Decision options for ${employee.name}`"
+      >
+        <button
+          v-for="option in pendingDecisionOptions"
+          :key="option.id"
+          type="button"
+          class="agent-persona-dock__decision-option"
+          @click="emit('decisionOption', option)"
+        >
+          {{ option.label }}
+        </button>
+      </div>
     </section>
 
-    <p
-      class="agent-persona-dock__beat"
+    <button
+      v-if="failure"
+      type="button"
+      class="agent-persona-dock__beat agent-persona-dock__beat-btn"
       :class="{
-        'agent-persona-dock__beat--failed': !!failure && !interruptedShift,
-        'agent-persona-dock__beat--interrupted': !!failure && interruptedShift,
+        'agent-persona-dock__beat--failed': !interruptedShift,
+        'agent-persona-dock__beat--interrupted': interruptedShift,
       }"
       :title="beatDetailTooltip ?? undefined"
-      :aria-label="failureBeatAriaLabel ?? undefined"
-      :aria-live="failure ? 'polite' : undefined"
+      :aria-label="`${failureBeatAriaLabel ?? liveBeat}. Tap to ${retryActionLabel}.`"
+      @click="emit('recoverFailure')"
+    >
+      {{ liveBeat }}
+      <span class="agent-persona-dock__beat-cta">{{ retryActionLabel }} →</span>
+    </button>
+    <p
+      v-else
+      class="agent-persona-dock__beat"
+      :class="{ 'agent-persona-dock__beat--live': reporting }"
+      :title="beatDetailTooltip ?? undefined"
       role="status"
     >
       {{ liveBeat }}
     </p>
 
-    <div
-      v-if="reporting && transcript"
+    <ul
+      v-if="transcriptLines.length"
       ref="transcriptRef"
-      class="agent-persona-dock__transcript"
-      aria-label="Live report transcript"
+      class="agent-persona-dock__transcript-list"
+      aria-label="Live shift activity"
       aria-live="polite"
-    >{{ transcript }}</div>
+    >
+      <li
+        v-for="line in transcriptLines"
+        :key="line.id"
+        class="agent-persona-dock__transcript-line"
+        :data-kind="line.kind"
+        :data-live="line.live ? 'true' : undefined"
+      >
+        {{ line.text }}
+      </li>
+    </ul>
 
     <div
-      v-if="deliveryLinks"
+      v-if="showDeliveryLinks"
       class="agent-persona-dock__delivery-links"
       aria-label="Open pull request and CI"
     >
@@ -270,7 +344,7 @@ watch(
       </a>
     </div>
 
-    <section v-if="receiptDetail || receiptRunId" class="agent-persona-dock__receipt">
+    <section v-if="showReceipt" class="agent-persona-dock__receipt">
       <p class="agent-persona-dock__receipt-label">Last job</p>
       <p v-if="receiptDetail" class="agent-persona-dock__receipt-detail">
         {{ receiptDetail }}
@@ -292,6 +366,7 @@ watch(
         <span v-else :title="receiptRunId">{{ receiptRunLabel || receiptRunId }}</span>
       </p>
     </section>
+    </div>
 
     <div
       v-if="displayActions.length"

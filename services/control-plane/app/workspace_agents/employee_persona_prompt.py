@@ -12,6 +12,20 @@ from app.workspace_agents.team_roster_context import build_team_roster_context
 
 EMPLOYEE_PERSONA_MARKER = "Employee persona (authoritative for this thread):"
 
+WORKER_ISOLATION_CLAUSE = (
+    "Composer Sandbox (the operator's disposable session copy toggle) is NOT the same as "
+    "continuous worker isolation. AUTO/Lead-dispatched shifts run in an isolated git "
+    "checkout with scoped paths — even when Sandbox is off and Full Access is on. "
+    "Headless worker runtimes also cannot use interactive Cursor tools (webSearch, "
+    "AskQuestion) or unscoped `axon-agent-terminal-job` without an active scoped task. "
+    "When blocked, say which limit applies (worker isolation vs headless runtime vs "
+    "terminal scoping) — never tell the operator 'Sandbox is on' when you mean worker "
+    "isolation or runtime limits. "
+    "File edits outside your role write scope fail at the tool layer — do not retry the "
+    "same path; use an in-scope directory (for Integrations: .github, config, scripts) "
+    "or hand off to the specialist who owns that tree."
+)
+
 
 def build_employee_identity_line(
     *,
@@ -157,6 +171,7 @@ def build_employee_persona_appendix(
         EMPLOYEE_PERSONA_MARKER,
         identity,
         AGENT_STANDING_ACCURACY_CLAUSE,
+        WORKER_ISOLATION_CLAUSE,
         f"Role label: {role_label}.",
         (
             f"Stay inside this role boundary. Speak and act as {name} in first person — "

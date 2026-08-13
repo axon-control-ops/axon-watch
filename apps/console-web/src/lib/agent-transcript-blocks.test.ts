@@ -312,6 +312,28 @@ describe('parseAgentTranscriptBlocks', () => {
       { kind: 'text', text: 'Just a reply' },
     ]);
   });
+
+  it('parses edit-failed fences and legacy tool labels', () => {
+    const content = [
+      ':::edit-failed tests/test_foo.py',
+      'Sandbox policy denied write to tests/test_foo.py',
+      ':::',
+      '',
+      ':::tool Edit failed scripts/workflow/foo.mjs',
+    ].join('\n');
+    const segments = parseAgentTranscriptBlocks(content);
+    expect(segments[0]).toEqual({
+      kind: 'edit-failed',
+      path: 'tests/test_foo.py',
+      reason: 'Sandbox policy denied write to tests/test_foo.py',
+    });
+    expect(segments[1]).toEqual({
+      kind: 'edit-failed',
+      path: 'scripts/workflow/foo.mjs',
+      reason: 'Edit was rejected (path may be outside write scope or patch did not apply).',
+    });
+    expect(agentContentHasTranscriptBlocks(content)).toBe(true);
+  });
 });
 
 describe('diffLineTone', () => {

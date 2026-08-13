@@ -203,20 +203,32 @@ export function shouldOfferMarkdownPreview(content: string): boolean {
 
 /** Rich agent prose renders as inline markdown — not interim status or read_file stubs. */
 export function shouldUseAgentMarkdownBlock(content: string, isComplete = true): boolean {
+  return shouldRenderAgentProseMarkdown(content, { isComplete });
+}
+
+/** Agent dock prose lane — complete replies always render as markdown unless error/read_file. */
+export function shouldRenderAgentProseMarkdown(
+  content: string,
+  options: { isComplete?: boolean; isErrorDump?: boolean } = {},
+): boolean {
   const trimmed = content.trim();
-  if (!trimmed) {
-    return false;
-  }
-  if (!isComplete && isInterimAgentStatus(trimmed)) {
-    return false;
-  }
-  if (isInterimAgentStatus(trimmed)) {
+  if (!trimmed || options.isErrorDump) {
     return false;
   }
   if (isMarkdownFileAgentResponse(trimmed)) {
     return false;
   }
-  return true;
+  const isComplete = options.isComplete !== false;
+  if (!isComplete && isInterimAgentStatus(trimmed)) {
+    return false;
+  }
+  if (isComplete) {
+    return true;
+  }
+  if (isInterimAgentStatus(trimmed)) {
+    return false;
+  }
+  return agentMessageLooksLikeMarkdown(trimmed) || trimmed.length >= 120;
 }
 
 const MD_FILE_HEADING_RE = /^#{1,6}\s+(.+\.md)\s*$/im;

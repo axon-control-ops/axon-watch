@@ -327,7 +327,7 @@ describe('buildIdeQuickGuide', () => {
       terminalVisible: true,
       failedEmployeeCount: 2,
       failedEmployeesHint:
-        '2 teammates need attention after a failed job — select one and tap Try again, or click to talk it through.',
+        '2 teammates need attention after a failed job — tap to open a failed teammate\'s dock and Try again.',
     });
 
     expect(guide?.tone).toBe('failure');
@@ -396,6 +396,19 @@ describe('buildIdeQuickGuide', () => {
     expect(guide?.title).not.toContain('Workspace files failed to load');
   });
 
+  it('surfaces workbench problems guidance when the terminal panel is hidden', () => {
+    const guide = buildIdeQuickGuide({
+      ...base,
+      problemCount: 2,
+      terminalVisible: false,
+    });
+
+    expect(guide?.tone).toBe('attention');
+    expect(guide?.title).toContain('2 problems reported');
+    expect(guide?.actions).toEqual([{ id: 'show-problems', label: 'Show problems' }]);
+    expect(guide?.steps.join(' ')).toContain('Problems tab');
+  });
+
   it('keeps unsaved-file guidance above search load-failure nudges', () => {
     expect(
       buildIdeQuickGuide({
@@ -446,6 +459,9 @@ describe('ideQuickGuideActionAriaLabel', () => {
     expect(
       ideQuickGuideActionAriaLabel({ id: 'show-terminal', label: 'Show terminal' }),
     ).toContain('below the editor');
+    expect(
+      ideQuickGuideActionAriaLabel({ id: 'show-problems', label: 'Show problems' }),
+    ).toContain('Problems tab');
     expect(
       ideQuickGuideActionAriaLabel({ id: 'retry-employee-shift', label: 'Continue' }),
     ).toContain('agent dock composer');

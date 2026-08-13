@@ -67,7 +67,16 @@ class AgentSandboxTests(unittest.TestCase):
             run_id="run-sandbox-1",
             workspace_root=self.workspace,
             policy_root=self.policy_root,
+            user_home=self.home,
         )
+
+    def test_materialize_seeds_writable_cursor_state(self) -> None:
+        config = self.home / ".cursor" / "cli-config.json"
+        config.write_text('{"version":1}', encoding="utf-8")
+        material = self._material()
+        seeded = material.sandbox_home / ".cursor" / "cli-config.json"
+        self.assertTrue(seeded.is_file())
+        self.assertEqual('{"version":1}', seeded.read_text(encoding="utf-8"))
 
     def test_no_policy_leaves_command_unwrapped(self) -> None:
         with patch(

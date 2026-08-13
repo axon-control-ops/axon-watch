@@ -2,6 +2,7 @@
 @import './editor-statusbar-panels.css';
 @import './editor-statusbar-meta.css';
 @import './center-workbench-ide-guide.css';
+@import './center-workbench-empty-editor.css';
 @import './center-workbench-editor-flex.css';
 @import './mockup-shell-07-monaco.css';
 .editor-tabbar__tab-select {

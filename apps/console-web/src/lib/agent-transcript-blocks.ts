@@ -27,7 +27,7 @@ import {
 
 export function agentContentHasTranscriptBlocks(content: string): boolean {
   if (
-    /^:::(thinking|edit|tool|plan|ask|terminal|research|image|debug-reproduce|lead-fan-out)\b/m.test(
+    /^:::(thinking|edit|edit-failed|tool|plan|ask|terminal|research|image|debug-reproduce|lead-fan-out)\b/m.test(
       content,
     )
   ) {

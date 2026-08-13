@@ -122,7 +122,7 @@ export class BrainGalaxyScene {
     try {
       this.renderer = new WebGLRenderer({
         antialias: true,
-        alpha: true,
+        alpha: false,
         failIfMajorPerformanceCaveat: false,
       });
     } catch {

@@ -147,8 +147,24 @@
   color: rgba(255, 170, 150, 0.92);
 }
 
+.company-roster__hint--decision {
+  color: rgba(255, 232, 172, 0.96);
+  border: 1px solid rgba(255, 202, 82, 0.45);
+  background: rgba(94, 57, 14, 0.28);
+}
+
+.company-roster__hint--decision:hover,
+.company-roster__hint--decision:focus-visible {
+  color: rgba(255, 244, 212, 1);
+  border-color: rgba(255, 211, 102, 0.72);
+  background: rgba(112, 69, 17, 0.42);
+}
+
 .company-roster__hint--action {
-  display: block;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  overflow: hidden;
   width: 100%;
   margin: 0.4rem 0 0;
   text-align: left;

@@ -5,6 +5,7 @@ import {
   buildIdeEditorStatusAgentChip,
   buildIdeEditorStatusConnectorChip,
   buildIdeEditorStatusGitChip,
+  buildIdeEditorStatusProblemsChip,
   buildIdeEditorStatusSearchChip,
   buildIdeEditorStatusTeamChip,
   buildIdeEditorStatusTerminalChip,
@@ -413,5 +414,37 @@ describe('buildIdeEditorStatusAgentChip', () => {
       alive: true,
     });
     expect(chip?.title).toContain('Speaking');
+  });
+});
+
+describe('buildIdeEditorStatusProblemsChip', () => {
+  it('shows a compact problems chip when the terminal panel is hidden', () => {
+    expect(
+      buildIdeEditorStatusProblemsChip({
+        problemCount: 2,
+        terminalVisible: false,
+      }),
+    ).toEqual({
+      label: '2 PROBLEMS',
+      title: 'Workbench problems — open the Problems tab in the terminal dock',
+      ariaLabel:
+        '2 PROBLEMS. Workbench problems — open the Problems tab in the terminal dock.',
+      count: 2,
+    });
+  });
+
+  it('hides when the terminal is visible or there are no problems', () => {
+    expect(
+      buildIdeEditorStatusProblemsChip({
+        problemCount: 1,
+        terminalVisible: true,
+      }),
+    ).toBeNull();
+    expect(
+      buildIdeEditorStatusProblemsChip({
+        problemCount: 0,
+        terminalVisible: false,
+      }),
+    ).toBeNull();
   });
 });

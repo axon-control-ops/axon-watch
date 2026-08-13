@@ -4,7 +4,11 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from app.cli_runtime.agent_sandbox import AgentSandboxPolicy
+from app.cli_runtime.agent_dispatch_preflight import validate_agent_dispatch_preflight
+from app.cli_runtime.agent_sandbox import (
+    CURSOR_WRITABLE_STATE_RELATIVE,
+    AgentSandboxPolicy,
+)
 from app.workspace_agents.execution_policy import AgentExecutionPolicy
 
 
@@ -17,8 +21,6 @@ from app.workspace_agents.execution_policy import AgentExecutionPolicy
 # regardless of host login state.
 _AUTH_PATH_CANDIDATES: dict[str, tuple[str, ...]] = {
     "cursor": (
-        ".cursor/cli-config.json",
-        ".cursor/agent-cli-state.json",
         ".config/cursor/auth.json",
     ),
     "claude": (".claude/.credentials.json",),
@@ -40,7 +42,10 @@ def _runtime_paths(binary: str, *, family: str) -> tuple[str, ...]:
         # codex's own error handling reports as "Missing optional dependency"
         # even though the real, unsandboxed install has it.
         paths.append(executable.parent.parent)
+    writable_state = set(CURSOR_WRITABLE_STATE_RELATIVE)
     for relative in _AUTH_PATH_CANDIDATES.get(family, ()):
+        if relative in writable_state:
+            continue
         candidate = home / relative
         if candidate.is_file():
             paths.append(candidate)
@@ -113,6 +118,11 @@ def prepare_execution_sandbox(
         # sandbox materializes below. Its optional auth.json is read-only bound
         # there by AgentSandboxPolicy.codex_auth_path.
         sandbox_env["CODEX_HOME"] = "/run/axon-agent-home/.codex"
+    validate_agent_dispatch_preflight(
+        family=family,
+        runtime_binary=runtime_binary,
+        sandbox_policy=policy_value,
+    )
     return sandbox_env, policy_value
 
 

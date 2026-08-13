@@ -11,6 +11,7 @@ import {
   isOperatorStoppedFailure,
   isRestartInterruptedFailure,
   isRuntimeAuthFailure,
+  isCompletionGateFailure,
   isRuntimeAuthProbeFailure,
   isShiftContinuationFailure,
   isUsageLimitFailure,
@@ -86,6 +87,12 @@ export function employeeFailureLine(
     }
     if (isRuntimeAuthFailure(employee.last_outcome_detail)) {
       return 'Last job could not run — login is not ready. Run `cursor agent login` on the host or unlock /vault, then tap Try again.';
+    }
+    if (isCompletionGateFailure(employee.last_outcome_detail)) {
+      return (
+        'Last job produced no file changes in the worker isolation checkout — ' +
+        'not Composer Sandbox. Tap Try again with a narrower task, or reassign as report-only audit.'
+      );
     }
     return `Last job failed: ${truncateFailureDetail(detail)}`;
   }
@@ -280,11 +287,19 @@ export function companyFailedEmployeesHint(
       liveBusy: liveBusyEmployeeIds?.includes(row.employee_id),
     });
     if (line) {
-      return `${name} — ${line}`;
+      if (employeeShiftNeedsContinuation(row)) {
+        return `${name} — ${line}`;
+      }
+      // Keep the alert scannable in narrow team rails — full detail stays in title/tooltip.
+      const compact = `${name} — last job needs attention. Tap to open dock and Try again.`;
+      if (line.length > 96) {
+        return compact;
+      }
+      return `${name} — ${line} Tap to open their dock and Try again.`;
     }
-    return `${name}'s last job failed — select them and tap Try again, or click to talk it through.`;
+    return `${name}'s last job failed — tap to open their dock and Try again.`;
   }
-  return `${failed.length} teammates need attention after a failed job — select one and tap Try again, or click to talk it through.`;
+  return `${failed.length} teammates need attention after a failed job — tap to open a failed teammate's dock and Try again.`;
 }
 
 /** Hover title for the roster alert hint when a single teammate failed with truncated detail. */
@@ -345,8 +360,8 @@ export function buildCompanyRosterAlertBadge(
 
     return {
       label: '1 failed',
-      title: '1 teammate needs attention after a failed job',
-      ariaLabel: 'Jump to 1 failed teammate',
+      title: '1 teammate needs attention — tap to open their dock, then Try again',
+      ariaLabel: 'Open failed teammate dock to retry',
       tone: 'failure',
     };
   }
@@ -363,8 +378,8 @@ export function buildCompanyRosterAlertBadge(
   if (interruptedCount === 0) {
     return {
       label: `${count} failed`,
-      title: `${count} teammates need attention after a failed job`,
-      ariaLabel: `Jump to ${count} failed teammates`,
+      title: `${count} teammates need attention — tap to open a failed dock, then Try again`,
+      ariaLabel: `Open failed teammate dock to retry (${count})`,
       tone: 'failure',
     };
   }

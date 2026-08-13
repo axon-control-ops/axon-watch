@@ -88,21 +88,6 @@ export function createKairoVoiceSlice(input: CreateKairoVoiceSliceInput) {
 
   function voiceDeliveryAllowed(): boolean {
     if (typeof document !== 'undefined' && document.visibilityState === 'hidden') {
-      // #region agent log
-      fetch('http://127.0.0.1:7706/ingest/90bcaec2-2b39-4d4a-84b5-157c12735440', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '9e41d8' },
-        body: JSON.stringify({
-          sessionId: '9e41d8',
-          runId: 'post-fix',
-          hypothesisId: 'H6_cross_context',
-          location: 'create-kairo-voice-slice.ts:voiceDeliveryAllowed',
-          message: 'voice delivery rejected for hidden document',
-          data: { documentVisibility: document.visibilityState },
-          timestamp: Date.now(),
-        }),
-      }).catch(() => {});
-      // #endregion agent log
       return false;
     }
     return ideVoiceSpeechAllowed({
@@ -164,28 +149,6 @@ export function createKairoVoiceSlice(input: CreateKairoVoiceSliceInput) {
   ): Promise<void> {
     const trimmed = line.trim();
     const configuredNarration = input.operatorPresenceSettings.value.kairo_narration ?? 'minimal';
-    // #region agent log
-    fetch('http://127.0.0.1:7706/ingest/90bcaec2-2b39-4d4a-84b5-157c12735440', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '9e41d8' },
-      body: JSON.stringify({
-        sessionId: '9e41d8',
-        hypothesisId: 'H4_conversation_channel',
-        location: 'create-kairo-voice-slice.ts:speakKairoConversationLine',
-        message: 'conversation-channel speech requested',
-        data: {
-          priority: options?.priority ?? 'conversation',
-          speakerId: options?.speaker?.id ?? null,
-          operatorPrompt: options?.operatorPrompt?.slice(0, 80) ?? '',
-          textPreview: trimmed.slice(0, 180),
-          skipSpeakApi: options?.skipSpeakApi === true,
-          documentVisibility:
-            typeof document === 'undefined' ? null : document.visibilityState,
-        },
-        timestamp: Date.now(),
-      }),
-    }).catch(() => {});
-    // #endregion agent log
     if (
       !trimmed ||
       !voiceDeliveryAllowed() ||

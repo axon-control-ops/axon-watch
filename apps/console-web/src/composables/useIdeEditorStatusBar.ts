@@ -18,10 +18,12 @@ import {
   buildIdeEditorStatusAgentChip,
   buildIdeEditorStatusConnectorChip,
   buildIdeEditorStatusGitChip,
+  buildIdeEditorStatusProblemsChip,
   buildIdeEditorStatusSearchChip,
   buildIdeEditorStatusTeamChip,
   buildIdeEditorStatusTerminalChip,
 } from '../lib/ide-editor-status-view';
+import { buildWorkbenchProblemItems } from '../lib/workbench-problem-items';
 import { navigateToSettingsSection } from '../lib/settings-section-route';
 import { runEmployeeShiftRetry } from '../lib/run-employee-shift-retry';
 import { useShellStore } from '../stores/shell';
@@ -100,6 +102,13 @@ export function useIdeEditorStatusBar(input: {
     }),
   );
 
+  const ideEditorStatusProblemsChip = computed(() =>
+    buildIdeEditorStatusProblemsChip({
+      problemCount: buildWorkbenchProblemItems(shell).length,
+      terminalVisible: terminalPanelVisible.value,
+    }),
+  );
+
   const ideQuickGuide = computed(() => {
     const watchConnected = shell.runtimeSummary?.watch.connected ?? false;
     const employee = shell.activeIdeEmployeeRecord;
@@ -141,6 +150,7 @@ export function useIdeEditorStatusBar(input: {
       workspaceFilesLoadState: shell.workspaceFilesLoadState,
       searchExpanded: searchExpanded.value,
       teamExpanded: teamExpanded.value,
+      problemCount: buildWorkbenchProblemItems(shell).length,
     });
   });
 
@@ -151,6 +161,7 @@ export function useIdeEditorStatusBar(input: {
     ideEditorStatusGitChip,
     ideEditorStatusSearchChip,
     ideEditorStatusTeamChip,
+    ideEditorStatusProblemsChip,
     ideQuickGuide,
   };
 }
@@ -289,6 +300,11 @@ export function handleIdeQuickGuideAction(
 
   if (actionId === 'retry-employee-shift') {
     void openEmployeeShiftRetry(input);
+    return;
+  }
+
+  if (actionId === 'show-problems') {
+    input.shell.revealIdeWorkbenchProblems();
     return;
   }
 

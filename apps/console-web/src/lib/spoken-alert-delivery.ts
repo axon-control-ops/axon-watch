@@ -205,28 +205,6 @@ export async function deliverSpokenOperatorAlert(
   storage: Pick<Storage, 'getItem' | 'setItem'> = defaultSpokenAlertStorage(),
   options: DeliverSpokenAlertOptions = {},
 ): Promise<SpokenAlertDeliveryChannel> {
-  // #region agent log
-  fetch('http://127.0.0.1:7706/ingest/90bcaec2-2b39-4d4a-84b5-157c12735440', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '9e41d8' },
-    body: JSON.stringify({
-      sessionId: '9e41d8',
-      hypothesisId: 'H5_alert_narration_channel',
-      location: 'spoken-alert-delivery.ts:deliverSpokenOperatorAlert',
-      message: 'alert/narration-channel speech requested',
-      data: {
-        priority: options.priority ?? 'alert',
-        speakerId: options.speaker?.id ?? null,
-        reason: alert.reason,
-        signalId: alert.signal_id,
-        textPreview: alert.message.slice(0, 180),
-        documentVisibility:
-          typeof document === 'undefined' ? null : document.visibilityState,
-      },
-      timestamp: Date.now(),
-    }),
-  }).catch(() => {});
-  // #endregion agent log
   if (options.dedupe !== false && !shouldSpeakAlert(alert, storage)) {
     return 'skipped';
   }

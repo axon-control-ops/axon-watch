@@ -1,4 +1,5 @@
 export const EDIT_HEADER_RE = /^:::edit\s+(.+?)\s+\+(\d+)\s+-(\d+)\s*$/;
+export const EDIT_FAILED_HEADER_RE = /^:::edit-failed\s+(.+)$/;
 export const TOOL_HEADER_RE = /^:::tool\s+(.+)$/;
 export const PLAN_HEADER_RE = /^:::plan\s+(plan_[a-f0-9]{12})\s+(.+)$/;
 export const LEAD_FAN_OUT_HEADER_RE = /^:::lead-fan-out(?:\s+(.+))?$/;

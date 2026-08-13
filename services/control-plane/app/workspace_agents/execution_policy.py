@@ -180,6 +180,25 @@ _ROLE_SAFE_TASK_SCOPE_EXPANSIONS: dict[str, tuple[tuple[str, frozenset[str]], ..
     # expansion stays bounded by the role baseline and workspace contract below.
     "frontend": (("hooks", _FRONTEND_UI_SCOPE_MARKERS),),
 }
+# Node/Express ops workspaces (Young Eagles command centre) store UI under
+# command-centre/ and printable assets under output/, not apps/src/components.
+_OPS_FRONTEND_WRITE_ROOTS = frozenset({"command-centre", "output"})
+
+
+def _ops_frontend_write_paths_for_workspace(
+    workspace_allowed_paths: Iterable[str] | None,
+) -> tuple[str, ...]:
+    """Grant Frontend write scope for ops-dashboard trees when the contract uses them."""
+    if not workspace_allowed_paths:
+        return ()
+    workspace_scope = _normalize_paths(workspace_allowed_paths)
+    workspace_roots = {
+        path if path == "." else path.split("/", 1)[0] for path in workspace_scope
+    }
+    if "command-centre" not in workspace_roots:
+        return ()
+    candidates = _normalize_paths(tuple(sorted(_OPS_FRONTEND_WRITE_ROOTS)))
+    return _intersect_path_scopes(candidates, workspace_scope)
 
 
 def role_execution_policy(role: str) -> AgentExecutionPolicy:
@@ -349,6 +368,9 @@ def resolve_effective_policy(
     forbidden = _ordered_union(
         forbidden, _normalize_strings(workspace_forbidden_path_globs or ())
     )
+
+    if not write_paths and _normalize_name(role) == "frontend":
+        write_paths = _ops_frontend_write_paths_for_workspace(workspace_allowed_paths)
 
     if not write_paths:
         execution_access = "consultative"

@@ -85,7 +85,11 @@ describe('sandbox session view', () => {
       composerAccessMenuStatus({ fullAccess: true, sandboxEnabled: true }),
     ).toEqual({
       executionLine: 'Full Access active — tools after approval',
-      sandboxLine: 'Sandbox on — disposable copy',
+      sandboxLine: 'Sandbox on — disposable session copy',
+      workerIsolationLine: 'Company workers still use isolated git checkouts for AUTO shifts',
     });
+    expect(
+      composerAccessMenuStatus({ fullAccess: true, sandboxEnabled: false }).workerIsolationLine,
+    ).toContain('isolated checkouts');
   });
 });

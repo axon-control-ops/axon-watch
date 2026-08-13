@@ -41,6 +41,8 @@ import { requestIdeComposerMode } from '../../lib/ide-composer-restore-request';
 import { employeeVoiceSpeaker } from '../../lib/kairo-voice-utterance';
 import { runEmployeeShiftRetry } from '../../lib/run-employee-shift-retry';
 import { navigateToSettingsSection } from '../../lib/settings-section-route';
+import { buildPendingDecisionComposerDraft, companyPendingDecisionHint } from '../../features/workspace-agents/company-roster-focus';
+import { submitQuestionAnswer } from '../../lib/submit-question-answer';
 import { useCompanyRosterControlActions } from '../../composables/use-company-roster-control-actions';
 import { useCompanyRosterQuickActionState } from '../../composables/use-company-roster-quick-action-state';
 import { useShellStore } from '../../stores/shell';
@@ -121,6 +123,7 @@ watch(
       scrollDockIntoView();
     }
   },
+  { immediate: true },
 );
 
 watch(
@@ -209,6 +212,8 @@ const rosterAlertBadge = computed(() =>
 const busyCount = computed(() => liveBusyEmployeeIds.value.length);
 
 const pendingDecisionEmployees = computed(() => employees.value.filter((employee) => employee.pending_decision_id));
+
+const pendingDecisionHint = computed(() => companyPendingDecisionHint(employees.value));
 
 const busyBadgeLabel = computed(() => {
   if (!employees.value.length) {
@@ -354,16 +359,69 @@ async function focusFailedEmployee(): Promise<void> {
   selectEmployee(target);
   presenceStripRef.value?.focusEmployee(target.employee_id);
   await shell.openOrFocusEmployeeIdeThread(target);
+  shell.openIdeComposer({ keepActivityView: true });
+  focusAgentDockComposerInput();
   scrollDockIntoView();
 }
 
 async function focusPendingDecisionEmployee(employee?: CompanyEmployeeRecord): Promise<void> {
   const target = employee?.pending_decision_id ? employee : pendingDecisionEmployees.value[0];
-  if (!target) return;
+  if (!target) {
+    return;
+  }
   selectEmployee(target);
   presenceStripRef.value?.focusEmployee(target.employee_id);
-  await shell.openOrFocusEmployeeIdeThread(target);
+
+  shell.setIdeActivityView('agent');
+  const threadId = await shell.openOrFocusEmployeeIdeThread(target);
+  if (!threadId) {
+    shell.commandMutationError = 'Could not open the teammate thread for this decision.';
+    return;
+  }
+
+  const draft = buildPendingDecisionComposerDraft(target);
+  if (draft) {
+    shell.openIdeComposerWithDraft(draft, { keepActivityView: true });
+  } else {
+    shell.openIdeComposer({ keepActivityView: true });
+  }
+  focusAgentDockComposerInput();
   scrollDockIntoView();
+}
+
+async function applyPendingDecisionOption(
+  employee: CompanyEmployeeRecord,
+  option: { id: string; label: string },
+): Promise<void> {
+  if (!employee.pending_decision_id || !option.id?.trim()) {
+    return;
+  }
+  selectEmployee(employee);
+  presenceStripRef.value?.focusEmployee(employee.employee_id);
+  shell.setIdeActivityView('agent');
+  const threadId = await shell.openOrFocusEmployeeIdeThread(employee);
+  if (!threadId) {
+    shell.commandMutationError = 'Could not open the teammate thread for this decision.';
+    return;
+  }
+  await submitQuestionAnswer(shell, {
+    workspaceId: currentWorkspaceId.value,
+    option,
+    prompt:
+      employee.pending_decision_prompt?.trim()
+      || employee.pending_decision_title?.replace(/^.+? needs a decision:\s*/i, '').trim()
+      || undefined,
+  });
+  focusAgentDockComposerInput();
+  scrollDockIntoView();
+}
+
+async function recoverSelectedEmployeeFailure(): Promise<void> {
+  const target = selectedEmployee.value;
+  if (!target || !employeeFailureLine(target)) {
+    return;
+  }
+  await startChat(target, 'retry');
 }
 
 async function onPresenceSelect(employee: CompanyEmployeeRecord): Promise<void> {
@@ -427,6 +485,14 @@ async function onPresenceSelect(employee: CompanyEmployeeRecord): Promise<void> 
           Fleet controls
         </button>
       </div>
+      <button
+        v-if="pendingDecisionHint"
+        type="button"
+        class="company-roster__hint company-roster__hint--alert company-roster__hint--action company-roster__hint--decision"
+        @click="focusPendingDecisionEmployee()"
+      >
+        {{ pendingDecisionHint }}
+      </button>
       <button
         v-if="hasFailedEmployees && failedEmployeesHint"
         type="button"
@@ -492,6 +558,8 @@ async function onPresenceSelect(employee: CompanyEmployeeRecord): Promise<void> 
           :transcript="selectedEmployeeIsReporting ? shell.latestWorkspaceAgentOutput ?? '' : ''"
           @talk="void startChat(selectedEmployee, 'talk')"
           @decision="void focusPendingDecisionEmployee(selectedEmployee)"
+          @decision-option="void applyPendingDecisionOption(selectedEmployee, $event)"
+          @recover-failure="void recoverSelectedEmployeeFailure()"
           @action="onQuickAction(selectedEmployee, $event)"
         />
       </div>

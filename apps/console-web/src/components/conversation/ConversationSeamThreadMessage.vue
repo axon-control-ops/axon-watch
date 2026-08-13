@@ -17,7 +17,7 @@ import { thinkingPreview, agentContentHasTranscriptBlocks } from '../../lib/agen
 import {
   isMarkdownFileAgentResponse,
   shouldHideAgentReportInThread,
-  shouldUseAgentMarkdownBlock,
+  shouldRenderAgentProseMarkdown,
 } from '../../lib/agent-message-markdown';
 import { createTranscriptSegmentCache } from '../../lib/conversation-transcript-segment-cache';
 import { sanitizeAgentThinkingForOperator, THINKING_SPEECH_FALLBACK } from '../../lib/agent-live-line-view';
@@ -38,6 +38,7 @@ import AgentMarkdownBlock from '../ide/AgentMarkdownBlock.vue';
 import AgentFileReadBlock from '../ide/AgentFileReadBlock.vue';
 import ConversationAgentStructuredBlock from '../ide/ConversationAgentStructuredBlock.vue';
 import AgentEditBlock from '../ide/AgentEditBlock.vue';
+import AgentEditFailedBlock from '../ide/AgentEditFailedBlock.vue';
 import AgentImageBlock from '../ide/AgentImageBlock.vue';
 import IdeActivityIcon from '../ide/IdeActivityIcon.vue';
 import ConversationSeamTerminalBlock from './ConversationSeamTerminalBlock.vue';
@@ -121,7 +122,7 @@ async function onRegenerate(): Promise<void> {
 }
 
 function isMarkdownBlock(content: string, isComplete = true): boolean {
-  return shouldUseAgentMarkdownBlock(content, isComplete) && !isErrorDump(content);
+  return shouldRenderAgentProseMarkdown(content, { isComplete, isErrorDump: isErrorDump(content) });
 }
 
 function isMarkdownFileBlock(content: string): boolean {
@@ -422,6 +423,12 @@ async function copyTerminalOutput(output: string): Promise<void> {
         :open="segment.open"
       />
 
+      <AgentEditFailedBlock
+        v-else-if="segment.kind === 'edit-failed'"
+        :path="segment.path"
+        :reason="segment.reason"
+      />
+
       <!-- Reproduce UI lives once in the sticky composer banner (avoid duplicate cards). -->
       <template v-else-if="segment.kind === 'debug-reproduce'"></template>
 
@@ -458,7 +465,7 @@ async function copyTerminalOutput(output: string): Promise<void> {
       />
 
       <p
-        v-else-if="segment.text.trim()"
+        v-else-if="segment.text.trim() && isStreamingMessage(message.message_id)"
         class="agent-block agent-block--text conversation-seam__content conversation-seam__content--agent"
       >
         {{ segment.text }}
@@ -520,7 +527,11 @@ async function copyTerminalOutput(output: string): Promise<void> {
         <IdeActivityIcon name="agent" :size="12" />
         <span>{{ threadMessageSpeakerLabel({ role: 'agent', speaker_name: line.speaker.name, speaker_role: line.speaker.role }) }}</span>
       </span>
-      <pre>{{ line.text }}</pre>
+      <AgentMarkdownBlock
+        v-if="line.text.trim()"
+        :content="line.text"
+        :workspace-id="shell.currentWorkspace?.workspace_id ?? null"
+      />
     </div>
   </div>
 

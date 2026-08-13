@@ -347,6 +347,13 @@ watch(
   },
 );
 
+watch(
+  () => shell.ideTerminalProblemsRevealToken,
+  () => {
+    bottomTab.value = 'problems';
+  },
+);
+
 onMounted(() => {
   document.addEventListener('pointerdown', handleDocumentPointerDown, true);
 });

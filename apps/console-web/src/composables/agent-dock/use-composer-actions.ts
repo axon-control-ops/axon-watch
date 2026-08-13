@@ -1,4 +1,5 @@
 import type { Ref } from 'vue';
+import { nextTick } from 'vue';
 
 import {
   shouldProceedDebugReproduceComposer,
@@ -34,12 +35,22 @@ import {
 import { persistIdeComposerDraft } from '../../lib/ide-composer-draft-prefs';
 import { focusAgentDockComposerInput } from '../../lib/agent-dock-composer-focus';
 import type { TeammateRouteNotice } from '../../lib/teammate-route-notice';
+import { resolveComposerWorkspaceScopeMismatch } from '../../lib/composer-workspace-scope';
+import {
+  clearWorkspaceScopeNotice,
+  setWorkspaceScopeNotice,
+  workspaceScopeNotice,
+  type WorkspaceScopeNotice,
+} from '../../lib/workspace-scope-notice';
+import { applyChatUiAction } from '../../lib/chat-ui-action';
 import { resolveLiveBusyEmployeeIds } from '../../features/workspace-agents/company-roster-busy';
 import { useShellStore } from '../../stores/shell';
 import { useDebugReproduceActions } from './use-debug-reproduce-actions';
 import type { ComposerMode } from './use-composer-menus';
 
 type ShellStore = ReturnType<typeof useShellStore>;
+
+export type { WorkspaceScopeNotice };
 
 export type PlanSoftSwitchNotice = {
   reason: string;
@@ -211,8 +222,21 @@ export function useComposerActions(options: UseComposerActionsOptions) {
       }
     }
 
-    dismissEmployeeSpecialtyRoute();
     const workspaceId = shell.currentWorkspace?.workspace_id ?? '';
+    const scopeMismatch = resolveComposerWorkspaceScopeMismatch(workspaceId, submitDraft);
+    if (scopeMismatch) {
+      setWorkspaceScopeNotice({
+        currentWorkspaceId: scopeMismatch.currentWorkspaceId,
+        inferredWorkspaceId: scopeMismatch.inferredWorkspaceId,
+        inferredLabel: scopeMismatch.inferredLabel,
+        currentLabel: scopeMismatch.currentLabel,
+        pendingDraft: submitDraft,
+      });
+      return;
+    }
+    clearWorkspaceScopeNotice();
+
+    dismissEmployeeSpecialtyRoute();
     const originThreadId = shell.activeIdeThreadId;
     // Capture attachments before specialty route swaps the thread image scope.
     const attachmentFiles = composerImages.value.map((image) => image.file);
@@ -361,6 +385,29 @@ export function useComposerActions(options: UseComposerActionsOptions) {
     dismissEmployeeSpecialtyRoute();
   }
 
+  function dismissWorkspaceScopeNotice(): void {
+    clearWorkspaceScopeNotice();
+  }
+
+  function switchComposerWorkspaceScope(): void {
+    const notice = workspaceScopeNotice.value;
+    if (!notice) {
+      return;
+    }
+    applyChatUiAction(shell, {
+      type: 'switch_workspace',
+      workspace_id: notice.inferredWorkspaceId,
+      layout_mode: 'ide',
+    });
+    shell.ideComposerDraft = notice.pendingDraft;
+    const threadId = shell.activeIdeThreadId;
+    if (threadId) {
+      persistIdeComposerDraft(notice.inferredWorkspaceId, notice.pendingDraft, threadId);
+    }
+    clearWorkspaceScopeNotice();
+    void nextTick(() => focusAgentDockComposerInput(inputRef.value));
+  }
+
   async function handleSteer(event?: Event): Promise<void> {
     event?.preventDefault();
     if (composerMode.value === 'kairo') {
@@ -473,6 +520,9 @@ export function useComposerActions(options: UseComposerActionsOptions) {
     declinePlanSoftSwitchOffer,
     dismissPlanSoftSwitch,
     dismissTeammateRoute,
+    dismissWorkspaceScopeNotice,
+    switchComposerWorkspaceScope,
+    workspaceScopeNotice,
     handleApproveRun,
     handleComposerKeydown,
     handleDebugReproduceProceed,
