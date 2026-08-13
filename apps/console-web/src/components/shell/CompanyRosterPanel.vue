@@ -248,7 +248,8 @@ const selectedEmployeeIsReporting = computed(
     }) === selectedEmployee.value?.employee_id,
 );
 
-const { selectedActions, handoffWaitingEmployeeIds } = useCompanyRosterQuickActionState({
+const { selectedActions, handoffWaitingEmployeeIds, selectedHandoffBlockedReason } =
+  useCompanyRosterQuickActionState({
   shell,
   employees,
   selectedEmployee,
@@ -524,6 +525,13 @@ async function onPresenceSelect(employee: CompanyEmployeeRecord): Promise<void> 
         role="alert"
       >
         {{ controlError }}
+      </p>
+      <p
+        v-else-if="selectedHandoffBlockedReason"
+        class="company-roster__empty company-roster__hint"
+        role="status"
+      >
+        {{ selectedHandoffBlockedReason }}
       </p>
 
       <CompanyPresenceStrip

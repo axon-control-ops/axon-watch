@@ -311,9 +311,34 @@ def post_lead_takeover_report(
         }
     )
     follow_up = None
+    verification_task = None
     # Full-autonomy loops must keep ownership after both successful and failed
     # specialist shifts. Sticky plan follow-ups keep the original ask as sole truth.
     if create_follow_up_task and phase in {"completed", "failed"}:
+        from app.workspace_agents.lead_verification_handoff import (
+            enqueue_specialist_verification_task,
+            looks_like_verification_handoff,
+        )
+
+        if looks_like_verification_handoff(
+            blockers=blockers,
+            lead_next=lead_next,
+            reply_text=reply_text,
+        ):
+            verification_task = enqueue_specialist_verification_task(
+                workspace_id=workspace_id,
+                employee_name=employee_name,
+                employee_role=role,
+                run_id=cleaned_run,
+                reply_text=reply_text,
+                blockers=blockers,
+            )
+        follow_up_deps = (
+            [str(verification_task.get("task_id") or "").strip()]
+            if isinstance(verification_task, dict)
+            and str(verification_task.get("task_id") or "").strip()
+            else None
+        )
         follow_up = enqueue_lead_follow_up_task(
             workspace_id=workspace_id,
             employee_name=employee_name,
@@ -325,6 +350,7 @@ def post_lead_takeover_report(
             specialist_goal=goal,
             plan_id=resolved_plan_id,
             task_id=task_id,
+            dependencies=follow_up_deps,
         )
     vaxon_flash: dict[str, Any] | None = None
     try:
@@ -383,6 +409,7 @@ def post_lead_takeover_report(
         "run_id": cleaned_run,
         "lead_next": lead_next,
         "follow_up_task_id": (follow_up or {}).get("task_id"),
+        "verification_task_id": (verification_task or {}).get("task_id"),
         "controlling_plan_id": resolved_plan_id,
         "vaxon_flash": vaxon_flash,
         "spoken": spoken,

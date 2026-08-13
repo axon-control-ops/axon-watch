@@ -153,9 +153,10 @@ def operator_start_task(task_id: str) -> dict[str, Any]:
         )
 
     if not _deps_completed(task):
-        raise OperatorStartTaskError(
-            "task is still blocked by unfinished dependencies"
-        )
+        from app.workspace_agents.task_dependencies import dependency_blocker_message
+
+        detail = dependency_blocker_message(task) or "task is still blocked by unfinished dependencies"
+        raise OperatorStartTaskError(detail)
 
     if not workspace_id:
         raise OperatorStartTaskError("task is missing workspace_id")

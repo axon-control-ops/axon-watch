@@ -10,7 +10,11 @@ from uuid import uuid4
 from app.persistence import chat_store, task_store
 from app.runs.service import append_run_execution_receipt, create_run
 from app.workspace_agents import build_company_roster
-from app.workspace_agents.assignment_messages import assignment_card, employee_display_name
+from app.workspace_agents.assignment_messages import (
+    assignment_card,
+    employee_display_name,
+    is_lead_self_assignment,
+)
 from app.workspace_agents import lead_plan_store
 from app.workspace_agents.lead_task_persist import persist_lead_task_plan
 from app.workspace_agents.lead_task_plan import (
@@ -160,16 +164,25 @@ def _employee_id_for_role(workspace_id: str, role: str) -> str | None:
 
 
 def _deps_completed(task: dict[str, Any]) -> bool:
-    deps = task.get("dependencies")
-    if not isinstance(deps, list) or not deps:
-        return True
-    for dep_id in deps:
-        dep = task_store.get_task(str(dep_id))
-        if dep is None:
-            return False
-        if str(dep.get("status") or "").strip().lower() != "completed":
-            return False
-    return True
+    from app.workspace_agents.task_dependencies import dependencies_completed
+
+    return dependencies_completed(task)
+
+
+def _lead_thread_has_recent_executive_brief(thread_id: str, *, scan_limit: int = 12) -> bool:
+    """Skip redundant Lead self-assignment cards when takeover brief is already in-thread."""
+    try:
+        history = chat_store.list_thread_messages(thread_id)
+    except Exception:  # noqa: BLE001
+        return False
+    recent = list(reversed(history or []))[:scan_limit]
+    for message in recent:
+        if str(message.get("role") or "") != "agent":
+            continue
+        content = str(message.get("content") or "")
+        if "Lead executive brief" in content or "Lead takeover" in content:
+            return True
+    return False
 
 
 def _post_assignment_to_employee_thread(
@@ -208,6 +221,10 @@ def _post_assignment_to_employee_thread(
             employee_role=owner_role,
         )
     thread_id = str(thread["thread_id"])
+    # Lead follow-up tickets already surface as an executive brief on Dana's thread.
+    # Skip the extra "queued" card — worker start still posts the picked-up card.
+    if is_lead_self_assignment(owner_role) and _lead_thread_has_recent_executive_brief(thread_id):
+        return thread_id
     # Compact human assignment card only — raw task/run ids stay in the receipt line.
     # Lead keeps a full summary on their own thread; run receipts stay on the ledger.
     chat_store.save_message(

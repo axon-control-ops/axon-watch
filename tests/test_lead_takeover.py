@@ -165,6 +165,46 @@ class LeadTakeoverTests(unittest.TestCase):
         self.assertEqual("open", follow.get("status"))
         self.assertEqual("lead", follow.get("owner_role"))
 
+    def test_verification_handoff_routes_backend_task_and_blocks_lead_follow_up(self) -> None:
+        from app.persistence import task_store
+        from app.workspace_agents.lead_takeover import post_lead_takeover_report
+
+        marco_reply = (
+            "Staff linkage backend is ready.\n"
+            "- **Tests:** `npm test -- tests/unit/services/staffVisibility.test.ts` — "
+            "blocked in this headless runtime\n"
+            "- **Live verify:** `npx tsx services/ops/verify-lesego-dimakatso-staff.ts` — "
+            "not run here\n"
+            "Blockers / Lead next:\n"
+            "- I could not execute Jest in this worker runtime — run read-only verify on a "
+            "scoped terminal job before APPLY=true.\n"
+            "Confidence: 8/10"
+        )
+        with (
+            patch("app.live_events.broadcast_material_change"),
+            patch("app.live_events.broadcast_spoken_line", return_value=1),
+        ):
+            takeover = post_lead_takeover_report(
+                workspace_id="workspace_dashpro",
+                run_id="run_marco_verify_route_1",
+                employee_role="backend",
+                employee_name="Marco",
+                phase="completed",
+                reply_text=marco_reply,
+                create_follow_up_task=True,
+            )
+
+        verify_id = str(takeover.get("verification_task_id") or "")
+        follow_id = str(takeover.get("follow_up_task_id") or "")
+        self.assertTrue(verify_id)
+        self.assertTrue(follow_id)
+        verify = task_store.get_task(verify_id)
+        follow = task_store.get_task(follow_id)
+        assert verify is not None and follow is not None
+        self.assertEqual("backend", verify.get("owner_role"))
+        self.assertTrue(str(verify.get("goal") or "").startswith("Verification after Marco"))
+        self.assertIn(verify_id, follow.get("dependencies") or [])
+
     def test_sticky_follow_up_binds_to_ota_plan_goal(self) -> None:
         from app.persistence import chat_store, task_store
         from app.workspace_agents import lead_plan_store

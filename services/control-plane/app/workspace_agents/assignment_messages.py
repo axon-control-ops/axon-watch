@@ -23,6 +23,29 @@ def role_label(role: str) -> str:
     return cleaned.title() if cleaned else "Agent"
 
 
+def is_lead_self_assignment(assignee_role: str) -> bool:
+    """Lead board tickets are always owned and executed by the Lead employee."""
+    return str(assignee_role or "").strip().lower() == "lead"
+
+
+def assignment_card_title(
+    *,
+    assignee_name: str,
+    assignee_role: str,
+    state: str,
+    lead_name: str | None = None,
+) -> str:
+    role = role_label(assignee_role)
+    if is_lead_self_assignment(assignee_role):
+        if state == "started":
+            return f"{assignee_name} picked up a follow-up board ticket."
+        return f"{assignee_name} queued a follow-up board ticket."
+    if state == "started":
+        return f"{assignee_name} started this {role} assignment."
+    dispatcher = lead_name or "Lead"
+    return f"{dispatcher} queued a {role} assignment for {assignee_name}."
+
+
 def readable_goal(goal: str, *, max_chars: int = 260) -> str:
     text = " ".join(str(goal or "").split()).strip()
     text = _ROLE_PREFIX_RE.sub("", text).strip()
@@ -49,17 +72,20 @@ def assignment_card(
     validation_status: str | None = None,
     commit_hash: str | None = None,
 ) -> str:
-    action = "started work on" if state == "started" else "queued"
+    action = "picked up" if state == "started" and is_lead_self_assignment(assignee_role) else (
+        "started work on" if state == "started" else "queued"
+    )
     role = str(assignee_role or "").strip().lower()
     status_subject = (
         "the Lead should decide, assign, escalate, or report back with receipts"
         if role == "lead"
         else "the specialist should implement, verify, and report back with receipts"
     )
-    title = (
-        f"{assignee_name} started this {role_label(assignee_role)} assignment."
-        if state == "started"
-        else f"{lead_name or 'Lead'} queued a {role_label(assignee_role)} assignment for {assignee_name}."
+    title = assignment_card_title(
+        assignee_name=assignee_name,
+        assignee_role=assignee_role,
+        state=state,
+        lead_name=lead_name,
     )
     expected = ", ".join(str(item).strip() for item in (expected_files or []) if str(item).strip())
     return "\n".join(
@@ -81,7 +107,9 @@ def assignment_card(
 
 __all__ = [
     "assignment_card",
+    "assignment_card_title",
     "employee_display_name",
+    "is_lead_self_assignment",
     "readable_goal",
     "role_label",
 ]

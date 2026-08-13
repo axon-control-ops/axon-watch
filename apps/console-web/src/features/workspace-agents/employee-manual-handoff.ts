@@ -1,6 +1,10 @@
 import type { CompanyEmployeeRecord, RunRecord } from '../../contracts/canonical';
 import type { WorkspaceTaskRecord } from '../../api/tasks-api';
 import { normalizeAutonomyMode } from '../../lib/operator-presence-settings';
+import {
+  humanizeHandoffBlockedReason,
+  taskDependenciesCompleted,
+} from '../../lib/task-dependencies';
 
 import { employeeIsActivelyBusy } from './company-roster-busy';
 
@@ -8,24 +12,14 @@ export type EmployeeManualHandoff = {
   waiting: boolean;
   taskId: string | null;
   reason: 'open_task' | 'assigned' | null;
+  /** Set when a handoff ticket exists but unfinished deps block Operator Start. */
+  blockedReason: string | null;
 };
 
 function roleKey(value: string | null | undefined): string {
   return String(value || '')
     .trim()
     .toLowerCase();
-}
-
-function taskIsUnblocked(
-  task: WorkspaceTaskRecord,
-  byId: Map<string, WorkspaceTaskRecord>,
-): boolean {
-  const deps = Array.isArray(task.dependencies) ? task.dependencies : [];
-  return deps.every((depId) => {
-    const dep = byId.get(depId);
-    const status = dep?.status ?? 'open';
-    return status === 'completed' || status === 'cancelled';
-  });
 }
 
 /** A task with an exhausted attempt budget cannot be leased by Operator Start. */
@@ -78,17 +72,23 @@ export function resolveEmployeeManualHandoff(input: {
   /** True when this teammate owns an active IDE stream (Team BUSY badge). */
   liveBusy?: boolean;
 }): EmployeeManualHandoff {
+  const idle = {
+    waiting: false,
+    taskId: null,
+    reason: null,
+    blockedReason: null,
+  } satisfies EmployeeManualHandoff;
   const mode = normalizeAutonomyMode(input.autonomyMode);
   if (mode === 'full' || (mode !== 'manual' && mode !== 'semi')) {
-    return { waiting: false, taskId: null, reason: null };
+    return idle;
   }
   if (!input.employee.enabled) {
-    return { waiting: false, taskId: null, reason: null };
+    return idle;
   }
 
   const role = roleKey(input.employee.role);
   if (!role) {
-    return { waiting: false, taskId: null, reason: null };
+    return idle;
   }
 
   const status = roleKey(input.employee.status);
@@ -98,7 +98,7 @@ export function resolveEmployeeManualHandoff(input: {
     employeeIsActivelyBusy(input.employee) ||
     IN_FLIGHT_STATUSES.has(status)
   ) {
-    return { waiting: false, taskId: null, reason: null };
+    return idle;
   }
 
   const byId = new Map(input.tasks.map((task) => [task.task_id, task]));
@@ -117,32 +117,58 @@ export function resolveEmployeeManualHandoff(input: {
   const allowsTask = (task: WorkspaceTaskRecord): boolean =>
     mode === 'manual' || taskIsSemiStartFallback(task);
 
+  const blockedReasonFor = (task: WorkspaceTaskRecord): string | null => {
+    if (taskDependenciesCompleted(task, byId)) {
+      return null;
+    }
+    return humanizeHandoffBlockedReason(task, byId);
+  };
+
   // An assigned employee's bound run is authoritative. Never let an unrelated
   // newer open task steal this Start button.
   if (status === 'assigned' && (assignedTask || activeRunTaskId)) {
     if (assignedTask && !allowsTask(assignedTask)) {
-      return { waiting: false, taskId: null, reason: null };
+      return idle;
+    }
+    const boundTask =
+      assignedTask ??
+      (activeRunTaskId ? byId.get(activeRunTaskId) ?? null : null);
+    if (boundTask) {
+      const blockedReason = blockedReasonFor(boundTask);
+      if (blockedReason) {
+        return { ...idle, blockedReason };
+      }
     }
     return {
       waiting: true,
       taskId: assignedTask?.task_id ?? activeRunTaskId,
       reason: 'assigned',
+      blockedReason: null,
     };
   }
 
-  const openTask = [...input.tasks]
+  const openCandidates = [...input.tasks]
     .filter(
       (task) =>
         roleKey(task.owner_role) === role &&
         task.status === 'open' &&
         taskHasAttemptCapacity(task) &&
-        taskIsUnblocked(task, byId) &&
         allowsTask(task),
     )
-    .sort((left, right) => right.updated_at.localeCompare(left.updated_at))[0];
+    .sort((left, right) => right.updated_at.localeCompare(left.updated_at));
+
+  const openTask =
+    openCandidates.find((task) => taskDependenciesCompleted(task, byId)) ?? null;
+  const blockedOpenTask =
+    openCandidates.find((task) => !taskDependenciesCompleted(task, byId)) ?? null;
 
   if (openTask) {
-    return { waiting: true, taskId: openTask.task_id, reason: 'open_task' };
+    return {
+      waiting: true,
+      taskId: openTask.task_id,
+      reason: 'open_task',
+      blockedReason: null,
+    };
   }
 
   const leasedQueued = [...input.tasks]
@@ -156,9 +182,25 @@ export function resolveEmployeeManualHandoff(input: {
     .sort((left, right) => right.updated_at.localeCompare(left.updated_at))[0];
 
   if (leasedQueued && status === 'assigned') {
-    return { waiting: true, taskId: leasedQueued.task_id, reason: 'assigned' };
+    const blockedReason = blockedReasonFor(leasedQueued);
+    if (blockedReason) {
+      return { ...idle, blockedReason };
+    }
+    return {
+      waiting: true,
+      taskId: leasedQueued.task_id,
+      reason: 'assigned',
+      blockedReason: null,
+    };
+  }
+
+  if (blockedOpenTask) {
+    return {
+      ...idle,
+      blockedReason: blockedReasonFor(blockedOpenTask),
+    };
   }
 
   // Do not show a handoff glow that has no actionable task behind it.
-  return { waiting: false, taskId: null, reason: null };
+  return idle;
 }

@@ -317,6 +317,40 @@ def create_task(
     return stored
 
 
+def refresh_task_dependencies(task_id: str, dependencies: list[str]) -> dict[str, Any]:
+    """Replace dependency list on an open task (e.g. swap stale verification deps)."""
+    task_key = str(task_id or "").strip()
+    if not task_key:
+        raise TaskLedgerError("task_id is required")
+    deps = [str(item).strip() for item in dependencies if str(item).strip()]
+    timestamp = _utc_now_iso()
+    with _managed_connection() as connection:
+        ensure_task_ledger_schema(connection)
+        row = connection.execute(
+            "SELECT * FROM workspace_tasks WHERE task_id = ?",
+            (task_key,),
+        ).fetchone()
+        if row is None:
+            raise TaskLedgerError(f"task not found: {task_key}")
+        record = _row_to_record(row)
+        if record["status"] != "open":
+            raise TaskLedgerError(
+                f"only open tasks can refresh dependencies ({record['status']})"
+            )
+        connection.execute(
+            """
+            UPDATE workspace_tasks
+            SET dependencies_json = ?, updated_at = ?
+            WHERE task_id = ?
+            """,
+            (json.dumps(deps), timestamp, task_key),
+        )
+        connection.commit()
+    stored = get_task(task_key)
+    assert stored is not None
+    return stored
+
+
 def _expire_stale_leases(connection: Any, *, now: datetime) -> None:
     now_iso = now.isoformat().replace("+00:00", "Z")
     rows = connection.execute(

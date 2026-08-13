@@ -12,6 +12,7 @@ from app.runs.service import (
     get_run,
     resume_run,
 )
+from app.workspace_agents.lead_verification_handoff import try_lease_open_verification_task
 
 
 def lane_b_run_summary(content: str) -> str:
@@ -56,6 +57,27 @@ def resolve_lane_b_agent_run(
                     from app.persistence import run_store
 
                     existing = run_store.save_run(existing)
+                if cleaned_role and not str(existing.get("task_id") or "").strip():
+                    leased = try_lease_open_verification_task(
+                        workspace_id=workspace_id,
+                        owner_role=cleaned_role,
+                        lease_holder=f"lane-b-{workspace_id}-{cleaned_role}",
+                        run_id=str(existing.get("run_id") or "").strip() or None,
+                    )
+                    if leased is not None:
+                        task_id = str(leased.get("task_id") or "").strip()
+                        existing["task_id"] = task_id
+                        from app.persistence import run_store, task_store
+
+                        existing = run_store.save_run(existing)
+                        if task_id:
+                            try:
+                                task_store.bind_task_run(
+                                    task_id,
+                                    str(existing.get("run_id") or "").strip(),
+                                )
+                            except task_store.TaskLedgerError:
+                                pass
                 phase = str(existing.get("phase") or "")
                 if phase in {"review_ready", "paused"}:
                     try:
@@ -80,12 +102,22 @@ def resolve_lane_b_agent_run(
         if run_mode == "plan"
         else "Lane B agent-mode runtime request"
     )
+    task_id: str | None = None
+    if cleaned_role:
+        leased = try_lease_open_verification_task(
+            workspace_id=workspace_id,
+            owner_role=cleaned_role,
+            lease_holder=f"lane-b-{workspace_id}-{cleaned_role}",
+        )
+        if leased is not None:
+            task_id = str(leased.get("task_id") or "").strip() or None
     return create_run(
         workspace_id=workspace_id,
         mode=run_mode,
         summary=lane_b_run_summary(content),
         detail=detail,
         employee_role=cleaned_role,
+        task_id=task_id,
         requires_approval=(
             False if run_mode == "plan" else lane_b_agent_requires_approval(execution_access)
         ),

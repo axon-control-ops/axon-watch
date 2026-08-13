@@ -41,6 +41,7 @@ def enqueue_lead_follow_up_task(
     specialist_goal: str = "",
     plan_id: str | None = None,
     task_id: str | None = None,
+    dependencies: list[str] | None = None,
 ) -> dict[str, Any] | None:
     """Create an open Lead-owned follow-up sticky to the controlling plan when present."""
     workspace = workspace_id.strip()
@@ -75,16 +76,59 @@ def enqueue_lead_follow_up_task(
     controlling_plan_id = str((plan or {}).get("plan_id") or "").strip()
     marker = plan_marker(controlling_plan_id) if controlling_plan_id else ""
 
+    def _merge_follow_up_dependencies(existing: dict[str, Any]) -> list[str] | None:
+        incoming = [str(item).strip() for item in (dependencies or []) if str(item).strip()]
+        if not incoming:
+            return None
+        merged: list[str] = []
+        seen: set[str] = set()
+        for dep_id in incoming:
+            if dep_id not in seen:
+                seen.add(dep_id)
+                merged.append(dep_id)
+        for dep_id in existing.get("dependencies") or []:
+            cleaned = str(dep_id or "").strip()
+            if not cleaned or cleaned in seen:
+                continue
+            dep = task_store.get_task(cleaned)
+            if dep is None:
+                continue
+            goal = str(dep.get("goal") or "")
+            status = str(dep.get("status") or "").strip().lower()
+            if goal.startswith("Verification after") and status != "completed":
+                continue
+            seen.add(cleaned)
+            merged.append(cleaned)
+        return merged
+
     for status in ("open", "leased"):
         for row in task_store.list_tasks(workspace_id=workspace, status=status, limit=100):
             if str(row.get("owner_role") or "").strip().lower() != "lead":
                 continue
             goal = str(row.get("goal") or "")
             if run_id and run_id in goal:
+                merged = _merge_follow_up_dependencies(row)
+                if merged is not None and row.get("status") == "open":
+                    try:
+                        return task_store.refresh_task_dependencies(str(row["task_id"]), merged)
+                    except task_store.TaskLedgerError:
+                        return row
                 return row
             if marker and marker in goal:
+                merged = _merge_follow_up_dependencies(row)
+                if merged is not None and row.get("status") == "open":
+                    try:
+                        return task_store.refresh_task_dependencies(str(row["task_id"]), merged)
+                    except task_store.TaskLedgerError:
+                        return row
                 return row
             if controlling_plan_id and extract_plan_id_from_goal(goal) == controlling_plan_id:
+                merged = _merge_follow_up_dependencies(row)
+                if merged is not None and row.get("status") == "open":
+                    try:
+                        return task_store.refresh_task_dependencies(str(row["task_id"]), merged)
+                    except task_store.TaskLedgerError:
+                        return row
                 return row
 
     name = (employee_name or employee_role or "specialist").strip()
@@ -121,6 +165,7 @@ def enqueue_lead_follow_up_task(
             risk="normal",
             owner_role="lead",
             attempt_budget=2,
+            dependencies=list(dependencies or []),
         )
     except task_store.TaskLedgerError as exc:
         logger.warning("lead follow-up task create failed: %s", exc)
