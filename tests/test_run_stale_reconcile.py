@@ -499,7 +499,7 @@ class RunStaleReconcileTests(unittest.TestCase):
             worker.start()
             # Heartbeat is on a 50ms interval under the patch; wait for the receipt
             # instead of a fixed sleep (CI load made 150ms flake).
-            deadline = time.monotonic() + 2.0
+            deadline = time.monotonic() + 5.0
             receipt_types: list[str] = []
             while time.monotonic() < deadline:
                 history = run_store.list_history(get_run(run_id)["history_ref"])
