@@ -405,7 +405,7 @@ export function useComposerActions(options: UseComposerActionsOptions) {
       persistIdeComposerDraft(notice.inferredWorkspaceId, notice.pendingDraft, threadId);
     }
     clearWorkspaceScopeNotice();
-    void nextTick(() => focusAgentDockComposerInput(inputRef.value));
+    void nextTick(() => focusAgentDockComposerInput());
   }
 
   async function handleSteer(event?: Event): Promise<void> {

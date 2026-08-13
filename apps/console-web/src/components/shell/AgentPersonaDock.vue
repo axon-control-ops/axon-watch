@@ -315,7 +315,7 @@ watch(
     </ul>
 
     <div
-      v-if="showDeliveryLinks"
+      v-if="showDeliveryLinks && deliveryLinks"
       class="agent-persona-dock__delivery-links"
       aria-label="Open pull request and CI"
     >
