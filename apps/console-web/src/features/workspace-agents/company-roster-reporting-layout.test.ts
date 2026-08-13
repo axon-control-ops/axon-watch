@@ -19,6 +19,6 @@ describe('company roster reporting layout', () => {
     expect(panel).not.toContain(':aria-hidden="selectedEmployeeIsReporting"');
     expect(panel).toContain(':reporting="selectedEmployeeIsReporting"');
     expect(reportingCss).not.toContain('max-height: 0');
-    expect(reportingCss).toContain('max-height: min(22rem, 34vh)');
+    expect(reportingCss).toContain('max-height: min(32rem, 58vh)');
   });
 });
