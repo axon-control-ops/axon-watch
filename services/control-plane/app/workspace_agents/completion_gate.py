@@ -115,11 +115,37 @@ def implementation_requested(task: dict[str, Any] | None) -> bool:
     explicitly_requests_implementation = any(word in assigned_blob for word in _IMPLEMENTATION_WORDS)
     if no_change_delivery_is_successful_ops_task(task):
         return False
+    # "Critically review X, suggest fixes, apply them" leads with review: the
+    # diff is conditional on finding something. Counting the word "fix" as a
+    # hard implementation demand fails an honest report with the misleading
+    # reason "worker produced no changed files".
+    if _leads_with_review_intent(task) and not _demands_unconditional_change(assigned_blob):
+        return False
     if role in _IMPLEMENTATION_ROLES:
         return explicitly_requests_implementation or not any(
             word in assigned_blob for word in _REPORT_ONLY_WORDS
         )
     return explicitly_requests_implementation
+
+
+_REVIEW_LEAD_RE = re.compile(
+    r"^\s*(?:please\s+)?(?:critically\s+)?"
+    r"(review|re-?check|audit|critique|verify|validate|inspect|triage|assess)\b",
+    re.IGNORECASE,
+)
+# Phrasing that still demands a diff even inside a review-shaped goal.
+_UNCONDITIONAL_CHANGE_RE = re.compile(
+    r"\b(implement|add|create|build|migrate|refactor|rewrite the (?:code|module|service))\b",
+    re.IGNORECASE,
+)
+
+
+def _leads_with_review_intent(task: dict[str, Any]) -> bool:
+    return bool(_REVIEW_LEAD_RE.match(str(task.get("goal") or "")))
+
+
+def _demands_unconditional_change(assigned_blob: str) -> bool:
+    return bool(_UNCONDITIONAL_CHANGE_RE.search(assigned_blob))
 
 
 def expected_files_for_task(task: dict[str, Any] | None) -> list[str]:
@@ -187,29 +213,23 @@ def _validation_status(run_id: str, task: dict[str, Any]) -> tuple[bool, str]:
         return False, "missing run record"
 
     if is_verification_task(task):
+        from app.workspace_agents.verification_execution import (
+            describe_failed_jobs,
+            job_failed,
+            job_passed,
+        )
+
         workspace_id = str(task.get("workspace_id") or "").strip()
         terminal_jobs = verification_terminal_jobs_for_run(workspace_id, run_id)
-        passed_jobs = [
-            job
-            for job in terminal_jobs
-            if str(job.get("status") or "").strip().lower() == "completed"
-            and job.get("exit_code") is not None
-            and int(job.get("exit_code") or 0) == 0
-        ]
+        passed_jobs = [job for job in terminal_jobs if job_passed(job)]
         if passed_jobs:
             return True, f"passed with {len(passed_jobs)} verification terminal job(s)"
-        failed_jobs = [
-            job
-            for job in terminal_jobs
-            if str(job.get("status") or "").strip().lower() == "failed"
-            or (
-                str(job.get("status") or "").strip().lower() == "completed"
-                and job.get("exit_code") is not None
-                and int(job.get("exit_code") or 0) != 0
-            )
-        ]
+        failed_jobs = [job for job in terminal_jobs if job_failed(job)]
         if failed_jobs:
-            return False, f"verification terminal jobs failed ({len(failed_jobs)})"
+            return False, (
+                f"verification terminal jobs failed ({len(failed_jobs)}): "
+                f"{describe_failed_jobs(failed_jobs)}"
+            )
         if terminal_jobs:
             return False, "verification terminal jobs incomplete"
         return False, "missing verification terminal job receipts"

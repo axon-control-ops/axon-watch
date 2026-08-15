@@ -27,6 +27,7 @@ from app.routes import (
     vault_http,
     worker_scheduler,
     workspaces,
+    workspaces_agent_jobs,
 )
 
 
@@ -45,6 +46,7 @@ def register_routes(app: FastAPI) -> None:
     app.include_router(plans.router)
     app.include_router(runs.router)
     app.include_router(workspaces.router)
+    app.include_router(workspaces_agent_jobs.router)
     app.include_router(worker_scheduler.router)
     app.include_router(tasks.router)
     app.include_router(lead_planner.router)

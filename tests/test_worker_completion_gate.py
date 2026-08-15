@@ -196,7 +196,7 @@ class WorkerCompletionGateTests(unittest.TestCase):
         self.assertIn("required evidence", result.reason)
 
     def test_specialist_verification_handoff_passes_with_terminal_jobs(self) -> None:
-        from app.terminal import agent_jobs
+        from app.terminal.agent_job_registry import register_job
         from app.workspace_agents.verifier_contract import ensure_acceptance_before_publish
 
         opened = task_store.create_task(
@@ -215,8 +215,8 @@ class WorkerCompletionGateTests(unittest.TestCase):
             lease_holder="employee-workspace_dashpro-backend",
         )
         run_id = self._run_for_task(task)
-        with agent_jobs._lock:
-            agent_jobs._jobs["agent-job-verify-gate"] = {
+        register_job(
+            {
                 "job_id": "agent-job-verify-gate",
                 "workspace_id": "workspace_dashpro",
                 "run_id": run_id,
@@ -225,6 +225,7 @@ class WorkerCompletionGateTests(unittest.TestCase):
                 "exit_code": 0,
                 "created_at": "2026-01-01T00:00:00Z",
             }
+        )
         ensure_acceptance_before_publish(run_id, changed_paths=["src/out_of_scope.ts"])
 
         with tempfile.TemporaryDirectory() as tempdir:
@@ -369,6 +370,38 @@ class WorkerCompletionGateTests(unittest.TestCase):
 
         self.assertFalse(result.passed)
         self.assertIn("missing validation command outputs", result.reason)
+
+
+class ReviewShapedTaskClassificationTests(unittest.TestCase):
+    """Regression: a review goal mentioning "fixes" demanded a diff, so an
+    honest report failed with "worker produced no changed files"."""
+
+    def _requested(self, goal: str) -> bool:
+        from app.workspace_agents.completion_gate import implementation_requested
+
+        return implementation_requested(
+            {"owner_role": "backend", "goal": goal, "acceptance_criteria": ""}
+        )
+
+    def test_review_then_apply_fixes_is_not_an_implementation_demand(self) -> None:
+        self.assertFalse(
+            self._requested(
+                "Critically review all your previous work for factual errors. "
+                "Suggest fixes/improvements - Apply them - Then rewrite the answer."
+            )
+        )
+
+    def test_audit_goal_is_report_first(self) -> None:
+        self.assertFalse(self._requested("Audit the CI workflows and report findings"))
+
+    def test_review_that_names_a_build_still_demands_a_diff(self) -> None:
+        self.assertTrue(
+            self._requested("Review the lessons service and implement the missing endpoint")
+        )
+
+    def test_plain_implementation_goals_are_unchanged(self) -> None:
+        self.assertTrue(self._requested("Fix the failing lessons service test"))
+        self.assertTrue(self._requested("Add a new payments endpoint"))
 
 
 if __name__ == "__main__":

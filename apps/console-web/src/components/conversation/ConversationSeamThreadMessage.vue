@@ -33,6 +33,7 @@ import {
   agentReplyRegeneratePrompt,
   regenerateAgentReplyFromPrompt,
 } from '../../lib/operator-message-composer-actions';
+import { cancelAgentTerminalJobFromCard, copyTerminalOutput } from '../../lib/agent-terminal-cancel';
 import { useShellStore } from '../../stores/shell';
 import AgentMarkdownBlock from '../ide/AgentMarkdownBlock.vue';
 import AgentFileReadBlock from '../ide/AgentFileReadBlock.vue';
@@ -264,12 +265,9 @@ function hasEmbeddedEmployeeReports(content: string): boolean {
   return embeddedReportLines(content).some((line) => line.speaker !== null);
 }
 
-async function copyTerminalOutput(output: string): Promise<void> {
-  if (typeof navigator === 'undefined' || !navigator.clipboard || !output.trim()) {
-    return;
-  }
-  await navigator.clipboard.writeText(output);
-}
+const onCancelAgentTerminalJob = (jobId: string): void => void cancelAgentTerminalJobFromCard(
+  { workspaceId: shell.currentWorkspace?.workspace_id, jobId, statuses: shell.agentTerminalJobStatuses },
+);
 </script>
 
 <template>
@@ -423,6 +421,7 @@ async function copyTerminalOutput(output: string): Promise<void> {
         @reveal="revealTerminalPanel"
         @background="backgroundAgentTerminalRun"
         @copy-output="copyTerminalOutput"
+        @cancel-job="onCancelAgentTerminalJob"
       />
 
       <AgentEditBlock

@@ -16,28 +16,23 @@ from app.workspace_agents.critical_review_clause import (
 )
 from app.workspace_agents.employee_persona_prompt import build_employee_identity_line
 from app.workspace_agents.lead_text import truncate_text as _truncate
-from app.workspace_agents.run_outcome import latest_role_run_outcome
+from app.workspace_agents.prior_shift_evidence import (
+    looks_like_review_or_retry,
+    prior_failure_clause as _prior_failure_clause,
+    prior_shift_evidence_clause,
+)
 from app.workspace_agents.supabase_self_heal import dashpro_supabase_self_heal_clause
+from app.workspace_agents.watcher_receipts import (
+    should_attach_watcher_receipts,
+    watcher_receipts_prompt_block,
+)
 from app.workspace_agents.team_roster_context import build_team_roster_context
+from app.workspace_agents.worker_prompt_scope import (
+    OUT_OF_SCOPE_GUARD_MARKER,
+    task_scope_clause,
+)
 
-OUT_OF_SCOPE_GUARD_MARKER = "OUT_OF_SCOPE_GUARD:"
 _OUT_OF_SCOPE_GUARD_RE = re.compile(r"OUT_OF_SCOPE_GUARD:\s*(.+)", re.IGNORECASE)
-
-
-def _prior_failure_clause(*, workspace_id: str, role: str) -> str:
-    """Surface the last terminal failure so a new shift can retry with context."""
-    outcome = latest_role_run_outcome(workspace_id, role)
-    if not outcome or str(outcome.get("outcome") or "").strip().lower() != "failed":
-        return ""
-    detail = str(outcome.get("detail") or "").strip()
-    run_id = str(outcome.get("run_id") or "").strip()
-    if not detail:
-        detail = "open run history for receipts"
-    run_hint = f" (run {run_id})" if run_id else ""
-    return (
-        f" Prior shift failed{run_hint}: {detail}. "
-        "Prefer fixing or clearing that failure before unrelated work. "
-    )
 
 
 def _workspace_continuity_clause(*, workspace_id: str, current_role: str) -> str:
@@ -162,61 +157,6 @@ def _role_tools_clause(role: str) -> str:
             "delegate Shell-heavy verification to specialists unless you must confirm a gate. "
         )
     return shared
-
-
-def _task_scope_anchors(*parts: str, limit: int = 8) -> list[str]:
-    anchors: list[str] = []
-    seen: set[str] = set()
-    for part in parts:
-        text = str(part or "")
-        candidates = re.findall(r"`([^`]+)`", text)
-        candidates.extend(re.findall(r"\b[\w./-]*[./_-][\w./-]+\b", text))
-        for raw in candidates:
-            cleaned = str(raw).strip().strip(".,;:()[]{}")
-            if not cleaned or len(cleaned) < 3:
-                continue
-            lowered = cleaned.lower()
-            if lowered in seen:
-                continue
-            seen.add(lowered)
-            anchors.append(cleaned)
-            if len(anchors) >= limit:
-                return anchors
-    return anchors
-
-
-def _task_scope_clause(
-    *,
-    goal: str,
-    acceptance: str,
-    allowed_paths: list[str] | None = None,
-) -> str:
-    paths = [str(p).strip() for p in (allowed_paths or []) if str(p).strip()]
-    anchors = _task_scope_anchors(goal, acceptance)
-    anchor_clause = ""
-    if paths:
-        joined = ", ".join(f"`{path}`" for path in paths[:12])
-        anchor_clause = (
-            f" Explicit allowed write paths for this leased task: {joined}. "
-            "Do not modify any path outside that allowlist."
-        )
-    elif anchors:
-        joined = ", ".join(f"`{anchor}`" for anchor in anchors)
-        anchor_clause = f" Hard scope anchors from the task: {joined}. "
-    return (
-        " Scope guard: before you browse, edit, or summarize anything, lock onto the "
-        "leased task's exact goal and acceptance criteria."
-        f"{anchor_clause}"
-        "Only open, mention, or modify files and topics that directly serve that scope. "
-        "Do not drift into neighboring files, similarly named campaigns, prior tasks, or "
-        "semantically related artifacts just because they are nearby. "
-        "If the goal is about a README, docs, layout, bug, API, or specific deliverable, "
-        "treat unrelated posts, assets, illustrations, marketing copy, and old workspace "
-        "tasks as out of scope unless the goal explicitly asks for them. "
-        f"If the next file or topic is not clearly justified by the task, stop and reply "
-        f"with `{OUT_OF_SCOPE_GUARD_MARKER} <file-or-topic> is not required for this leased task` "
-        "instead of continuing."
-    )
 
 
 def _current_task_packet(
@@ -412,7 +352,7 @@ def build_continuous_worker_prompt(
         if isinstance(exclusive_paths_raw, list)
         else []
     )
-    scope_clause = _task_scope_clause(
+    scope_clause = task_scope_clause(
         goal=goal,
         acceptance=acceptance,
         allowed_paths=allowed_paths,
@@ -520,6 +460,14 @@ def build_continuous_worker_prompt(
     )
     roster_block = build_team_roster_context(workspace_id, viewer_role=role)
     roster_clause = f"\n\n{roster_block}" if roster_block else ""
+    # Receipts live in the project root, unreachable from the isolation checkout;
+    # prior-shift artifacts are what makes "review your previous work" answerable.
+    watcher_clause = evidence_clause = ""
+    if should_attach_watcher_receipts(role=role, goal=goal):
+        block = watcher_receipts_prompt_block(workspace_id)
+        watcher_clause = f"\n\n{block}" if block else ""
+    if looks_like_review_or_retry(goal, acceptance):
+        evidence_clause = prior_shift_evidence_clause(workspace_id=workspace_id, role=role)
     continuity = _workspace_continuity_clause(
         workspace_id=workspace_id,
         current_role=role,
@@ -594,6 +542,8 @@ def build_continuous_worker_prompt(
         f"{_auto_mode_ask_clause()}"
         " If a step fails, say what failed and why (command, assertion, import, CI step) — "
         "never a bare FAILED."
+        f"{evidence_clause}"
+        f"{watcher_clause}"
         f"{roster_clause}"
     )
     assembled = append_agent_voice_style(assembled)

@@ -135,11 +135,11 @@
       "note": "Sandbox launch and policy materialization; ratcheted to current dirty baseline while constitution/runtime policy work is committed; extract policy helpers next."
     },
     "services/control-plane/app/workspace_agents/worker_prompt.py": {
-      "max_lines": 606,
+      "max_lines": 567,
       "soft_limit": 350,
       "hard_limit": 650,
       "target": "services/control-plane/app/workspace_agents/worker_prompt_*.py",
-      "note": "Prompt assembler now includes exact task-display scope, bounded verification, and voice style; split lead evidence and task scope clauses next."
+      "note": "Prompt assembler now includes exact task-display scope, bounded verification, voice style, and live watcher receipts. Task scope clause extracted to worker_prompt_scope.py; split lead evidence clause next."
     },
     "apps/console-web/src/composables/agent-dock/use-agent-dock-composer-setup.ts": {
       "max_lines": 526,
@@ -492,11 +492,11 @@
       "note": "First constitution registry spine with seven tables and CRUD helpers; split per-registry modules after the initial audit slice lands."
     },
     "services/control-plane/app/routes/workspaces.py": {
-      "max_lines": 507,
+      "max_lines": 452,
       "soft_limit": 350,
       "hard_limit": 525,
       "target": "services/control-plane/app/routes/workspaces_*",
-      "note": "Workspace routes plus runtime/composer policy DTOs. +5 for save-conflict base_sha256 (409). Extract composer policy routes next."
+      "note": "Workspace routes plus runtime/composer policy DTOs. Agent terminal job routes extracted to workspaces_agent_jobs.py. Extract composer policy routes next."
     },
     "services/control-plane/app/workspace_agents/worker_dispatch.py": {
       "max_lines": 494,
@@ -569,11 +569,11 @@
       "note": "Lead\u2192VAXON handoffs; message builders in lead_vaxon_messages.py"
     },
     "services/control-plane/app/workspace_agents/execution_policy.py": {
-      "max_lines": 585,
+      "max_lines": 575,
       "soft_limit": 350,
       "hard_limit": 575,
       "target": "services/control-plane/app/workspace_agents/execution_policy_*.py",
-      "note": "Worker policy authority resolution; current baseline includes widened safe-agent scope support. Extract allowlist/scope helpers next."
+      "note": "Worker policy authority resolution. Command-prefix allowlists extracted to execution_policy_prefixes.py; extract scope helpers next."
     },
     "services/control-plane/app/workspace_agents/lead_team_checkin.py": {
       "max_lines": 567,

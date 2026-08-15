@@ -96,6 +96,8 @@ class EnqueueAgentTerminalJobRequest(BaseModel):
     stream_to_chat: bool | None = None
     thread_id: str | None = None
     message_id: str | None = None
+    # Per-job deadline override; omitted means the command-class default.
+    timeout_seconds: float | None = None
 
 
 class RenameTerminalSessionRequest(BaseModel):

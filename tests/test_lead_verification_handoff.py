@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import shutil
 import sys
 import unittest
 from pathlib import Path
@@ -263,6 +264,100 @@ class LeadVerificationHandoffTests(unittest.TestCase):
             )
         self.assertFalse(payload["passed"])
         self.assertIn("incomplete", payload["summary"])
+
+    def test_timed_out_job_counts_as_failure_with_reason(self) -> None:
+        from unittest.mock import patch
+
+        task = {
+            "workspace_id": "workspace_dashpro",
+            "goal": "Verification after Marco (backend): `npm test` [from run run_demo]",
+        }
+        jobs = [
+            {
+                "status": "timed_out",
+                "exit_code": None,
+                "command": "npm test",
+                "failure_reason": "job exceeded its 600s deadline; sent SIGINT",
+            }
+        ]
+        with patch(
+            "app.workspace_agents.verification_execution.verification_terminal_jobs_for_run",
+            return_value=jobs,
+        ), patch(
+            "app.runs.service.get_run",
+            return_value={"history_ref": "hist-verify"},
+        ), patch(
+            "app.persistence.run_store.list_history",
+            return_value=[],
+        ):
+            payload = build_verification_acceptance_evaluation(
+                run_id="run_verify",
+                task=task,
+            )
+        self.assertFalse(payload["passed"])
+        self.assertIn("failed=1", payload["summary"])
+        self.assertIn("deadline", payload["summary"])
+
+
+class VerificationCommandPreflightTests(unittest.TestCase):
+    def setUp(self) -> None:
+        import tempfile
+
+        self.root = Path(tempfile.mkdtemp(prefix="axon-verify-preflight-"))
+        self.addCleanup(shutil.rmtree, self.root, True)
+
+    def _touch(self, relative: str) -> None:
+        target = self.root / relative
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text("// test\n", encoding="utf-8")
+
+    def test_existing_path_passes_through_unchanged(self) -> None:
+        from app.workspace_agents.verification_execution import resolve_verification_command
+
+        self._touch("tests/services/lessonsService.test.ts")
+        command = "npm test -- tests/services/lessonsService.test.ts"
+        runnable, note = resolve_verification_command(command, self.root)
+        self.assertEqual(command, runnable)
+        self.assertEqual("", note)
+
+    def test_missing_path_with_unique_match_is_repaired(self) -> None:
+        from app.workspace_agents.verification_execution import resolve_verification_command
+
+        self._touch("tests/services/lessonsService.schema-contract.test.ts")
+        runnable, note = resolve_verification_command(
+            "npm test -- tests/unit/lessonsService.schema-contract.test.ts",
+            self.root,
+        )
+        self.assertEqual(
+            "npm test -- tests/services/lessonsService.schema-contract.test.ts",
+            runnable,
+        )
+        self.assertIn("repaired", note)
+
+    def test_unresolvable_path_is_not_runnable(self) -> None:
+        from app.workspace_agents.verification_execution import resolve_verification_command
+
+        runnable, note = resolve_verification_command(
+            "npm test -- tests/services/doesNotExist.test.ts",
+            self.root,
+        )
+        self.assertIsNone(runnable)
+        self.assertIn("does not exist", note)
+
+    def test_ambiguous_basename_is_not_guessed(self) -> None:
+        from app.workspace_agents.verification_execution import resolve_verification_command
+
+        self._touch("tests/a/dup.test.ts")
+        self._touch("tests/b/dup.test.ts")
+        runnable, _ = resolve_verification_command("npm test -- tests/c/dup.test.ts", self.root)
+        self.assertIsNone(runnable)
+
+    def test_command_without_test_path_is_untouched(self) -> None:
+        from app.workspace_agents.verification_execution import resolve_verification_command
+
+        runnable, note = resolve_verification_command("npm test", self.root)
+        self.assertEqual("npm test", runnable)
+        self.assertEqual("", note)
 
 
 if __name__ == "__main__":

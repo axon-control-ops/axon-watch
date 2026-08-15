@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import os
 import re
 import shlex
 from pathlib import Path
@@ -35,6 +36,9 @@ _VERIFICATION_SHELL_PREFIXES: tuple[tuple[str, ...], ...] = (
     ("npx", "tsx"),
 )
 _UNSAFE_SHELL_CHARACTERS = frozenset(";&|><$()\\\r\n\x00")
+# A job the watcher interrupted is a failure with a known cause, not an
+# "incomplete" run that leaves the gate guessing.
+_FAILED_JOB_STATUSES = frozenset({"failed", "timed_out", "cancelled"})
 
 
 def _verification_command_is_valid(command: str) -> bool:
@@ -75,6 +79,55 @@ def extract_verification_commands(reply_text: str | None) -> list[str]:
             seen.add(command)
             commands.append(command)
     return commands[:4]
+
+
+_TEST_PATH_ARG_RE = re.compile(
+    r"(?<![\w/.-])((?:[\w.-]+/)+[\w.-]+\.(?:test|spec)\.(?:ts|tsx|js|jsx|mjs|cjs))"
+)
+_PRUNED_SEARCH_DIRS = frozenset({"node_modules", ".git", ".venv", "dist", "build", "coverage"})
+_MAX_SEARCH_DIRS = 4000
+
+
+def _find_test_file_by_name(root: Path, filename: str) -> str | None:
+    """Find a unique file with this basename, so a near-miss path is repairable."""
+    matches: list[str] = []
+    scanned = 0
+    for current, dirnames, filenames in os.walk(root):
+        dirnames[:] = [name for name in dirnames if name not in _PRUNED_SEARCH_DIRS]
+        scanned += 1
+        if scanned > _MAX_SEARCH_DIRS:
+            break
+        if filename in filenames:
+            matches.append(str(Path(current, filename).relative_to(root)))
+            if len(matches) > 1:
+                return None
+    return matches[0] if len(matches) == 1 else None
+
+
+def resolve_verification_command(command: str, root: Path | None) -> tuple[str | None, str]:
+    """Check a verify command's test paths before a run is spent on it.
+
+    Returns ``(runnable_command, note)``. ``runnable_command`` is None when the
+    command references a test file that does not exist and cannot be repaired —
+    running it would only produce a "test path absent" failure.
+    """
+    cleaned = " ".join(str(command or "").split()).strip()
+    if not cleaned:
+        return None, "empty command"
+    if root is None:
+        return cleaned, ""
+
+    resolved = cleaned
+    notes: list[str] = []
+    for referenced in dict.fromkeys(_TEST_PATH_ARG_RE.findall(cleaned)):
+        if (root / referenced).is_file():
+            continue
+        suggestion = _find_test_file_by_name(root, Path(referenced).name)
+        if suggestion is None:
+            return None, f"test path `{referenced}` does not exist in the workspace"
+        resolved = resolved.replace(referenced, suggestion)
+        notes.append(f"repaired `{referenced}` → `{suggestion}`")
+    return resolved, "; ".join(notes)
 
 
 def source_run_from_verification_goal(goal: str) -> str | None:
@@ -179,19 +232,36 @@ def verification_terminal_jobs_for_run(
     ]
 
 
-def _job_passed(job: dict[str, Any]) -> bool:
+def job_passed(job: dict[str, Any]) -> bool:
     if str(job.get("status") or "").strip().lower() != "completed":
         return False
     exit_code = job.get("exit_code")
     return exit_code is not None and int(exit_code) == 0
 
 
-def _job_failed(job: dict[str, Any]) -> bool:
+def job_failed(job: dict[str, Any]) -> bool:
     status = str(job.get("status") or "").strip().lower()
-    if status == "failed":
+    if status in _FAILED_JOB_STATUSES:
         return True
     exit_code = job.get("exit_code")
     return status == "completed" and exit_code is not None and int(exit_code) != 0
+
+
+def describe_failed_jobs(jobs: list[dict[str, Any]]) -> str:
+    """Name what actually broke so the operator card is actionable."""
+    details: list[str] = []
+    for job in jobs[:3]:
+        command = str(job.get("command") or job.get("job_id") or "job").strip()
+        status = str(job.get("status") or "").strip().lower()
+        reason = str(job.get("failure_reason") or "").strip()
+        if reason:
+            outcome = reason
+        elif status == "completed":
+            outcome = f"exit {job.get('exit_code')}"
+        else:
+            outcome = status or "unknown"
+        details.append(f"`{command[:80]}` → {outcome}")
+    return "; ".join(details)
 
 
 def build_verification_acceptance_evaluation(
@@ -213,8 +283,8 @@ def build_verification_acceptance_evaluation(
         and str((entry.get("receipt") or {}).get("type") or "")
         == "verification_terminal_enqueued"
     )
-    failed = [job for job in jobs if _job_failed(job)]
-    passed = [job for job in jobs if _job_passed(job)]
+    failed = [job for job in jobs if job_failed(job)]
+    passed = [job for job in jobs if job_passed(job)]
     required = min(len(commands), 3) if commands else max(1, enqueued or len(passed))
     checks = [
         {
@@ -225,7 +295,10 @@ def build_verification_acceptance_evaluation(
         for job in passed
     ]
     if failed:
-        summary = f"acceptance=fail · verification jobs failed={len(failed)} ok={len(passed)}"
+        summary = (
+            f"acceptance=fail · verification jobs failed={len(failed)} ok={len(passed)} · "
+            f"{describe_failed_jobs(failed)}"
+        )
         passed_gate = False
     elif len(passed) >= required and required > 0:
         summary = f"acceptance=pass · verification jobs={len(passed)}/{required}"
@@ -301,9 +374,13 @@ def verification_worker_prompt_clause(*, workspace_id: str, task: dict[str, Any]
 __all__ = [
     "build_verification_acceptance_evaluation",
     "complete_verification_no_change_delivery",
+    "describe_failed_jobs",
     "extract_verification_commands",
     "is_verification_task",
+    "job_failed",
+    "job_passed",
     "resolve_verification_baseline",
+    "resolve_verification_command",
     "source_run_from_verification_goal",
     "verification_approved_command_prefixes",
     "verification_commands_for_task",

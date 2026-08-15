@@ -45,7 +45,7 @@ class AgentTerminalJobsTests(unittest.TestCase):
         self.assertTrue(str(job["job_id"]).startswith("agent-job-"))
         self.assertEqual("terminal-agent", job["session_id"])
         self.assertEqual("echo axon-job-ok", job["command"])
-        self.assertEqual("running", job["status"])
+        self.assertIn(job["status"], ("running", "completed"))
         self.assertIn("Running in Axon terminal", job["receipt"])
         self.assertFalse(job.get("stream_to_chat"))
         self.assertEqual(1, len(list_agent_terminal_jobs("workspace_axon_watch")))
@@ -129,6 +129,121 @@ class AgentTerminalJobsTests(unittest.TestCase):
         assert record is not None
         self.assertIn("hello-live", str(record.get("output_tail") or ""))
         self.assertIn("bye-live", str(record.get("output_tail") or ""))
+
+    def _await_terminal_status(self, job_id: str, *, timeout: float = 20.0) -> dict:
+        from app.terminal.agent_jobs import get_agent_terminal_job
+
+        deadline = time.time() + timeout
+        record: dict = {}
+        while time.time() < deadline:
+            record = dict(get_agent_terminal_job(job_id) or {})
+            if str(record.get("status") or "") not in ("", "running"):
+                return record
+            time.sleep(0.05)
+        self.fail(f"job {job_id} never left running: {record}")
+
+    def test_unstreamed_job_still_records_exit_code_and_output(self) -> None:
+        """Regression: jobs with no chat target used to hang in `running` forever."""
+        from app.terminal.agent_jobs import enqueue_agent_terminal_job
+
+        job = enqueue_agent_terminal_job(
+            workspace_id="workspace_axon_watch",
+            command="printf 'quiet-job-ok\\n'",
+            run_id="run_unstreamed_job",
+        )
+        self.assertFalse(job.get("stream_to_chat"))
+
+        record = self._await_terminal_status(str(job["job_id"]))
+        self.assertEqual("completed", record.get("status"))
+        self.assertEqual(0, record.get("exit_code"))
+        self.assertIn("quiet-job-ok", str(record.get("output_tail") or ""))
+
+    def test_failing_unstreamed_job_reports_failed_status(self) -> None:
+        from app.terminal.agent_jobs import enqueue_agent_terminal_job
+
+        job = enqueue_agent_terminal_job(
+            workspace_id="workspace_axon_watch",
+            command="printf 'boom\\n' >&2; exit 3",
+            run_id="run_failing_job",
+        )
+        record = self._await_terminal_status(str(job["job_id"]))
+        self.assertEqual("failed", record.get("status"))
+        self.assertEqual(3, record.get("exit_code"))
+
+    def test_concurrent_jobs_do_not_steal_each_others_exit_codes(self) -> None:
+        """Job-scoped sentinels keep two jobs on the shared PTY independent."""
+        from app.terminal.agent_jobs import enqueue_agent_terminal_job
+
+        slow = enqueue_agent_terminal_job(
+            workspace_id="workspace_axon_watch",
+            command="sleep 0.4; printf 'slow-done\\n'; exit 0",
+            run_id="run_concurrent_jobs",
+        )
+        fast = enqueue_agent_terminal_job(
+            workspace_id="workspace_axon_watch",
+            command="printf 'fast-done\\n'; exit 7",
+            run_id="run_concurrent_jobs",
+        )
+
+        slow_record = self._await_terminal_status(str(slow["job_id"]))
+        fast_record = self._await_terminal_status(str(fast["job_id"]))
+        self.assertEqual(0, slow_record.get("exit_code"))
+        self.assertEqual("completed", slow_record.get("status"))
+        self.assertEqual(7, fast_record.get("exit_code"))
+        self.assertEqual("failed", fast_record.get("status"))
+
+    def test_hung_job_is_interrupted_at_its_own_deadline(self) -> None:
+        from app.terminal.agent_jobs import enqueue_agent_terminal_job
+
+        job = enqueue_agent_terminal_job(
+            workspace_id="workspace_axon_watch",
+            command="sleep 600",
+            run_id="run_hung_job",
+            timeout_seconds=1,
+        )
+        self.assertEqual(1, job.get("timeout_seconds"))
+
+        record = self._await_terminal_status(str(job["job_id"]))
+        self.assertEqual("timed_out", record.get("status"))
+        self.assertIn("deadline", str(record.get("failure_reason") or ""))
+
+    def test_cancel_closes_out_a_running_job(self) -> None:
+        from app.terminal.agent_jobs import cancel_agent_terminal_job, enqueue_agent_terminal_job
+
+        job = enqueue_agent_terminal_job(
+            workspace_id="workspace_axon_watch",
+            command="sleep 600",
+            run_id="run_cancel_job",
+        )
+        cancelled = cancel_agent_terminal_job(str(job["job_id"]))
+        self.assertIsNotNone(cancelled)
+        assert cancelled is not None
+        self.assertEqual("cancelled", cancelled.get("status"))
+        self.assertIn("cancelled by operator", str(cancelled.get("failure_reason") or ""))
+
+    def test_ship_jobs_get_a_longer_default_deadline(self) -> None:
+        """OTA/Vercel ship jobs must not inherit the short worker deadline."""
+        from app.terminal.agent_job_watcher import (
+            DEFAULT_JOB_TIMEOUT_SECONDS,
+            SHIP_JOB_TIMEOUT_SECONDS,
+            resolve_timeout_seconds,
+        )
+
+        self.assertEqual(
+            SHIP_JOB_TIMEOUT_SECONDS,
+            resolve_timeout_seconds(None, command="npm run ota:canary"),
+        )
+        self.assertEqual(
+            DEFAULT_JOB_TIMEOUT_SECONDS,
+            resolve_timeout_seconds(None, command="npm test -- tests/foo.test.ts"),
+        )
+        # An explicit override still wins, capped at the ceiling.
+        self.assertEqual(30.0, resolve_timeout_seconds(30, command="npm run ota:canary"))
+
+    def test_cancel_unknown_job_returns_none(self) -> None:
+        from app.terminal.agent_jobs import cancel_agent_terminal_job
+
+        self.assertIsNone(cancel_agent_terminal_job("agent-job-missing"))
 
     def test_stale_active_stream_target_does_not_block_job_enqueue(self) -> None:
         from app.terminal.active_chat_stream import register_active_chat_stream

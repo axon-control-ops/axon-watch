@@ -17,6 +17,7 @@ from app.persistence import task_store
 from app.workspace_agents.verification_execution import (
     is_verification_task,
     resolve_verification_baseline,
+    resolve_verification_command,
     verification_commands_for_task,
 )
 from app.workspace_agents.worker_isolation import (
@@ -120,6 +121,16 @@ def create_dispatch_isolation(
     )
 
 
+def _verification_command_root(workspace_id: str) -> Path | None:
+    """Root the verify commands actually run against (the agent PTY cwd)."""
+    from app.terminal.workspace_roots import resolve_workspace_root
+
+    try:
+        return Path(resolve_workspace_root(workspace_id))
+    except Exception:  # noqa: BLE001 - preflight is best effort
+        return None
+
+
 def enqueue_verification_terminal_jobs(
     *, workspace_id: str, run_id: str, task: dict[str, Any]
 ) -> None:
@@ -133,11 +144,26 @@ def enqueue_verification_terminal_jobs(
 
     from app.terminal.agent_jobs import enqueue_agent_terminal_job
 
+    workspace_root = _verification_command_root(workspace_id)
     for command in commands[:3]:
+        runnable, note = resolve_verification_command(command, workspace_root)
+        if runnable is None:
+            # Running a command against a path that does not exist only burns a
+            # run and reports "test path absent". Say so up front instead.
+            logger.info("verification command skipped run=%s: %s", run_id, note)
+            append_run_execution_receipt(
+                run_id,
+                receipt_type="verification_terminal_unrunnable",
+                receipt_summary=f"Skipped verify command `{command[:100]}`: {note}",
+                actor="workspace_scheduler",
+                success=False,
+                intent="verification_terminal",
+            )
+            continue
         try:
             enqueue_agent_terminal_job(
                 workspace_id=workspace_id,
-                command=command,
+                command=runnable,
                 run_id=run_id,
                 stream_to_chat=True,
                 source_workspace_id=workspace_id,
@@ -145,7 +171,10 @@ def enqueue_verification_terminal_jobs(
             append_run_execution_receipt(
                 run_id,
                 receipt_type="verification_terminal_enqueued",
-                receipt_summary=f"Auto-enqueued verify command: {command[:140]}",
+                receipt_summary=(
+                    f"Auto-enqueued verify command: {runnable[:140]}"
+                    + (f" ({note})" if note else "")
+                ),
                 actor="workspace_scheduler",
                 success=True,
                 intent="verification_terminal",

@@ -207,10 +207,18 @@ def evaluate_hook_payload(
     executable = os.path.basename(executable_token).lower()
     if executable_token.startswith("-") or "=" in executable_token:
         return _deny("environment assignments and option-shaped executables are not allowed")
+    # An explicitly enumerated multi-token prefix is an operator decision about
+    # one specific sub-command (e.g. `gh auth status`). Without this, the
+    # blanket network deny below fires first and silently voids that config.
+    prefix_match = next(
+        (prefix for prefix in approved_command_prefixes if _matches_prefix(tokens, prefix)),
+        None,
+    )
+    narrowly_approved = prefix_match is not None and len(prefix_match) >= 2
     if executable in _PRIVILEGE_TOOLS:
         hint = f" {write_scope_hint}" if write_scope_hint else ""
         return _deny(f"privilege escalation is not allowed — never use sudo/su to work around filesystem restrictions.{hint}")
-    if executable in _RAW_NETWORK_TOOLS:
+    if executable in _RAW_NETWORK_TOOLS and not narrowly_approved:
         return _deny("raw network tools are not allowed")
     if executable in _INTERPRETER_ESCAPES:
         return _deny("shell and interpreter escapes are not allowed")
@@ -221,7 +229,7 @@ def evaluate_hook_payload(
 
     if executable != "git" and executable_token == executable and executable in approved_wrappers:
         return _allow()
-    if any(_matches_prefix(tokens, prefix) for prefix in approved_command_prefixes):
+    if prefix_match is not None:
         return _allow()
     return _deny("command does not match an approved wrapper or command prefix")
 

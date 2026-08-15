@@ -299,5 +299,58 @@ class EmployeeExecutionPolicyConfigTests(unittest.TestCase):
                 load_workspace_agent_configs(agents_file)
 
 
+class SelfValidationPolicyTests(unittest.TestCase):
+    """The completion gate demands test evidence; the sandbox must permit it."""
+
+    def _policy(self, role: str):
+        from app.workspace_agents.execution_policy import resolve_effective_policy
+
+        return resolve_effective_policy(
+            role=role,
+            workspace_allowed_paths=(),
+            task_allowed_paths=None,
+        )
+
+    def _permission(self, role: str, command: str) -> str:
+        from app.cli_runtime.agent_shell_hook import evaluate_hook_payload
+
+        policy = self._policy(role)
+        return evaluate_hook_payload(
+            {"hook_event_name": "beforeShellExecution", "command": command},
+            approved_wrappers=frozenset(policy.approved_wrappers),
+            approved_command_prefixes=policy.approved_command_prefixes,
+        )["permission"]
+
+    def test_implementation_roles_can_run_their_own_validation(self) -> None:
+        for role in ("backend", "frontend", "integrations", "lead"):
+            for command in ("npm test -- tests/x.test.ts", "npm run lint", "npx jest tests/x"):
+                with self.subTest(role=role, command=command):
+                    self.assertEqual("allow", self._permission(role, command))
+
+    def test_mutating_package_commands_stay_gated(self) -> None:
+        for command in ("npm install lodash", "npm run deploy", "npm publish", "npx create-app"):
+            with self.subTest(command=command):
+                self.assertEqual("deny", self._permission("backend", command))
+
+    def test_ci_read_roles_can_probe_gh_but_not_mutate_it(self) -> None:
+        for role in ("lead", "integrations"):
+            with self.subTest(role=role):
+                self.assertEqual("allow", self._permission(role, "gh auth status"))
+                self.assertEqual("allow", self._permission(role, "gh run list"))
+                self.assertEqual("deny", self._permission(role, "gh pr merge 12"))
+
+    def test_roles_without_ci_read_still_cannot_reach_gh(self) -> None:
+        self.assertEqual("deny", self._permission("backend", "gh auth status"))
+
+    def test_consultative_watcher_stays_read_only(self) -> None:
+        self.assertEqual("allow", self._permission("watcher", "git status"))
+        self.assertEqual("deny", self._permission("watcher", "npm test"))
+
+    def test_interpreter_and_privilege_escapes_remain_absolute(self) -> None:
+        for command in ('node -e "1"', "bash -c ls", "sudo npm test", "curl https://x.invalid"):
+            with self.subTest(command=command):
+                self.assertEqual("deny", self._permission("backend", command))
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -192,7 +192,7 @@ class WorkspaceWorkerPromptTests(unittest.TestCase):
 
     def test_prompt_includes_prior_failure_detail_for_retry(self) -> None:
         with patch(
-            "app.workspace_agents.worker_prompt.latest_role_run_outcome",
+            "app.workspace_agents.run_outcome.latest_role_run_outcome",
             return_value={
                 "run_id": "run_failed_backend",
                 "outcome": "failed",
@@ -219,7 +219,7 @@ class WorkspaceWorkerPromptTests(unittest.TestCase):
 
     def test_leased_prompt_uses_current_task_packet_not_prior_failure(self) -> None:
         with patch(
-            "app.workspace_agents.worker_prompt.latest_role_run_outcome",
+            "app.workspace_agents.run_outcome.latest_role_run_outcome",
             return_value={
                 "run_id": "run_stale_frontend",
                 "outcome": "failed",
@@ -255,7 +255,7 @@ class WorkspaceWorkerPromptTests(unittest.TestCase):
 
     def test_prompt_omits_prior_failure_when_last_shift_completed(self) -> None:
         with patch(
-            "app.workspace_agents.worker_prompt.latest_role_run_outcome",
+            "app.workspace_agents.run_outcome.latest_role_run_outcome",
             return_value={
                 "run_id": "run_ok_backend",
                 "outcome": "completed",
@@ -280,7 +280,7 @@ class WorkspaceWorkerPromptTests(unittest.TestCase):
 
     def test_prompt_omits_prior_failure_for_control_plane_restart(self) -> None:
         with patch(
-            "app.workspace_agents.worker_prompt.latest_role_run_outcome",
+            "app.workspace_agents.run_outcome.latest_role_run_outcome",
             return_value=None,
         ), patch(
             "app.workspace_agents.worker_prompt.build_team_roster_context",
@@ -300,7 +300,7 @@ class WorkspaceWorkerPromptTests(unittest.TestCase):
 
     def test_lead_prompt_includes_authoritative_team_roster(self) -> None:
         with patch(
-            "app.workspace_agents.worker_prompt.latest_role_run_outcome",
+            "app.workspace_agents.run_outcome.latest_role_run_outcome",
             return_value=None,
         ), patch(
             "app.workspace_agents.worker_prompt.build_team_roster_context",

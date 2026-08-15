@@ -377,6 +377,13 @@ export type AgentTerminalJobRecord = {
   status: string;
   created_at: string;
   receipt: string;
+  /** Set once the job reaches a terminal state (completed/failed/timed_out/cancelled). */
+  finished_at?: string | null;
+  exit_code?: number | null;
+  /** Why a job ended without its own exit code (deadline, cancellation). */
+  failure_reason?: string | null;
+  timeout_seconds?: number;
+  output_tail?: string;
   stream_to_chat?: boolean;
   thread_id?: string | null;
   message_id?: string | null;
@@ -425,4 +432,24 @@ export async function fetchAgentTerminalJobStatus(
     {},
     'workspace agent terminal job status request failed',
   );
+}
+
+/** Interrupt a running job (SIGINT) and close it out as cancelled, so a hung
+ * command can be stopped without tearing down the whole agent PTY session. */
+export async function cancelAgentTerminalJob(
+  workspaceId: string,
+  jobId: string,
+): Promise<AgentTerminalJobRecord> {
+  const encodedWorkspaceId = encodeURIComponent(workspaceId);
+  const encodedJobId = encodeURIComponent(jobId);
+  const payload = await fetchJson<{
+    workspace_id: string;
+    cancelled: boolean;
+    job: AgentTerminalJobRecord;
+  }>(
+    `/api/workspaces/${encodedWorkspaceId}/terminal/agent-jobs/${encodedJobId}`,
+    { method: 'DELETE' },
+    'workspace agent terminal job cancel failed',
+  );
+  return payload.job;
 }

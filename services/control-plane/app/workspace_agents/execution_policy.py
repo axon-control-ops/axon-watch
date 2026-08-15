@@ -7,6 +7,13 @@ from dataclasses import dataclass
 from pathlib import PurePosixPath
 from typing import Any, Iterable, Mapping
 
+from app.workspace_agents.execution_policy_prefixes import (
+    COMMON_AUDITED_WRAPPERS as _COMMON_AUDITED_WRAPPERS,
+    COMMON_READ_PREFIXES as _COMMON_READ_PREFIXES,
+    GH_READ_PREFIXES as _GH_READ_PREFIXES,
+    VALIDATION_PREFIXES as _VALIDATION_PREFIXES,
+)
+
 
 class ExecutionPolicyError(ValueError):
     """An execution policy is malformed or attempts an unknown policy mode."""
@@ -62,30 +69,13 @@ class AgentExecutionPolicyOverride:
     execution_access: str | None = None
 
 
-_COMMON_READ_PREFIXES = (
-    ("git", "status"),
-    ("git", "diff"),
-    ("git", "log"),
-    ("rg",),
-)
-# gh read-only sub-commands used at ship gates: auth probe, CI run status, log tails.
-# These never mutate repo or PR state; they're safe to pre-approve for Lead + Integrations.
-_GH_READ_PREFIXES = (
-    ("gh", "auth", "status"),
-    ("gh", "run", "list"),
-    ("gh", "run", "view"),
-    ("gh", "run", "watch"),
-    ("gh", "api", "repos"),
-)
-_COMMON_AUDITED_WRAPPERS = ("axon-agent-terminal-job",)
-
 _ROLE_DEFAULTS: dict[str, AgentExecutionPolicy] = {
     "lead": AgentExecutionPolicy(
         read_paths=(".",),
         write_paths=("docs/planning", "docs/ops", "plans"),
         forbidden_path_globs=(),
         approved_wrapper_names=(*_COMMON_AUDITED_WRAPPERS, "run_contract_unit_tests.sh"),
-        approved_command_prefixes=(*_COMMON_READ_PREFIXES, *_GH_READ_PREFIXES),
+        approved_command_prefixes=(*_COMMON_READ_PREFIXES, *_VALIDATION_PREFIXES, *_GH_READ_PREFIXES),
         audited_capabilities=("planning_write", "test", "workspace_read", "ci_read"),
         network_mode="audited",
         timeout_seconds=900,
@@ -121,7 +111,7 @@ _ROLE_DEFAULTS: dict[str, AgentExecutionPolicy] = {
         ),
         forbidden_path_globs=(),
         approved_wrapper_names=(*_COMMON_AUDITED_WRAPPERS, "console-web.sh"),
-        approved_command_prefixes=_COMMON_READ_PREFIXES,
+        approved_command_prefixes=(*_COMMON_READ_PREFIXES, *_VALIDATION_PREFIXES),
         audited_capabilities=("build", "test", "workspace_read"),
         network_mode="none",
         timeout_seconds=1200,
@@ -133,7 +123,7 @@ _ROLE_DEFAULTS: dict[str, AgentExecutionPolicy] = {
         write_paths=("services", "server", "api", "lib", "supabase", "packages", "tests"),
         forbidden_path_globs=(),
         approved_wrapper_names=(*_COMMON_AUDITED_WRAPPERS, "run_contract_unit_tests.sh"),
-        approved_command_prefixes=_COMMON_READ_PREFIXES,
+        approved_command_prefixes=(*_COMMON_READ_PREFIXES, *_VALIDATION_PREFIXES),
         audited_capabilities=("build", "test", "workspace_read"),
         network_mode="none",
         timeout_seconds=1200,
@@ -145,7 +135,7 @@ _ROLE_DEFAULTS: dict[str, AgentExecutionPolicy] = {
         write_paths=(".github", "config", "scripts"),
         forbidden_path_globs=(),
         approved_wrapper_names=(*_COMMON_AUDITED_WRAPPERS, "axonhealth", "watch-fast-gate.sh"),
-        approved_command_prefixes=(*_COMMON_READ_PREFIXES, *_GH_READ_PREFIXES),
+        approved_command_prefixes=(*_COMMON_READ_PREFIXES, *_VALIDATION_PREFIXES, *_GH_READ_PREFIXES),
         audited_capabilities=("ci_read", "health", "test", "workspace_read"),
         network_mode="audited",
         timeout_seconds=900,
