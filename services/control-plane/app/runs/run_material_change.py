@@ -12,3 +12,9 @@ def notify_run_material_change(run_id: str, record: dict[str, Any]) -> None:
         broadcast_material_change(receipt_id=str(record.get("run_id") or run_id))
     except Exception:
         pass
+    try:
+        from app.local_notifications import notify_run_transition
+
+        notify_run_transition(record)
+    except Exception:
+        pass

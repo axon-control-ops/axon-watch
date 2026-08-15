@@ -12,7 +12,6 @@ from typing import Any
 from app.safe_improvement.isolated_executor import read_baseline_metadata
 from app.workspace_agents.diff_policy import (
     evaluate_changed_paths,
-    is_control_plane_owned_path,
     resolve_effective_allowed_paths,
     scan_text_for_secrets,
 )
@@ -24,9 +23,9 @@ from app.workspace_delivery.config import (
 from app.workspace_delivery.gh_cli import gh_missing_hint, resolve_gh_cli
 from app.workspace_delivery import store as delivery_store
 from app.workspace_delivery.receipts import delivery_refs_from_record, emit_delivery_receipt
+from app.workspace_delivery.changed_paths import list_changed_paths
 
 logger = logging.getLogger(__name__)
-
 _GIT_TIMEOUT = 60
 _GH_TIMEOUT = 90
 _PROTECTED_PUSH_RE = re.compile(r"^(main|master|dev|production|release)$", re.IGNORECASE)
@@ -39,7 +38,6 @@ class PublishResult:
     delivery: dict[str, Any] | None
     detail: str
     cleanup_isolation: bool
-
 
 def _run(
     args: list[str],
@@ -63,21 +61,24 @@ def _combined(result: subprocess.CompletedProcess[str]) -> str:
     ).strip() or "(no output)"
 
 
-def list_isolation_changed_paths(isolation_root: Path) -> list[str]:
-    paths: list[str] = []
-    for args in (
-        ["git", "diff", "--name-only", "HEAD"],
-        ["git", "diff", "--name-only", "--cached"],
-        ["git", "ls-files", "--others", "--exclude-standard"],
-    ):
-        result = _run(args, cwd=isolation_root)
-        if result.returncode != 0:
-            continue
-        for line in (result.stdout or "").splitlines():
-            cleaned = line.strip()
-            if cleaned and cleaned not in paths and not is_control_plane_owned_path(cleaned):
-                paths.append(cleaned)
-    return paths
+def list_isolation_changed_paths(
+    isolation_root: Path,
+    *,
+    include_ignored_pathspecs: list[str] | None = None,
+) -> list[str]:
+    return list_changed_paths(
+        isolation_root,
+        run=_run,
+        include_ignored_pathspecs=include_ignored_pathspecs,
+    )
+
+
+def _stage_isolation_paths(isolation_root: Path, paths: list[str]) -> subprocess.CompletedProcess[str]:
+    """Stage only the path set that passed delivery scope and secret review."""
+    # ``-f`` is intentional: ignored files make it this far only when the task
+    # explicitly scoped their parent and passed policy/secret review. Without
+    # it, Git silently drops the exact work we audited.
+    return _run(["git", "add", "-f", "--", *paths], cwd=isolation_root)
 
 
 def _derive_commit_message(paths: list[str], turn_subject: str | None) -> str:
@@ -334,7 +335,11 @@ def publish_worker_isolation(
             cleanup_isolation=False,
         )
 
-    paths = list_isolation_changed_paths(isolation_root)
+    task_allowed_paths = _task_allowed_paths(task_id)
+    paths = list_isolation_changed_paths(
+        isolation_root,
+        include_ignored_pathspecs=task_allowed_paths,
+    )
     delivery = delivery_store.create_delivery(
         workspace_id=workspace_id,
         run_id=run_id,
@@ -415,7 +420,11 @@ def publish_worker_isolation(
         )
 
     message = _derive_commit_message(paths, turn_subject)
-    staged = _run(["git", "add", "-A"], cwd=isolation_root)
+    # A worker isolation is already single-run, but still stage the exact
+    # audited delta rather than relying on a blanket add. This keeps the
+    # delivery receipt, scope scan, and commit contents tied to the same list
+    # and makes accidental sidecar/runtime files impossible to sweep in.
+    staged = _stage_isolation_paths(isolation_root, paths)
     if staged.returncode != 0:
         detail = _combined(staged)
         delivery_store.update_delivery(

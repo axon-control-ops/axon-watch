@@ -43,8 +43,11 @@ def _utc_now_iso() -> str:
 
 
 def default_settings() -> dict[str, Any]:
-    # Safe default: continuous workers stay off until an operator enables them in UI.
+    # Safe default: action-taking continuous workers stay off until an
+    # operator enables them in UI. Observation stays on: company watchers are
+    # smoke alarms, not autonomous actors.
     return {
+        "watcher_scheduler_enabled": True,
         "scheduler_enabled": False,
         "max_active": 4,
         "max_starts_per_tick": 2,
@@ -81,6 +84,12 @@ def _normalize_settings(raw: dict[str, Any] | None) -> dict[str, Any]:
     if not raw:
         return deepcopy(defaults)
     return {
+        "watcher_scheduler_enabled": bool(
+            raw.get(
+                "watcher_scheduler_enabled",
+                defaults["watcher_scheduler_enabled"],
+            )
+        ),
         "scheduler_enabled": bool(raw.get("scheduler_enabled", defaults["scheduler_enabled"])),
         "max_active": _clamp_int(
             raw.get("max_active", defaults["max_active"]),
@@ -149,6 +158,8 @@ def save_settings(settings: dict[str, Any]) -> dict[str, Any]:
 
 def patch_settings(patch: dict[str, Any]) -> dict[str, Any]:
     current = load_settings()
+    if "watcher_scheduler_enabled" in patch and patch["watcher_scheduler_enabled"] is not None:
+        current["watcher_scheduler_enabled"] = bool(patch["watcher_scheduler_enabled"])
     if "scheduler_enabled" in patch and patch["scheduler_enabled"] is not None:
         current["scheduler_enabled"] = bool(patch["scheduler_enabled"])
     if "max_active" in patch and patch["max_active"] is not None:

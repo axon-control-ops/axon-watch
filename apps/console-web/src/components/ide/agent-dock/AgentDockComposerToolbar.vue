@@ -77,6 +77,7 @@ defineProps<{
   modelSearchQuery: string;
   runtimeHint: string;
   canConvertInstructions?: boolean;
+  instructionsGenerating?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -202,13 +203,16 @@ function runtimeStatusLine(record: AgentDockComposerRuntimeTarget): string {
       <button
         type="button"
         class="agent-dock-composer__tool"
-        title="Structure the full draft as lossless Instructions markdown"
-        aria-label="Convert the full draft to Instructions markdown"
+        :class="{ 'is-thinking': instructionsGenerating }"
+        :title="instructionsGenerating ? 'The instruction model is thinking' : 'Use the model to turn the draft into complete Instructions markdown'"
+        :aria-label="instructionsGenerating ? 'Generating Instructions' : 'Generate Instructions with the model'"
+        :aria-busy="instructionsGenerating ? 'true' : 'false'"
         :disabled="!canConvertInstructions"
         @click="emit('convert-to-instructions')"
       >
-        <span class="agent-dock-composer__tool-icon" aria-hidden="true">≡</span>
-        <span>Instructions</span>
+        <span v-if="instructionsGenerating" class="agent-dock-composer__tool-spinner" aria-hidden="true" />
+        <span v-else class="agent-dock-composer__tool-icon" aria-hidden="true">≡</span>
+        <span>{{ instructionsGenerating ? 'Thinking…' : 'Instructions' }}</span>
       </button>
     </div>
 
@@ -448,6 +452,11 @@ function runtimeStatusLine(record: AgentDockComposerRuntimeTarget): string {
             <span class="agent-dock-composer__model-label">
               {{ row.label }}
               <span v-if="row.badge" class="agent-dock-composer__model-badge">{{ row.badge }}</span>
+              <span
+                v-if="row.effort"
+                class="agent-dock-composer__model-effort"
+                :data-effort="row.effort"
+              >{{ row.effort }}</span>
             </span>
             <small>{{ row.description }}</small>
           </button>

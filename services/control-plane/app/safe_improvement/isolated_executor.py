@@ -66,6 +66,43 @@ def _resolve_baseline_commit(bound_project_root: Path) -> str:
     return commit
 
 
+def _commit_exists(bound_project_root: Path, commit: str) -> bool:
+    cleaned = str(commit or "").strip()
+    if not cleaned:
+        return False
+    result = _run_git(["cat-file", "-e", f"{cleaned}^{{commit}}"], cwd=bound_project_root)
+    return result.returncode == 0
+
+
+def _resolve_git_ref_commit(
+    bound_project_root: Path,
+    ref: str,
+    *,
+    fetch_remote: str = "origin",
+) -> str | None:
+    """Resolve a branch or commit ref, fetching from remote when missing locally."""
+    cleaned = str(ref or "").strip()
+    if not cleaned:
+        return None
+    if _commit_exists(bound_project_root, cleaned):
+        return cleaned
+    resolved = _run_git(["rev-parse", "--verify", f"{cleaned}^{{commit}}"], cwd=bound_project_root)
+    if resolved.returncode == 0:
+        commit = (resolved.stdout or "").strip()
+        return commit or None
+    fetched = _run_git(
+        ["fetch", fetch_remote, cleaned, "--quiet"],
+        cwd=bound_project_root,
+    )
+    if fetched.returncode != 0:
+        return None
+    resolved = _run_git(["rev-parse", "--verify", f"FETCH_HEAD^{{commit}}"], cwd=bound_project_root)
+    if resolved.returncode != 0:
+        return None
+    commit = (resolved.stdout or "").strip()
+    return commit or None
+
+
 def _write_sidecar_baseline(
     root: Path,
     *,
@@ -143,23 +180,39 @@ def _try_shallow_clone(
     return True
 
 
-def create_isolation_root(*, proposal_id: str, bound_project_root: Path) -> Path:
+def create_isolation_root(
+    *,
+    proposal_id: str,
+    bound_project_root: Path,
+    baseline_commit: str | None = None,
+    baseline_ref: str | None = None,
+) -> Path:
     """
     Create a disposable git checkout for proposal work.
 
     Prefer a named ``worker/<run_id>`` worktree at the bound project's HEAD commit;
     fall back to a local clone pinned to the same commit on the same branch name.
     Never writes into ``bound_project_root``. Fail closed if neither strategy succeeds.
+
+    When ``baseline_commit`` or ``baseline_ref`` is supplied (verification shifts),
+    pin isolation to that implementation head instead of the bound workspace checkout.
     """
     bound = bound_project_root.expanduser().resolve()
     if not bound.is_dir():
         raise IsolationError(f"bound project root is not a directory: {bound}")
 
-    baseline_commit = _resolve_baseline_commit(bound)
-    branch_ref = _run_git(["rev-parse", "--abbrev-ref", "HEAD"], cwd=bound)
-    baseline_branch = (branch_ref.stdout or "").strip() or None
-    if baseline_branch == "HEAD":
-        baseline_branch = None
+    pinned_commit = str(baseline_commit or "").strip() or None
+    if not pinned_commit and baseline_ref:
+        pinned_commit = _resolve_git_ref_commit(bound, str(baseline_ref).strip())
+    if pinned_commit:
+        baseline_commit_value = pinned_commit
+        baseline_branch = str(baseline_ref or "").strip() or None
+    else:
+        baseline_commit_value = _resolve_baseline_commit(bound)
+        branch_ref = _run_git(["rev-parse", "--abbrev-ref", "HEAD"], cwd=bound)
+        baseline_branch = (branch_ref.stdout or "").strip() or None
+        if baseline_branch == "HEAD":
+            baseline_branch = None
     branch = worker_branch_name(proposal_id)
     parent = Path(tempfile.mkdtemp(prefix=f"axon-si-{proposal_id[:12]}-"))
     checkout = parent / "checkout"
@@ -167,13 +220,13 @@ def create_isolation_root(*, proposal_id: str, bound_project_root: Path) -> Path
     isolation_kind: str | None = None
     # If the preferred branch already exists, uniquify once then fail closed.
     for attempt_branch in (branch, f"{branch}-{uuid4().hex[:8]}"):
-        if _try_worktree(bound, checkout, baseline_commit, attempt_branch):
+        if _try_worktree(bound, checkout, baseline_commit_value, attempt_branch):
             isolation_kind = "worktree"
             branch = attempt_branch
             break
         if checkout.exists():
             shutil.rmtree(checkout, ignore_errors=True)
-        if _try_shallow_clone(bound, checkout, baseline_commit, attempt_branch):
+        if _try_shallow_clone(bound, checkout, baseline_commit_value, attempt_branch):
             isolation_kind = "shallow_clone"
             branch = attempt_branch
             break
@@ -191,7 +244,7 @@ def create_isolation_root(*, proposal_id: str, bound_project_root: Path) -> Path
         checkout,
         proposal_id=proposal_id,
         bound_project_root=bound,
-        baseline_commit=baseline_commit,
+        baseline_commit=baseline_commit_value,
         isolation_kind=isolation_kind,
         worker_branch=branch,
         baseline_branch=baseline_branch,

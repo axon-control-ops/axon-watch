@@ -2,8 +2,8 @@
   "schema_version": 1,
   "canonical_home": "docs/planning/",
   "legacy_mirror": "axon-local/Plans/Axon-Watch/",
-  "generated_on": "2026-07-31",
-  "file_count": 44,
+  "generated_on": "2026-08-09",
+  "file_count": 45,
   "files": {
     "ADR-001-greenfield-repo.md": {
       "sha256": "558fd8d8fa76eacbae7b2d276c01bc85bf8e2e33c86af49a62bafc3c0a42cedc",
@@ -92,6 +92,10 @@
     "KAIRO_VOICE_UPGRADE_PLAN.md": {
       "sha256": "3bae920975f04985a9efe5f8c61ef9722f033352ddc20b76f5d8ae4ec69f3a9c",
       "bytes": 10681
+    },
+    "MOBILE_CONTROL_PLANE_V1.md": {
+      "sha256": "b187785756aedab7891a0a7d0fbd515628c2eb49fd4732b3a5c89ad5f8c66021",
+      "bytes": 8230
     },
     "OPERATOR_BRAIN_PIVOT.md": {
       "sha256": "5b789c0ee500d04a699686a8f9bffd641199df9e6af3d18546d894d65af7ad68",

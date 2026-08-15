@@ -14,6 +14,7 @@ CONTROL_PLANE_ROOT = Path(__file__).resolve().parents[1] / "services" / "control
 sys.path.insert(0, str(CONTROL_PLANE_ROOT))
 
 from app.persistence import (  # noqa: E402
+    constitution_registry_store,
     run_store,
     task_store,
     worker_scheduler_settings_store,
@@ -21,6 +22,7 @@ from app.persistence import (  # noqa: E402
 from app.runs.service import create_run, fail_run, get_run, stop_run  # noqa: E402
 from app.workspace_agents import build_company_roster  # noqa: E402
 from app.workspace_agents.scheduler import run_continuous_worker_tick  # noqa: E402
+from app.workspace_agents.scheduler import run_observation_tick  # noqa: E402
 from app.workspace_agents.status import active_role_run_id, active_role_run_status  # noqa: E402
 
 
@@ -37,7 +39,9 @@ class WorkspaceAgentSchedulerTests(unittest.TestCase):
     def setUp(self) -> None:
         isolate_control_plane_db(self, run_store)
         task_store.reset_store()
+        constitution_registry_store.reset_store()
         self.addCleanup(task_store.reset_store)
+        self.addCleanup(constitution_registry_store.reset_store)
 
     def test_default_agents_file_resolves_to_repo_config_not_services(self) -> None:
         from app.workspace_agents.config_loader import default_agents_file, load_workspace_agent_configs
@@ -234,6 +238,37 @@ class WorkspaceAgentSchedulerTests(unittest.TestCase):
 
         self.assertEqual([], started)
 
+    def test_observation_tick_runs_watch_sources_when_worker_scheduler_off(self) -> None:
+        with (
+            patch.dict(
+                os.environ,
+                {
+                    "AXON_WATCH_OBSERVATION_SCHEDULER": "1",
+                    "AXON_WATCH_WORKER_SCHEDULER": "1",
+                },
+                clear=False,
+            ),
+            patch(
+                "app.workspace_agents.company_work_sources.run_scheduled_work_sources",
+                return_value={
+                    "recovered_leases": [],
+                    "sources": {"ci_stale_signal_sweep": {"checked": 1}},
+                },
+            ) as work_sources,
+        ):
+            worker_scheduler_settings_store.patch_settings(
+                {
+                    "watcher_scheduler_enabled": True,
+                    "scheduler_enabled": False,
+                }
+            )
+            observed = run_observation_tick()
+            started = run_continuous_worker_tick()
+
+        self.assertTrue(observed["enabled"])
+        self.assertEqual([], started)
+        work_sources.assert_any_call(observation_only=True)
+
     def test_dispatch_crash_fails_run_instead_of_leaving_executing(self) -> None:
         from app.workspace_agents.config_loader import EmployeeConfig
         from app.workspace_agents.worker_dispatch import dispatch_continuous_worker_run
@@ -259,6 +294,9 @@ class WorkspaceAgentSchedulerTests(unittest.TestCase):
         with patch(
             "app.workspace_agents.worker_dispatch.generate_lane_b_result",
             side_effect=RuntimeError("simulated dispatch crash"),
+        ), patch(
+            "app.workspace_agents.worker_dispatch.prepare_worker_ide_stream",
+            return_value=None,
         ):
             dispatched, finalized = dispatch_continuous_worker_run(
                 workspace_id="workspace_worker_fail",
@@ -302,9 +340,19 @@ class WorkspaceAgentSchedulerTests(unittest.TestCase):
             require_leased_task=True,
         )
         run_id = str(created["run_id"])
-        with patch(
-            "app.workspace_agents.worker_dispatch.generate_lane_b_result",
-            return_value={"dispatched": True, "runtime_label": "test", "content": "done"},
+        with (
+            patch(
+                "app.workspace_agents.worker_dispatch.generate_lane_b_result",
+                return_value={"dispatched": True, "runtime_label": "test", "content": "done"},
+            ),
+            patch(
+                "app.workspace_agents.worker_dispatch.finalize_lane_b_agent_run",
+                return_value=(False, None),
+            ),
+            patch(
+                "app.workspace_agents.worker_dispatch.prepare_worker_ide_stream",
+                return_value=None,
+            ),
         ):
             dispatch_continuous_worker_run(
                 workspace_id="workspace_worker_heartbeat",
@@ -320,6 +368,89 @@ class WorkspaceAgentSchedulerTests(unittest.TestCase):
         history = run_store.list_history(get_run(run_id)["history_ref"])
         receipt_types = [str(item.get("receipt", {}).get("type") or "") for item in history]
         self.assertIn("worker_dispatch_started", receipt_types)
+
+    def test_full_access_no_change_delivery_reopens_task(self) -> None:
+        from app.workspace_agents.config_loader import EmployeeConfig
+        from app.workspace_agents.execution_policy import role_execution_policy
+        from app.workspace_agents.worker_dispatch import dispatch_continuous_worker_run
+        from app.workspace_delivery.publish import PublishResult
+
+        opened = _seed_open_task(
+            workspace_id="workspace_worker_noop",
+            owner_role="backend",
+            goal="Implement the backend fix",
+        )
+        leased = task_store.lease_task(
+            opened["task_id"],
+            lease_holder="employee-workspace_worker_noop-backend",
+        )
+        created = create_run(
+            workspace_id="workspace_worker_noop",
+            mode="agent",
+            summary="Backend continuous shift",
+            employee_role="backend",
+            task_id=leased["task_id"],
+            require_leased_task=True,
+        )
+        run_id = str(created["run_id"])
+        with patch(
+            "app.workspace_agents.worker_dispatch.generate_lane_b_result",
+            return_value={
+                "dispatched": True,
+                "runtime_label": "test",
+                "content": "No files changed.\n\nConfidence: 10/10",
+            },
+        ), patch(
+            "app.workspace_agents.worker_dispatch.resolve_worker_execution_policy",
+            return_value=role_execution_policy("backend"),
+        ), patch(
+            "app.workspace_agents.worker_dispatch.finalize_lane_b_agent_run",
+            return_value=(True, {"phase": "executing"}),
+        ), patch(
+            "app.workspace_agents.verifier_contract.run_requires_acceptance_evidence",
+            return_value=True,
+        ), patch(
+            "app.workspace_agents.verifier_contract.has_passing_acceptance_evidence",
+            return_value=True,
+        ), patch(
+            "app.workspace_delivery.publish_worker_isolation",
+            return_value=PublishResult(
+                ok=True,
+                stage="no_change",
+                delivery={"delivery_id": "delivery-noop"},
+                detail="no changes",
+                cleanup_isolation=True,
+            ),
+        ), patch(
+            "app.workspace_agents.worker_dispatch.prepare_worker_ide_stream",
+            return_value=None,
+        ):
+            dispatched, finalized = dispatch_continuous_worker_run(
+                workspace_id="workspace_worker_noop",
+                employee=EmployeeConfig(
+                    name="API Craft",
+                    role="backend",
+                    owns="APIs and persistence",
+                    schedule="continuous",
+                ),
+                run_record=created,
+            )
+
+        self.assertFalse(dispatched)
+        assert finalized is not None
+        self.assertEqual("failed", finalized["phase"])
+        task = task_store.get_task(leased["task_id"])
+        assert task is not None
+        self.assertEqual("open", task["status"])
+        history = run_store.list_history(get_run(run_id)["history_ref"])
+        summaries = [
+            str(item.get("receipt", {}).get("summary") or "").lower()
+            for item in history
+        ]
+        self.assertTrue(
+            any("no changed files" in summary or "completion gate" in summary for summary in summaries),
+            summaries,
+        )
 
     def test_continuous_worker_tick_skips_role_after_usage_limit_failure(self) -> None:
         with tempfile.TemporaryDirectory() as tempdir:
@@ -343,14 +474,24 @@ class WorkspaceAgentSchedulerTests(unittest.TestCase):
                 ),
                 encoding="utf-8",
             )
-            with patch.dict(
-                os.environ,
-                {
-                    "AXON_WATCH_WORKSPACE_AGENTS_FILE": str(agents_file),
-                    "AXON_WATCH_WORKER_SCHEDULER": "1",
-                    "AXON_WATCH_WORKER_SCHEDULER_DISPATCH": "0",
-                },
-                clear=False,
+            with (
+                patch.dict(
+                    os.environ,
+                    {
+                        "AXON_WATCH_WORKSPACE_AGENTS_FILE": str(agents_file),
+                        "AXON_WATCH_WORKER_SCHEDULER": "1",
+                        "AXON_WATCH_WORKER_SCHEDULER_DISPATCH": "0",
+                    },
+                    clear=False,
+                ),
+                patch(
+                    "app.cli_runtime.cursor_usage_probe.probe_cursor_usage",
+                    return_value={},
+                ),
+                patch(
+                    "app.cli_runtime.cursor_usage_probe.cursor_usage_allows_agent_retry",
+                    return_value=False,
+                ),
             ):
                 worker_scheduler_settings_store.patch_settings({"scheduler_enabled": True})
                 failed = create_run(
@@ -473,6 +614,58 @@ class WorkspaceAgentSchedulerTests(unittest.TestCase):
         roles = [str(run.get("employee_role") or "") for run in started]
         self.assertEqual(["backend"], roles)
         self.assertTrue(all(run.get("task_id") for run in started))
+
+    def test_scheduler_dispatch_records_constitution_decision_trace(self) -> None:
+        with tempfile.TemporaryDirectory() as tempdir:
+            agents_file = Path(tempdir) / "agents.json"
+            agents_file.write_text(
+                json.dumps(
+                    {
+                        "companies": {
+                            "workspace_axon_watch": {
+                                "company_name": "Axon-X",
+                                "employees": [
+                                    {
+                                        "name": "Trace",
+                                        "role": "backend",
+                                        "schedule": "continuous",
+                                    },
+                                ],
+                            }
+                        }
+                    }
+                ),
+                encoding="utf-8",
+            )
+            with patch.dict(
+                os.environ,
+                {
+                    "AXON_WATCH_WORKSPACE_AGENTS_FILE": str(agents_file),
+                    "AXON_WATCH_WORKER_SCHEDULER": "1",
+                    "AXON_WATCH_WORKER_SCHEDULER_DISPATCH": "0",
+                },
+                clear=False,
+            ):
+                worker_scheduler_settings_store.patch_settings({"scheduler_enabled": True})
+                task = _seed_open_task(
+                    workspace_id="workspace_axon_watch",
+                    owner_role="backend",
+                    goal="Trace a scheduler dispatch",
+                )
+                started = run_continuous_worker_tick()
+
+        self.assertEqual(1, len(started))
+        decisions = constitution_registry_store.list_decisions(task_id=task["task_id"])
+        self.assertEqual(1, len(decisions))
+        self.assertEqual("worker_scheduler", decisions[0]["actor"])
+        self.assertEqual("dispatch", decisions[0]["decision"])
+        self.assertEqual("CAP-034", decisions[0]["capability_id"])
+        evidence = constitution_registry_store.list_evidence(
+            source_table="workspace_tasks",
+            task_id=task["task_id"],
+        )
+        self.assertEqual(1, len(evidence))
+        self.assertEqual(decisions[0]["decision_id"], evidence[0]["decision_id"])
 
 
 if __name__ == "__main__":

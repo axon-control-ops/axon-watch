@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, ref } from 'vue';
-
 import VaultHudPanel from './VaultHudPanel.vue';
+import VaultSentryValidationCard from './VaultSentryValidationCard.vue';
 import { useVaultSurface } from '../../composables/useVaultSurface';
 import {
   formatVaultTimestamp,
@@ -21,7 +21,6 @@ import {
 } from '../../lib/runtime-auth-view';
 
 const vault = useVaultSurface();
-
 const snapshot = computed(() => vault.snapshot.value);
 const knownKeys = computed(() => snapshot.value?.known_keys ?? []);
 const consumers = computed(() => snapshot.value?.consumers ?? []);
@@ -53,8 +52,8 @@ const showSetupFlow = computed(
 const showUnlockFlow = computed(
   () => Boolean(snapshot.value?.is_setup) && !snapshot.value?.is_unlocked && !vault.setupTotpSecret.value,
 );
-const secretSearch = ref('');
-const secretCategoryFilter = ref('all');
+const [showUnlockPassword, showSetupPassword, showSetupConfirmPassword] = [ref(false), ref(false), ref(false)];
+const secretSearch = ref(''), secretCategoryFilter = ref('all');
 const secretsExpanded = ref(true);
 const defaultCategories = ['general', 'runtime', 'monitor', 'analytics', 'security', 'integration'];
 const secretCategoryOptions = computed(() => {
@@ -211,11 +210,11 @@ function onBackupFileSelected(event: Event): void {
         <div class="vault-surface__form-grid">
           <label>
             Master password
-            <input v-model="vault.setupPassword.value" class="vault-surface__input" type="password" autocomplete="new-password" />
+            <input v-model="vault.setupPassword.value" class="vault-surface__input" :type="showSetupPassword ? 'text' : 'password'" autocomplete="new-password" /><button type="button" class="vault-surface__button" :aria-label="showSetupPassword ? 'Hide password' : 'Show password'" @click="showSetupPassword = !showSetupPassword">{{ showSetupPassword ? 'Hide' : 'Show' }}</button>
           </label>
           <label>
             Confirm password
-            <input v-model="vault.setupConfirmPassword.value" class="vault-surface__input" type="password" autocomplete="new-password" />
+            <input v-model="vault.setupConfirmPassword.value" class="vault-surface__input" :type="showSetupConfirmPassword ? 'text' : 'password'" autocomplete="new-password" /><button type="button" class="vault-surface__button" :aria-label="showSetupConfirmPassword ? 'Hide password' : 'Show password'" @click="showSetupConfirmPassword = !showSetupConfirmPassword">{{ showSetupConfirmPassword ? 'Hide' : 'Show' }}</button>
           </label>
         </div>
         <button type="button" class="vault-surface__button vault-surface__button--primary" @click="vault.submitSetup">
@@ -239,7 +238,7 @@ function onBackupFileSelected(event: Event): void {
         <div class="vault-surface__form-grid">
           <label>
             Master password
-            <input v-model="vault.unlockPassword.value" class="vault-surface__input" type="password" autocomplete="current-password" />
+            <input v-model="vault.unlockPassword.value" class="vault-surface__input" :type="showUnlockPassword ? 'text' : 'password'" autocomplete="current-password" /><button type="button" class="vault-surface__button" :aria-label="showUnlockPassword ? 'Hide password' : 'Show password'" @click="showUnlockPassword = !showUnlockPassword">{{ showUnlockPassword ? 'Hide' : 'Show' }}</button>
           </label>
           <label>
             2FA code
@@ -277,6 +276,7 @@ function onBackupFileSelected(event: Event): void {
               <div><dt>Legacy import file</dt><dd>{{ snapshot.import_file_present ? importFileLabel : 'None' }}</dd></div>
               <div><dt>Resolved keys</dt><dd>{{ snapshot.available_keys.length }}</dd></div>
             </dl>
+            <VaultSentryValidationCard />
           </VaultHudPanel>
         </aside>
 

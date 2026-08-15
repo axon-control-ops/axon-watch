@@ -24,6 +24,7 @@ from app.chat.progress_milestones import (
 from app.plans.service import maybe_attach_plan_artifact
 from app.kairo.turn_memory import remember_turn
 from app.persistence import chat_store
+from app.workspace_agents.execution_policy import AgentExecutionPolicy
 from app.runs.service import (
     RunLifecycleError,
     RunNotFoundError,
@@ -71,6 +72,10 @@ class LaneBStreamJob:
     memory_appendix: str | None = None
     kairo_session_id: str | None = None
     workspace_root: Path | None = None
+    # Role baseline for the thread this turn is dispatched under — independent
+    # of the operator's own execution_access toggle above; see
+    # try_lane_b_git_commit_dispatch for why both are needed.
+    execution_policy: AgentExecutionPolicy | None = None
 
 
 def _utc_now() -> str:
@@ -135,12 +140,19 @@ def finalize_lane_b_agent_run(
     reply_text: str = "",
     workspace_root: str | None = None,
     defer_complete: bool = False,
+    require_critical_review: bool = True,
 ) -> tuple[bool, dict[str, object] | None]:
     """Finalize a Lane B agent run.
 
     When ``defer_complete`` is True (scheduled workers), critical review and
     Gate 6 acceptance still run, but ``complete_run`` is left to the caller so
     workspace delivery can publish before the terminal phase.
+
+    ``require_critical_review`` (default True, preserving prior behavior for
+    every existing caller) gates whether a missing "Confidence: N/10" line
+    fails the run. Routine (non-review-type) continuous shifts pass False —
+    see is_review_type_task() — so an ordinary reply is not hard-failed for
+    omitting a ritual it was never asked to perform.
     """
     dispatched = bool(lane_b_result.get("dispatched"))
     runtime_label = str(lane_b_result.get("runtime_label") or "runtime fallback")
@@ -162,35 +174,39 @@ def finalize_lane_b_agent_run(
         if dispatched:
             confidence, auto_recovered = resolve_critical_review_confidence(reply_text)
             if confidence is None:
+                if require_critical_review:
+                    run_record = append_run_execution_receipt(
+                        dispatch_run_id,
+                        receipt_type="critical_review",
+                        receipt_summary=MISSING_CONFIDENCE_DETAIL,
+                        actor="critical_review",
+                        success=False,
+                        intent="lane_b_agent",
+                    )
+                    run_record = fail_run(
+                        dispatch_run_id,
+                        receipt_summary=MISSING_CONFIDENCE_DETAIL,
+                    )
+                    # Still notify Lead/VAXON on terminal failure so the chain is not silent.
+                    _maybe_notify_lead_after_lane_b(
+                        dispatch_run_id=dispatch_run_id,
+                        run_record=run_record,
+                        reply_text=reply_text,
+                    )
+                    return False, run_record
+                # Routine reply, ritual not required — proceed without demanding
+                # a confidence line or stamping an unrequested receipt for it.
+            else:
                 run_record = append_run_execution_receipt(
                     dispatch_run_id,
                     receipt_type="critical_review",
-                    receipt_summary=MISSING_CONFIDENCE_DETAIL,
+                    receipt_summary=critical_review_receipt_summary(
+                        confidence, auto_recovered=auto_recovered
+                    ),
                     actor="critical_review",
-                    success=False,
+                    success=True,
                     intent="lane_b_agent",
                 )
-                run_record = fail_run(
-                    dispatch_run_id,
-                    receipt_summary=MISSING_CONFIDENCE_DETAIL,
-                )
-                # Still notify Lead/VAXON on terminal failure so the chain is not silent.
-                _maybe_notify_lead_after_lane_b(
-                    dispatch_run_id=dispatch_run_id,
-                    run_record=run_record,
-                    reply_text=reply_text,
-                )
-                return False, run_record
-            run_record = append_run_execution_receipt(
-                dispatch_run_id,
-                receipt_type="critical_review",
-                receipt_summary=critical_review_receipt_summary(
-                    confidence, auto_recovered=auto_recovered
-                ),
-                actor="critical_review",
-                success=True,
-                intent="lane_b_agent",
-            )
             from app.workspace_agents.verifier_contract import (
                 ensure_acceptance_before_publish,
             )
@@ -334,6 +350,7 @@ def execute_lane_b_stream(job: LaneBStreamJob) -> None:
             execution_access=job.execution_access,
             on_chunk=on_chunk,
             workspace_root=job.workspace_root,
+            execution_policy=job.execution_policy,
         )
         agent_content = str(lane_b_result.get("content") or "")
         speaker_name = employee_name_from_persona_block(job.memory_appendix)

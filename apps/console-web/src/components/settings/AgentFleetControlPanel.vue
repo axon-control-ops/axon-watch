@@ -52,14 +52,35 @@ const effectiveTone = computed(() => {
 });
 
 const workersWantedOn = computed(() => Boolean(status.value?.scheduler_enabled));
+const watcherWantedOn = computed(() => Boolean(status.value?.watcher_scheduler_enabled));
+
+const watcherLabel = computed(() => {
+  if (!status.value) {
+    return 'Unknown';
+  }
+  if (status.value.watcher_blocked_by_env) {
+    return 'Blocked by host brake';
+  }
+  return status.value.watcher_effective_enabled ? 'Watching' : 'Paused';
+});
+
+const watcherTone = computed(() => {
+  if (!status.value) {
+    return 'unknown';
+  }
+  if (status.value.watcher_blocked_by_env) {
+    return 'blocked';
+  }
+  return status.value.watcher_effective_enabled ? 'running' : 'paused';
+});
 
 const modeCopy: Record<AutonomyMode, string> = {
   manual:
-    'VAXON speaks only for approvals and interruptive signals. Continuous workers stay paused. Lead Send still kicks specialists for that handoff.',
+    'VAXON speaks only for approvals and interruptive signals. Continuous workers stay paused. The monitoring lane can still watch for blockers and bugs.',
   semi:
-    'VAXON stays proactive with advisory briefs. Continuous workers stay paused (no idle Cursor burn). Lead Send still kicks specialists for that handoff — Full is required for always-on leasing.',
+    'VAXON stays proactive with advisory briefs. Continuous workers stay paused (no idle Cursor burn). The monitoring lane keeps observing; Full is required for always-on leasing.',
   full:
-    'VAXON advisory plus continuous workers that lease tasks and run Cursor shifts without per-run approval.',
+    'VAXON advisory plus continuous workers that lease tasks and run Cursor shifts without per-run approval. Monitoring remains separate and always-on unless explicitly braked.',
 };
 
 async function reload(): Promise<void> {
@@ -80,6 +101,7 @@ async function reload(): Promise<void> {
 }
 
 async function persistCaps(patch: {
+  watcher_scheduler_enabled?: boolean;
   max_active?: number;
   max_starts_per_tick?: number;
 }): Promise<void> {
@@ -99,6 +121,10 @@ async function persistCaps(patch: {
   } finally {
     saving.value = false;
   }
+}
+
+async function onWatcherToggle(): Promise<void> {
+  await persistCaps({ watcher_scheduler_enabled: !watcherWantedOn.value });
 }
 
 async function onAutonomyModeChange(mode: AutonomyMode): Promise<void> {
@@ -260,7 +286,7 @@ onUnmounted(() => {
     >
       {{
         actionMessage ||
-        'Semi keeps VAXON proactive with workers off. Full starts continuous Cursor shifts. Hard-kill and resume live here — no .env edit for day-to-day control.'
+        'Monitoring watches blockers/errors separately from worker autonomy. Semi keeps VAXON proactive with workers off; Full starts continuous Cursor shifts.'
       }}
     </p>
 
@@ -328,6 +354,17 @@ onUnmounted(() => {
 
         <dl class="operator-settings-form__status-grid">
           <div>
+            <dt>Monitoring lane</dt>
+            <dd>
+              <span
+                class="operator-settings-form__pill agent-fleet-panel__effective"
+                :class="`agent-fleet-panel__effective--${watcherTone}`"
+              >
+                {{ watcherLabel }}
+              </span>
+            </dd>
+          </div>
+          <div>
             <dt>Workers</dt>
             <dd>
               <span
@@ -341,6 +378,10 @@ onUnmounted(() => {
           <div>
             <dt>Settings switch</dt>
             <dd>{{ workersWantedOn ? 'On' : 'Off' }}</dd>
+          </div>
+          <div>
+            <dt>Watcher switch</dt>
+            <dd>{{ watcherWantedOn ? 'On' : 'Off' }}</dd>
           </div>
           <div>
             <dt>Executing now</dt>
@@ -361,8 +402,13 @@ onUnmounted(() => {
         </dl>
 
         <p class="agent-fleet-panel__usage-note" role="note">
-          Idle scheduler ticks do not call Cursor CLI. Usage only when a leased task actually
-          dispatches a worker shift.
+          Monitoring ticks reconcile deliveries, stale runs, CI/watch signals, and Lead blockers without
+          dispatching worker shifts. Cursor usage only starts when a leased task actually dispatches.
+        </p>
+
+        <p v-if="status.watcher_blocked_by_env" class="agent-fleet-panel__env-warn">
+          Monitoring host brake is on (<code>AXON_WATCH_OBSERVATION_SCHEDULER=0</code>).
+          AXON-X will not run scheduled watcher checks until that env flag is cleared.
         </p>
 
         <p v-if="readiness" class="agent-fleet-panel__readiness" role="status">
@@ -402,6 +448,14 @@ onUnmounted(() => {
             @click="reload"
           >
             Refresh
+          </button>
+          <button
+            type="button"
+            class="settings-surface__button"
+            :disabled="saving || killing || resuming || status.watcher_blocked_by_env"
+            @click="onWatcherToggle"
+          >
+            {{ watcherWantedOn ? 'Pause monitoring lane' : 'Resume monitoring lane' }}
           </button>
         </div>
       </section>

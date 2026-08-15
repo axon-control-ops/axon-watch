@@ -118,6 +118,20 @@ describe('IDE editor surface layout contract', () => {
     expect(focus).toMatch(/outline-offset:\s*2px/);
   });
 
+  it('styles the IDE editor status-bar problems chip with failure attention', () => {
+    const panels = readCss('shell/editor-statusbar-panels.css');
+    const chip = ruleBlock(panels, '.editor-statusbar__panel-toggle--problems');
+    expect(chip).toMatch(/border-color:\s*rgba\(255,\s*110,\s*90,\s*0\.38\)/);
+    expect(chip).toMatch(/box-shadow:\s*inset 0 -1px 0 rgba\(190,\s*80,\s*60,\s*0\.38\)/);
+
+    const focus = ruleBlock(
+      panels,
+      '.editor-statusbar__panel-toggle--problems:focus-visible',
+    );
+    expect(focus).toMatch(/outline:\s*2px solid rgba\(220,\s*110,\s*90,\s*0\.55\)/);
+    expect(focus).toMatch(/outline-offset:\s*2px/);
+  });
+
   it('styles the IDE editor status-bar team-attention chips with roster tones', () => {
     const panels = readCss('shell/editor-statusbar-panels.css');
     const failure = ruleBlock(panels, '.editor-statusbar__panel-toggle--team-failure');

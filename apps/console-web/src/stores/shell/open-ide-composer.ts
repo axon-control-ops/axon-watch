@@ -18,8 +18,8 @@ export function openIdeComposerSurface(input: {
   }
   input.agentDockCollapsed.value = false;
   input.persistAgentDockCollapsed(false);
-  if (!input.keepActivityView) {
-    input.ideActivityView.value = 'agent';
+  if (!input.keepActivityView && input.ideActivityView.value === 'agent') {
+    input.ideActivityView.value = 'team';
   }
   input.commandFocusToken.value += 1;
 }

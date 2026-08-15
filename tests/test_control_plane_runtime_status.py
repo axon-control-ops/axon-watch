@@ -6,16 +6,15 @@ from pathlib import Path
 from unittest.mock import patch
 
 from fastapi.testclient import TestClient
+from tests.support.control_plane_app_loader import load_control_plane_app
 
 CONTROL_PLANE_ROOT = Path(__file__).resolve().parents[1] / "services" / "control-plane"
 sys.path.insert(0, str(CONTROL_PLANE_ROOT))
 
-from app.main import app  # noqa: E402
-
 
 class ControlPlaneRuntimeStatusTests(unittest.TestCase):
     def setUp(self) -> None:
-        self.client = TestClient(app)
+        self.client = TestClient(load_control_plane_app())
         self.addCleanup(self.client.close)
 
     @patch("app.routes.runtime.get_runtime_status")

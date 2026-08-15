@@ -13,6 +13,7 @@ from app.cli_runtime.catalog import (
     _run_command,
     find_cursor_cli,
 )
+from app.cli_runtime.catalog_discovery import cursor_cli_argv
 from app.cli_runtime.vault_keys import fetch_runtime_context
 
 ModelRecord = dict[str, str]
@@ -90,7 +91,7 @@ def _normalize_model_record(model_id: str, label: str) -> ModelRecord:
 def _fetch_cursor_models(binary: str) -> list[ModelRecord]:
     try:
         proc = _run_command(
-            [binary, "agent", "--list-models"],
+            cursor_cli_argv(binary, "--list-models"),
             timeout=_LIST_MODELS_TIMEOUT_SECONDS,
         )
     except Exception:

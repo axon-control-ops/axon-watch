@@ -14,11 +14,11 @@ export type AutonomyActionTone = 'idle' | 'ok' | 'error' | 'pending' | 'warn';
 
 export const AUTONOMY_MODE_COPY: Record<AutonomyMode, string> = {
   manual:
-    'VAXON speaks only for approvals and interruptive signals. Continuous workers stay paused. Lead Send still kicks specialists for that handoff.',
+    'VAXON speaks only for approvals and interruptive signals. Continuous workers stay paused. The monitoring lane can still watch for blockers and bugs.',
   semi:
-    'VAXON stays proactive with advisory briefs. Continuous workers stay paused (no idle Cursor burn). Lead Send still kicks specialists for that handoff — Full is required for always-on leasing.',
+    'VAXON stays proactive with advisory briefs. Continuous workers stay paused (no idle Cursor burn). The monitoring lane keeps observing; Full is required for always-on leasing.',
   full:
-    'VAXON advisory plus continuous workers that lease tasks and run Cursor shifts without per-run approval.',
+    'VAXON advisory plus continuous workers that lease tasks and run Cursor shifts without per-run approval. Monitoring remains separate and always-on unless explicitly braked.',
 };
 
 export function useWorkerAutonomyControl(options?: {
@@ -60,6 +60,24 @@ export function useWorkerAutonomyControl(options?: {
     return status.value.effective_enabled ? 'running' : 'paused';
   });
   const workersWantedOn = computed(() => Boolean(status.value?.scheduler_enabled));
+  const watcherLabel = computed(() => {
+    if (!status.value) {
+      return 'Unknown';
+    }
+    if (status.value.watcher_blocked_by_env) {
+      return 'Blocked by host brake';
+    }
+    return status.value.watcher_effective_enabled ? 'Watching' : 'Paused';
+  });
+  const watcherTone = computed(() => {
+    if (!status.value) {
+      return 'unknown';
+    }
+    if (status.value.watcher_blocked_by_env) {
+      return 'blocked';
+    }
+    return status.value.watcher_effective_enabled ? 'running' : 'paused';
+  });
 
   async function reload(): Promise<void> {
     loadState.value = status.value ? loadState.value : 'loading';
@@ -245,6 +263,8 @@ export function useWorkerAutonomyControl(options?: {
     effectiveLabel,
     effectiveTone,
     workersWantedOn,
+    watcherLabel,
+    watcherTone,
     modeCopy: AUTONOMY_MODE_COPY,
     reload,
     setAutonomyMode,

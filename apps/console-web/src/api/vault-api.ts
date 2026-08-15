@@ -1,6 +1,7 @@
 import type {
   VaultSecretDetail,
   VaultSecretRecord,
+  VaultSentryValidation,
   VaultStatusSnapshot,
 } from '../lib/vault-surface-view';
 
@@ -99,6 +100,12 @@ export async function fetchVaultProviderKeys(): Promise<{
   dev_bypass: boolean;
 }> {
   return vaultRequest('/api/vault/provider-keys');
+}
+
+export async function validateVaultSentry(): Promise<VaultSentryValidation> {
+  return vaultRequest<VaultSentryValidation>('/api/vault/validate/sentry', {
+    method: 'POST',
+  });
 }
 
 export async function setupVault(masterPassword: string): Promise<VaultSetupResponse> {

@@ -41,6 +41,7 @@ import {
   kairoConversationError,
   kairoConversationPhase,
   kairoConversationReply,
+  pushKairoTurn,
   setKairoConversationPhase,
 } from './kairo-conversation-state';
 import { executeReportTheaterAction } from '../report-theater/report-theater-execute';
@@ -180,6 +181,7 @@ export function useKairoConversation() {
         ? 'deep'
         : determineAnswerTier(content);
 
+    pushKairoTurn('operator', content);
     pending.value = true;
     kairoConversationError.value = null;
     thinkingLine.value = thinkingStatusLine(content, answerTier);
@@ -250,9 +252,11 @@ export function useKairoConversation() {
           return;
         }
       }
-      kairoConversationReply.value = normalizeKairoCopy(
+      const replyText = normalizeKairoCopy(
         formatConversationDisplayReply(response.reply) || sanitizeSpokenReply(response.reply),
       );
+      kairoConversationReply.value = replyText;
+      pushKairoTurn('vaxon', replyText);
       resetDraftState();
       await dispatchKairoConverseOutcome(shell, response, executeConverseAction);
       if (response.dispatch_lane === 'deterministic_report') {

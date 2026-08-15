@@ -47,11 +47,15 @@ def project_root_allowlist() -> tuple[Path, ...]:
             return tuple(roots)
 
     repo_root = _repo_root()
-    return (
+    defaults = [
         repo_root.resolve(),
         repo_root.parent.resolve(),
         Path.home().resolve(),
-    )
+    ]
+    parts = repo_root.resolve().parts
+    if len(parts) >= 4 and parts[:3] == ("/", "run", "media"):
+        defaults.append(Path(*parts[:4]).resolve())
+    return tuple(dict.fromkeys(defaults))
 
 
 def _resolve_project_root(raw_root: str, *, bindings_file: Path) -> Path:
@@ -106,7 +110,19 @@ def load_workspace_project_bindings(
         if not isinstance(entry, dict):
             raise WorkspaceBindingError(f"binding for {normalized_id} must be an object")
 
-        project_root = _resolve_project_root(str(entry.get("project_root", "")), bindings_file=path)
+        # Bindings are operator-maintained and project folders can be moved or
+        # archived. One stale optional workspace must not make `/api/workspaces`
+        # fail and leave the whole console in an unusable empty-shell state.
+        try:
+            project_root = _resolve_project_root(
+                str(entry.get("project_root", "")), bindings_file=path
+            )
+        except WorkspaceBindingError as exc:
+            # Missing folders are stale operational data; an out-of-allowlist
+            # root is a security configuration error and must still fail closed.
+            if "does not exist:" in str(exc):
+                continue
+            raise
         display_name = str(entry.get("display_name", "")).strip() or None
         bindings[normalized_id] = WorkspaceProjectBinding(
             workspace_id=normalized_id,

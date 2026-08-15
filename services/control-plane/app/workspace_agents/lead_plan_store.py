@@ -5,11 +5,14 @@ from __future__ import annotations
 from contextlib import contextmanager
 from datetime import datetime, timezone
 import json
+import logging
 import os
 from typing import Any
 from uuid import uuid4
 
 from app.persistence import run_store_sqlite
+
+logger = logging.getLogger(__name__)
 
 
 def _now() -> str:
@@ -118,6 +121,12 @@ def persist_plan(
             ],
         )
         connection.commit()
+    _ensure_constitution_mission(
+        plan_id=plan_id,
+        workspace_id=workspace_id,
+        goal=goal,
+        plan=plan,
+    )
     append_receipt(
         plan_id=plan_id,
         workspace_id=workspace_id,
@@ -132,6 +141,48 @@ def persist_plan(
     stored = get_plan(plan_id)
     assert stored is not None
     return stored
+
+
+def _lead_plan_success_criteria(plan: dict[str, Any]) -> list[str]:
+    criteria: list[str] = []
+    raw_items = plan.get("items")
+    if isinstance(raw_items, list):
+        for item in raw_items[:8]:
+            if not isinstance(item, dict):
+                continue
+            title = str(item.get("title") or item.get("goal") or item.get("summary") or "").strip()
+            if title:
+                criteria.append(f"Complete: {title}")
+    if not criteria:
+        criteria.append("Lead plan reaches completed or awaiting-engagement with receipts.")
+    return criteria
+
+
+def _ensure_constitution_mission(
+    *,
+    plan_id: str,
+    workspace_id: str,
+    goal: str,
+    plan: dict[str, Any],
+) -> None:
+    try:
+        from app.persistence import constitution_registry_store as registry
+
+        existing = registry.mission_for_lead_plan(plan_id)
+        if existing:
+            return
+        title = goal or f"Lead plan {plan_id}"
+        mode = str(plan.get("mode") or "sequential").strip() or "sequential"
+        registry.create_mission(
+            title=title,
+            workspace_id=workspace_id,
+            description=f"Mission automatically created from Lead plan {plan_id} ({mode} mode).",
+            risk=str(plan.get("risk") or "normal").strip().lower() or "normal",
+            lead_plan_id=plan_id,
+            success_criteria=_lead_plan_success_criteria(plan),
+        )
+    except Exception:
+        logger.exception("constitution mission creation failed for lead plan")
 
 
 def get_plan(plan_id: str) -> dict[str, Any] | None:
@@ -319,7 +370,29 @@ def append_receipt(
             ),
         )
         connection.commit()
+    _index_constitution_receipt(receipt)
     return receipt
+
+
+def _index_constitution_receipt(receipt: dict[str, Any]) -> None:
+    """Best-effort Evidence Registry index for durable Lead receipts."""
+    try:
+        from app.persistence.evidence_ref_adapters import index_lead_plan_receipt
+        from app.persistence import constitution_registry_store as registry
+
+        payload = receipt.get("payload") if isinstance(receipt.get("payload"), dict) else {}
+        summary = str(payload.get("summary") or payload.get("goal") or payload.get("status") or "").strip()
+        mission = registry.mission_for_lead_plan(str(receipt.get("plan_id") or ""))
+        index_lead_plan_receipt(
+            receipt_id=str(receipt.get("receipt_id") or ""),
+            plan_id=str(receipt.get("plan_id") or ""),
+            workspace_id=str(receipt.get("workspace_id") or ""),
+            kind=str(receipt.get("kind") or ""),
+            summary=summary,
+            mission_id=str(mission.get("mission_id")) if mission else None,
+        )
+    except Exception:
+        logger.exception("constitution indexing failed for lead plan receipt")
 
 
 def list_receipts(plan_id: str) -> list[dict[str, Any]]:

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
 
 import {
   fetchAutonomyStatus,
@@ -13,9 +13,12 @@ import {
 import {
   kairoConversationPhase,
   kairoConversationReply,
+  kairoConversationThread,
   kairoLastRoutingReceipt,
+  clearKairoConversationThread,
 } from '../../features/kairo-conversation/kairo-conversation-state';
 import { useKairoConversation } from '../../features/kairo-conversation/use-kairo-conversation';
+import { formatVoiceGateFeedback } from '../../lib/kairo-voice-gate';
 import KairoGalaxyOrb from '../../features/brain-galaxy/KairoGalaxyOrb.vue';
 import { resolveGalaxyPresence } from '../../features/brain-galaxy/galaxy-presence-state';
 import { projectLiveOperationsStream } from '../../features/brain-galaxy/live-operations-stream';
@@ -37,9 +40,9 @@ import VaxonExecutiveComposer from './VaxonExecutiveComposer.vue';
 const shell = useShellStore();
 const { spokenText } = useSpokenUtteranceText();
 const { pending, submitTurn, speechCapture } = useKairoConversation();
-const showTransmissionDetail = ref(false);
 const autonomyReceipts = ref<AutonomyReceipt[]>([]);
 const autonomyEffective = ref(false);
+const threadEl = ref<HTMLElement | null>(null);
 let autonomyPoll: ReturnType<typeof setInterval> | null = null;
 
 const companyBusyCount = computed(() =>
@@ -105,8 +108,6 @@ const transmission = computed(() =>
 );
 
 const spokenLine = computed(() => transmission.value.body);
-const transmissionHasDetail = computed(() => transmission.value.detailLines.length > 0);
-
 
 const asksForReply = computed(
   () =>
@@ -115,6 +116,12 @@ const asksForReply = computed(
     !isTransmissionAskAnswered(spokenLine.value),
 );
 const affirmCta = computed(() => vaxonAffirmReplyCta(spokenLine.value));
+
+const isTransmitting = computed(
+  () => transmission.value.mode === 'transmitting' || pending.value,
+);
+
+const hasThread = computed(() => kairoConversationThread.value.length > 0);
 
 const modeChip = computed(() => {
   if (presencePhase.value === 'speaking') return 'speaking';
@@ -142,6 +149,16 @@ const micLive = computed(
   () => speechCapture.capturing.value && speechCapture.captureMode.value === 'manual',
 );
 
+const speechCaptureError = computed(() => speechCapture.captureError.value);
+
+const voiceGateFeedback = computed(() =>
+  formatVoiceGateFeedback(
+    speechCapture.lastGateReason.value,
+    speechCapture.lastHeardTranscript.value,
+    speechCapture.lastAccepted.value,
+  ),
+);
+
 const focusedWorkspaceLabel = computed(() => {
   const ws = shell.currentWorkspace;
   if (!ws) {
@@ -153,21 +170,22 @@ const focusedWorkspaceLabel = computed(() => {
 async function sendReply({
   content,
   submissionIntent = 'ask',
+  attachments,
 }: {
   content: string;
   submissionIntent?: 'ask' | 'dispatch';
+  attachments?: import('../../lib/composer-clipboard-paste').ComposerClipboardImage[];
 }): Promise<void> {
   const message = content.trim();
-  if (!message || pending.value) {
-    return;
-  }
+  if (!message && !attachments?.length) return;
+  if (pending.value) return;
   if (message === 'yes' || message === 'not now') {
     markTransmissionAskAnswered(spokenLine.value);
   }
   // Affirmative Needs-you answers must be allowed to trigger dig-in / handoff.
   const intent =
     message === 'yes' ? 'dispatch' : message === 'not now' ? 'ask' : submissionIntent;
-  await submitTurn(message, { submissionIntent: intent });
+  await submitTurn(message, { submissionIntent: intent, dockAttachments: attachments });
 }
 
 function toggleMic(): void {
@@ -196,6 +214,15 @@ async function refreshAutonomyReceipts(): Promise<void> {
     // Keep last good receipts; stream falls back to briefing items.
   }
 }
+
+watch(
+  () => kairoConversationThread.value.length,
+  () => void nextTick(() => {
+    if (threadEl.value) {
+      threadEl.value.scrollTop = threadEl.value.scrollHeight;
+    }
+  }),
+);
 
 onMounted(() => {
   void refreshAutonomyReceipts();
@@ -255,39 +282,74 @@ onUnmounted(() => {
     </div>
 
     <div class="mc-live-ops__scroll">
+
+      <!-- ── Conversation thread ─────────────────────────────────────────── -->
       <article
         class="mc-transmission"
         :data-mode="transmission.mode"
-        :aria-live="transmission.mode === 'transmitting' ? 'polite' : 'off'"
+        :aria-live="isTransmitting ? 'polite' : 'off'"
         aria-label="VAXON transmission"
       >
         <header class="mc-transmission__header">
           <span class="mc-transmission__pulse" aria-hidden="true" />
-          <p class="mc-transmission__eyebrow">{{ transmission.eyebrow }}</p>
-          <span class="mc-transmission__badge">{{ transmission.mode }}</span>
+          <p class="mc-transmission__eyebrow">{{ hasThread ? 'Conversation' : transmission.eyebrow }}</p>
+          <div class="mc-transmission__header-actions">
+            <span class="mc-transmission__badge">{{ transmission.mode }}</span>
+            <button
+              v-if="hasThread"
+              type="button"
+              class="mc-transmission__clear"
+              title="Clear conversation"
+              @click="clearKairoConversationThread()"
+            >
+              Clear
+            </button>
+          </div>
         </header>
-        <p
-          class="mc-transmission__body"
-          :data-empty="transmission.empty ? 'true' : 'false'"
+
+        <!-- Thread view: full conversation history -->
+        <div
+          v-if="hasThread"
+          ref="threadEl"
+          class="mc-transmission__thread"
+          aria-label="Conversation history"
         >
-          {{ transmission.summary }}
-        </p>
-        <ul
-          v-if="transmissionHasDetail && showTransmissionDetail"
-          class="mc-transmission__detail"
-        >
-          <li v-for="(line, index) in transmission.detailLines" :key="index">
-            {{ line }}
-          </li>
-        </ul>
-        <button
-          v-if="transmissionHasDetail"
-          type="button"
-          class="mc-transmission__detail-toggle"
-          @click="showTransmissionDetail = !showTransmissionDetail"
-        >
-          {{ showTransmissionDetail ? 'Hide detail' : `Show detail (${transmission.detailLines.length})` }}
-        </button>
+          <div
+            v-for="(turn, i) in kairoConversationThread"
+            :key="i"
+            class="mc-transmission__turn"
+            :data-role="turn.role"
+          >
+            <div class="mc-transmission__turn-meta">
+              <span class="mc-transmission__turn-role">{{ turn.role === 'vaxon' ? OPERATOR_PERSONA_NAME : 'You' }}</span>
+              <span class="mc-transmission__turn-at">{{ turn.at }}</span>
+            </div>
+            <p class="mc-transmission__turn-body">{{ turn.content }}</p>
+          </div>
+
+          <!-- Thinking indicator -->
+          <div v-if="isTransmitting" class="mc-transmission__turn mc-transmission__turn--thinking" data-role="vaxon">
+            <div class="mc-transmission__turn-meta">
+              <span class="mc-transmission__turn-role">{{ OPERATOR_PERSONA_NAME }}</span>
+            </div>
+            <p class="mc-transmission__thinking-dots">
+              <span /><span /><span />
+            </p>
+          </div>
+        </div>
+
+        <!-- Empty state: no thread yet -->
+        <div v-else class="mc-transmission__empty">
+          <p v-if="isTransmitting" class="mc-transmission__thinking-inline">
+            <span class="mc-transmission__thinking-dots"><span /><span /><span /></span>
+            {{ OPERATOR_PERSONA_NAME }} is working…
+          </p>
+          <p v-else class="mc-transmission__empty-body">
+            {{ transmission.body }}
+          </p>
+        </div>
+
+        <!-- CTA buttons for yes/no prompts -->
         <div v-if="asksForReply" class="mc-transmission__actions">
           <button type="button" :disabled="pending" @click="void sendReply({ content: 'yes' })">
             {{ affirmCta }}
@@ -298,40 +360,21 @@ onUnmounted(() => {
         </div>
       </article>
 
+      <!-- ── Mode chips ──────────────────────────────────────────────────── -->
       <div class="mc-live-ops__modes" role="status" aria-label="Voice mode">
-        <span
-          class="mc-live-ops__mode"
-          :data-active="modeChip === 'speaking' ? 'true' : 'false'"
-        >
-          Speaking
-        </span>
-        <span
-          class="mc-live-ops__mode"
-          :data-active="modeChip === 'listening' ? 'true' : 'false'"
-        >
-          Listening
-        </span>
-        <span
-          class="mc-live-ops__mode"
-          :data-active="modeChip === 'autonomous' ? 'true' : 'false'"
-        >
-          Autonomous
-        </span>
-        <span
-          class="mc-live-ops__mode"
-          :data-active="modeChip === 'scanning' ? 'true' : 'false'"
-        >
-          Scanning
-        </span>
-        <span
-          class="mc-live-ops__mode"
-          :data-active="modeChip === 'standby' ? 'true' : 'false'"
-        >
-          Standby
-        </span>
+        <span class="mc-live-ops__mode" :data-active="modeChip === 'speaking' ? 'true' : 'false'">Speaking</span>
+        <span class="mc-live-ops__mode" :data-active="modeChip === 'listening' ? 'true' : 'false'">Listening</span>
+        <span class="mc-live-ops__mode" :data-active="modeChip === 'autonomous' ? 'true' : 'false'">Autonomous</span>
+        <span class="mc-live-ops__mode" :data-active="modeChip === 'scanning' ? 'true' : 'false'">Scanning</span>
+        <span class="mc-live-ops__mode" :data-active="modeChip === 'standby' ? 'true' : 'false'">Standby</span>
       </div>
 
-      <ul class="mc-live-ops__stream" aria-label="Live updates">
+      <!-- ── Live stream — collapses while VAXON is transmitting ──────────── -->
+      <ul
+        class="mc-live-ops__stream"
+        :class="{ 'mc-live-ops__stream--collapsed': isTransmitting }"
+        aria-label="Live updates"
+      >
         <li
           v-for="item in streamItems"
           :key="item.id"
@@ -352,6 +395,10 @@ onUnmounted(() => {
       :mic-supported="speechCapture.supported"
       :privacy-blocked="shell.operatorPresenceSettings.privacy_mode"
       :focused-workspace-label="focusedWorkspaceLabel"
+      :activity-label="shell.ideComposerActivity?.label ?? null"
+      :activity-phase="presencePhase !== 'idle' ? presencePhase : null"
+      :capture-error="speechCaptureError"
+      :voice-gate-feedback="voiceGateFeedback"
       @submit="void sendReply($event)"
       @toggle-mic="toggleMic"
     />

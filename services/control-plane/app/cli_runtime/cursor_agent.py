@@ -21,6 +21,7 @@ from app.cli_runtime.subprocess_runner import (
     stream_registered_process,
 )
 from app.cli_runtime.agent_sandbox import AgentSandboxPolicy
+from app.cli_runtime.catalog_discovery import is_cursor_agent_binary
 
 logger = logging.getLogger(__name__)
 
@@ -64,15 +65,25 @@ def build_cursor_agent_command(
     research_available: bool | None = None,
 ) -> list[str]:
     """Build the Cursor CLI argv for operator vs continuous-worker trust policies."""
-    command = [
-        binary,
-        "agent",
-        "--print",
-        "--trust",
-        "--output-format",
-        "stream-json",
-        "--stream-partial-output",
-    ]
+    if is_cursor_agent_binary(binary):
+        command = [
+            binary,
+            "--print",
+            "--trust",
+            "--output-format",
+            "stream-json",
+            "--stream-partial-output",
+        ]
+    else:
+        command = [
+            binary,
+            "agent",
+            "--print",
+            "--trust",
+            "--output-format",
+            "stream-json",
+            "--stream-partial-output",
+        ]
     policy = str(trust_policy or "operator").strip().lower() or "operator"
     if research_available is None:
         research_available = bool(research_capability_snapshot().get("available"))

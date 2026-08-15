@@ -96,6 +96,20 @@ class EmailTriageTests(unittest.TestCase):
             self.email_inbox_item(analysis, workspace_id="workspace_dashpro")
         )
 
+    def test_analyze_email_message_suppresses_duplicate_ci_mail(self) -> None:
+        analysis = self.analyze_email_message(
+            {
+                "subject": "[axon-control-ops/axon-watch] Run failed: Axon-X Fast Gate",
+                "text": "GitHub Actions workflow run failed. View results.",
+                "from": "axon-control-ops <notifications@github.com>",
+                "message_id": "<ci-mail@example.com>",
+            }
+        )
+        self.assertTrue(analysis["automated_dev_notification"])
+        self.assertLessEqual(analysis["priority"], 40)
+        self.assertEqual(analysis["recommended_action"], "monitor_engineering_signal")
+        self.assertIsNone(self.email_inbox_item(analysis, workspace_id="workspace_axon_watch"))
+
     def test_analyze_email_message_ignores_modal_may_as_due_marker(self) -> None:
         analysis = self.analyze_email_message(
             {

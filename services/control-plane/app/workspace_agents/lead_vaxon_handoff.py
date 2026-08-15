@@ -215,6 +215,43 @@ def count_awaiting_engagement_plans(*, workspace_id: str | None = None) -> int:
     return len(list_awaiting_engagement_plans(workspace_id=workspace_id))
 
 
+def _matches_last_vaxon_flash(
+    *,
+    workspace_id: str,
+    employee_role: str,
+    phase: str,
+    lead_next: str,
+    lead_summary: str,
+) -> bool:
+    """True when the most recent VAXON flash for this employee said the same thing.
+
+    Continuous shifts fire every 15-30 minutes around the clock; without this,
+    every "nothing changed, still completed" shift adds two more messages to the
+    operator thread forever. Only exact repeats of phase+lead_next+lead_summary
+    are suppressed — any wording change (a new blocker, a different next step)
+    still posts.
+    """
+    from app.workspace_agents import lead_adhoc_receipt_store
+
+    if not employee_role:
+        return False
+    recent = lead_adhoc_receipt_store.list_receipts_for_workspace(
+        workspace_id,
+        kind=lead_adhoc_receipt_store.KIND_VAXON_POSTED,
+        limit=40,
+    )
+    for receipt in recent:
+        payload = receipt.get("payload") or {}
+        if str(payload.get("employee_role") or "").strip() != employee_role:
+            continue
+        return (
+            str(payload.get("phase") or "") == phase
+            and str(payload.get("lead_next") or "") == lead_next
+            and str(payload.get("lead_summary") or "") == lead_summary
+        )
+    return False
+
+
 def publish_ad_hoc_synthesis_to_vaxon(
     *,
     workspace_id: str,
@@ -252,6 +289,42 @@ def publish_ad_hoc_synthesis_to_vaxon(
         return {"status": "skipped_missing_synthesis", "run_id": cleaned_run}
 
     fields = synthesis.get("payload") or {}
+    employee_role = str(fields.get("employee_role") or "").strip()
+    phase = str(fields.get("phase") or "ended")
+    lead_next = str(fields.get("lead_next") or "")
+    lead_summary = str(fields.get("lead_summary") or "")
+
+    if _matches_last_vaxon_flash(
+        workspace_id=workspace,
+        employee_role=employee_role,
+        phase=phase,
+        lead_next=lead_next,
+        lead_summary=lead_summary,
+    ):
+        receipt = lead_adhoc_receipt_store.append_receipt(
+            workspace_id=workspace,
+            run_id=cleaned_run,
+            kind=lead_adhoc_receipt_store.KIND_VAXON_POSTED,
+            payload={
+                "thread_id": None,
+                "message_id": None,
+                "synthesis_receipt_id": synthesis_receipt_id or synthesis.get("receipt_id"),
+                "employee_name": fields.get("employee_name"),
+                "employee_role": employee_role,
+                "phase": phase,
+                "lead_next": lead_next,
+                "lead_summary": lead_summary,
+                "skipped_duplicate": True,
+            },
+        )
+        return {
+            "status": "skipped_duplicate_flash",
+            "run_id": cleaned_run,
+            "kind": AD_HOC_TAKEOVER_VAXON_KIND,
+            "receipt_id": receipt["receipt_id"],
+            "synthesis_receipt_id": synthesis.get("receipt_id"),
+        }
+
     created_at = _utc_now_iso()
     thread = chat_store.get_latest_thread_for_workspace(
         workspace,

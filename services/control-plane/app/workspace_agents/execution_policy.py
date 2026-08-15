@@ -68,6 +68,15 @@ _COMMON_READ_PREFIXES = (
     ("git", "log"),
     ("rg",),
 )
+# gh read-only sub-commands used at ship gates: auth probe, CI run status, log tails.
+# These never mutate repo or PR state; they're safe to pre-approve for Lead + Integrations.
+_GH_READ_PREFIXES = (
+    ("gh", "auth", "status"),
+    ("gh", "run", "list"),
+    ("gh", "run", "view"),
+    ("gh", "run", "watch"),
+    ("gh", "api", "repos"),
+)
 _COMMON_AUDITED_WRAPPERS = ("axon-agent-terminal-job",)
 
 _ROLE_DEFAULTS: dict[str, AgentExecutionPolicy] = {
@@ -76,9 +85,9 @@ _ROLE_DEFAULTS: dict[str, AgentExecutionPolicy] = {
         write_paths=("docs/planning", "docs/ops", "plans"),
         forbidden_path_globs=(),
         approved_wrapper_names=(*_COMMON_AUDITED_WRAPPERS, "run_contract_unit_tests.sh"),
-        approved_command_prefixes=_COMMON_READ_PREFIXES,
-        audited_capabilities=("planning_write", "test", "workspace_read"),
-        network_mode="none",
+        approved_command_prefixes=(*_COMMON_READ_PREFIXES, *_GH_READ_PREFIXES),
+        audited_capabilities=("planning_write", "test", "workspace_read", "ci_read"),
+        network_mode="audited",
         timeout_seconds=900,
         trust_policy="worker",
         execution_access="full",
@@ -97,7 +106,19 @@ _ROLE_DEFAULTS: dict[str, AgentExecutionPolicy] = {
     ),
     "frontend": AgentExecutionPolicy(
         read_paths=(".",),
-        write_paths=("apps", "app", "src", "components", "packages", "tests", "__tests__", "locales"),
+        write_paths=(
+            "apps",
+            "app",
+            "src",
+            "components",
+            "features",
+            "screens",
+            "hooks",
+            "packages",
+            "tests",
+            "__tests__",
+            "locales",
+        ),
         forbidden_path_globs=(),
         approved_wrapper_names=(*_COMMON_AUDITED_WRAPPERS, "console-web.sh"),
         approved_command_prefixes=_COMMON_READ_PREFIXES,
@@ -124,7 +145,7 @@ _ROLE_DEFAULTS: dict[str, AgentExecutionPolicy] = {
         write_paths=(".github", "config", "scripts"),
         forbidden_path_globs=(),
         approved_wrapper_names=(*_COMMON_AUDITED_WRAPPERS, "axonhealth", "watch-fast-gate.sh"),
-        approved_command_prefixes=(*_COMMON_READ_PREFIXES,),
+        approved_command_prefixes=(*_COMMON_READ_PREFIXES, *_GH_READ_PREFIXES),
         audited_capabilities=("ci_read", "health", "test", "workspace_read"),
         network_mode="audited",
         timeout_seconds=900,
@@ -149,12 +170,90 @@ _FALLBACK_POLICY = AgentExecutionPolicy(
 _NETWORK_RANK = {"none": 0, "audited": 1, "unrestricted": 2}
 _TRUST_RANK = {"worker": 0, "operator": 1}
 _ACCESS_RANK = {"consultative": 0, "full": 1}
+_FRONTEND_UI_SCOPE_MARKERS = frozenset(
+    {"apps", "app", "src", "components", "features", "screens", "locales"}
+)
+_ROLE_SAFE_TASK_SCOPE_EXPANSIONS: dict[str, tuple[tuple[str, frozenset[str]], ...]] = {
+    # Frontend hooks are part of the UI implementation surface in React/Expo
+    # apps.  Older task rows often leased app/components but omitted hooks,
+    # which made normal hook edits look like a read-only checkout failure.  The
+    # expansion stays bounded by the role baseline and workspace contract below.
+    "frontend": (("hooks", _FRONTEND_UI_SCOPE_MARKERS),),
+}
+# Node/Express ops workspaces (Young Eagles command centre) store UI under
+# command-centre/ and printable assets under output/, not apps/src/components.
+_OPS_FRONTEND_WRITE_ROOTS = frozenset({"command-centre", "output"})
+
+
+def _ops_frontend_write_paths_for_workspace(
+    workspace_allowed_paths: Iterable[str] | None,
+) -> tuple[str, ...]:
+    """Grant Frontend write scope for ops-dashboard trees when the contract uses them."""
+    if not workspace_allowed_paths:
+        return ()
+    workspace_scope = _normalize_paths(workspace_allowed_paths)
+    workspace_roots = {
+        path if path == "." else path.split("/", 1)[0] for path in workspace_scope
+    }
+    if "command-centre" not in workspace_roots:
+        return ()
+    candidates = _normalize_paths(tuple(sorted(_OPS_FRONTEND_WRITE_ROOTS)))
+    return _intersect_path_scopes(candidates, workspace_scope)
 
 
 def role_execution_policy(role: str) -> AgentExecutionPolicy:
     """Return an immutable conservative baseline for an employee role."""
 
     return _ROLE_DEFAULTS.get(_normalize_name(role), _FALLBACK_POLICY)
+
+
+def default_write_scope_for_role(role: str) -> list[str]:
+    """Write scope for a task that declared none — the role's own boundary.
+
+    Returns the role's own write boundary as the fallback scope when a task
+    declares no allowed_paths.  resolve_effective_policy treats task_allowed_paths=None
+    as "no restriction", so passing these paths gives the task the role ceiling
+    without granting anything beyond it.  A role that is read-only by design
+    (watcher) still resolves to no write access.
+    """
+
+    return [str(path).strip() for path in role_execution_policy(role).write_paths if str(path).strip()]
+
+
+def safe_task_write_scope_for_role(
+    role: str,
+    task_allowed_paths: Iterable[str],
+) -> tuple[str, ...]:
+    """Return a role-bounded task scope with safe conventional siblings restored.
+
+    A task scope is still an authority boundary; this helper does not widen a
+    run beyond the role baseline or workspace contract.  It only prevents stale
+    leased scopes from excluding standard role-owned roots that are commonly
+    required by the same implementation slice (for example React UI hooks).
+    """
+
+    normalized = _normalize_paths(task_allowed_paths)
+    if not normalized:
+        return normalized
+
+    role_name = _normalize_name(role)
+    additions = _ROLE_SAFE_TASK_SCOPE_EXPANSIONS.get(role_name, ())
+    if not additions:
+        return normalized
+
+    role_roots = set(role_execution_policy(role_name).write_paths)
+    present_roots = {
+        path if path == "." else path.split("/", 1)[0]
+        for path in normalized
+    }
+    expanded = list(normalized)
+    for candidate, markers in additions:
+        if candidate not in role_roots or candidate in present_roots:
+            continue
+        if present_roots & markers:
+            expanded.append(candidate)
+            present_roots.add(candidate)
+    return _normalize_paths(expanded)
 
 
 def parse_execution_policy_override(raw: Any) -> AgentExecutionPolicyOverride | None:
@@ -209,9 +308,9 @@ def resolve_effective_policy(
 ) -> AgentExecutionPolicy:
     """Intersect every authority source at a worker enforcement boundary.
 
-    Workspace and task allowlists are mandatory authority sources here. Missing,
-    empty, invalid, or disjoint task scope therefore resolves to no writable
-    paths rather than an unrestricted workspace.
+    task_allowed_paths=None means "no task-level restriction" — the role's
+    write_paths are used as-is after workspace intersection.  An explicit empty
+    list still collapses write access to nothing (fail-closed).
     """
 
     baseline = role_execution_policy(role)
@@ -261,13 +360,17 @@ def resolve_effective_policy(
             )
 
     workspace_scope = _normalize_paths(workspace_allowed_paths or ())
-    task_scope = _normalize_paths(task_allowed_paths or ())
     read_paths = _intersect_path_scopes(read_paths, workspace_scope)
     write_paths = _intersect_path_scopes(write_paths, workspace_scope)
-    write_paths = _intersect_path_scopes(write_paths, task_scope)
+    if task_allowed_paths is not None:
+        task_scope = safe_task_write_scope_for_role(role, task_allowed_paths)
+        write_paths = _intersect_path_scopes(write_paths, task_scope)
     forbidden = _ordered_union(
         forbidden, _normalize_strings(workspace_forbidden_path_globs or ())
     )
+
+    if not write_paths and _normalize_name(role) == "frontend":
+        write_paths = _ops_frontend_write_paths_for_workspace(workspace_allowed_paths)
 
     if not write_paths:
         execution_access = "consultative"
@@ -478,4 +581,5 @@ __all__ = [
     "parse_execution_policy_override",
     "resolve_effective_policy",
     "role_execution_policy",
+    "safe_task_write_scope_for_role",
 ]

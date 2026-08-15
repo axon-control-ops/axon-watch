@@ -10,6 +10,7 @@ import type {
   WorkspaceRecord,
 } from '../../../contracts/canonical';
 import { buildStatusBarClaudeUsageZone } from '../../../lib/claude-usage-view';
+import { buildStatusBarCodexUsageZone } from '../../../lib/codex-usage-view';
 import { buildStatusBarConnectorChip } from '../../../lib/connector-glance-view';
 import { buildStatusBarUsageZone } from '../../../lib/cursor-usage-view';
 import { shouldShowIdeAgentStop } from '../../../lib/ide-agent-run-active';
@@ -67,6 +68,7 @@ interface CreateShellDisplaySliceInput {
   connectorsItems: Ref<ConnectorProbeRecord[]>;
   connectorsSummary: Ref<{ required_unavailable: number } | null>;
   connectorsLoadState: Ref<'idle' | 'loading' | 'loaded' | 'error'>;
+  getSelectedRuntimeTargetId?: () => string | null | undefined;
   /** Kept for callers that still pass fleet activeRun; unused by status-bar zones. */
   activeRun?: Ref<RunRecord | null>;
 }
@@ -173,14 +175,20 @@ export function createShellDisplaySlice(input: CreateShellDisplaySliceInput) {
       zones.center.push(connectorChip);
     }
 
-    const usageZone = buildStatusBarUsageZone(input.runtimeStatus.value?.cursor_usage);
+    const selectedRuntimeTargetId = input.getSelectedRuntimeTargetId?.()?.trim();
+    const selectedRuntime = [
+      ...(input.runtimeStatus.value?.local ?? []),
+      ...(input.runtimeStatus.value?.cloud ?? []),
+    ].find((record) => record.id === selectedRuntimeTargetId);
+    const family = selectedRuntime?.family?.trim().toLowerCase() || 'cursor';
+    const usageZone =
+      family === 'codex'
+        ? buildStatusBarCodexUsageZone(input.runtimeStatus.value?.codex_usage)
+        : family === 'claude'
+          ? buildStatusBarClaudeUsageZone(input.runtimeStatus.value?.claude_usage)
+          : buildStatusBarUsageZone(input.runtimeStatus.value?.cursor_usage);
     if (usageZone) {
       zones.center.push(usageZone);
-    }
-
-    const claudeUsageZone = buildStatusBarClaudeUsageZone(input.runtimeStatus.value?.claude_usage);
-    if (claudeUsageZone) {
-      zones.center.push(claudeUsageZone);
     }
 
     return zones;

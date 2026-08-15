@@ -21,6 +21,9 @@ export const THREAD_HISTORY_FETCH_TIMEOUT_MS = 45_000;
  */
 export const CHAT_MESSAGE_FETCH_TIMEOUT_MS = 60_000;
 
+/** Attachment uploads carry a file body, not just JSON — allow more time than a plain call. */
+export const ATTACHMENT_UPLOAD_TIMEOUT_MS = 60_000;
+
 export class ApiRequestError extends Error {
   readonly status: number;
   readonly label: string;
@@ -35,6 +38,10 @@ export class ApiRequestError extends Error {
 
 export function isApiNotFoundError(error: unknown): boolean {
   return error instanceof ApiRequestError && error.status === 404;
+}
+
+export function isApiConflictError(error: unknown): boolean {
+  return error instanceof ApiRequestError && error.status === 409;
 }
 
 export function controlPlaneBaseUrl(): string {
@@ -127,6 +134,38 @@ export async function fetchJson<T>(
       );
     }
     throw new Error(humanizeNetworkError(error, { action: errorLabel ?? 'Request' }));
+  } finally {
+    clear();
+  }
+}
+
+/**
+ * Bare `fetch()` with no signal never resolves if the network stalls
+ * (as opposed to failing outright) — the caller's request spins forever with
+ * no error and no recovery. Callers that need the raw Response (custom
+ * status-code branching, non-JSON bodies) should use this instead of calling
+ * `fetch()` directly; it gives them the same timeout/abort behavior as
+ * `fetchJson` without forcing the throw-on-!ok contract.
+ */
+export async function fetchWithTimeout(
+  path: string,
+  init: RequestInit = {},
+  timeoutMs: number = DEFAULT_FETCH_TIMEOUT_MS,
+): Promise<Response> {
+  const { signal, clear } = mergeAbortSignals(timeoutMs, init.signal);
+  try {
+    return await fetch(apiUrl(path), { ...init, signal });
+  } catch (error) {
+    if (error instanceof DOMException && error.name === 'TimeoutError') {
+      throw new Error(`request timed out after ${timeoutMs}ms`);
+    }
+    if (error instanceof Error && error.name === 'AbortError') {
+      if (init.signal?.aborted) {
+        throw error;
+      }
+      throw new Error(`request timed out after ${timeoutMs}ms`);
+    }
+    throw new Error(humanizeNetworkError(error, { action: 'Request' }));
   } finally {
     clear();
   }

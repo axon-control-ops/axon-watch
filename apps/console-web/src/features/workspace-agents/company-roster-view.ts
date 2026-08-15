@@ -15,6 +15,7 @@ export {
   isAgentRuntimeFallbackFailure,
   isAgentSessionInterruptedFailure,
   isMissingConfidenceFailure,
+  isCompletionGateFailure,
   isOperatorStoppedFailure,
   isRestartInterruptedFailure,
   isShiftContinuationFailure,
@@ -38,6 +39,8 @@ export {
   employeeSpeakLine,
   type EmployeeTalkSpeakMode,
 } from './company-roster-speak-view';
+
+export { employeeRuntimeShiftHint } from './employee-runtime-shift-view';
 
 export {
   buildCompanyRosterAlertBadge,
@@ -147,15 +150,23 @@ export function adjacentPresenceStripEmployee(
   return sorted[nextIndex];
 }
 
+/** First teammate with a pending VAXON decision. */
+export function firstPendingDecisionEmployee(
+  employees: readonly CompanyEmployeeRecord[],
+): CompanyEmployeeRecord | null {
+  return employees.find((row) => Boolean(row.pending_decision_id?.trim())) ?? null;
+}
+
 /** Surface failed teammates first, then live workers, then lead/primary, then name. */
 export function sortEmployeesForPresenceStrip(
   employees: readonly CompanyEmployeeRecord[],
 ): CompanyEmployeeRecord[] {
   const rank = (employee: CompanyEmployeeRecord): number[] => {
+    const pending = employee.pending_decision_id?.trim() ? 0 : 1;
     const failed = employeeFailureLine(employee) ? 0 : 1;
     const working = employeeIsWorking(employee.status) ? 0 : 1;
     const lead = employee.primary || (employee.role ?? '').trim().toLowerCase() === 'lead' ? 0 : 1;
-    return [failed, working, lead];
+    return [pending, failed, working, lead];
   };
 
   return [...employees].sort((left, right) => {
@@ -177,12 +188,16 @@ export function firstFailedRosterEmployee(
   return sortEmployeesForPresenceStrip(employees).find((row) => employeeFailureLine(row)) ?? null;
 }
 
-/** Default dock selection: failed first, then primary/lead, then first row. */
+/** Default dock selection: pending decision first, then failed, then primary/lead. */
 export function pickDefaultRosterEmployee(
   employees: readonly CompanyEmployeeRecord[],
 ): CompanyEmployeeRecord | null {
   if (!employees.length) {
     return null;
+  }
+  const pending = firstPendingDecisionEmployee(employees);
+  if (pending) {
+    return pending;
   }
   const failed = firstFailedRosterEmployee(employees);
   if (failed) {

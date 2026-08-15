@@ -24,12 +24,44 @@ class LeadReplanTests(unittest.TestCase):
         isolate_control_plane_db(self, run_store)
         task_store.reset_store()
         lead_plan_store.reset_store()
+        planner = patch(
+            "app.workspace_agents.teammate_route.dispatch_model_tiebreak",
+            return_value={
+                "content": (
+                    '{"items":['
+                    '{"owner_role":"frontend","goal":"Fix the dashboard UI",'
+                    '"dependencies":[],"acceptance_criteria":"UI validation passes"},'
+                    '{"owner_role":"backend",'
+                    '"goal":"Fix assignment idempotency and data cleanup",'
+                    '"dependencies":[],"acceptance_criteria":"Backend validation passes"}'
+                    "]}"
+                )
+            },
+        )
+        planner.start()
+        self.addCleanup(planner.stop)
 
     def _restore(self) -> None:
         for name in list(sys.modules):
             if name == "app" or name.startswith("app."):
                 del sys.modules[name]
         sys.modules.update(self._saved)
+
+    def _record_passing_delivery_receipt(self, *, task: dict, run_id: str) -> None:
+        from app.runs.service import append_run_execution_receipt
+
+        append_run_execution_receipt(
+            run_id,
+            receipt_type="completion_gate",
+            receipt_summary=(
+                "completion=pass · reason=completion gate passed · "
+                "changed_files=app/dashboard.tsx · expected_files=task/role scope · "
+                "validation=passed with command outputs · commit=abc123def456"
+            ),
+            actor="test",
+            success=True,
+            intent="worker_completion_gate",
+        )
 
     def test_leased_paths_block_overlapping_task_from_another_plan(self) -> None:
         from app.persistence import task_store
@@ -109,6 +141,17 @@ class LeadReplanTests(unittest.TestCase):
                 str(task["task_id"]),
                 lease_holder=f"test-{task['owner_role']}",
             )
+            from app.runs.service import create_run
+
+            run = create_run(
+                workspace_id="workspace_axon_watch",
+                mode="agent",
+                summary=f"{task['owner_role']} implementation",
+                employee_role=str(task["owner_role"]),
+                task_id=str(leased["task_id"]),
+                require_leased_task=True,
+            )
+            self._record_passing_delivery_receipt(task=leased, run_id=str(run["run_id"]))
             task_store.complete_task(
                 str(leased["task_id"]),
                 terminal_outcome=f"{task['owner_role']} approved",
@@ -122,6 +165,135 @@ class LeadReplanTests(unittest.TestCase):
             row["kind"] for row in lead_plan_store.list_receipts(result["plan_id"])
         }
         self.assertIn("lead_synthesis_completed", kinds)
+
+    def test_synthesis_blocks_completed_implementation_without_delivery_receipt(self) -> None:
+        from app.persistence import task_store
+        from app.workspace_agents import lead_plan_store
+        from app.workspace_agents.lead_fan_out import materialize_lead_fan_out
+        from app.workspace_agents.lead_replan import synthesize_lead_plan
+
+        result = materialize_lead_fan_out(
+            workspace_id="workspace_axon_watch",
+            goal="Fix dashboard UI and assignment idempotency/data cleanup",
+            mode="decompose",
+            create_runs=False,
+        )
+
+        for task in result["tasks"]:
+            leased = task_store.lease_task(
+                str(task["task_id"]),
+                lease_holder=f"test-{task['owner_role']}",
+            )
+            task_store.complete_task(
+                str(leased["task_id"]),
+                terminal_outcome=f"{task['owner_role']} claims complete",
+            )
+
+        blocked = synthesize_lead_plan(result["plan_id"])
+
+        self.assertEqual("blocked", blocked["status"])
+        self.assertTrue(blocked["gate_failures"])
+        self.assertIn("missing implementation run receipt", "; ".join(blocked["gate_failures"]))
+        kinds = {
+            row["kind"] for row in lead_plan_store.list_receipts(result["plan_id"])
+        }
+        self.assertIn("lead_synthesis_blocked", kinds)
+        self.assertNotIn("lead_synthesis_completed", kinds)
+
+    def test_synthesis_can_complete_after_prior_blocker_is_cleared(self) -> None:
+        from app.persistence import task_store
+        from app.runs.service import create_run
+        from app.workspace_agents import lead_plan_store
+        from app.workspace_agents.lead_fan_out import materialize_lead_fan_out
+        from app.workspace_agents.lead_replan import synthesize_lead_plan
+
+        result = materialize_lead_fan_out(
+            workspace_id="workspace_axon_watch",
+            goal="Fix dashboard UI and assignment idempotency/data cleanup",
+            mode="decompose",
+            create_runs=False,
+        )
+        lead_plan_store.set_plan_status(result["plan_id"], "awaiting_engagement")
+        lead_plan_store.append_receipt(
+            plan_id=result["plan_id"],
+            workspace_id="workspace_axon_watch",
+            kind="lead_synthesis_blocked",
+            payload={"gate_failures": ["prior missing implementation run receipt"]},
+        )
+
+        for task in result["tasks"]:
+            leased = task_store.lease_task(
+                str(task["task_id"]),
+                lease_holder=f"test-{task['owner_role']}",
+            )
+            run = create_run(
+                workspace_id="workspace_axon_watch",
+                mode="agent",
+                summary=f"{task['owner_role']} implementation",
+                employee_role=str(task["owner_role"]),
+                task_id=str(leased["task_id"]),
+                require_leased_task=True,
+            )
+            self._record_passing_delivery_receipt(task=leased, run_id=str(run["run_id"]))
+            task_store.complete_task(
+                str(leased["task_id"]),
+                terminal_outcome=f"{task['owner_role']} approved",
+            )
+
+        completed = synthesize_lead_plan(result["plan_id"])
+
+        self.assertEqual("completed", completed["status"])
+        plan = lead_plan_store.get_plan(result["plan_id"])
+        assert plan is not None
+        self.assertEqual("awaiting_engagement", plan["status"])
+        kinds = {
+            row["kind"] for row in lead_plan_store.list_receipts(result["plan_id"])
+        }
+        self.assertIn("lead_synthesis_blocked", kinds)
+        self.assertIn("lead_synthesis_completed", kinds)
+
+    def test_synthesis_blocks_when_linked_specialist_failed(self) -> None:
+        from app.persistence import task_store
+        from app.workspace_agents import lead_plan_store
+        from app.workspace_agents.lead_fan_out import materialize_lead_fan_out
+        from app.workspace_agents.lead_replan import synthesize_lead_plan
+
+        result = materialize_lead_fan_out(
+            workspace_id="workspace_axon_watch",
+            goal="Fix dashboard UI and assignment idempotency/data cleanup",
+            mode="decompose",
+            create_runs=False,
+        )
+        self.assertEqual(["backend", "frontend"], sorted(t["owner_role"] for t in result["tasks"]))
+
+        for task in result["tasks"]:
+            leased = task_store.lease_task(
+                str(task["task_id"]),
+                lease_holder=f"test-{task['owner_role']}",
+            )
+            if task["owner_role"] == "frontend":
+                task_store.complete_task(
+                    str(leased["task_id"]),
+                    terminal_outcome="frontend diff and validation passed",
+                )
+            else:
+                task_store.cancel_task(
+                    str(leased["task_id"]),
+                    terminal_outcome="backend validation receipt missing",
+                )
+
+        blocked = synthesize_lead_plan(result["plan_id"])
+
+        self.assertEqual("blocked", blocked["status"])
+        self.assertEqual(1, len(blocked["blocked_task_ids"]))
+        plan = lead_plan_store.get_plan(result["plan_id"])
+        assert plan is not None
+        self.assertEqual("awaiting_engagement", plan["status"])
+        kinds = {
+            row["kind"] for row in lead_plan_store.list_receipts(result["plan_id"])
+        }
+        self.assertIn("lead_synthesis_blocked", kinds)
+        self.assertNotIn("lead_synthesis_completed", kinds)
 
     def test_replan_fails_closed_when_obsolete_run_cannot_stop(self) -> None:
         from app.persistence import task_store

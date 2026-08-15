@@ -124,8 +124,35 @@ class AgentTerminalJobsTests(unittest.TestCase):
 
         self.assertIn("bye-live", content)
         self.assertIn("[exit", content)
+        record = get_agent_terminal_job(str(job["job_id"]))
+        self.assertIsNotNone(record)
+        assert record is not None
+        self.assertIn("hello-live", str(record.get("output_tail") or ""))
+        self.assertIn("bye-live", str(record.get("output_tail") or ""))
+
+    def test_stale_active_stream_target_does_not_block_job_enqueue(self) -> None:
+        from app.terminal.active_chat_stream import register_active_chat_stream
+        from app.terminal.agent_jobs import enqueue_agent_terminal_job
+
+        register_active_chat_stream(
+            workspace_id="workspace_axon_watch",
+            thread_id="thread_missing",
+            message_id="message_missing",
+            run_id="run_stale_stream",
+        )
+
+        job = enqueue_agent_terminal_job(
+            workspace_id="workspace_axon_watch",
+            command="echo no-stream-target-ok",
+            run_id="run_stale_stream",
+            stream_to_chat=True,
+        )
+
+        self.assertEqual("running", job["status"])
+        self.assertFalse(job.get("stream_to_chat"))
+        self.assertIsNone(job.get("thread_id"))
+        self.assertIsNone(job.get("message_id"))
 
 
 if __name__ == "__main__":
     unittest.main()
-

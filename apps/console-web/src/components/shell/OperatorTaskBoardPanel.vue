@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, ref, watch } from 'vue';
 
-import { fetchLeadPlan } from '../../api/lead-plans-api';
+import { openLeadReviewOverlay, leadReviewOverlayError } from '../../features/lead-review/lead-review-overlay-state';
 import {
   fetchWorkerSchedulerStatus,
   type WorkerSchedulerStatus,
@@ -14,7 +14,6 @@ import {
 } from '../../features/hud-holo/hud-holo-tones';
 import { resolveTaskBoardCardActivation } from '../../lib/operator-task-board-activate';
 import { buildOperatorTaskBoardView, type TaskBoardRow } from '../../lib/operator-task-board-view';
-import { resolveVaxonReviewTarget } from '../../lib/operator-task-board-vaxon-review';
 import {
   dismissDoneTaskId,
   dismissDoneTaskIds,
@@ -256,24 +255,16 @@ async function reopenLeadPlan(planId: string | null | undefined): Promise<void> 
 async function openVaxonReview(planId?: string | null): Promise<void> {
   const cleaned = String(planId || '').trim();
   planFilterId.value = cleaned || planFilterId.value;
+  shell.focusLiveOperations();
   if (!cleaned) {
-    shell.focusLiveOperations();
     return;
   }
-  try {
-    const plan = await fetchLeadPlan(cleaned);
-    const target = resolveVaxonReviewTarget(plan);
-    if (target.kind === 'open_thread') {
-      await shell.selectIdeThread(target.threadId, { forceRefresh: true });
-      shell.setLayoutMode('ide');
-      return;
-    }
-    shell.commandMutationError = target.reason;
-  } catch (error) {
+  const opened = await openLeadReviewOverlay(cleaned);
+  if (!opened) {
     shell.commandMutationError =
-      error instanceof Error ? error.message : 'Could not open the Lead rollup.';
+      leadReviewOverlayError.value
+      || 'Could not open the Lead rollup in Live operations.';
   }
-  shell.focusLiveOperations();
 }
 
 const selectedPlanAwaitingEngagement = computed(() => {

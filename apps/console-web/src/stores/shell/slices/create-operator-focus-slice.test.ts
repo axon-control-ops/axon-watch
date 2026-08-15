@@ -3,7 +3,7 @@ import { ref } from 'vue';
 
 import { createOperatorFocusSlice } from './create-operator-focus-slice';
 
-function createSlice(initialLayout: 'ide' | 'operator' = 'ide') {
+function createSlice(initialLayout: 'ide' | 'operator' = 'ide', ideActivityView = 'explorer') {
   const layoutMode = ref<'ide' | 'operator'>(initialLayout);
   const operatorCenterView = ref<'grid' | 'graph'>('graph');
   const setLayoutMode = vi.fn((mode: 'ide' | 'operator') => {
@@ -15,6 +15,8 @@ function createSlice(initialLayout: 'ide' | 'operator' = 'ide') {
     highlightedSignalId: ref(null),
     ideAttentionPanelOpen: ref(false),
     ideBriefingPanelOpen: ref(false),
+    ideVaxonDockPinned: ref(false),
+    ideActivityView: ref(ideActivityView),
     ideExplorerCollapsed: ref(false),
     signalsSeamEmphasized: ref(false),
     missionControlEmphasized: ref(false),
@@ -76,6 +78,8 @@ describe('focusAttentionSidebar', () => {
       highlightedSignalId: ref(null),
       ideAttentionPanelOpen,
       ideBriefingPanelOpen: ref(false),
+      ideVaxonDockPinned: ref(false),
+      ideActivityView: ref('explorer'),
       ideExplorerCollapsed: ref(false),
       signalsSeamEmphasized: ref(false),
       missionControlEmphasized: ref(false),
@@ -287,5 +291,40 @@ describe('focusLiveOperations', () => {
 
     expect(expandedDockSeams.value.has('thread')).toBe(true);
     expect(dockThreadSeamTouched.value).toBe(false);
+  });
+});
+
+describe('focusKairoBriefing', () => {
+  it('pins the talking card on team view without replacing the roster', () => {
+    const ideBriefingPanelOpen = ref(false);
+    const ideVaxonDockPinned = ref(false);
+    const ideActivityView = ref('team');
+    const slice = createOperatorFocusSlice({
+      layoutMode: ref('ide'),
+      operatorBriefing: ref(null),
+      highlightedSignalId: ref(null),
+      ideAttentionPanelOpen: ref(false),
+      ideBriefingPanelOpen,
+      ideVaxonDockPinned,
+      ideActivityView,
+      ideExplorerCollapsed: ref(false),
+      signalsSeamEmphasized: ref(false),
+      missionControlEmphasized: ref(false),
+      connectorsEmphasized: ref(false),
+      briefingSeamEmphasized: ref(false),
+      operatorCenterView: ref('graph'),
+      dockHeroMode: ref('command'),
+      expandedDockSeams: ref(new Set()),
+      dockThreadSeamTouched: ref(false),
+      setDockHeroMode: vi.fn(),
+      restoreComposerDraft: vi.fn(),
+      setLayoutMode: vi.fn(),
+      setCurrentWorkspace: vi.fn(),
+    } as Parameters<typeof createOperatorFocusSlice>[0]);
+
+    slice.focusKairoBriefing();
+
+    expect(ideVaxonDockPinned.value).toBe(true);
+    expect(ideBriefingPanelOpen.value).toBe(false);
   });
 });

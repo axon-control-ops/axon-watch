@@ -1,5 +1,6 @@
 import type { Ref } from 'vue';
 
+import { isApiConflictError } from '../api/client';
 import { renameWorkspaceFile, saveWorkspaceFile } from '../api/control-plane';
 import { workspaceFileDocumentId } from './workspace-file-language';
 import {
@@ -186,8 +187,12 @@ export function createWorkspaceFileOps(input: WorkspaceFileOpsInput) {
       input.activeEditorDocumentId.value = workspaceFileDocumentId(newPath);
       await input.ensureWorkspaceFileLoaded(newPath);
     } catch (error) {
-      input.fileSaveError.value =
-        error instanceof Error ? error.message : 'workspace file rename failed';
+      if (isApiConflictError(error)) {
+        input.fileSaveError.value = `A file already exists at "${newPath}" — choose a different name.`;
+      } else {
+        input.fileSaveError.value =
+          error instanceof Error ? error.message : 'workspace file rename failed';
+      }
     } finally {
       input.fileSaveState.value = 'idle';
     }

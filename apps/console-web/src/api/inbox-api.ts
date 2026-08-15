@@ -1,6 +1,6 @@
 import type { InboxItem } from '../contracts/canonical';
 
-import { apiUrl, fetchJson, INBOX_FETCH_TIMEOUT_MS } from './client';
+import { fetchJson, fetchWithTimeout, INBOX_FETCH_TIMEOUT_MS } from './client';
 
 export interface InboxSnapshot {
   items: InboxItem[];
@@ -28,7 +28,7 @@ export async function fetchInbox(): Promise<InboxSnapshot> {
 async function acknowledgeInboxSignalsViaWatchCommand(
   signalIds: string[],
 ): Promise<AcknowledgeInboxSignalsResult> {
-  const response = await fetch(apiUrl('/api/watch/commands'), {
+  const response = await fetchWithTimeout('/api/watch/commands', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -74,7 +74,7 @@ async function acknowledgeInboxSignalsViaWatchCommand(
 export async function acknowledgeInboxSignals(
   signalIds: string[],
 ): Promise<AcknowledgeInboxSignalsResult> {
-  const response = await fetch(apiUrl('/api/inbox/signals/acknowledge'), {
+  const response = await fetchWithTimeout('/api/inbox/signals/acknowledge', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ signal_ids: signalIds }),

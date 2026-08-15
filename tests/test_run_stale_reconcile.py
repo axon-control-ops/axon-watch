@@ -192,6 +192,37 @@ class RunStaleReconcileTests(unittest.TestCase):
         self.assertEqual(reaped, [run_id])
         self.assertEqual("failed", get_run(run_id)["phase"])
 
+    def test_reap_fails_executing_run_without_worker_dispatch_started(self) -> None:
+        from app.persistence import task_store
+        from app.runs.begin_execution import begin_execution
+
+        record = _leased_worker_run(
+            workspace_id="workspace_undispatched",
+            employee_role="backend",
+            summary="Verification after Marco (backend): npm test",
+        )
+        run_id = str(record["run_id"])
+        task_id = str(record.get("task_id") or "")
+        begin_execution(
+            run_id,
+            actor="workspace_scheduler",
+            receipt_summary="Operator start entered execution",
+        )
+        append_run_execution_receipt(
+            run_id,
+            receipt_type="operator_task_started",
+            receipt_summary="Operator started backend task",
+            actor="operator",
+        )
+        _age_run(run_id, seconds=120)
+
+        reaped = reap_stale_employee_runs()
+
+        self.assertEqual([run_id], reaped)
+        self.assertEqual("failed", get_run(run_id)["phase"])
+        task = task_store.get_task(task_id) or {}
+        self.assertEqual("open", task.get("status"))
+
     def test_touch_run_activity_does_not_block_stale_reaper(self) -> None:
         record = create_run(
             workspace_id="workspace_axon_watch",
@@ -470,17 +501,20 @@ class RunStaleReconcileTests(unittest.TestCase):
             "app.workspace_agents.worker_dispatch.generate_lane_b_result",
             side_effect=blocked_lane_b,
         ), patch(
-            "app.workspace_agents.worker_dispatch._HEARTBEAT_SECONDS",
+            "app.workspace_agents.worker_dispatch_progress.HEARTBEAT_SECONDS",
             0.05,
         ), patch(
-            "app.workspace_agents.worker_dispatch.create_worker_isolation",
+            "app.workspace_agents.worker_dispatch.create_dispatch_isolation",
             return_value=__import__("pathlib").Path("/tmp/axon-si-test/checkout"),
         ), patch(
             "app.workspace_agents.worker_dispatch.worker_agent_workspace",
             return_value=__import__("pathlib").Path("/tmp/axon-si-test/checkout"),
         ), patch(
-            "app.workspace_agents.worker_dispatch.cleanup_worker_isolation",
-            return_value={"cleaned": True},
+            "app.workspace_agents.worker_dispatch.cleanup_dispatch_isolation",
+            return_value=None,
+        ), patch(
+            "app.workspace_agents.worker_dispatch.prepare_worker_ide_stream",
+            return_value=None,
         ):
             worker = threading.Thread(
                 target=dispatch_continuous_worker_run,
@@ -499,7 +533,7 @@ class RunStaleReconcileTests(unittest.TestCase):
             worker.start()
             # Heartbeat is on a 50ms interval under the patch; wait for the receipt
             # instead of a fixed sleep (CI load made 150ms flake).
-            deadline = time.monotonic() + 2.0
+            deadline = time.monotonic() + 5.0
             receipt_types: list[str] = []
             while time.monotonic() < deadline:
                 history = run_store.list_history(get_run(run_id)["history_ref"])
@@ -543,14 +577,17 @@ class RunStaleReconcileTests(unittest.TestCase):
             "app.workspace_agents.worker_dispatch.generate_lane_b_result",
             side_effect=streaming_lane_b,
         ), patch(
-            "app.workspace_agents.worker_dispatch.create_worker_isolation",
+            "app.workspace_agents.worker_dispatch.prepare_worker_ide_stream",
+            return_value=None,
+        ), patch(
+            "app.workspace_agents.worker_dispatch.create_dispatch_isolation",
             return_value=__import__("pathlib").Path("/tmp/axon-si-test/checkout"),
         ), patch(
             "app.workspace_agents.worker_dispatch.worker_agent_workspace",
             return_value=__import__("pathlib").Path("/tmp/axon-si-test/checkout"),
         ), patch(
-            "app.workspace_agents.worker_dispatch.cleanup_worker_isolation",
-            return_value={"cleaned": True},
+            "app.workspace_agents.worker_dispatch.cleanup_dispatch_isolation",
+            return_value=None,
         ):
             worker = threading.Thread(
                 target=dispatch_continuous_worker_run,

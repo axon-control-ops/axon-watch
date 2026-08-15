@@ -119,6 +119,8 @@ def generate_lane_b_result(
     cursor_trust_policy: str = "operator",
     workspace_root: Path | None = None,
     execution_policy: AgentExecutionPolicy | None = None,
+    allow_git_dispatch: bool = True,
+    fallback_runtime_families: tuple[str, ...] = (),
 ) -> dict[str, object]:
     trimmed = user_prompt.strip()
     if not trimmed:
@@ -131,10 +133,17 @@ def generate_lane_b_result(
         }
 
     context_block = build_lane_b_context_block(context)
-    git_result = try_lane_b_git_commit_dispatch(
-        workspace_id=context.workspace_id,
-        user_prompt=trimmed,
-        execution_access=execution_access,
+    # Continuous-worker prompts carry commit safety language as policy, not as
+    # operator intent. Only interactive turns may route through direct Git.
+    git_result = (
+        try_lane_b_git_commit_dispatch(
+            workspace_id=context.workspace_id,
+            user_prompt=trimmed,
+            execution_access=execution_access,
+            execution_policy=execution_policy,
+        )
+        if allow_git_dispatch
+        else None
     )
     if git_result is not None:
         continue_prompt = str(git_result.get("continue_prompt") or "").strip()
@@ -155,6 +164,7 @@ def generate_lane_b_result(
                 cursor_trust_policy=cursor_trust_policy,
                 workspace_root=workspace_root,
                 execution_policy=execution_policy,
+                fallback_runtime_families=fallback_runtime_families,
             )
         except RuntimeError as exc:
             return {
@@ -197,6 +207,7 @@ def generate_lane_b_result(
             cursor_trust_policy=cursor_trust_policy,
             workspace_root=workspace_root,
             execution_policy=execution_policy,
+            fallback_runtime_families=fallback_runtime_families,
         )
     except RuntimeError as exc:
         return {

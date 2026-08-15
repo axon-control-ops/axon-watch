@@ -180,6 +180,30 @@
   box-sizing: border-box;
 }
 
+/* Operator prompts stay compact even when an Instructions brief is long.
+ * The complete source remains available through this internal scroll area,
+ * while the following agent reply keeps its usable vertical space. */
+.agent-dock__transcript .conversation-seam__content--operator {
+  max-height: 6.25rem;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 0.38rem 0.62rem;
+  border: 1px solid rgba(104, 204, 255, 0.16);
+  border-radius: 0.45rem;
+  background: rgba(25, 29, 36, 0.8);
+  scrollbar-width: thin;
+  scrollbar-color: rgba(99, 216, 255, 0.5) transparent;
+}
+
+.agent-dock__transcript .conversation-seam__content--operator::-webkit-scrollbar {
+  width: 0.32rem;
+}
+
+.agent-dock__transcript .conversation-seam__content--operator::-webkit-scrollbar-thumb {
+  border-radius: 99px;
+  background: rgba(99, 216, 255, 0.5);
+}
+
 .agent-dock__transcript .conversation-seam__role {
   color: rgba(150, 231, 255, 0.94);
   font-size: 0.58rem;
@@ -426,4 +450,3 @@
   padding-left: 0.7rem;
   padding-right: 0.7rem;
 }
-

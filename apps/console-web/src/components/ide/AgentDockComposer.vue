@@ -13,6 +13,7 @@ const toolbarProps = useAgentDockComposerToolbarProps(composer);
 
 <template>
   <AgentDockComposerChrome
+    :ref="(el) => { composer.composerRootRef.value = el as HTMLElement | null; }"
     :show-full-access-consent="composer.showFullAccessConsent.value"
     :full-access-consent-checked="composer.fullAccessConsentChecked.value"
     :show-sandbox-consent="composer.showSandboxConsent.value"
@@ -29,6 +30,7 @@ const toolbarProps = useAgentDockComposerToolbarProps(composer);
     :run-mutation-pending="composer.shell.runMutationPending"
     :plan-soft-switch-notice="composer.planSoftSwitchNotice.value"
     :teammate-route-notice="composer.teammateRouteNotice.value"
+    :workspace-scope-notice="composer.workspaceScopeNotice.value"
     @update:full-access-consent-checked="composer.fullAccessConsentChecked.value = $event"
     @cancel-full-access-consent="composer.cancelFullAccessConsent()"
     @confirm-full-access-consent="composer.confirmFullAccessConsent()"
@@ -46,6 +48,8 @@ const toolbarProps = useAgentDockComposerToolbarProps(composer);
     @decline-plan-soft-switch-offer="composer.declinePlanSoftSwitchOffer()"
     @undo-teammate-route="composer.undoTeammateRoute()"
     @dismiss-teammate-route="composer.dismissTeammateRoute()"
+    @switch-workspace-scope="composer.switchComposerWorkspaceScope()"
+    @dismiss-workspace-scope="composer.dismissWorkspaceScopeNotice()"
   />
   <form
     class="agent-dock-composer"
@@ -147,6 +151,9 @@ const toolbarProps = useAgentDockComposerToolbarProps(composer);
       :command-mutation-error="composer.shell.commandMutationError"
       :run-mutation-error="composer.shell.runMutationError"
       :workspace-selected="Boolean(composer.shell.currentWorkspace)"
+      @dismiss-kairo-conversation-error="composer.kairoConversationError.value = null"
+      @dismiss-command-mutation-error="composer.shell.commandMutationError = null"
+      @dismiss-run-mutation-error="composer.shell.runMutationError = null"
     />
   </form>
 </template>

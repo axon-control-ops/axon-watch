@@ -100,6 +100,37 @@ describe('company-roster-busy', () => {
     expect(ids.sort()).toEqual(['amara', 'sipho']);
   });
 
+  it('does not show a terminal ask stream as busy while awaiting approval', () => {
+    const marco = employee({
+      employee_id: 'marco',
+      status: 'waiting_approval',
+      pending_decision_id: 'auton-1',
+      active_run_id: null,
+    });
+    const ids = resolveLiveBusyEmployeeIds({
+      employees: [marco],
+      streamingThreadIds: ['thread_marco'],
+      threads: [{ thread_id: 'thread_marco', employee_id: 'marco' }],
+      focusedStreamEmployeeId: 'marco',
+    });
+    expect(ids).toEqual([]);
+  });
+
+  it('keeps an approval-waiting employee busy when a real run remains active', () => {
+    const marco = employee({
+      employee_id: 'marco',
+      status: 'waiting_approval',
+      pending_decision_id: 'auton-1',
+      active_run_id: 'run_active',
+    });
+    const ids = resolveLiveBusyEmployeeIds({
+      employees: [marco],
+      streamingThreadIds: ['thread_marco'],
+      threads: [{ thread_id: 'thread_marco', employee_id: 'marco' }],
+    });
+    expect(ids).toEqual(['marco']);
+  });
+
   describe('resolveReportingEmployeeId', () => {
     it('returns the focused thread owner while a stream is active', () => {
       const result = resolveReportingEmployeeId({

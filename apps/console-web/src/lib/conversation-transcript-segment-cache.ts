@@ -12,6 +12,9 @@ type TranscriptSegmentCacheEntry = {
 
 const STREAM_SEGMENT_MIN_INTERVAL_MS = 120;
 const STREAM_SEGMENT_MIN_GROWTH = 1500;
+const LARGE_STREAM_CONTENT_CHARS = 100_000;
+const LARGE_STREAM_MIN_INTERVAL_MS = 500;
+const LARGE_STREAM_MIN_GROWTH = 8_000;
 const SEGMENT_CACHE_LIMIT = 80;
 
 export function createTranscriptSegmentCache() {
@@ -27,6 +30,11 @@ export function createTranscriptSegmentCache() {
     // every stream tick — that is what freezes the console ("Page Unresponsive").
     if (streaming) {
       const now = Date.now();
+      const largeStream = content.length >= LARGE_STREAM_CONTENT_CHARS;
+      const minInterval = largeStream
+        ? LARGE_STREAM_MIN_INTERVAL_MS
+        : STREAM_SEGMENT_MIN_INTERVAL_MS;
+      const minGrowth = largeStream ? LARGE_STREAM_MIN_GROWTH : STREAM_SEGMENT_MIN_GROWTH;
       const previousTailStart = Math.max(0, (cached?.contentLength ?? 0) - 64);
       const previousContentStillPrefix =
         Boolean(cached) &&
@@ -34,8 +42,8 @@ export function createTranscriptSegmentCache() {
         content.slice(previousTailStart, cached!.contentLength) === cached!.contentTail;
       if (
         cached &&
-        now - cached.atMs < STREAM_SEGMENT_MIN_INTERVAL_MS &&
-        content.length - cached.contentLength < STREAM_SEGMENT_MIN_GROWTH &&
+        now - cached.atMs < minInterval &&
+        content.length - cached.contentLength < minGrowth &&
         previousContentStillPrefix
       ) {
         return cached.segments;
@@ -63,4 +71,14 @@ export function createTranscriptSegmentCache() {
   }
 
   return { transcriptSegments };
+}
+
+let sharedCache: ReturnType<typeof createTranscriptSegmentCache> | null = null;
+
+/** One process-wide cache so every message component shares parse results. */
+export function sharedTranscriptSegmentCache(): ReturnType<typeof createTranscriptSegmentCache> {
+  if (!sharedCache) {
+    sharedCache = createTranscriptSegmentCache();
+  }
+  return sharedCache;
 }

@@ -14,6 +14,7 @@ import { useComposerWorkspaceSync } from './use-composer-workspace-sync';
 import { readWorkspaceComposerMode } from '../../lib/composer-mode-prefs';
 import { persistIdeComposerDraft } from '../../lib/ide-composer-draft-prefs';
 import { teammateRouteNotice } from '../../lib/teammate-route-notice';
+import { workspaceScopeNotice } from '../../lib/workspace-scope-notice';
 import { buildAgentDockComposerApi } from './build-agent-dock-composer-api';
 export function useAgentDockComposerSetup() {
   const shell = useShellStore();
@@ -27,6 +28,7 @@ export function useAgentDockComposerSetup() {
     stopVoiceCapture,
   } = useKairoConversation();
   const inputRef = ref<HTMLTextAreaElement | null>(null);
+  const composerRootRef = ref<HTMLElement | null>(null);
   const dismissedDebugReproduceMessageId = ref<string | null>(null);
   const planSoftSwitchNotice = ref<PlanSoftSwitchNotice | null>(null);
   function setInputRef(el: HTMLTextAreaElement | null): void {
@@ -240,6 +242,8 @@ export function useAgentDockComposerSetup() {
     declinePlanSoftSwitchOffer,
     dismissPlanSoftSwitch,
     dismissTeammateRoute,
+    dismissWorkspaceScopeNotice,
+    switchComposerWorkspaceScope,
     handleApproveRun,
     handleComposerKeydown,
     handleDebugReproduceProceed,
@@ -287,6 +291,7 @@ export function useAgentDockComposerSetup() {
     composerActivityChips,
     composerDraftModel,
     canConvertInstructions,
+    instructionsGenerating,
     convertDraftToInstructions,
     composerPlaceholder,
     composerQueueHint,
@@ -338,6 +343,7 @@ export function useAgentDockComposerSetup() {
     composerMode,
     defaultComposerMode,
     inputRef,
+    composerRootRef,
     applyingHistoryDraft,
     composerHistoryIndex,
     composerHistoryScratch,
@@ -373,6 +379,7 @@ export function useAgentDockComposerSetup() {
     composerActivityChips,
     composerDraftModel,
     canConvertInstructions,
+    instructionsGenerating,
     convertDraftToInstructions,
     composerImages,
     composerMode,
@@ -407,6 +414,8 @@ export function useAgentDockComposerSetup() {
     debugReproduceRequest,
     dismissPlanSoftSwitch,
     dismissTeammateRoute,
+    dismissWorkspaceScopeNotice,
+    switchComposerWorkspaceScope,
     enlargedComposerImage,
     executionAccessHint,
     extraPinnedRows,
@@ -440,6 +449,7 @@ export function useAgentDockComposerSetup() {
     openVaultSurface,
     planSoftSwitchNotice,
     teammateRouteNotice,
+    workspaceScopeNotice,
     removeChip,
     removeComposerImage,
     editQueuedMessage,
@@ -510,6 +520,7 @@ export function useAgentDockComposerSetup() {
     undoPlanSoftSwitch,
     undoTeammateRoute,
     updateComposerDraft,
+    composerRootRef,
     cancelFullAccessConsent,
   });
 }

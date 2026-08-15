@@ -45,6 +45,7 @@ from app.workspace_project_bindings import (
     upsert_workspace_project_binding,
 )
 from app.workspace_files import (
+    WorkspaceFileConflictError,
     WorkspaceFileError,
     list_workspace_files,
     read_workspace_file,
@@ -140,7 +141,11 @@ def workspace_composer_prefs_put(
     prefs = set_workspace_composer_prefs(
         workspace_id,
         cursor_cli_model=body.cursor_cli_model,
+        claude_cli_model=body.claude_cli_model,
+        codex_cli_model=body.codex_cli_model,
         runtime_target=body.runtime_target,
+        auto_allowed_runtimes=body.auto_allowed_runtimes,
+        max_concurrent_runtimes=body.max_concurrent_runtimes,
     )
     return {"workspace_id": workspace_id, **prefs}
 
@@ -476,9 +481,13 @@ def workspace_files_update(
     body: WriteWorkspaceFileRequest,
 ) -> dict[str, object]:
     try:
-        return write_workspace_file(workspace_id, file_path, body.content)
+        return write_workspace_file(
+            workspace_id, file_path, body.content, base_sha256=body.base_sha256
+        )
     except WorkspaceNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except WorkspaceFileConflictError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
     except WorkspaceFileError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 

@@ -17,6 +17,7 @@ const props = defineProps<{
 const containerRef = ref<HTMLElement | null>(null);
 const loadState = ref<'loading' | 'ready' | 'error'>('loading');
 let terminalController: Awaited<ReturnType<typeof createXtermSession>> | null = null;
+let unmounted = false;
 
 function clearTerminal(): void {
   terminalController?.clearScreen();
@@ -64,10 +65,18 @@ onMounted(async () => {
   window.addEventListener('beforeunload', handleBeforeUnload);
 
   try {
-    terminalController = await createXtermSession(containerRef.value, {
+    const session = await createXtermSession(containerRef.value, {
       readOnly: props.readOnly ?? props.sessionRole === 'agent',
       variant: props.variant,
     });
+    if (unmounted) {
+      // Component was torn down while the session was still connecting —
+      // onBeforeUnmount already ran and found terminalController null, so
+      // dispose this one ourselves instead of leaking the socket/xterm instance.
+      session.dispose();
+      return;
+    }
+    terminalController = session;
     terminalController.setContext({
       workspaceId: props.workspaceId,
       runSummary: props.runSummary,
@@ -78,7 +87,9 @@ onMounted(async () => {
     });
     loadState.value = 'ready';
   } catch {
-    loadState.value = 'error';
+    if (!unmounted) {
+      loadState.value = 'error';
+    }
   }
 });
 
@@ -98,6 +109,7 @@ watch(
 );
 
 onBeforeUnmount(() => {
+  unmounted = true;
   window.removeEventListener('beforeunload', handleBeforeUnload);
   persistTerminalScrollback();
   terminalController?.dispose();

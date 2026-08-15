@@ -6,12 +6,14 @@ import tempfile
 import unittest
 from dataclasses import FrozenInstanceError
 from pathlib import Path
+from unittest.mock import patch
 
 
 CONTROL_PLANE_ROOT = Path(__file__).resolve().parents[1] / "services" / "control-plane"
 sys.path.insert(0, str(CONTROL_PLANE_ROOT))
 
 from app.workspace_agents.config_loader import (  # noqa: E402
+    EmployeeConfig,
     WorkspaceAgentError,
     load_workspace_agent_configs,
 )
@@ -19,6 +21,9 @@ from app.workspace_agents.execution_policy import (  # noqa: E402
     AgentExecutionPolicyOverride,
     resolve_effective_policy,
     role_execution_policy,
+)
+from app.workspace_agents.execution_policy_runtime import (  # noqa: E402
+    resolve_worker_execution_policy,
 )
 
 
@@ -34,6 +39,7 @@ class RoleExecutionPolicyTests(unittest.TestCase):
         self.assertEqual((), watcher.write_paths)
         self.assertEqual("consultative", watcher.execution_access)
         self.assertIn("components", frontend.write_paths)
+        self.assertIn("hooks", frontend.write_paths)
         self.assertIn("services", backend.write_paths)
         self.assertNotIn("apps", integrations.write_paths)
         self.assertTrue(
@@ -87,6 +93,41 @@ class EffectiveExecutionPolicyTests(unittest.TestCase):
         self.assertEqual((), policy.write_paths)
         self.assertEqual("consultative", policy.execution_access)
 
+    def test_missing_task_scope_uses_the_role_ceiling(self) -> None:
+        policy = resolve_effective_policy(
+            role="backend",
+            workspace_allowed_paths=("services", "tests"),
+            task_allowed_paths=None,
+        )
+
+        self.assertEqual(("services", "tests"), policy.write_paths)
+        self.assertEqual("full", policy.execution_access)
+
+    def test_frontend_ui_task_scope_restores_safe_hooks_root(self) -> None:
+        policy = resolve_effective_policy(
+            role="frontend",
+            workspace_allowed_paths=("app", "components", "hooks", "tests"),
+            task_allowed_paths=("app", "components", "tests"),
+        )
+
+        self.assertIn("hooks", policy.write_paths)
+        self.assertEqual("full", policy.execution_access)
+
+    def test_safe_scope_expansion_stays_role_and_contract_bounded(self) -> None:
+        backend = resolve_effective_policy(
+            role="backend",
+            workspace_allowed_paths=("services", "hooks", "tests"),
+            task_allowed_paths=("services",),
+        )
+        missing_contract = resolve_effective_policy(
+            role="frontend",
+            workspace_allowed_paths=("app", "components", "tests"),
+            task_allowed_paths=("app", "components", "tests"),
+        )
+
+        self.assertNotIn("hooks", backend.write_paths)
+        self.assertNotIn("hooks", missing_contract.write_paths)
+
     def test_missing_or_disjoint_scope_fails_closed(self) -> None:
         missing_contract = resolve_effective_policy(
             role="frontend",
@@ -102,6 +143,28 @@ class EffectiveExecutionPolicyTests(unittest.TestCase):
         self.assertEqual((), missing_contract.read_paths)
         self.assertEqual((), missing_contract.write_paths)
         self.assertEqual((), disjoint_task.write_paths)
+
+    def test_ops_dashboard_contract_grants_frontend_command_centre_writes(self) -> None:
+        allowed = (
+            "package.json",
+            "scripts/",
+            "server/",
+            "command-centre/",
+            "data/live/",
+            "data/exports/",
+            "docs/ops/",
+            "output/homework/",
+            "output/poems/",
+        )
+        policy = resolve_effective_policy(
+            role="frontend",
+            workspace_allowed_paths=allowed,
+            task_allowed_paths=None,
+        )
+
+        self.assertIn("command-centre", policy.write_paths)
+        self.assertTrue(any(path.startswith("output/") for path in policy.write_paths))
+        self.assertEqual("full", policy.execution_access)
 
     def test_employee_override_can_only_reduce_authority(self) -> None:
         override = AgentExecutionPolicyOverride(
@@ -135,6 +198,23 @@ class EffectiveExecutionPolicyTests(unittest.TestCase):
         self.assertEqual(1200, policy.timeout_seconds)
         self.assertEqual("worker", policy.trust_policy)
         self.assertEqual(("private/**", "**/.env"), policy.forbidden_path_globs)
+
+    def test_legacy_empty_task_scope_is_recovered_at_the_worker_boundary(self) -> None:
+        # Pre-default task rows persisted an omitted allowed_paths as [], which
+        # would otherwise make every queued specialist task consultative.
+        employee = EmployeeConfig(role="backend")
+        with patch(
+            "app.workspace_agents.execution_policy_runtime.load_repo_contract",
+            return_value={"allowed_paths": ["services", "tests"]},
+        ):
+            policy = resolve_worker_execution_policy(
+                employee=employee,
+                task_payload={"allowed_paths": []},
+                workspace_root=Path("/workspace"),
+            )
+
+        self.assertEqual(("services", "tests"), policy.write_paths)
+        self.assertEqual("full", policy.execution_access)
 
 
 class EmployeeExecutionPolicyConfigTests(unittest.TestCase):

@@ -1,0 +1,94 @@
+/* Compact OTA / axon-agent-terminal-job cards in the agent thread. */
+
+.agent-block--terminal-job {
+  border-color: rgba(90, 200, 230, 0.28);
+}
+
+.agent-block--terminal-ota {
+  border-color: rgba(120, 220, 180, 0.32);
+  box-shadow: inset 0 0 0 1px rgba(80, 200, 160, 0.08);
+}
+
+.agent-block__terminal-jobchip {
+  flex: 0 1 auto;
+  max-width: 14rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 0.08rem 0.35rem;
+  border-radius: 999px;
+  border: 1px solid rgba(90, 200, 230, 0.35);
+  background: rgba(12, 40, 55, 0.72);
+  color: rgba(180, 235, 255, 0.96);
+  font-size: 0.52rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: none;
+}
+
+.agent-block__terminal-jobchip[data-status='running'],
+.agent-block__terminal-jobchip[data-status='queued'] {
+  border-color: rgba(80, 220, 180, 0.45);
+  color: rgba(180, 255, 220, 0.96);
+  background: rgba(16, 55, 45, 0.7);
+}
+
+.agent-block__terminal-jobchip[data-status='failed'],
+.agent-block__terminal-jobchip[data-status='error'] {
+  border-color: rgba(255, 120, 100, 0.45);
+  color: rgba(255, 210, 200, 0.96);
+  background: rgba(70, 28, 24, 0.72);
+}
+
+.agent-block__terminal-jobchip[data-status='done'],
+.agent-block__terminal-jobchip[data-status='succeeded'],
+.agent-block__terminal-jobchip[data-status='completed'] {
+  border-color: rgba(120, 200, 255, 0.4);
+  color: rgba(200, 235, 255, 0.96);
+}
+
+.agent-block__terminal-summary {
+  display: grid;
+  gap: 0.22rem;
+  margin: 0;
+  padding: 0.45rem 0.55rem 0.55rem;
+}
+
+.agent-block__terminal-summary-row {
+  display: grid;
+  grid-template-columns: 4.5rem minmax(0, 1fr);
+  gap: 0.45rem;
+  align-items: start;
+  font-size: 0.58rem;
+  line-height: 1.35;
+}
+
+.agent-block__terminal-summary-row dt {
+  margin: 0;
+  color: rgba(140, 175, 200, 0.78);
+  font-weight: 650;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.agent-block__terminal-summary-row dd {
+  margin: 0;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: rgba(210, 230, 245, 0.94);
+  font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, Consolas, monospace);
+}
+
+.agent-block__terminal-output--ota {
+  max-height: 16rem;
+  border-top: 1px solid rgba(80, 200, 160, 0.12);
+  color: rgba(190, 230, 210, 0.94);
+}
+
+.agent-block--terminal-compact {
+  opacity: 0.88;
+}
+
+.agent-block--terminal-compact .agent-block__terminal-hint {
+  padding-top: 0;
+}

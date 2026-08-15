@@ -52,6 +52,16 @@ def usage_limit_blocks_auto_start(workspace_id: str, role: str) -> bool:
             record_claude_usage_limit_hit(detail)
             if claude_usage_allows_agent_retry(probe_claude_usage()):
                 return False
+        elif "codex" in lowered:
+            from app.cli_runtime.codex_usage_probe import (
+                codex_usage_allows_agent_retry,
+                probe_codex_usage,
+                record_codex_usage_limit_hit,
+            )
+
+            record_codex_usage_limit_hit(detail)
+            if codex_usage_allows_agent_retry(probe_codex_usage()):
+                return False
         else:
             # Cursor remains the default/legacy source of this failure shape;
             # unknown runtimes fall back to the Cursor pool check too.
@@ -314,7 +324,11 @@ def generic_repeated_failure_blocks_auto_start(
 def continuous_auto_start_skip_reason(workspace_id: str, role: str) -> str | None:
     """Return a skip reason for continuous ticks, or None when the role may start."""
     if usage_limit_blocks_auto_start(workspace_id, role):
-        return "Cursor usage limits blocked this role's last shift"
+        outcome = latest_role_run_outcome(workspace_id, role) or {}
+        detail = str(outcome.get("detail") or "")
+        lowered = detail.lower()
+        runtime = "Codex" if "codex" in lowered else "Claude" if "claude" in lowered else "Cursor"
+        return f"{runtime} usage limits blocked this role's last shift"
     if billing_block_blocks_auto_start(workspace_id, role):
         return "Cursor unpaid invoice blocked this role's last shift"
     if billing_blocks_auto_start(workspace_id, role):

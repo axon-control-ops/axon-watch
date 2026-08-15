@@ -807,7 +807,7 @@ building a disciplined company around the AI:
 - clear ownership;
 - independent quality checks;
 - clean pull requests;
-- fair scheduling;
+- fair scheduling, including Full Auto ask-card receipts;
 - restart recovery;
 - strong identity and permissions;
 - staging and rollback;

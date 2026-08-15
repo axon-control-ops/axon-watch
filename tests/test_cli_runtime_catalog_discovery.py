@@ -26,7 +26,9 @@ sys.path.insert(0, str(CONTROL_PLANE_ROOT))
 
 from app.cli_runtime.catalog_discovery import (  # noqa: E402
     cli_runtime_family,
+    cursor_cli_argv,
     find_cursor_cli,
+    is_cursor_agent_binary,
 )
 
 
@@ -39,6 +41,26 @@ class CliRuntimeFamilyTests(unittest.TestCase):
     def test_recognizes_cursor_agent_binary_as_cursor_family(self) -> None:
         self.assertEqual("cursor", cli_runtime_family("/home/edp/.local/bin/cursor-agent"))
         self.assertEqual("cursor", cli_runtime_family("/home/edp/.local/bin/cursor"))
+
+
+class CursorCliArgvTests(unittest.TestCase):
+    def test_cursor_agent_binary_omits_agent_subcommand(self) -> None:
+        self.assertTrue(is_cursor_agent_binary("/home/edp/.local/bin/cursor-agent"))
+        self.assertEqual(
+            ["/home/edp/.local/bin/cursor-agent", "status"],
+            cursor_cli_argv("/home/edp/.local/bin/cursor-agent", "status"),
+        )
+        self.assertEqual(
+            ["/home/edp/.local/bin/cursor-agent", "--list-models"],
+            cursor_cli_argv("/home/edp/.local/bin/cursor-agent", "--list-models"),
+        )
+
+    def test_cursor_shim_keeps_agent_subcommand(self) -> None:
+        self.assertFalse(is_cursor_agent_binary("/home/edp/.local/bin/cursor"))
+        self.assertEqual(
+            ["/home/edp/.local/bin/cursor", "agent", "status"],
+            cursor_cli_argv("/home/edp/.local/bin/cursor", "status"),
+        )
 
 
 class FindCursorCliTests(unittest.TestCase):

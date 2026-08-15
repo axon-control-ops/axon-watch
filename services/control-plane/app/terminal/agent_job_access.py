@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
+from app.cli_runtime.long_running_shell import is_long_running_ship_shell
 from app.cli_runtime.agent_shell_hook import evaluate_hook_payload
-from app.persistence import task_store
+from app.persistence import run_store, task_store
 from app.runs.service import (
     RunNotFoundError,
     append_run_execution_receipt,
@@ -11,6 +12,7 @@ from app.runs.service import (
 )
 from app.terminal.workspace_roots import WorkspaceRootError, resolve_workspace_root
 from app.workspace_agents.config_loader import EmployeeConfig, load_workspace_agent_configs
+from app.workspace_agents.execution_policy import role_execution_policy
 from app.workspace_agents.execution_policy_runtime import resolve_worker_execution_policy
 
 
@@ -26,6 +28,51 @@ def _employee_for_role(workspace_id: str, role: str) -> EmployeeConfig:
             if employee.role == role:
                 return employee
     return EmployeeConfig(role=role)
+
+
+def _resolve_scoped_task_for_run(
+    *,
+    workspace_id: str,
+    role: str,
+    run: dict[str, Any],
+) -> tuple[dict[str, Any] | None, dict[str, Any]]:
+    """Backfill run.task_id from an open verification ticket when chat runs lack scope."""
+    task_id = str(run.get("task_id") or "").strip()
+    task = task_store.get_task(task_id) if task_id else None
+    if task is not None:
+        return task, run
+    from app.workspace_agents.lead_verification_handoff import (
+        find_open_verification_task,
+        try_lease_open_verification_task,
+    )
+
+    candidate = find_open_verification_task(workspace_id, role)
+    if candidate is None:
+        return None, run
+    cleaned_run = str(run.get("run_id") or "").strip()
+    holder = f"agent-terminal-{workspace_id}-{role}"
+    leased = try_lease_open_verification_task(
+        workspace_id=workspace_id,
+        owner_role=role,
+        lease_holder=holder,
+        run_id=cleaned_run or None,
+    )
+    if leased is None:
+        leased = candidate
+    bound_task_id = str(leased.get("task_id") or "").strip()
+    if not bound_task_id:
+        return None, run
+    updated = dict(run)
+    if not task_id:
+        updated["task_id"] = bound_task_id
+        updated = run_store.save_run(updated)
+    if str(leased.get("status") or "").strip().lower() == "leased" and cleaned_run:
+        try:
+            task_store.bind_task_run(bound_task_id, cleaned_run)
+        except task_store.TaskLedgerError:
+            pass
+    stored = task_store.get_task(bound_task_id)
+    return stored, updated
 
 
 def assert_agent_terminal_job_allowed(
@@ -53,14 +100,32 @@ def assert_agent_terminal_job_allowed(
     role = str(run.get("employee_role") or "").strip().lower()
     if not role:
         raise AgentTerminalPolicyError("agent terminal run has no employee role")
-    task_id = str(run.get("task_id") or "").strip()
-    task = task_store.get_task(task_id) if task_id else None
-    if task is None:
-        raise AgentTerminalPolicyError("agent terminal run has no scoped task")
+    task, run = _resolve_scoped_task_for_run(
+        workspace_id=source,
+        role=role,
+        run=run,
+    )
     try:
         root = resolve_workspace_root(workspace_id)
     except WorkspaceRootError as exc:
         raise AgentTerminalPolicyError(str(exc)) from exc
+    if task is None:
+        policy = role_execution_policy(role)
+        if (
+            policy.execution_access != "full"
+            or role not in {"lead", "integrations"}
+            or not is_long_running_ship_shell(command)
+        ):
+            raise AgentTerminalPolicyError("agent terminal run has no scoped task")
+        append_run_execution_receipt(
+            clean_run,
+            receipt_type="agent_terminal_allowed",
+            receipt_summary="Approved no-task ship terminal command accepted",
+            actor="agent_terminal_policy",
+            success=True,
+            intent="terminal_command",
+        )
+        return role
     policy = resolve_worker_execution_policy(
         employee=_employee_for_role(source, role),
         task_payload=task,

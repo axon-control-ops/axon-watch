@@ -189,6 +189,11 @@ def append_transition(history_ref: str, transition: dict[str, Any]) -> None:
     payload = deepcopy(transition)
     encoded = json.dumps(payload, separators=(",", ":"), sort_keys=True)
     with _managed_connection() as connection:
+        # Sequence allocation and insertion must share one write transaction.
+        # Heartbeats, streamed progress, and lifecycle receipts can arrive from
+        # separate threads; a deferred transaction allowed two writers to read
+        # the same MAX(sequence) before either inserted it.
+        connection.execute("BEGIN IMMEDIATE")
         sequence = connection.execute(
             "SELECT COALESCE(MAX(sequence), 0) + 1 FROM run_history WHERE history_ref = ?",
             (history_ref,),

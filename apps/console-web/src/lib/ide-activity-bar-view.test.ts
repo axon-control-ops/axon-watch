@@ -114,16 +114,16 @@ describe('ide activity bar view', () => {
     expect(buildIdeActivityBarTeamAttention(failed)).toEqual({
       count: 1,
       tone: 'failure',
-      hint: '1 teammate needs attention after a failed job',
+      hint: '1 teammate needs attention — tap to open their dock, then Try again',
     });
     expect(ideActivityBarTeamTitle(false, failed)).toBe(
-      'Workspace team · 1 teammate needs attention after a failed job',
+      'Workspace team · 1 teammate needs attention — tap to open their dock, then Try again',
     );
     expect(ideActivityBarTeamTitle(true, [failed[0], { ...failed[0], employee_id: 'e2' }])).toBe(
-      'Workspace team · Click to collapse · 2 teammates need attention after a failed job',
+      'Workspace team · Click to collapse · 2 teammates need attention — tap to open a failed dock, then Try again',
     );
     expect(ideActivityBarTeamAriaLabel(false, failed)).toBe(
-      'Expand workspace team sidebar, 1 teammate needs attention after a failed job',
+      'Expand workspace team sidebar, 1 teammate needs attention — tap to open their dock, then try again',
     );
   });
 

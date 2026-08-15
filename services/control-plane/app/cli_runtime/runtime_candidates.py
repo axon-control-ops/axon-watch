@@ -1,4 +1,4 @@
-"""Ordering helpers for preferred and fallback local runtime targets."""
+"""Ordering helpers for runtime selection and automatic fallback."""
 
 from __future__ import annotations
 
@@ -26,6 +26,8 @@ def effective_cli_model(family: str, runtime_model: str) -> str:
 def ordered_candidates_for_dispatch(
     snapshot: dict[str, object],
     runtime_target: str | None,
+    *,
+    fallback_runtime_families: tuple[str, ...] = (),
 ) -> list[dict[str, object]]:
     candidates = ordered_runtime_candidates(snapshot)
     preferred = str(runtime_target or "").strip()
@@ -33,13 +35,23 @@ def ordered_candidates_for_dispatch(
         return candidates
     by_id = {str(record.get("id") or ""): record for record in candidates}
     selected = by_id.get(preferred)
+    # A value passed by an interactive composer remains a strict operator
+    # selection. Autonomous workers may additionally supply the workspace's
+    # explicitly approved Auto families; keep the selected runtime first and
+    # never consume an unapproved provider.
     if not selected:
-        return candidates
-    return [selected, *(
-        record
-        for record in candidates
-        if str(record.get("id") or "") not in {"", preferred}
-    )]
+        return []
+    allowed = {str(family).strip() for family in fallback_runtime_families if family}
+    if not allowed:
+        return [selected]
+    return [
+        selected,
+        *[
+            record
+            for record in candidates
+            if record is not selected and str(record.get("family") or "") in allowed
+        ],
+    ]
 
 
 __all__ = ["effective_cli_model", "ordered_candidates_for_dispatch"]

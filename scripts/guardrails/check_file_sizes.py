@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
+import os
 import sys
 from pathlib import Path
 
@@ -56,8 +57,20 @@ def main() -> int:
                 f"WARN {rel}: {lines} lines exceeds advisory limit {advisory_limit}"
             )
 
-    for warning in advisory_hits:
+    verbose = os.environ.get("AXON_GUARDRAIL_VERBOSE", "").strip().lower() in {
+        "1",
+        "true",
+        "yes",
+    }
+    visible_advisories = advisory_hits if verbose else advisory_hits[:5]
+    for warning in visible_advisories:
         print(warning)
+    hidden_count = len(advisory_hits) - len(visible_advisories)
+    if hidden_count:
+        print(
+            f"WARN {hidden_count} additional legacy advisory-size files omitted; "
+            "set AXON_GUARDRAIL_VERBOSE=1 for the full list"
+        )
 
     if failed:
         print("File-size guardrails failed.")

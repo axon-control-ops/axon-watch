@@ -5,11 +5,29 @@ from __future__ import annotations
 import json
 import os
 import subprocess
+import base64
+from pathlib import Path
 from typing import Any
 
+from app.cli_runtime.catalog_discovery import cursor_cli_argv
 from app.cli_runtime.runtime_auth import env_without_api_keys
+from app.cli_runtime.runtime_profiles import codex_profile_env
 
 StatusRecord = dict[str, Any]
+
+
+def _codex_account_email(env: dict[str, str] | None = None) -> str:
+    """Return only the local Codex ID-token email claim; never expose its token."""
+    try:
+        runtime_env = codex_profile_env(env)
+        with open(Path(runtime_env["CODEX_HOME"]) / "auth.json", encoding="utf-8") as handle:
+            token = str((json.load(handle).get("tokens") or {}).get("id_token") or "")
+        payload = token.split(".")[1]
+        decoded = base64.urlsafe_b64decode(payload + "=" * (-len(payload) % 4))
+        email = str((json.loads(decoded).get("email") or "")).strip()
+        return email if "@" in email else ""
+    except (OSError, ValueError, IndexError, KeyError, TypeError, json.JSONDecodeError):
+        return ""
 
 # `cursor agent status` commonly takes 6–8s on this host; keep headroom above that.
 # Occasional cold starts / contention can push past 15s — retry once before failing.
@@ -117,33 +135,37 @@ def cursor_auth_status(
         }
 
     def _probe(env: dict[str, str]) -> StatusRecord:
+        status_argv = cursor_cli_argv(binary, "status")
         try:
-            proc = _run_command_with_timeout_retry([binary, "agent", "status"], env=env)
+            proc = _run_command_with_timeout_retry(status_argv, env=env)
         except subprocess.TimeoutExpired:
+            preview = " ".join(status_argv)
             return {
                 "logged_in": False,
                 "auth_method": "",
                 "provider_label": "Timed out",
                 "vault_posture": vault_posture.get("posture"),
-                "message": "Cursor auth probe timed out. Run `cursor agent status` manually.",
+                "message": f"Cursor auth probe timed out. Run `{preview}` manually.",
             }
         except Exception:
+            preview = " ".join(status_argv)
             return {
                 "logged_in": False,
                 "auth_method": "",
                 "provider_label": "Probe failed",
                 "vault_posture": vault_posture.get("posture"),
-                "message": "Cursor auth probe failed. Run `cursor agent status` manually.",
+                "message": f"Cursor auth probe failed. Run `{preview}` manually.",
             }
         raw = (proc.stdout or proc.stderr or "").strip()
         lowered = raw.lower()
+        login_hint = " ".join(cursor_cli_argv(binary, "login"))
         if "not logged in" in lowered or "authentication required" in lowered:
             return {
                 "logged_in": False,
                 "auth_method": "",
                 "provider_label": "Not signed in",
                 "vault_posture": vault_posture.get("posture"),
-                "message": "Cursor is installed but not signed in. Run `cursor agent login` or unlock /vault.",
+                "message": f"Cursor is installed but not signed in. Run `{login_hint}` or unlock /vault.",
             }
         if proc.returncode == 0 and raw:
             return {
@@ -159,7 +181,7 @@ def cursor_auth_status(
             "auth_method": "",
             "provider_label": "Not signed in",
             "vault_posture": vault_posture.get("posture"),
-            "message": "Cursor is installed but not signed in. Run `cursor agent login` or unlock /vault.",
+            "message": f"Cursor is installed but not signed in. Run `{login_hint}` or unlock /vault.",
         }
 
     has_api_key = bool(runtime_env.get("CURSOR_API_KEY", "").strip())
@@ -202,7 +224,7 @@ def cursor_auth_status(
             "vault_posture": vault_posture.get("posture"),
             "message": (
                 "CURSOR_API_KEY is set but Cursor CLI is not signed in. "
-                "Fix the vault secret, clear shell env, or run `cursor agent login`."
+                f"Fix the vault secret, clear shell env, or run `{' '.join(cursor_cli_argv(binary, 'login'))}`."
             ),
         }
     if vault_overlay and vault_posture.get("unlocked") and vault_overlay.get("logged_in"):
@@ -244,7 +266,7 @@ def _probe_codex_cli(
         "logged_in": True,
         "auth_method": method,
         "provider_label": "Codex",
-        "account_label": raw.splitlines()[0].strip(),
+        "account_label": _codex_account_email(env) or raw.splitlines()[0].strip(),
         "vault_posture": "ready",
         "message": "Authenticated with Codex CLI.",
     }
@@ -257,7 +279,7 @@ def codex_auth_status(
     env_keys: dict[str, str],
     probe_env: dict[str, str] | None = None,
 ) -> StatusRecord:
-    runtime_env = probe_env or {**os.environ, **env_keys}
+    runtime_env = codex_profile_env(probe_env or {**os.environ, **env_keys})
     vault_overlay = vault_auth_overlay("codex_local", vault_posture=vault_posture, env_keys=env_keys)
     has_api_key = bool(
         runtime_env.get("CODEX_API_KEY", "").strip() or runtime_env.get("OPENAI_API_KEY", "").strip()

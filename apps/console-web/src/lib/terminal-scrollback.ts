@@ -7,13 +7,113 @@ const SCROLLBACK_SCAFFOLD_LINE =
   /^\[(terminal|attached|context)\]/;
 
 const ANSI_ESCAPE_PATTERN = /\x1b\[[0-9;]*m/g;
+const CSI_SEQUENCE_PATTERN =
+  /\u001b(?:\u009b)?[[\]()#;?]*(?:\d{1,4}(?:;\d{0,4})*)?[\dA-PRZcf-nqry=><~]/g;
+const OSC_SEQUENCE_PATTERN = /\u001b\][^\u0007]*(?:\u0007|\u001b\\)/g;
+const ORPHAN_CSI_PATTERN = /(?:\uFFFD)?(?:\[[0-9;?]*[A-Za-z])+/g;
 
 const SINGLE_SHELL_PROMPT_LINE = /^[^\s]+@[^\s:]+:.*\$\s*$/;
 
 const CONCATENATED_SHELL_PROMPT_LINE = /^([^\s]+@[^\s:]+:.*\$\s*)+$/;
 
 export function stripAnsi(text: string): string {
-  return text.replace(ANSI_ESCAPE_PATTERN, '');
+  return String(text || '')
+    .replace(OSC_SEQUENCE_PATTERN, '')
+    .replace(CSI_SEQUENCE_PATTERN, '')
+    .replace(ANSI_ESCAPE_PATTERN, '')
+    .replace(/\u001b./g, '')
+    .replace(/\u009b[[\]()#;?]*(?:\d{1,4}(?:;\d{0,4})*)?[\dA-PRZcf-nqry=><~]/g, '');
+}
+
+/** Strip CSI fragments when the ESC byte was lost in tee/storage (Jest cursor spam). */
+export function stripOrphanAnsiFragments(text: string): string {
+  return String(text || '').replace(ORPHAN_CSI_PATTERN, '');
+}
+
+function lineLooksAnsiPolluted(line: string): boolean {
+  return (
+    /\u001b/.test(line) ||
+    /\[[0-9]+[A-Z]/.test(line) ||
+    (line.match(/\[[0-9;?]*[A-Za-z]/g)?.length ?? 0) >= 2
+  );
+}
+
+export function cleanTerminalDisplayLine(line: string): string {
+  let cleaned = stripAnsi(line);
+  if (lineLooksAnsiPolluted(line)) {
+    cleaned = stripOrphanAnsiFragments(cleaned).replace(/\[[0-9;?]*[A-Za-z]/g, '');
+  }
+  return cleaned;
+}
+
+/** Jest/npm test scrollback: drop cursor-rewrite noise, keep pass/fail + summaries. */
+export function compactTestRunnerOutput(text: string): string {
+  const lines = String(text || '')
+    .split('\n')
+    .map((line) => cleanTerminalDisplayLine(line));
+  const kept: string[] = [];
+  const summaries = new Map<string, string>();
+  const seen = new Set<string>();
+
+  const remember = (line: string): void => {
+    const key = line.trim();
+    if (!key || seen.has(key)) {
+      return;
+    }
+    seen.add(key);
+    kept.push(line.trimEnd());
+  };
+
+  for (const line of lines) {
+    const trimmed = line.trimEnd();
+    if (!trimmed.trim()) {
+      continue;
+    }
+    if (/^(PASS|FAIL)\s+\S/.test(trimmed)) {
+      remember(trimmed);
+      continue;
+    }
+    const summaryMatch = /^(Test Suites:|Tests:|Snapshots:|Time:)/.exec(trimmed);
+    if (summaryMatch) {
+      summaries.set(summaryMatch[1], trimmed.trim());
+      continue;
+    }
+    if (/^\s*(✓|✕|○|●)/.test(trimmed) || /\(\d+\s*m?s\)\s*$/.test(trimmed)) {
+      remember(trimmed);
+      continue;
+    }
+    if (/^RUNS\s/.test(trimmed) && !/PASS|FAIL/.test(trimmed)) {
+      continue;
+    }
+    if (/Test Suites:|Tests:|Snapshots:/i.test(trimmed)) {
+      continue;
+    }
+    if (trimmed.length > 1) {
+      remember(trimmed);
+    }
+  }
+
+  for (const summary of summaries.values()) {
+    remember(summary);
+  }
+
+  return kept.join('\n').trim();
+}
+
+export function sanitizeTerminalDisplayOutput(text: string, command = ''): string {
+  const normalized = String(text || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+  const cleaned = normalized
+    .split('\n')
+    .map((line) => cleanTerminalDisplayLine(line))
+    .join('\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .replace(/^\n+|\n+$/g, '');
+
+  if (/\bnpm\s+test\b|\bnpx\s+jest\b|\bjest\b/i.test(command)) {
+    const compact = compactTestRunnerOutput(cleaned);
+    return compact || cleaned;
+  }
+  return cleaned;
 }
 
 export function isShellPromptLine(line: string): boolean {

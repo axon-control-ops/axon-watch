@@ -73,6 +73,7 @@ export type AgentDockComposerToolbarSource = {
   modelSearchQuery: MaybeRef<string>;
   runtimeHint: MaybeRef<string>;
   canConvertInstructions: MaybeRef<boolean>;
+  instructionsGenerating: MaybeRef<boolean>;
 };
 
 /** Bind composer setup refs into toolbar prop values (keeps AgentDockComposer.vue thin). */
@@ -142,6 +143,7 @@ export function useAgentDockComposerToolbarProps(
     modelSearchQuery: toValue(composer.modelSearchQuery),
     runtimeHint: toValue(composer.runtimeHint),
     canConvertInstructions: toValue(composer.canConvertInstructions),
+    instructionsGenerating: toValue(composer.instructionsGenerating),
   }));
 }
 

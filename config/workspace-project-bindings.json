@@ -2,71 +2,71 @@
   "bindings": {
     "workspace_audio_transcribe": {
       "display_name": "audio-transcribe",
-      "project_root": "/home/edp/Projectx/product/audio-transcribe"
+      "project_root": "/run/media/vaxon/axon-data/projectx/product/audio-transcribe"
     },
     "workspace_axon_local": {
       "display_name": "axon-local",
-      "project_root": "/home/edp/axon-nvme/repos/axon-local"
+      "project_root": "/run/media/vaxon/axon-data/repos/axon-nvme/repos/axon-local"
     },
     "workspace_axon_watch": {
       "display_name": "axon-watch",
-      "project_root": "/home/edp/axon-nvme/repos/axon-watch"
+      "project_root": "/run/media/vaxon/axon-data/repos/axon-nvme/repos/axon-watch"
     },
     "workspace_axon_online": {
       "display_name": "axon-online",
-      "project_root": "/home/edp/Projectx/internal/axon-online"
+      "project_root": "/run/media/vaxon/axon-data/projectx/internal/axon-online"
     },
     "workspace_bkk_invoice_system": {
       "display_name": "bkk-invoice-system",
-      "project_root": "/home/edp/Projectx/client/bkk-invoice-system"
+      "project_root": "/run/media/vaxon/axon-data/projectx/client/bkk-invoice-system"
     },
     "workspace_bkkinnovationhub": {
       "display_name": "bkkinnovationhub",
-      "project_root": "/home/edp/Projectx/client/bkkinnovationhub"
+      "project_root": "/run/media/vaxon/axon-data/projectx/client/bkkinnovationhub"
     },
     "workspace_dashpro": {
       "display_name": "DashPro",
-      "project_root": "/home/edp/Projectx/product/dashpro"
+      "project_root": "/run/media/vaxon/axon-data/projectx/product/dashpro"
     },
     "workspace_dashpro_pr_integration": {
       "display_name": "dashpro-pr-integration",
-      "project_root": "/home/edp/Projectx/product/dashpro-pr-integration"
+      "project_root": "/run/media/vaxon/axon-data/projectx/product/dashpro-pr-integration"
     },
     "workspace_ecd_staff_desktop": {
       "display_name": "ecd-staff-desktop",
-      "project_root": "/home/edp/Projectx/internal/ecd-staff-desktop"
+      "project_root": "/run/media/vaxon/axon-data/projectx/internal/ecd-staff-desktop"
     },
     "workspace_edudashpro_school": {
       "display_name": "EDP Excellence",
-      "project_root": "/home/edp/Projectx/client/edudashpro-school-of-excellence"
+      "project_root": "/run/media/vaxon/axon-data/projectx/client/edudashpro-school-of-excellence"
     },
     "workspace_edusitepro": {
       "display_name": "edusitepro",
-      "project_root": "/home/edp/Projectx/product/edusitepro"
+      "project_root": "/run/media/vaxon/axon-data/projectx/product/edusitepro"
     },
     "workspace_forum_registration": {
       "display_name": "forum-registration",
-      "project_root": "/home/edp/Projectx/client/forum-registration"
+      "project_root": "/run/media/vaxon/axon-data/projectx/client/forum-registration"
     },
     "workspace_khanyisa_website": {
       "display_name": "khanyisa-website",
-      "project_root": "/home/edp/Projectx/client/khanyisa-website"
+      "project_root": "/run/media/vaxon/axon-data/projectx/client/khanyisa-website"
     },
     "workspace_tps": {
       "display_name": "TPS",
-      "project_root": "/home/edp/Projectx/client/tps"
+      "project_root": "/run/media/vaxon/axon-data/projectx/client/tps"
     },
     "workspace_transcriber": {
       "display_name": "transcriber",
-      "project_root": "/home/edp/Projectx/product/transcriber"
+      "project_root": "/run/media/vaxon/axon-data/projectx/product/transcriber"
     },
     "workspace_web": {
       "display_name": "web",
-      "project_root": "/home/edp/Documents/archives/dev/web"
+      "project_root": "/run/media/vaxon/nvme-data/home/edp/Documents/archives/dev/web"
     },
     "workspace_young_eagles_day_care": {
       "display_name": "Young Eagles Day Care",
-      "project_root": "/home/edp/Projectx/client/young-eagles-day-care"
+      "project_root": "/run/media/vaxon/axon-data/projectx/client/young-eagles-day-care"
     }
   }
 }

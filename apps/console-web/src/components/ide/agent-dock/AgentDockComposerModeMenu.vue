@@ -143,6 +143,9 @@ const menuStatus = computed(() =>
           <span class="agent-dock-composer__access-status-dot" aria-hidden="true" />
           <span>{{ menuStatus.sandboxLine }}</span>
         </div>
+        <p class="agent-dock-composer__menu-caption agent-dock-composer__menu-caption--subtle">
+          {{ menuStatus.workerIsolationLine }}
+        </p>
         <button
           v-if="!sandboxSessionEnabled"
           type="button"

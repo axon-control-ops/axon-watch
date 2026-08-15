@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import http.client
 import json
 import re
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -15,6 +17,8 @@ from app.operator_persona_stt_aliases import normalize_persona_stt_aliases
 MAX_STT_UPLOAD_BYTES = 2 * 1024 * 1024
 STT_REQUEST_TIMEOUT_SECONDS = 12
 DEFAULT_STT_LANGUAGE = "en-US"
+STT_READ_ATTEMPTS = 2
+STT_RETRY_BACKOFF_SECONDS = 0.15
 
 _AZURE_OGG_CONTENT_TYPE = "audio/ogg; codecs=opus"
 _AZURE_WAV_CONTENT_TYPE = "audio/wav; codecs=audio/pcm; samplerate=16000"
@@ -120,10 +124,26 @@ def transcribe_azure_stt(
         method="POST",
     )
 
-    try:
-        with urllib.request.urlopen(request, timeout=STT_REQUEST_TIMEOUT_SECONDS) as response:
-            body = response.read().decode("utf-8", errors="replace")
-    except (urllib.error.URLError, TimeoutError, ValueError):
+    # Azure occasionally drops the connection mid-response (RemoteDisconnected /
+    # IncompleteRead) — those are http.client.HTTPException subclasses that
+    # urllib does NOT wrap into URLError, so they used to escape this call
+    # entirely and surface as an unhandled 500 (see azure_tts.py's matching
+    # fix for the same Azure Speech quirk on the TTS side). Retry quietly once,
+    # then fall back to the caller's existing None → browser-STT contract.
+    body: str | None = None
+    for attempt in range(STT_READ_ATTEMPTS):
+        try:
+            with urllib.request.urlopen(request, timeout=STT_REQUEST_TIMEOUT_SECONDS) as response:
+                body = response.read().decode("utf-8", errors="replace")
+            break
+        except http.client.HTTPException:
+            if attempt + 1 < STT_READ_ATTEMPTS:
+                time.sleep(STT_RETRY_BACKOFF_SECONDS * (attempt + 1))
+                continue
+            return None
+        except (urllib.error.URLError, TimeoutError, OSError, ValueError):
+            return None
+    if body is None:
         return None
 
     try:

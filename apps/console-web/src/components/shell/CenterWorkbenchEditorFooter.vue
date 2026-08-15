@@ -5,6 +5,7 @@ import type {
   IdeEditorStatusAgentChip,
   IdeEditorStatusConnectorChip,
   IdeEditorStatusGitChip,
+  IdeEditorStatusProblemsChip,
   IdeEditorStatusSearchChip,
   IdeEditorStatusTeamChip,
   IdeEditorStatusTerminalChip,
@@ -26,6 +27,7 @@ defineProps<{
   gitChip: IdeEditorStatusGitChip | null;
   searchChip: IdeEditorStatusSearchChip | null;
   teamChip: IdeEditorStatusTeamChip | null;
+  problemsChip: IdeEditorStatusProblemsChip | null;
   agentChip: IdeEditorStatusAgentChip | null;
 }>();
 
@@ -35,6 +37,7 @@ const emit = defineEmits<{
   openSourceControl: [];
   openSearch: [];
   openTeam: [];
+  showProblems: [];
   showAgent: [];
   toggleMinimap: [];
 }>();
@@ -49,8 +52,10 @@ const emit = defineEmits<{
       :git-chip="gitChip"
       :search-chip="searchChip"
       :team-chip="teamChip"
+      :problems-chip="problemsChip"
       :agent-chip="agentChip"
       @show-terminal="emit('showTerminal')"
+      @show-problems="emit('showProblems')"
       @open-connectors="emit('openConnectors')"
       @open-source-control="emit('openSourceControl')"
       @open-search="emit('openSearch')"

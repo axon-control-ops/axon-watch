@@ -38,7 +38,7 @@ class SandboxPolicyAdapterTests(unittest.TestCase):
                 sandbox = adapt_execution_policy(
                     role_execution_policy("watcher"),
                     runtime_binary=str(binary),
-                    include_cursor_auth=True,
+                    family="cursor",
                 )
 
         mounted = set(sandbox.cursor_readonly_paths)
@@ -46,6 +46,59 @@ class SandboxPolicyAdapterTests(unittest.TestCase):
         self.assertIn(str(home / ".config/cursor/auth.json"), mounted)
         self.assertNotIn(str(home / ".config"), mounted)
         self.assertNotIn(str(home / ".cursor"), mounted)
+        self.assertNotIn(str(home / ".cursor/cli-config.json"), mounted)
+        self.assertNotIn(str(home / ".cursor/agent-cli-state.json"), mounted)
+
+    def test_claude_and_codex_mount_their_own_subscription_credentials(self) -> None:
+        """Regression: sandboxed claude/codex dispatch always reported "not
+        logged in" because only the cursor family's auth files were ever
+        bind-mounted into the sandbox's rewritten HOME — the CLI was fully
+        authenticated on the host but the sandbox exposed no credentials.
+        """
+        for family, relative in (("claude", ".claude/.credentials.json"), ("codex", ".axon-codex/auth.json")):
+            with self.subTest(family=family):
+                with tempfile.TemporaryDirectory() as directory:
+                    home = Path(directory) / "home"
+                    binary = home / ".local/bin" / family
+                    binary.parent.mkdir(parents=True)
+                    binary.write_text("#!/bin/sh\n", encoding="utf-8")
+                    creds = home / relative
+                    creds.parent.mkdir(parents=True, exist_ok=True)
+                    creds.write_text("{}", encoding="utf-8")
+                    with patch(
+                        "app.cli_runtime.sandbox_policy_adapter.Path.home",
+                        return_value=home,
+                    ):
+                        sandbox = adapt_execution_policy(
+                            role_execution_policy("lead"),
+                            runtime_binary=str(binary),
+                            family=family,
+                            env={"CODEX_HOME": str(creds.parent)} if family == "codex" else {},
+                        )
+                mounted = set(sandbox.cursor_readonly_paths)
+                if family == "codex":
+                    self.assertEqual(sandbox.codex_auth_path, str(creds))
+                    self.assertNotIn(str(home / ".codex/auth.json"), mounted)
+                else:
+                    self.assertIn(str(creds), mounted)
+
+    def test_missing_credentials_file_is_not_mounted(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            home = Path(directory) / "home"
+            binary = home / ".local/bin/claude"
+            binary.parent.mkdir(parents=True)
+            binary.write_text("#!/bin/sh\n", encoding="utf-8")
+            with patch(
+                "app.cli_runtime.sandbox_policy_adapter.Path.home",
+                return_value=home,
+            ):
+                sandbox = adapt_execution_policy(
+                    role_execution_policy("lead"),
+                    runtime_binary=str(binary),
+                    family="claude",
+                )
+        mounted = set(sandbox.cursor_readonly_paths)
+        self.assertFalse(any(".credentials.json" in path for path in mounted))
 
     def test_npm_style_bin_layout_also_mounts_package_root(self) -> None:
         """codex/claude resolve sibling optional/native deps via node_modules
@@ -68,7 +121,7 @@ class SandboxPolicyAdapterTests(unittest.TestCase):
                 sandbox = adapt_execution_policy(
                     role_execution_policy("watcher"),
                     runtime_binary=str(binary),
-                    include_cursor_auth=False,
+                    family="codex",
                 )
 
         mounted = set(sandbox.cursor_readonly_paths)
@@ -87,6 +140,23 @@ class SandboxPolicyAdapterTests(unittest.TestCase):
         )
         self.assertIs(env, unchanged)
         self.assertIsNone(sandbox)
+
+    def test_codex_uses_a_private_sandbox_home_not_a_hidden_host_path(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            binary = Path(directory) / "codex"
+            binary.write_text("#!/bin/sh\n", encoding="utf-8")
+            env, sandbox = prepare_execution_sandbox(
+                role_execution_policy("lead"),
+                family="codex",
+                runtime_binary=str(binary),
+                env={"CODEX_HOME": str(Path(directory) / "missing-profile")},
+                workspace_id="workspace_demo",
+                run_id="run_demo",
+            )
+
+        self.assertEqual("/run/axon-agent-home/.codex", env["CODEX_HOME"])
+        self.assertIsNotNone(sandbox)
+        self.assertEqual("", sandbox.codex_auth_path)  # type: ignore[union-attr]
 
 
 if __name__ == "__main__":

@@ -1,6 +1,7 @@
 import { watch, type Ref } from 'vue';
 
 import {
+  AGENT_TERMINAL_MIRROR_MAX_SEGMENTS,
   buildAgentTerminalMirrorScrollback,
   findAgentTerminalMirrorSegment,
   listAgentTerminalMirrorSegments,
@@ -36,13 +37,17 @@ export function useAgentTerminalMirror(input: {
     // Live open shells must win over a pinned snapshot from a prior turn/card,
     // otherwise OTA/`npm run …` mirrors stay stuck on stale output.
     if (segment?.open) {
-      return buildAgentTerminalMirrorScrollback(content);
+      return buildAgentTerminalMirrorScrollback(content, {
+        maxSegments: AGENT_TERMINAL_MIRROR_MAX_SEGMENTS,
+      });
     }
     const forced = forcedText.value?.trim();
     if (forced) {
       return forced.endsWith('\n') ? forced : `${forced}\n`;
     }
-    return buildAgentTerminalMirrorScrollback(content);
+    return buildAgentTerminalMirrorScrollback(content, {
+      maxSegments: AGENT_TERMINAL_MIRROR_MAX_SEGMENTS,
+    });
   }
 
   function syncNow(): void {

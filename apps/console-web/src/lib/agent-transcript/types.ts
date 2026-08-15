@@ -16,6 +16,7 @@ export type AgentTranscriptSegment =
       diff: string;
       open: boolean;
     }
+  | { kind: 'edit-failed'; path: string; reason: string }
   | { kind: 'tool'; label: string }
   | { kind: 'plan'; planId: string; title: string }
   | {

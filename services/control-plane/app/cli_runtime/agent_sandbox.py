@@ -1,5 +1,4 @@
 """Fail-closed Bubblewrap launcher and immutable per-run Cursor hook material."""
-
 from __future__ import annotations
 
 import hashlib
@@ -12,28 +11,28 @@ import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Sequence
-
 from app.cli_runtime.agent_sandbox_paths import append_hidden_mounts, hidden_workspace_paths
+from app.cli_runtime.codex_profile_mount import append_codex_auth_mount, resolve_codex_auth_path
+from app.cli_runtime.user_bin_path import existing_user_local_bin, sandbox_path_with_user_bins
 
 _SANDBOX_HOME = Path("/run/axon-agent-home")
 _SANDBOX_POLICY_ROOT = Path("/run/axon-agent-policy")
 _HOOK_TIMEOUT_SECONDS = 5
+# Cursor CLI atomically renames these under $HOME on startup. Bind-mounting the
+# host copies read-only (or sharing one mount across concurrent agents) surfaces
+# as EBUSY and fails every dispatch before work begins.
+CURSOR_WRITABLE_STATE_RELATIVE = (
+    ".cursor/cli-config.json",
+    ".cursor/agent-cli-state.json",
+)
 _SYSTEM_DIRS = ("/usr", "/bin", "/sbin", "/lib", "/lib64")
 _SYSTEM_FILES = (
-    "/etc/group",
-    "/etc/hosts",
-    "/etc/ld.so.cache",
-    "/etc/localtime",
-    "/etc/nsswitch.conf",
-    "/etc/passwd",
-    "/etc/resolv.conf",
+    "/etc/group", "/etc/hosts", "/etc/ld.so.cache", "/etc/localtime",
+    "/etc/nsswitch.conf", "/etc/passwd", "/etc/resolv.conf",
 )
 _SYSTEM_CONFIG_DIRS = ("/etc/ssl", "/etc/ca-certificates")
-
-
 class SandboxConfigurationError(RuntimeError):
     """Raised instead of running without a requested sandbox boundary."""
-
 
 @dataclass(frozen=True)
 class AgentSandboxPolicy:
@@ -43,6 +42,9 @@ class AgentSandboxPolicy:
     approved_wrappers: tuple[str, ...] = ()
     approved_command_prefixes: tuple[tuple[str, ...], ...] = ()
     cursor_readonly_paths: tuple[str, ...] = ()
+    # Codex can use an Axon-X profile outside the desktop user's home.  Its
+    # auth file is mounted only at the sandbox's private CODEX_HOME.
+    codex_auth_path: str = ""
     forbidden_path_globs: tuple[str, ...] = ()
 
 
@@ -53,6 +55,9 @@ class CursorHookMaterial:
     hooks_json: Path
     policy_json: Path
     hook_script: Path
+    workspace_scratch: Path
+    workspace_codex_scratch: Path
+    sandbox_home: Path
 
 
 @dataclass(frozen=True)
@@ -89,6 +94,46 @@ def _validate_policy(policy: AgentSandboxPolicy) -> None:
             raise SandboxConfigurationError("Approved command prefixes must contain valid tokens.")
 
 
+_ROLE_WRITE_SCOPE_HINTS: dict[str, list[str]] = {
+    "frontend": [
+        "app/",
+        "apps/",
+        "src/",
+        "components/",
+        "features/",
+        "screens/",
+        "hooks/",
+        "locales/",
+        "packages/",
+        "tests/",
+        "__tests__/",
+    ],
+    "backend": ["services/", "server/", "api/", "lib/", "supabase/", "packages/", "tests/"],
+    "integrations": [".github/", "config/", "scripts/"],
+    "lead": ["docs/planning/", "docs/ops/", "plans/"],
+}
+
+
+def _write_scope_specialist_hint(writable_roots: tuple[str, ...]) -> str:
+    """Return a plain-language hint about which specialist role can write paths not in writable_roots."""
+    if not writable_roots:
+        return (
+            "This agent role has read-only access to the workspace. "
+            "To make code changes, dispatch a specialist: "
+            "frontend (UI/screens/components/hooks), backend (services/api/lib), "
+            "or integrations (scripts/config/.github)."
+        )
+    roots_str = ", ".join(sorted(writable_roots))
+    return (
+        f"This agent can only write within: {roots_str}. "
+        "For paths outside this scope, dispatch the appropriate specialist: "
+        "frontend (app/components/features/screens/hooks), "
+        "backend (services/api/lib/supabase), "
+        "integrations (scripts/config/.github). "
+        "Do NOT ask the operator to remount the filesystem — use dispatch instead."
+    )
+
+
 def _policy_document(policy: AgentSandboxPolicy) -> dict[str, object]:
     _validate_policy(policy)
     return {
@@ -98,6 +143,8 @@ def _policy_document(policy: AgentSandboxPolicy) -> dict[str, object]:
             list(prefix) for prefix in policy.approved_command_prefixes
         ],
         "forbidden_path_globs": sorted(set(policy.forbidden_path_globs)),
+        "writable_roots": sorted(set(policy.writable_roots)),
+        "write_scope_hint": _write_scope_specialist_hint(policy.writable_roots),
     }
 
 
@@ -107,6 +154,11 @@ def _trusted_wrapper_sources(
 ) -> dict[str, Path]:
     sources: dict[str, Path] = {}
     for wrapper in policy.approved_wrappers:
+        if wrapper == "axon-agent-terminal-job":
+            # This capability is materialized from the running control-plane
+            # package below. Never resolve a PATH entry for it: local installs
+            # commonly symlink back into the workspace being sandboxed.
+            continue
         installed = shutil.which(wrapper)
         if not installed:
             continue
@@ -115,6 +167,35 @@ def _trusted_wrapper_sources(
             raise SandboxConfigurationError("Approved wrappers cannot come from the workspace.")
         sources[wrapper] = source
     return sources
+
+
+def _builtin_wrapper_source(wrapper: str) -> bytes | None:
+    if wrapper != "axon-agent-terminal-job":
+        return None
+    return Path(__file__).with_name("agent_terminal_job_wrapper.py").read_bytes()
+
+
+def _prepare_workspace_scratch(workspace: Path, target: Path, name: str) -> None:
+    """Reserve an empty mount point for agent-owned ephemeral state.
+
+    Agent CLIs may create private state directories in their current project
+    directory, including ``.agents`` and Codex's ``.codex``.
+    The checkout itself is read-only inside Bubblewrap, so Bubblewrap attempts
+    to create that destination and dies before the runtime can answer. We
+    reserve only the empty host mount point, then bind a private per-run
+    directory over it. Agent writes never land in the selected workspace or
+    in a later commit.
+    """
+    destination = workspace / name
+    if destination.exists():
+        if destination.is_symlink() or not destination.is_dir():
+            raise SandboxConfigurationError("Agent project scratch is not a safe directory.")
+        if any(destination.iterdir()):
+            raise SandboxConfigurationError("Agent project scratch must be empty before launch.")
+    else:
+        destination.mkdir(mode=0o700)
+    if target.is_symlink() or not target.is_dir():
+        raise SandboxConfigurationError("Private agent scratch is not a safe directory.")
 
 
 def _hooks_document() -> dict[str, object]:
@@ -164,12 +245,26 @@ def _write_immutable(path: Path, content: bytes, *, executable: bool = False) ->
     path.chmod(mode)
 
 
+def _seed_cursor_writable_state(*, user_home: Path, cursor_dir: Path) -> None:
+    """Copy host Cursor state into the per-run sandbox HOME as writable files."""
+    for relative in CURSOR_WRITABLE_STATE_RELATIVE:
+        source = user_home / relative
+        if not source.is_file():
+            continue
+        destination = cursor_dir / Path(relative).name
+        if destination.exists():
+            continue
+        shutil.copy2(source, destination)
+        destination.chmod(0o600)
+
+
 def materialize_cursor_hook_policy(
     *,
     policy: AgentSandboxPolicy,
     run_id: str,
     workspace_root: Path,
     policy_root: Path | None = None,
+    user_home: Path | None = None,
 ) -> CursorHookMaterial:
     """Create deterministic read-only hook files in host state, never the checkout."""
     cleaned_run_id = str(run_id or "").strip()
@@ -195,6 +290,8 @@ def materialize_cursor_hook_policy(
     generated_home = target / "home"
     cursor_dir = generated_home / ".cursor"
     cursor_dir.mkdir(mode=0o700, parents=True, exist_ok=True)
+    if user_home is not None:
+        _seed_cursor_writable_state(user_home=user_home.expanduser().resolve(), cursor_dir=cursor_dir)
     if (
         generated_home.is_symlink()
         or cursor_dir.is_symlink()
@@ -208,17 +305,32 @@ def materialize_cursor_hook_policy(
     policy_path = target / "policy.json"
     hook_path = target / "hook.py"
     wrapper_dir = target / "bin"
+    scratch_root = target / "scratch"
+    workspace_scratch = scratch_root / ".agents"
+    workspace_codex_scratch = scratch_root / ".codex"
     wrapper_dir.mkdir(mode=0o700, exist_ok=True)
+    workspace_scratch.mkdir(mode=0o700, parents=True, exist_ok=True)
+    workspace_codex_scratch.mkdir(mode=0o700, parents=True, exist_ok=True)
+    if (
+        scratch_root.is_symlink()
+        or workspace_scratch.is_symlink()
+        or workspace_codex_scratch.is_symlink()
+    ):
+        raise SandboxConfigurationError("Sandbox policy scratch contains an unsafe directory.")
     _write_immutable(hooks_path, _canonical_json(_hooks_document()))
     _write_immutable(policy_path, policy_bytes)
     _write_immutable(hook_path, hook_source, executable=True)
+    for wrapper in policy.approved_wrappers:
+        source = _builtin_wrapper_source(wrapper)
+        if source is not None:
+            _write_immutable(wrapper_dir / wrapper, source, executable=True)
     for wrapper, source in _trusted_wrapper_sources(policy, workspace).items():
         proxy = f"#!/bin/sh\nexec {shlex.quote(str(source))} \"$@\"\n".encode()
         _write_immutable(wrapper_dir / wrapper, proxy, executable=True)
 
     wrapper_dir.chmod(0o555)
-    cursor_dir.chmod(0o555)
-    generated_home.chmod(0o555)
+    cursor_dir.chmod(0o700)
+    generated_home.chmod(0o700)
     target.chmod(0o555)
     return CursorHookMaterial(
         policy_id=policy_id,
@@ -226,6 +338,9 @@ def materialize_cursor_hook_policy(
         hooks_json=hooks_path,
         policy_json=policy_path,
         hook_script=hook_path,
+        workspace_scratch=workspace_scratch,
+        workspace_codex_scratch=workspace_codex_scratch,
+        sandbox_home=generated_home,
     )
 
 
@@ -258,15 +373,31 @@ def _resolve_workspace_root(workspace_root: Path) -> Path:
 def _resolve_workspace_path(workspace: Path, configured: str) -> Path:
     raw = Path(configured).expanduser()
     candidate = raw if raw.is_absolute() else workspace / raw
-    try:
-        resolved = candidate.resolve(strict=True)
-    except OSError as exc:
-        raise SandboxConfigurationError(
-            f"Approved writable root does not exist: {configured!r}"
-        ) from exc
+    resolved = candidate.resolve(strict=False)
     if not _is_relative_to(resolved, workspace):
         raise SandboxConfigurationError(
             f"Approved writable root escapes the disposable workspace: {configured!r}"
+        )
+    # Writable roots are usually role-baseline directories (e.g. "docs/ops"),
+    # but a leased task may narrow authority to one existing file. The latter
+    # is safe to bind directly over the read-only workspace and must not be
+    # rejected merely because it is not a directory.
+    if resolved.exists() and resolved.is_file():
+        return resolved
+    # Role-baseline directories are applied across every workspace's
+    # disposable checkout. Requiring one to pre-exist turned an approved,
+    # boundary-checked target into a hard dispatch failure. Create a missing
+    # directory instead — this narrows no existing authority.
+    if not resolved.exists():
+        try:
+            resolved.mkdir(parents=True, exist_ok=True)
+        except OSError as exc:
+            raise SandboxConfigurationError(
+                f"Approved writable root does not exist and could not be created: {configured!r}"
+            ) from exc
+    elif not resolved.is_dir():
+        raise SandboxConfigurationError(
+            f"Approved writable root is not a directory: {configured!r}"
         )
     return resolved
 
@@ -351,6 +482,14 @@ def build_bwrap_command(
         resolved_material_path = material_path.resolve(strict=True)
         if not _is_relative_to(resolved_material_path, material_root):
             raise SandboxConfigurationError("Sandbox hook material contains an escaped path.")
+    workspace_scratch = hook_material.workspace_scratch.resolve(strict=True)
+    workspace_codex_scratch = hook_material.workspace_codex_scratch.resolve(strict=True)
+    if not _is_relative_to(workspace_scratch, material_root) or not _is_relative_to(
+        workspace_codex_scratch, material_root
+    ):
+        raise SandboxConfigurationError("Sandbox scratch contains an escaped path.")
+    _prepare_workspace_scratch(workspace, workspace_scratch, ".agents")
+    _prepare_workspace_scratch(workspace, workspace_codex_scratch, ".codex")
     writable_roots = tuple(
         dict.fromkeys(_resolve_workspace_path(workspace, path) for path in policy.writable_roots)
     )
@@ -361,10 +500,13 @@ def build_bwrap_command(
             for path in policy.cursor_readonly_paths
         )
     )
+    try:
+        codex_auth_path = resolve_codex_auth_path(policy.codex_auth_path, workspace=workspace)
+    except ValueError as exc:
+        raise SandboxConfigurationError(str(exc)) from exc
     wrapper_sources = tuple(_trusted_wrapper_sources(policy, workspace).values())
-    cursor_paths = tuple(dict.fromkeys((*cursor_paths, *(
-        source for source in wrapper_sources if _is_relative_to(source, home)
-    ))))
+    cursor_paths = tuple(dict.fromkeys((*cursor_paths, *(source for source in wrapper_sources if _is_relative_to(source, home)))))
+    user_local_bin = existing_user_local_bin(home)
 
     arguments = [
         str(bwrap),
@@ -403,7 +545,13 @@ def build_bwrap_command(
         ]
     )
 
-    destination_paths = [workspace, _SANDBOX_HOME / ".cursor" / "hooks.json"]
+    destination_paths = [
+        workspace,
+        _SANDBOX_HOME / ".cursor" / "hooks.json",
+        _SANDBOX_HOME / ".codex" / "auth.json",
+    ]
+    if user_local_bin is not None:
+        destination_paths.append(user_local_bin)
     destination_paths.extend(cursor_paths)
     destination_paths.extend(
         _SANDBOX_HOME / path.relative_to(home) for path in cursor_paths
@@ -413,6 +561,8 @@ def build_bwrap_command(
     arguments.extend(["--ro-bind", str(workspace), str(workspace)])
     for writable_root in writable_roots:
         arguments.extend(["--bind", str(writable_root), str(writable_root)])
+    arguments.extend(["--bind", str(workspace_scratch), str(workspace / ".agents")])
+    arguments.extend(["--bind", str(workspace_codex_scratch), str(workspace / ".codex")])
     append_hidden_mounts(arguments, hidden_paths)
 
     arguments.extend(
@@ -420,6 +570,12 @@ def build_bwrap_command(
             "--ro-bind",
             str(material_root),
             str(_SANDBOX_POLICY_ROOT),
+        ]
+    )
+    sandbox_home = hook_material.sandbox_home.resolve(strict=True)
+    arguments.extend(["--bind", str(sandbox_home), str(_SANDBOX_HOME)])
+    arguments.extend(
+        [
             "--ro-bind",
             str(hook_material.hooks_json),
             str(_SANDBOX_HOME / ".cursor" / "hooks.json"),
@@ -429,6 +585,9 @@ def build_bwrap_command(
         arguments.extend(["--ro-bind", str(cursor_path), str(cursor_path)])
         home_destination = _SANDBOX_HOME / cursor_path.relative_to(home)
         arguments.extend(["--ro-bind", str(cursor_path), str(home_destination)])
+    append_codex_auth_mount(arguments, codex_auth_path, _SANDBOX_HOME / ".codex" / "auth.json")
+    if user_local_bin is not None:
+        arguments.extend(["--ro-bind", str(user_local_bin), str(user_local_bin)])
 
     arguments.extend(
         [
@@ -437,7 +596,7 @@ def build_bwrap_command(
             str(_SANDBOX_HOME),
             "--setenv",
             "PATH",
-            f"{_SANDBOX_POLICY_ROOT}/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+            sandbox_path_with_user_bins(user_local_bin),
             "--setenv",
             "TMPDIR",
             "/tmp",
@@ -473,6 +632,7 @@ def wrap_command_in_agent_sandbox(
         run_id=run_id,
         workspace_root=workspace,
         policy_root=policy_root,
+        user_home=user_home,
     )
     wrapped = build_bwrap_command(
         cleaned,
@@ -485,14 +645,7 @@ def wrap_command_in_agent_sandbox(
     return SandboxLaunch(command=tuple(wrapped), hook_material=material)
 
 
-__all__ = [
-    "AgentSandboxPolicy",
-    "CursorHookMaterial",
-    "SandboxConfigurationError",
-    "SandboxLaunch",
-    "build_bwrap_command",
-    "default_policy_root",
-    "materialize_cursor_hook_policy",
-    "require_bubblewrap",
-    "wrap_command_in_agent_sandbox",
-]
+__all__ = ["AgentSandboxPolicy", "CURSOR_WRITABLE_STATE_RELATIVE", "CursorHookMaterial", "SandboxConfigurationError",
+           "SandboxLaunch", "build_bwrap_command", "default_policy_root",
+           "materialize_cursor_hook_policy", "require_bubblewrap",
+           "wrap_command_in_agent_sandbox"]

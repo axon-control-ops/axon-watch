@@ -11,6 +11,7 @@ sys.path.insert(0, str(CONTROL_PLANE_ROOT))
 from app.cli_runtime.subprocess_runner import (  # noqa: E402
     communicate_registered_process,
     headless_cli_env,
+    stream_registered_process,
 )
 
 
@@ -20,7 +21,16 @@ class HeadlessCliEnvTests(unittest.TestCase):
         self.assertEqual(env["TERM"], "xterm-256color")
         self.assertEqual(env["COLORTERM"], "truecolor")
         self.assertEqual(env["NO_COLOR"], "1")
-        self.assertEqual(env["PATH"], "/usr/bin")
+        self.assertTrue(env["PATH"].startswith("/usr/bin"))
+
+    def test_adds_user_local_bin_when_available(self) -> None:
+        with (
+            patch("app.cli_runtime.user_bin_path.Path.is_dir", return_value=True),
+            patch("app.cli_runtime.user_bin_path.Path.exists", return_value=True),
+        ):
+            env = headless_cli_env({"PATH": "/usr/bin", "HOME": "/tmp"})
+
+        self.assertIn("/home/vaxon/.local/bin", env["PATH"].split(":"))
 
     def test_preserves_existing_term(self) -> None:
         env = headless_cli_env({"TERM": "screen-256color", "COLORTERM": "yes"})
@@ -66,6 +76,17 @@ class HeadlessCliEnvTests(unittest.TestCase):
         assert isinstance(env, dict)
         self.assertEqual(env["TERM"], "xterm-256color")
         self.assertEqual(env["NO_COLOR"], "1")
+
+    def test_stream_closes_process_pipes(self) -> None:
+        stdout, stderr, code = stream_registered_process(
+            run_id="run_stream_cleanup",
+            command=[sys.executable, "-c", "print('ready')"],
+            timeout_seconds=5,
+        )
+
+        self.assertEqual(stdout, "ready\n")
+        self.assertEqual(stderr, "")
+        self.assertEqual(code, 0)
 
 
 if __name__ == "__main__":

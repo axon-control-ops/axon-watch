@@ -55,6 +55,18 @@ class KairoConversationEndpointTests(unittest.TestCase):
         clear_pack_cache_for_tests()
         clear_memory_for_tests()
         isolate_control_plane_db(self, run_store)
+        runtime = patch(
+            "app.kairo_conversation.dispatch_ide_composer",
+            return_value={
+                "content": "",
+                "dispatched": False,
+                "runtime_id": "test_runtime",
+                "runtime_label": "Test runtime",
+                "reason": "unit-test runtime disabled",
+            },
+        )
+        runtime.start()
+        self.addCleanup(runtime.stop)
         self.client = TestClient(app)
         self.addCleanup(self.client.close)
 

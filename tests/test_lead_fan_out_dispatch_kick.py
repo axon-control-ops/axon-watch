@@ -17,6 +17,7 @@ from app.workspace_agents.scheduler import (  # noqa: E402
     kick_lead_fan_out_dispatch,
     run_continuous_worker_tick,
 )
+from app.workspace_agents.assignment_messages import assignment_card  # noqa: E402
 from app.workspace_agents.scheduler_queued_fan_out import (  # noqa: E402
     dispatch_queued_lead_fan_out_runs,
 )
@@ -52,7 +53,10 @@ class LeadFanOutDispatchKickTests(unittest.TestCase):
                 ),
                 patch(
                     "app.workspace_agents.scheduler._dispatch_queued_lead_fan_out_runs",
-                    return_value=[{"run_id": "run_kicked", "phase": "executing"}],
+                    side_effect=[
+                        [{"run_id": "run_kicked", "phase": "executing"}],
+                        [],
+                    ],
                 ) as mock_dispatch,
             ):
                 kicked = kick_lead_fan_out_dispatch(starts_bound=2)
@@ -60,10 +64,64 @@ class LeadFanOutDispatchKickTests(unittest.TestCase):
 
         self.assertEqual(1, len(kicked))
         self.assertEqual("run_kicked", kicked[0]["run_id"])
+        self.assertEqual(2, mock_dispatch.call_count)
+        self.assertEqual(2, mock_dispatch.call_args_list[0].kwargs["starts_bound"])
+        self.assertIsNone(mock_dispatch.call_args_list[0].kwargs["target_run_id"])
+        self.assertEqual([], tick)
+
+    def test_lead_assignment_card_uses_lead_action_language(self) -> None:
+        card = assignment_card(
+            assignee_name="Dana",
+            assignee_role="lead",
+            goal='Lead: advance "Ship canary" toward Done [plan lead-plan-demo]',
+            task_id="task-demo123456789",
+            run_id="run-demo",
+            state="queued",
+            lead_name="Dana",
+        )
+
+        self.assertIn("Lead should decide, assign, escalate, or report back", card)
+        self.assertNotIn("specialist should implement", card)
+        self.assertIn("Assigned to: Dana (Lead)", card)
+        self.assertIn("Task ID: task-demo123456789", card)
+        self.assertIn("Validation: pending", card)
+        self.assertIn("Commit: pending", card)
+
+    def test_paused_tick_rescues_queued_lead_handoff_after_restart(self) -> None:
+        """Restarted Manual/Semi sessions must not strand Dana→specialist handoffs."""
+        with patch.dict(
+            os.environ,
+            {
+                "AXON_WATCH_WORKER_SCHEDULER": "1",
+                "AXON_WATCH_WORKER_SCHEDULER_DISPATCH": "1",
+            },
+            clear=False,
+        ):
+            worker_scheduler_settings_store.patch_settings({"scheduler_enabled": False})
+            with (
+                patch(
+                    "app.workspace_agents.scheduler.load_workspace_agent_configs",
+                    return_value=({}, {}, {"workspace_demo": object()}, {}),
+                ),
+                patch(
+                    "app.workspace_agents.scheduler._executing_run_count",
+                    return_value=0,
+                ),
+                patch(
+                    "app.workspace_agents.scheduler.max_active_executing",
+                    return_value=3,
+                ),
+                patch(
+                    "app.workspace_agents.scheduler._dispatch_queued_lead_fan_out_runs",
+                    return_value=[{"run_id": "run_priya", "phase": "executing"}],
+                ) as mock_dispatch,
+            ):
+                tick = run_continuous_worker_tick()
+
+        self.assertEqual([], tick)
         mock_dispatch.assert_called_once()
         self.assertEqual(2, mock_dispatch.call_args.kwargs["starts_bound"])
         self.assertIsNone(mock_dispatch.call_args.kwargs["target_run_id"])
-        self.assertEqual([], tick)
 
     def test_kick_can_target_one_operator_started_run(self) -> None:
         with patch.dict(

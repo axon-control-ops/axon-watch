@@ -83,6 +83,13 @@ _GITHUB_EMAIL_CI_RE = re.compile(
 _GITHUB_EMAIL_SIGNAL_RE = re.compile(
     r"(?i)signal_email_.*(check-suites|pull_|actions|_github)"
 )
+_ACCOUNT_SECURITY_EMAIL_RE = re.compile(
+    r"(?is)email needs follow-up:.*\b("
+    r"new sign[ -]in|security alert|recovery codes?|password (?:was )?changed|"
+    r"two-factor authentication|2fa|unrecognized (?:login|device|activity)|"
+    r"verify (?:your )?(?:login|identity|account)"
+    r")\b"
+)
 
 # Investigatory criticals VAXON may auto-dispatch under Full autonomy
 # (no secrets / production mutation — those stay operator-gated).
@@ -167,6 +174,13 @@ def is_github_email_ci_noise(*, title: str = "", detail: str = "", dedupe_key: s
     return bool(_GITHUB_EMAIL_SIGNAL_RE.search(blob))
 
 
+def is_account_security_email(*, title: str = "", dedupe_key: str = "") -> bool:
+    """True for account-security mail that needs review, never worker execution."""
+    if not str(dedupe_key or "").lower().startswith("signal:workspace_"):
+        return False
+    return bool(_ACCOUNT_SECURITY_EMAIL_RE.search(str(title or "")))
+
+
 def is_investigatory_critical(*, title: str = "", detail: str = "", kind: str = "") -> bool:
     """True when a critical is safe to investigate automatically (CI/Sentry/monitor)."""
     blob = f"{kind}\n{title}\n{detail}".strip()
@@ -209,6 +223,18 @@ def classify_attention_item(
             risk="normal",
             reason="email_ci_noise_no_dispatch",
             ask_operator=False,
+        )
+
+    if cleaned_kind in {"warning_signal", "high_signal", "monitor_alert"} and is_account_security_email(
+        title=blob_title,
+        dedupe_key=dedupe_key,
+    ):
+        return AutonomyPolicyDecision(
+            tier="operator_gated",
+            decision="skip",
+            risk="high",
+            reason="account_security_email_operator_review",
+            ask_operator=True,
         )
 
     # Secrets / production markers always gate — even for investigatory CI titles.

@@ -8,6 +8,7 @@ from datetime import datetime, timezone
 from uuid import uuid4
 
 from app.chat.command_intent import classify_command, expand_command_shortcuts
+from app.workspace_agents.ask_autopilot import resolve_answered_operator_ask
 from app.chat.dispatch import build_command_dispatch_ack, resolve_command_dispatch
 from app.chat.lane_b_agent import (
     EditorSelectionContext,
@@ -85,7 +86,6 @@ _remember_lane_b_turn = remember_lane_b_turn
 
 class ChatValidationError(ValueError):
     pass
-
 
 _KAIRO_CONTINUATION_RE = re.compile(
     r"\b(continue|pick up|resume|as we discussed|the plan|that in the ide)\b",
@@ -285,6 +285,7 @@ def post_chat_message(
         raise ChatValidationError("content must not be empty")
 
     _validate_workspace(workspace_id)
+    resolve_answered_operator_ask(trimmed, workspace_id=workspace_id)
     created_at = _utc_now()
     normalized_attachment_ids = _coerce_attachment_ids(attachment_ids)
     normalized = expand_command_shortcuts(trimmed)
@@ -406,4 +407,3 @@ def post_chat_message(
             else {}
         ),
     }
-

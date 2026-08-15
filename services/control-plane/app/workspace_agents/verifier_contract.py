@@ -199,6 +199,16 @@ def ensure_acceptance_before_publish(
 
         task = task_store.get_task(task_id)
         if isinstance(task, dict):
+            from app.workspace_agents.lead_verification_handoff import (
+                build_verification_acceptance_evaluation,
+                is_verification_task,
+            )
+
+            if is_verification_task(task):
+                payload = build_verification_acceptance_evaluation(run_id=run_id, task=task)
+                payload["summary"] = f"{payload['summary']} · mode=verification_terminal"
+                return record_acceptance_evaluation(run_id, payload)
+
             raw_allowed = task.get("allowed_paths")
             if isinstance(raw_allowed, list):
                 task_allowed_paths = [

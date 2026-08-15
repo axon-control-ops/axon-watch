@@ -1,4 +1,6 @@
 import unittest
+import tempfile
+from unittest.mock import patch
 
 import sys
 from pathlib import Path
@@ -7,6 +9,7 @@ CONTROL_PLANE_ROOT = Path(__file__).resolve().parents[1] / "services" / "control
 sys.path.insert(0, str(CONTROL_PLANE_ROOT))
 
 from app.cli_runtime.runtime_auth import (  # noqa: E402
+    api_key_fallback_env,
     codex_dispatch_env,
     codex_subscription_ready,
     cursor_dispatch_env,
@@ -18,8 +21,36 @@ from app.cli_runtime.runtime_auth import (  # noqa: E402
 
 
 class RuntimeAuthTests(unittest.TestCase):
+    def test_codex_dispatch_uses_isolated_profile(self) -> None:
+        with tempfile.TemporaryDirectory() as root:
+            shaped = codex_dispatch_env(
+                {"AXON_WATCH_RUNTIME_PROFILE_ROOT": root},
+                auth={"auth_method": ""},
+            )
+            self.assertEqual(str(Path(root) / "codex"), shaped["CODEX_HOME"])
+            self.assertEqual("isolated", shaped["AXON_WATCH_AUTH_PROFILE"])
+
+    def test_codex_default_profile_is_outside_repository_state(self) -> None:
+        with tempfile.TemporaryDirectory() as root, patch(
+            "app.cli_runtime.runtime_profiles.Path.home",
+            return_value=Path(root),
+        ):
+            shaped = codex_dispatch_env(
+                {"AXON_WATCH_STATE_DIR": "./.local/state"},
+                auth={"auth_method": ""},
+            )
+        self.assertEqual(
+            str(Path(root) / ".local/state/axon-watch/runtime-profiles/codex"),
+            shaped["CODEX_HOME"],
+        )
+
     def test_looks_like_auth_error(self) -> None:
         self.assertTrue(looks_like_auth_error("401 Unauthorized: invalid API key"))
+        self.assertTrue(
+            looks_like_auth_error(
+                "Failed to authenticate: OAuth session expired and could not be refreshed"
+            )
+        )
         self.assertFalse(looks_like_auth_error("workspace root unavailable"))
 
     def test_env_without_api_keys_cursor(self) -> None:
@@ -81,6 +112,16 @@ class RuntimeAuthTests(unittest.TestCase):
         self.assertNotIn("CODEX_API_KEY", stripped)
         self.assertNotIn("OPENAI_API_KEY", stripped)
         self.assertEqual("/usr/bin", stripped["PATH"])
+
+    def test_api_key_fallback_restores_vault_key_after_oauth_failure(self) -> None:
+        env = {"ANTHROPIC_API_KEY": "vault-key", "PATH": "/usr/bin"}
+        subscription = cursor_dispatch_env(
+            {"CURSOR_API_KEY": "cursor-key", "PATH": "/usr/bin"},
+            auth={"auth_method": "oauth"},
+        )
+        self.assertNotIn("CURSOR_API_KEY", subscription)
+        fallback = api_key_fallback_env(env, family="claude")
+        self.assertEqual("vault-key", fallback["ANTHROPIC_API_KEY"])
 
 
 if __name__ == "__main__":

@@ -41,6 +41,14 @@ export interface OperatorPresenceSettings {
    * Default: cursor-grok-4.5-high-fast (Cursor Grok 4.5 Fast).
    */
   vaxon_model_id: string;
+  /**
+   * When enabled, Full Auto temporarily forces IDE composers and continuous
+   * workers to use the selected runtime target without overwriting manual
+   * per-thread composer prefs.
+   */
+  auto_composer_runtime_override_enabled: boolean;
+  /** Runtime target id used while Full Auto + override are active. */
+  auto_composer_runtime_target: string;
   /** Speak tool milestones during agent runs (conversational only). */
   narrate_tool_progress: boolean;
 }

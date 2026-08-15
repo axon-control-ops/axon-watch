@@ -122,6 +122,26 @@ class VaultRuntimeEnvTests(unittest.TestCase):
         self.assertEqual("sk-runtime-test", env["CURSOR_API_KEY"])
 
     @patch("app.vault.operations.verify_totp", return_value=True)
+    def test_vault_runtime_env_resolves_supabase_access_token(self, _mock_totp) -> None:
+        from app.vault import operations
+
+        operations.setup_vault("master-password-123")
+        operations.unlock_vault("master-password-123", "123456")
+        key = VaultSession.get_key()
+        self.assertIsNotNone(key)
+        operations.vault_add_secret(
+            key,
+            "SUPABASE_ACCESS_TOKEN",
+            "key",
+            "",
+            "sbp_test_access_token",
+            "https://supabase.com/dashboard/account/tokens",
+            "",
+        )
+        env = operations.vault_runtime_env()
+        self.assertEqual("sbp_test_access_token", env["SUPABASE_ACCESS_TOKEN"])
+
+    @patch("app.vault.operations.verify_totp", return_value=True)
     def test_vault_runtime_env_resolves_azure_speech_credentials(self, _mock_totp) -> None:
         from app.vault import operations
 

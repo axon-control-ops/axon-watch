@@ -15,6 +15,7 @@ from app.workspace_project_bindings import (  # noqa: E402
     WorkspaceBindingError,
     get_workspace_project_binding,
     load_workspace_project_bindings,
+    project_root_allowlist,
 )
 
 
@@ -85,6 +86,14 @@ class WorkspaceProjectBindingsTests(unittest.TestCase):
                 with self.assertRaises(WorkspaceBindingError):
                     load_workspace_project_bindings(bindings_file)
 
+    def test_default_allowlist_includes_run_media_user_mount(self) -> None:
+        with patch("app.workspace_project_bindings._repo_root") as repo_root:
+            repo_root.return_value = Path(
+                "/run/media/vaxon/axon-data/repos/axon-nvme/repos/axon-watch"
+            )
+
+            self.assertIn(Path("/run/media/vaxon"), project_root_allowlist())
+
     def test_get_workspace_project_binding_returns_none_for_unknown(self) -> None:
         with tempfile.TemporaryDirectory() as tempdir:
             bindings_file = Path(tempdir) / "bindings.json"
@@ -95,6 +104,20 @@ class WorkspaceProjectBindingsTests(unittest.TestCase):
                 clear=False,
             ):
                 self.assertIsNone(get_workspace_project_binding("workspace_missing"))
+
+    def test_stale_binding_does_not_hide_valid_workspaces(self) -> None:
+        with tempfile.TemporaryDirectory() as tempdir:
+            project_root = Path(tempdir) / "valid"
+            project_root.mkdir()
+            bindings_file = Path(tempdir) / "bindings.json"
+            bindings_file.write_text(json.dumps({"bindings": {
+                "workspace_valid": {"project_root": str(project_root)},
+                "workspace_stale": {"project_root": str(Path(tempdir) / "gone")},
+            }}), encoding="utf-8")
+            with patch.dict(os.environ, {"AXON_WATCH_PROJECT_ROOT_ALLOWLIST": str(tempdir)}, clear=False):
+                bindings = load_workspace_project_bindings(bindings_file)
+            self.assertIn("workspace_valid", bindings)
+            self.assertNotIn("workspace_stale", bindings)
 
     def test_upsert_workspace_project_binding_persists_and_reloads(self) -> None:
         from app.workspace_project_bindings import upsert_workspace_project_binding

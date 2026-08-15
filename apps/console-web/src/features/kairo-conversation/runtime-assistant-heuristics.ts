@@ -1,5 +1,5 @@
 const OPEN_STYLE_RE =
-  /\b(why|how|explain|tell me (?:more|about)|what happened|what went wrong|walk me through|can you elaborate|help me understand|what do you think|should we|could you help)\b/i;
+  /\b(why|how|explain|tell me (?:more|about)|what happened|what went wrong|walk me through|can you elaborate|help me understand|what do you think|should we|could you help|what is the best|what(?:'s| is) (?:the )?best|what(?:'s| is) (?:a )?good|recommend(?:ed)?|which (?:is|would|should)|pros and cons|compare|difference between|give me an? (?:overview|summary|breakdown))\b/i;
 
 const STATUS_STYLE_RE =
   /\b(approval|approvals|attention|status|briefing|fleet|health|signal|signals|running|active run|what needs|nominal|degraded|clear)\b/i;

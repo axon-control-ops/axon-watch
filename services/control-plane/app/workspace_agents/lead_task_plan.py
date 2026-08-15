@@ -33,7 +33,11 @@ _FAN_OUT_RE = re.compile(
     r"\b(?:sub[- ]?agents?|teammates?|specialists?|agents?)\b.{0,40}"
     r"\b(?:start|work|working|go)\b"
     r"|\bget\b.{0,24}\b(?:all|every|the)\b.{0,16}"
-    r"\b(?:agents?|teammates?|specialists?|team)\b.{0,24}\b(?:work|working|started?)\b",
+    r"\b(?:agents?|teammates?|specialists?|team)\b.{0,24}\b(?:work|working|started?)\b"
+    r"|\bmaterialize[_\s-]lead[_\s-]fan[_\s-]out\b"
+    r"|\b(?:assign|dispatch|route|lease|queue)\b.{0,160}\b(?:two|three|\d+)\b"
+    r".{0,120}\b(?:frontend|ui|backend|integrations?|watcher)\b.{0,120}"
+    r"\b(?:frontend|ui|backend|integrations?|watcher|specialists?)\b",
     re.I | re.S,
 )
 _THEN_SPLIT_RE = re.compile(
@@ -45,7 +49,7 @@ _ALSO_SPLIT_RE = re.compile(
     re.I,
 )
 _PATH_RE = re.compile(
-    r"(?:^|[\s`\"'(])((?:apps|services|packages|docs|tests|src)/[\w./\-]+)",
+    r"(?:^|[\s`\"'(])((?:app|apps|components|features|hooks|lib|locales|screens|services|packages|docs|tests|src)/[\w./\-]+)",
     re.I,
 )
 
@@ -57,7 +61,7 @@ _ROLE_FOCUS: dict[str, str] = {
 }
 
 _IMPLEMENT_RE = re.compile(
-    r"\b(?:fix|wire|implement|build|repair|ship|patch|update|add|remove|migrate)\b",
+    r"\b(?:fix(?:es|ed|ing)?|wire|implement|build|repair|ship|patch|update|add|remove|migrate)\b",
     re.I,
 )
 
@@ -211,8 +215,9 @@ def _owners_for_clause(
     scored = _score_specialists(clause, specialists)
     eligible = [(member, score) for member, score in scored if score >= MIN_WINNER_SCORE]
     if len(eligible) >= 2:
-        # Multi-domain: keep every role that cleared the bar.
-        return [member for member, _score in eligible], False
+        # Require every winner to clear the higher bar before automatic fan-out.
+        decisive = all(score >= MIN_WINNER_SCORE + MIN_MARGIN for _member, score in eligible)
+        return [member for member, _score in eligible], not decisive
     if len(eligible) == 1:
         return [eligible[0][0]], False
     # Soft winner: positive score but below hard threshold — ambiguous for model.

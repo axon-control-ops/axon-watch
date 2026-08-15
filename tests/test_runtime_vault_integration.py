@@ -108,6 +108,14 @@ class RuntimeVaultIntegrationTests(unittest.TestCase):
                 merged = vault_keys.runtime_subprocess_env(force_refresh=True)
         self.assertEqual("from-process", merged["CURSOR_API_KEY"])
 
+    def test_runtime_subprocess_env_includes_supabase_access_token_from_vault(self) -> None:
+        with patch(
+            "app.cli_runtime.vault_keys.runtime_vault_env",
+            return_value={"SUPABASE_ACCESS_TOKEN": "sbp_from_vault"},
+        ):
+            merged = vault_keys.runtime_subprocess_env(force_refresh=True)
+        self.assertEqual("sbp_from_vault", merged["SUPABASE_ACCESS_TOKEN"])
+
     @patch("app.cli_runtime.auth_probes._run_command")
     def test_codex_prefers_chatgpt_session_over_vault_key(self, mock_run) -> None:
         mock_run.return_value = subprocess.CompletedProcess(

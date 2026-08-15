@@ -6,6 +6,7 @@ import os
 import sqlite3
 import threading
 from pathlib import Path
+from app.persistence.sqlite_connection import ManagedConnection
 
 _DEFAULT_DB = "./.local/state/control-plane.sqlite3"
 _DEFAULT_BUSY_TIMEOUT_MS = 30_000
@@ -49,6 +50,7 @@ def connect(configured_path: str | None) -> sqlite3.Connection:
     connection = sqlite3.connect(
         str(db_path),
         timeout=busy_timeout_ms / 1_000,
+        factory=ManagedConnection,
     )
     connection.row_factory = sqlite3.Row
     connection.execute(f"PRAGMA busy_timeout = {busy_timeout_ms}")
@@ -57,9 +59,7 @@ def connect(configured_path: str | None) -> sqlite3.Connection:
     try:
         with _SCHEMA_LOCK:
             if db_path not in _INITIALIZED_DATABASES:
-                # WAL lets readers continue while one writer commits. SQLite
-                # still serializes writers; busy_timeout makes them wait instead
-                # of failing agent/chat/voice requests during short bursts.
+                # WAL plus busy_timeout keeps short writer bursts from failing.
                 connection.execute("PRAGMA journal_mode = WAL")
                 ensure_schema(connection)
                 connection.commit()
@@ -115,6 +115,9 @@ def ensure_schema(connection: sqlite3.Connection) -> None:
             run_id TEXT,
             role TEXT NOT NULL,
             content TEXT NOT NULL,
+            speaker_name TEXT,
+            speaker_role TEXT,
+            speaker_employee_id TEXT,
             created_at TEXT NOT NULL,
             FOREIGN KEY(thread_id) REFERENCES chat_threads(thread_id)
         );
@@ -175,6 +178,8 @@ def ensure_schema(connection: sqlite3.Connection) -> None:
         CREATE TABLE IF NOT EXISTS workspace_composer_prefs (
             workspace_id TEXT PRIMARY KEY,
             cursor_cli_model TEXT NOT NULL,
+            claude_cli_model TEXT,
+            codex_cli_model TEXT,
             updated_at TEXT NOT NULL
         );
 
@@ -209,7 +214,10 @@ def ensure_schema(connection: sqlite3.Connection) -> None:
     )
     _ensure_chat_thread_kind_column(connection)
     _ensure_chat_thread_persona_columns(connection)
+    _ensure_chat_message_speaker_columns(connection)
     _ensure_workspace_composer_prefs_runtime_target_column(connection)
+    _ensure_workspace_composer_prefs_runtime_policy_columns(connection)
+    _ensure_workspace_composer_prefs_per_runtime_model_columns(connection)
     _ensure_runs_employee_role_column(connection)
     _ensure_runs_task_id_column(connection)
     _ensure_workspace_tasks_table(connection)
@@ -243,6 +251,38 @@ def _ensure_workspace_composer_prefs_runtime_target_column(connection: sqlite3.C
     if "runtime_target" in columns:
         return
     connection.execute("ALTER TABLE workspace_composer_prefs ADD COLUMN runtime_target TEXT")
+    connection.commit()
+
+
+def _ensure_workspace_composer_prefs_runtime_policy_columns(connection: sqlite3.Connection) -> None:
+    columns = {
+        str(row[1])
+        for row in connection.execute("PRAGMA table_info(workspace_composer_prefs)").fetchall()
+    }
+    if "auto_allowed_runtimes_json" not in columns:
+        connection.execute(
+            "ALTER TABLE workspace_composer_prefs ADD COLUMN auto_allowed_runtimes_json TEXT"
+        )
+    if "max_concurrent_runtimes" not in columns:
+        connection.execute(
+            "ALTER TABLE workspace_composer_prefs ADD COLUMN max_concurrent_runtimes INTEGER"
+        )
+    connection.commit()
+
+
+def _ensure_workspace_composer_prefs_per_runtime_model_columns(connection: sqlite3.Connection) -> None:
+    columns = {
+        str(row[1])
+        for row in connection.execute("PRAGMA table_info(workspace_composer_prefs)").fetchall()
+    }
+    if "claude_cli_model" not in columns:
+        connection.execute(
+            "ALTER TABLE workspace_composer_prefs ADD COLUMN claude_cli_model TEXT"
+        )
+    if "codex_cli_model" not in columns:
+        connection.execute(
+            "ALTER TABLE workspace_composer_prefs ADD COLUMN codex_cli_model TEXT"
+        )
     connection.commit()
 
 
@@ -487,5 +527,19 @@ def _ensure_chat_thread_persona_columns(connection: sqlite3.Connection) -> None:
                 ON chat_threads(workspace_id, thread_kind, employee_id)
             """
         )
+    if changed:
+        connection.commit()
+
+
+def _ensure_chat_message_speaker_columns(connection: sqlite3.Connection) -> None:
+    columns = {
+        str(row[1])
+        for row in connection.execute("PRAGMA table_info(chat_messages)").fetchall()
+    }
+    changed = False
+    for column in ("speaker_name", "speaker_role", "speaker_employee_id"):
+        if column not in columns:
+            connection.execute(f"ALTER TABLE chat_messages ADD COLUMN {column} TEXT")
+            changed = True
     if changed:
         connection.commit()

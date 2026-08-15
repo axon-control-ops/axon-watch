@@ -1,0 +1,312 @@
+"""Executable verification-task contracts and terminal receipt evaluation."""
+
+from __future__ import annotations
+
+import logging
+import re
+import shlex
+from pathlib import Path
+from typing import Any, Callable
+
+from app.persistence import task_store
+
+logger = logging.getLogger(__name__)
+
+_VERIFICATION_COMMAND_RE = re.compile(
+    r"`((?:npm test[^\n`]*|npx tsx[^\n`]*|npx jest[^\n`]*))`",
+    re.IGNORECASE,
+)
+_TEST_FILE_BACKTICK_RE = re.compile(
+    r"`(tests/[^`\n]+\.(?:test|spec)\.(?:ts|tsx|js|jsx))`",
+    re.IGNORECASE,
+)
+_GOAL_INLINE_COMMAND_RE = re.compile(
+    r"(?<![/`])(npm test(?:\s+--\s+[^\n;`\[]+)?|npx tsx[^\n;`\[]+|npx jest[^\n;`\[]+)",
+    re.IGNORECASE,
+)
+_SOURCE_RUN_RE = re.compile(r"\[from run (run_[a-f0-9]+)\]", re.IGNORECASE)
+_MALFORMED_VERIFY_COMMAND_RE = re.compile(
+    r"^(npm test-|npx jest-|npx tsx-)",
+    re.IGNORECASE,
+)
+_VERIFICATION_SHELL_PREFIXES: tuple[tuple[str, ...], ...] = (
+    ("npm", "test"),
+    ("npx", "jest"),
+    ("npx", "tsx"),
+)
+_UNSAFE_SHELL_CHARACTERS = frozenset(";&|><$()\\\r\n\x00")
+
+
+def _verification_command_is_valid(command: str) -> bool:
+    raw = str(command or "")
+    if any(character in raw for character in _UNSAFE_SHELL_CHARACTERS):
+        return False
+    cleaned = " ".join(raw.split()).strip()
+    if not cleaned or _MALFORMED_VERIFY_COMMAND_RE.match(cleaned):
+        return False
+    try:
+        argv = shlex.split(cleaned)
+    except ValueError:
+        return False
+    if len(argv) < 2:
+        return False
+    return tuple(part.lower() for part in argv[:2]) in _VERIFICATION_SHELL_PREFIXES
+
+
+def extract_verification_commands(reply_text: str | None) -> list[str]:
+    """Pull supported test commands from fenced, path-only, or inline text."""
+    body = str(reply_text or "")
+    commands: list[str] = []
+    seen: set[str] = set()
+    for match in _VERIFICATION_COMMAND_RE.finditer(body):
+        command = " ".join(match.group(1).split()).strip()
+        if _verification_command_is_valid(command) and command not in seen:
+            seen.add(command)
+            commands.append(command)
+    for match in _TEST_FILE_BACKTICK_RE.finditer(body):
+        test_path = " ".join(match.group(1).split()).strip()
+        command = f"npm test -- {test_path}"
+        if _verification_command_is_valid(command) and command not in seen:
+            seen.add(command)
+            commands.append(command)
+    for match in _GOAL_INLINE_COMMAND_RE.finditer(body):
+        command = " ".join(match.group(1).split()).strip().rstrip(".")
+        if _verification_command_is_valid(command) and command not in seen:
+            seen.add(command)
+            commands.append(command)
+    return commands[:4]
+
+
+def source_run_from_verification_goal(goal: str) -> str | None:
+    match = _SOURCE_RUN_RE.search(str(goal or ""))
+    return match.group(1).strip() if match else None
+
+
+def is_verification_task(task: dict[str, Any] | None) -> bool:
+    if not isinstance(task, dict):
+        return False
+    return str(task.get("goal") or "").strip().lower().startswith("verification after")
+
+
+def verification_commands_for_task(task: dict[str, Any] | None) -> list[str]:
+    if not isinstance(task, dict):
+        return []
+    blob = "\n".join(
+        str(task.get(key) or "").strip()
+        for key in ("goal", "acceptance_criteria")
+        if str(task.get(key) or "").strip()
+    )
+    return extract_verification_commands(blob)
+
+
+def verification_approved_command_prefixes() -> tuple[tuple[str, ...], ...]:
+    return _VERIFICATION_SHELL_PREFIXES
+
+
+def resolve_verification_baseline(
+    *,
+    workspace_id: str,
+    task: dict[str, Any],
+    bound_project_root: Path | None = None,
+) -> tuple[str | None, str | None]:
+    """Resolve the implementation commit/ref that a verification shift must test."""
+    from app.safe_improvement.isolated_executor import _resolve_git_ref_commit
+    from app.terminal.workspace_roots import resolve_workspace_root
+    from app.workspace_delivery import store as delivery_store
+
+    source_run = source_run_from_verification_goal(str(task.get("goal") or ""))
+    if not source_run:
+        return None, None
+    try:
+        bound = bound_project_root or resolve_workspace_root(workspace_id)
+    except Exception:  # noqa: BLE001
+        bound = None
+
+    visited: set[str] = set()
+    current = source_run
+    for _ in range(6):
+        if not current or current in visited:
+            break
+        visited.add(current)
+        delivery = delivery_store.get_delivery_by_run(current)
+        if isinstance(delivery, dict):
+            commit_sha = str(delivery.get("commit_sha") or "").strip()
+            worker_branch = str(delivery.get("worker_branch") or "").strip()
+            if commit_sha:
+                return commit_sha, worker_branch or f"worker/{current}"
+            if worker_branch and bound is not None:
+                resolved = _resolve_git_ref_commit(bound, worker_branch)
+                if resolved:
+                    return resolved, worker_branch
+
+        worker_branch = f"worker/{current}"
+        if bound is not None:
+            resolved = _resolve_git_ref_commit(bound, worker_branch)
+            if resolved:
+                return resolved, worker_branch
+        try:
+            from app.runs.service import get_run
+
+            run = get_run(current)
+        except Exception:  # noqa: BLE001
+            run = None
+        task_id = str((run or {}).get("task_id") or "").strip()
+        prior_task = task_store.get_task(task_id) if task_id else None
+        if prior_task and is_verification_task(prior_task):
+            parent = source_run_from_verification_goal(str(prior_task.get("goal") or ""))
+            if parent and parent != current:
+                current = parent
+                continue
+        break
+
+    return None, None
+
+
+def verification_terminal_jobs_for_run(
+    workspace_id: str,
+    run_id: str,
+) -> list[dict[str, Any]]:
+    from app.terminal.agent_jobs import list_agent_terminal_jobs
+
+    clean_run = str(run_id or "").strip()
+    clean_workspace = str(workspace_id or "").strip()
+    if not clean_run or not clean_workspace:
+        return []
+    return [
+        job
+        for job in list_agent_terminal_jobs(clean_workspace, limit=100)
+        if str(job.get("run_id") or "") == clean_run
+    ]
+
+
+def _job_passed(job: dict[str, Any]) -> bool:
+    if str(job.get("status") or "").strip().lower() != "completed":
+        return False
+    exit_code = job.get("exit_code")
+    return exit_code is not None and int(exit_code) == 0
+
+
+def _job_failed(job: dict[str, Any]) -> bool:
+    status = str(job.get("status") or "").strip().lower()
+    if status == "failed":
+        return True
+    exit_code = job.get("exit_code")
+    return status == "completed" and exit_code is not None and int(exit_code) != 0
+
+
+def build_verification_acceptance_evaluation(
+    *, run_id: str, task: dict[str, Any]
+) -> dict[str, Any]:
+    """Build Gate 6 evidence from terminal receipts rather than source diffs."""
+    from app.persistence import run_store
+    from app.runs.service import get_run
+    from app.workspace_agents.verifier_checks import VERIFIER_IDENTITY
+
+    commands = verification_commands_for_task(task)
+    jobs = verification_terminal_jobs_for_run(str(task.get("workspace_id") or ""), run_id)
+    run = get_run(run_id)
+    history = run_store.list_history(str(run.get("history_ref") or ""))
+    enqueued = sum(
+        1
+        for entry in history
+        if isinstance(entry, dict)
+        and str((entry.get("receipt") or {}).get("type") or "")
+        == "verification_terminal_enqueued"
+    )
+    failed = [job for job in jobs if _job_failed(job)]
+    passed = [job for job in jobs if _job_passed(job)]
+    required = min(len(commands), 3) if commands else max(1, enqueued or len(passed))
+    checks = [
+        {
+            "name": "verification_terminal_job",
+            "passed": True,
+            "detail": str(job.get("command") or job.get("job_id") or "terminal job"),
+        }
+        for job in passed
+    ]
+    if failed:
+        summary = f"acceptance=fail · verification jobs failed={len(failed)} ok={len(passed)}"
+        passed_gate = False
+    elif len(passed) >= required and required > 0:
+        summary = f"acceptance=pass · verification jobs={len(passed)}/{required}"
+        passed_gate = True
+    elif not jobs and enqueued == 0:
+        summary = "acceptance=fail · no verification terminal jobs recorded"
+        checks = []
+        passed_gate = False
+    else:
+        summary = f"acceptance=fail · verification jobs incomplete ok={len(passed)}/{required}"
+        passed_gate = False
+    return {
+        "passed": passed_gate,
+        "summary": summary,
+        "checks": checks,
+        "actor": VERIFIER_IDENTITY,
+    }
+
+
+def complete_verification_no_change_delivery(
+    *,
+    run_id: str,
+    task: dict[str, Any],
+    fail_worker_run: Callable[[str], dict[str, Any] | None],
+) -> dict[str, Any] | None:
+    from app.runs.service import RunLifecycleError, append_run_execution_receipt, complete_run
+    from app.workspace_agents.verifier_contract import record_acceptance_evaluation
+
+    evaluation = build_verification_acceptance_evaluation(run_id=run_id, task=task)
+    if not evaluation.get("passed"):
+        return fail_worker_run(
+            "Workspace delivery blocked: verification jobs did not pass "
+            f"({evaluation.get('summary') or 'missing terminal receipts'})"
+        )
+    record_acceptance_evaluation(run_id, evaluation)
+    try:
+        finalized = complete_run(run_id)
+        append_run_execution_receipt(
+            run_id,
+            receipt_type="worker_delivery_verification_receipt",
+            actor="workspace_scheduler",
+            receipt_summary=(
+                "Workspace delivery completed: verification shift required "
+                "terminal job receipts; no publishable code changes."
+            ),
+        )
+        return finalized
+    except RunLifecycleError as exc:
+        logger.exception("complete_run after verification delivery failed for %s", run_id)
+        return fail_worker_run(f"Verification delivery succeeded but complete_run failed: {exc}")
+
+
+def verification_worker_prompt_clause(*, workspace_id: str, task: dict[str, Any]) -> str:
+    if not is_verification_task(task):
+        return ""
+    commands = verification_commands_for_task(task)
+    workspace = workspace_id.strip()
+    wrapped = (
+        "; ".join(
+            f"`axon-agent-terminal-job --workspace {workspace} -- {command}`"
+            for command in commands[:3]
+        )
+        if commands
+        else f"`axon-agent-terminal-job --workspace {workspace} -- <verify-command>`"
+    )
+    return (
+        " VERIFICATION SHIFT: run the scoped verify commands first via "
+        f"{wrapped}. Attach stdout/stderr receipts before static review. "
+        "Do not claim tests passed without terminal job output."
+    )
+
+
+__all__ = [
+    "build_verification_acceptance_evaluation",
+    "complete_verification_no_change_delivery",
+    "extract_verification_commands",
+    "is_verification_task",
+    "resolve_verification_baseline",
+    "source_run_from_verification_goal",
+    "verification_approved_command_prefixes",
+    "verification_commands_for_task",
+    "verification_terminal_jobs_for_run",
+    "verification_worker_prompt_clause",
+]

@@ -57,7 +57,12 @@ describe('resolveEmployeeManualHandoff', () => {
         autonomyMode: 'manual',
         tasks,
       }),
-    ).toEqual({ waiting: true, taskId: 'task_1', reason: 'open_task' });
+    ).toEqual({
+      waiting: true,
+      taskId: 'task_1',
+      reason: 'open_task',
+      blockedReason: null,
+    });
     expect(
       resolveEmployeeManualHandoff({
         employee: row,
@@ -65,6 +70,16 @@ describe('resolveEmployeeManualHandoff', () => {
         tasks,
       }).waiting,
     ).toBe(false);
+  });
+
+  it('hides Start now when an open task has exhausted its attempt budget', () => {
+    expect(
+      resolveEmployeeManualHandoff({
+        employee: employee({ role: 'lead', name: 'Imani' }),
+        autonomyMode: 'manual',
+        tasks: [task({ owner_role: 'lead', attempt_budget: 2, attempts_used: 2 })],
+      }),
+    ).toEqual({ waiting: false, taskId: null, reason: null, blockedReason: null });
   });
 
   it('hides Semi Start now for ordinary open tasks without handoff provenance', () => {
@@ -90,7 +105,12 @@ describe('resolveEmployeeManualHandoff', () => {
           }),
         ],
       }),
-    ).toEqual({ waiting: true, taskId: 'task_1', reason: 'open_task' });
+    ).toEqual({
+      waiting: true,
+      taskId: 'task_1',
+      reason: 'open_task',
+      blockedReason: null,
+    });
   });
 
   it('shows Semi Start now for open Lead board tickets', () => {
@@ -100,7 +120,12 @@ describe('resolveEmployeeManualHandoff', () => {
         autonomyMode: 'semi',
         tasks: [task({ owner_role: 'lead', goal: 'Lead board ticket' })],
       }),
-    ).toEqual({ waiting: true, taskId: 'task_1', reason: 'open_task' });
+    ).toEqual({
+      waiting: true,
+      taskId: 'task_1',
+      reason: 'open_task',
+      blockedReason: null,
+    });
   });
 
   it('treats assigned specialists as handoff waiters in Manual', () => {
@@ -116,7 +141,12 @@ describe('resolveEmployeeManualHandoff', () => {
           }),
         ],
       }),
-    ).toMatchObject({ waiting: true, reason: 'assigned', taskId: 'task_1' });
+    ).toMatchObject({
+      waiting: true,
+      reason: 'assigned',
+      taskId: 'task_1',
+      blockedReason: null,
+    });
   });
 
   it('starts the assigned run task before an unrelated newer open task', () => {
@@ -145,6 +175,7 @@ describe('resolveEmployeeManualHandoff', () => {
       waiting: true,
       taskId: 'task_assigned',
       reason: 'assigned',
+      blockedReason: null,
     });
   });
 
@@ -163,6 +194,73 @@ describe('resolveEmployeeManualHandoff', () => {
       waiting: true,
       taskId: 'task_assigned',
       reason: 'assigned',
+      blockedReason: null,
+    });
+  });
+
+  it('hides Start now when dependencies are cancelled instead of completed', () => {
+    const cancelled = task({
+      task_id: 'task_cancelled',
+      status: 'cancelled',
+      owner_role: 'backend',
+      goal: 'Verification after Marco backend work',
+    });
+    const leadFollowUp = task({
+      task_id: 'task_lead',
+      owner_role: 'lead',
+      dependencies: [cancelled.task_id],
+    });
+    expect(
+      resolveEmployeeManualHandoff({
+        employee: employee({ role: 'lead', name: 'Dana' }),
+        autonomyMode: 'semi',
+        tasks: [cancelled, leadFollowUp],
+      }),
+    ).toEqual({
+      waiting: false,
+      taskId: null,
+      reason: null,
+      blockedReason: expect.stringContaining('Waiting on backend verification'),
+    });
+  });
+
+  it('shows Start now for Marco verification tasks in Manual mode', () => {
+    const verification = task({
+      task_id: 'task_verify',
+      owner_role: 'backend',
+      goal: 'Verification after Marco backend work',
+    });
+    expect(
+      resolveEmployeeManualHandoff({
+        employee: employee({ role: 'backend', name: 'Marco' }),
+        autonomyMode: 'manual',
+        tasks: [verification],
+      }),
+    ).toEqual({
+      waiting: true,
+      taskId: 'task_verify',
+      reason: 'open_task',
+      blockedReason: null,
+    });
+  });
+
+  it('shows Semi Start now for specialist verification handoffs', () => {
+    const verification = task({
+      task_id: 'task_verify',
+      owner_role: 'backend',
+      goal: 'Verification after Marco (backend): npm test',
+    });
+    expect(
+      resolveEmployeeManualHandoff({
+        employee: employee({ role: 'backend', name: 'Marco' }),
+        autonomyMode: 'semi',
+        tasks: [verification],
+      }),
+    ).toEqual({
+      waiting: true,
+      taskId: 'task_verify',
+      reason: 'open_task',
+      blockedReason: null,
     });
   });
 
@@ -173,7 +271,7 @@ describe('resolveEmployeeManualHandoff', () => {
         autonomyMode: 'manual',
         tasks: [],
       }),
-    ).toEqual({ waiting: false, taskId: null, reason: null });
+    ).toEqual({ waiting: false, taskId: null, reason: null, blockedReason: null });
   });
 
   it('hides Start now when the teammate is live-busy even with an open handoff', () => {
@@ -184,7 +282,7 @@ describe('resolveEmployeeManualHandoff', () => {
         tasks: [task({ owner_role: 'watcher' })],
         liveBusy: true,
       }),
-    ).toEqual({ waiting: false, taskId: null, reason: null });
+    ).toEqual({ waiting: false, taskId: null, reason: null, blockedReason: null });
   });
 
   it('hides Start now when a continuous worker is mid-shift with an open handoff', () => {
@@ -199,7 +297,7 @@ describe('resolveEmployeeManualHandoff', () => {
         autonomyMode: 'manual',
         tasks: [task({ owner_role: 'watcher' })],
       }),
-    ).toEqual({ waiting: false, taskId: null, reason: null });
+    ).toEqual({ waiting: false, taskId: null, reason: null, blockedReason: null });
   });
 
   it('hides Start now while executing even if an assigned lease is still bound', () => {
@@ -217,7 +315,7 @@ describe('resolveEmployeeManualHandoff', () => {
           }),
         ],
       }),
-    ).toEqual({ waiting: false, taskId: null, reason: null });
+    ).toEqual({ waiting: false, taskId: null, reason: null, blockedReason: null });
   });
 
   it('still shows Start now for assigned leases that are not busy yet', () => {
@@ -233,6 +331,62 @@ describe('resolveEmployeeManualHandoff', () => {
         ],
         liveBusy: false,
       }),
-    ).toMatchObject({ waiting: true, reason: 'assigned', taskId: 'task_1' });
+    ).toMatchObject({
+      waiting: true,
+      reason: 'assigned',
+      taskId: 'task_1',
+      blockedReason: null,
+    });
+  });
+
+  it('shows Run verification after a failed leased verification shift', () => {
+    expect(
+      resolveEmployeeManualHandoff({
+        employee: employee({ role: 'backend', name: 'Marco', status: 'idle' }),
+        autonomyMode: 'manual',
+        tasks: [
+          task({
+            task_id: 'task_verify_failed',
+            owner_role: 'backend',
+            status: 'leased',
+            run_id: 'run_failed_verify',
+            goal: 'Verification after Marco (backend): npm test',
+          }),
+        ],
+      }),
+    ).toEqual({
+      waiting: true,
+      taskId: 'task_verify_failed',
+      reason: 'open_task',
+      blockedReason: null,
+    });
+  });
+
+  it('shows Run verification when active_run_id remains set after gate 6 fail', () => {
+    expect(
+      resolveEmployeeManualHandoff({
+        employee: employee({
+          role: 'backend',
+          name: 'Marco',
+          status: 'idle',
+          active_run_id: 'run_failed_verify',
+          last_outcome: 'failed',
+          last_outcome_detail: 'acceptance_evidence did not pass (Gate 6)',
+        }),
+        autonomyMode: 'manual',
+        tasks: [
+          task({
+            task_id: 'task_verify_failed',
+            owner_role: 'backend',
+            status: 'leased',
+            run_id: 'run_failed_verify',
+            goal: 'Verification after Marco (backend): npm test',
+          }),
+        ],
+      }),
+    ).toMatchObject({
+      waiting: true,
+      taskId: 'task_verify_failed',
+    });
   });
 });

@@ -3,6 +3,10 @@ import type { CompanyRosterSnapshot } from '../contracts/canonical';
 import { fetchJson } from './client';
 
 export interface WorkerSchedulerStatus {
+  watcher_scheduler_enabled: boolean;
+  watcher_effective_enabled: boolean;
+  watcher_env_allowed: boolean;
+  watcher_blocked_by_env: boolean;
   scheduler_enabled: boolean;
   effective_enabled: boolean;
   env_allowed: boolean;
@@ -25,6 +29,7 @@ export interface WorkerSchedulerStatus {
 }
 
 export interface WorkerSchedulerPatch {
+  watcher_scheduler_enabled?: boolean;
   scheduler_enabled?: boolean;
   max_active?: number;
   max_starts_per_tick?: number;

@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Callable
 
 from app.adapters.watch_client import fetch_watch_inbox
+from app.signal_explanation import resolve_signal_explanation
 
 WatchInboxFetcher = Callable[[], dict[str, object] | None]
 
@@ -33,8 +34,16 @@ def project_inbox_item(item: dict[str, object]) -> dict[str, object]:
             ),
         }
     )
-    if isinstance(item.get("meta"), dict):
-        projected["meta"] = item["meta"]
+    meta = dict(item["meta"]) if isinstance(item.get("meta"), dict) else {}
+    explanation = resolve_signal_explanation(projected)
+    if explanation is not None:
+        # Feed the existing frontend override contract (operator-signal-hints.ts,
+        # metaPlainOverride) instead of adding a parallel explanation field —
+        # that resolver already renders what/youDo/agentDo in the Attention panel.
+        meta.setdefault("operator_what", explanation.plain_explanation)
+        meta.setdefault("operator_you_do", explanation.next_step)
+    if meta:
+        projected["meta"] = meta
     return projected
 
 

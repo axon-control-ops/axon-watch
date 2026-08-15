@@ -10,6 +10,19 @@ import type { useShellStore } from '../stores/shell';
 
 type ShellStore = ReturnType<typeof useShellStore>;
 
+function resolveHandoff(employee: CompanyEmployeeRecord, input: {
+  shell: ShellStore;
+  liveBusy: boolean;
+}) {
+  return resolveEmployeeManualHandoff({
+    employee,
+    autonomyMode: input.shell.operatorPresenceSettings.autonomy_mode,
+    tasks: input.shell.workspaceTasksForCurrentWorkspace,
+    runs: input.shell.runs,
+    liveBusy: input.liveBusy,
+  });
+}
+
 /** Quick actions + manual-handoff-waiting state for the selected/roster employees. */
 export function useCompanyRosterQuickActionState(input: {
   shell: ShellStore;
@@ -19,6 +32,7 @@ export function useCompanyRosterQuickActionState(input: {
 }): {
   selectedActions: ComputedRef<TeamMemberQuickAction[]>;
   handoffWaitingEmployeeIds: ComputedRef<string[]>;
+  selectedHandoffBlockedReason: ComputedRef<string | null>;
 } {
   const selectedActions = computed(() =>
     input.selectedEmployee.value
@@ -34,22 +48,29 @@ export function useCompanyRosterQuickActionState(input: {
   );
 
   const handoffWaitingEmployeeIds = computed(() => {
-    const mode = input.shell.operatorPresenceSettings.autonomy_mode;
-    const tasks = input.shell.workspaceTasksForCurrentWorkspace;
-    const runs = input.shell.runs;
     const liveBusy = new Set(input.liveBusyEmployeeIds.value);
     return input.employees.value
       .filter((employee) =>
-        resolveEmployeeManualHandoff({
-          employee,
-          autonomyMode: mode,
-          tasks,
-          runs,
+        resolveHandoff(employee, {
+          shell: input.shell,
           liveBusy: liveBusy.has(employee.employee_id),
         }).waiting,
       )
       .map((employee) => employee.employee_id);
   });
 
-  return { selectedActions, handoffWaitingEmployeeIds };
+  const selectedHandoffBlockedReason = computed(() => {
+    const employee = input.selectedEmployee.value;
+    if (!employee) {
+      return null;
+    }
+    return (
+      resolveHandoff(employee, {
+        shell: input.shell,
+        liveBusy: input.liveBusyEmployeeIds.value.includes(employee.employee_id),
+      }).blockedReason ?? null
+    );
+  });
+
+  return { selectedActions, handoffWaitingEmployeeIds, selectedHandoffBlockedReason };
 }

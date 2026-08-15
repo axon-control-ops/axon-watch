@@ -14,6 +14,40 @@
   gap: 0.25rem;
 }
 
+/* Team view: speech card fills the bottom anchor and grows with available height. */
+.kairo-sidebar-panel-host--team-speaking {
+  flex: 1 1 auto;
+  min-height: 0;
+  justify-content: flex-end;
+}
+
+.kairo-sidebar-panel-host--team-speaking .kairo-sidebar-speech {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  height: 100%;
+  max-height: 100%;
+  margin: 0;
+}
+
+.kairo-sidebar-panel-host--team-speaking .kairo-sidebar-speech__body {
+  flex: 1 1 auto;
+  min-height: 4.5rem;
+}
+
+.kairo-sidebar-panel-host--team-speaking
+  .kairo-sidebar-speech:not(.kairo-sidebar-speech--expanded)
+  .kairo-sidebar-speech__text {
+  display: block;
+  overflow: auto;
+  -webkit-line-clamp: unset;
+}
+
+.kairo-sidebar-panel-host--team-speaking .kairo-sidebar-speech__reply {
+  flex-shrink: 0;
+}
+
 .kairo-sidebar-panel-compact-row {
   display: flex;
   flex: 0 0 auto;
@@ -111,12 +145,13 @@
   max-height: min(62vh, 32rem);
 }
 
-.kairo-sidebar-panel-host--team .kairo-sidebar-speech {
+.kairo-sidebar-panel-host--team:not(.kairo-sidebar-panel-host--team-speaking) .kairo-sidebar-speech {
   max-height: min(38vh, 16rem);
   margin-inline: 0;
 }
 
-.kairo-sidebar-panel-host--team .kairo-sidebar-speech--expanded {
+.kairo-sidebar-panel-host--team:not(.kairo-sidebar-panel-host--team-speaking)
+  .kairo-sidebar-speech--expanded {
   max-height: min(58vh, 28rem);
 }
 
@@ -129,6 +164,7 @@
 
 .kairo-sidebar-speech__header {
   display: flex;
+  flex-shrink: 0;
   align-items: center;
   justify-content: space-between;
   gap: 0.45rem;
@@ -258,6 +294,10 @@
   max-height: min(58vh, 28rem);
 }
 
+.kairo-sidebar-panel-host--team-speaking .kairo-sidebar-speech--awaiting-reply {
+  max-height: 100%;
+}
+
 .kairo-sidebar-speech--awaiting-reply .kairo-sidebar-speech__text {
   display: block;
   overflow: auto;
@@ -266,9 +306,10 @@
 
 .kairo-sidebar-speech__reply {
   display: flex;
+  flex-shrink: 0;
   flex-direction: column;
   gap: 0.35rem;
-  margin-top: 0.4rem;
+  margin-top: auto;
   padding-top: 0.4rem;
   border-top: 1px solid rgba(0, 242, 255, 0.16);
 }

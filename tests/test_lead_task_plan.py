@@ -12,6 +12,7 @@ sys.path.insert(0, str(CONTROL_PLANE_ROOT))
 from app.workspace_agents.lead_task_plan import (  # noqa: E402
     build_lead_task_plan,
     detect_fan_out_intent,
+    detect_implement_intent,
     extract_exclusive_paths,
     should_lead_decompose_dispatch,
 )
@@ -80,6 +81,41 @@ class LeadTaskPlanTests(unittest.TestCase):
         self.assertIn("Backend:", goals["backend"])
         self.assertNotEqual(goals["frontend"], goals["backend"])
 
+    def test_domain_agnostic_goal_flags_ambiguous_instead_of_confident_fan_out(self) -> None:
+        # Regression: a plain content-editing task (no API/database/signals system
+        # involved at all) that happens to contain a couple of generic words each
+        # role's keyword bag matches ("service", "data", "health", "signal") used to
+        # be treated as confidently decisive multi-domain work purely because two
+        # roles cleared the bare MIN_WINNER_SCORE — this is the exact failure that
+        # fanned a childcare-menu task out to mismatched Backend + Watcher specialists.
+        plan = build_lead_task_plan(
+            goal=(
+                "Rearrange the existing weekly menu items and update the room roster "
+                "service data, keeping an eye on child health signals throughout."
+            ),
+            roster=DASHPRO_ROSTER,
+            mode="decompose",
+        )
+        self.assertTrue(plan.ambiguous)
+        roles = sorted(item.owner_role for item in plan.items)
+        self.assertEqual(["backend", "watcher"], roles)
+
+    def test_dashboard_plus_idempotency_data_cleanup_splits_frontend_and_backend(self) -> None:
+        plan = build_lead_task_plan(
+            goal=(
+                "Fix the dashboard UI and assignment idempotency/data cleanup so "
+                "duplicate assignments stop and parent-delivery data is correct."
+            ),
+            roster=DASHPRO_ROSTER,
+            mode="decompose",
+        )
+
+        roles = sorted(item.owner_role for item in plan.items)
+        self.assertEqual(["backend", "frontend"], roles)
+        goals = {item.owner_role: item.goal for item in plan.items}
+        self.assertIn("Frontend:", goals["frontend"])
+        self.assertIn("Backend:", goals["backend"])
+
     def test_decompose_then_clause_chains_dependencies(self) -> None:
         plan = build_lead_task_plan(
             goal="Fix the API quality-gate heap calc then update the Expo confirmation screen",
@@ -111,6 +147,14 @@ class LeadTaskPlanTests(unittest.TestCase):
             if item.exclusive_paths:
                 self.assertEqual(item.exclusive_paths, item.allowed_paths)
 
+    def test_extract_exclusive_paths_includes_frontend_hooks(self) -> None:
+        paths = extract_exclusive_paths(
+            "Fix hooks/homework/usePracticeAtHome.ts and components/HomeworkCard.tsx"
+        )
+
+        self.assertIn("hooks/homework/usePracticeAtHome.ts", paths)
+        self.assertIn("components/HomeworkCard.tsx", paths)
+
     def test_should_lead_decompose_dispatch(self) -> None:
         multi = build_lead_task_plan(
             goal="Fix the quality-gate API failure and the enrollment confirmation popup",
@@ -130,6 +174,19 @@ class LeadTaskPlanTests(unittest.TestCase):
             mode="auto",
         )
         self.assertFalse(should_lead_decompose_dispatch(fan))
+
+    def test_dashpro_dashboard_fixes_dispatch_to_frontend(self) -> None:
+        goal = (
+            "I ran the dev server - but I still don't see any changes in the teachers "
+            "dashboard - and in the parent dashboard - can you please make the fixes "
+            "end to end - and stop at nothing until this is fixed"
+        )
+
+        plan = build_lead_task_plan(goal=goal, roster=DASHPRO_ROSTER, mode="decompose")
+
+        self.assertTrue(detect_implement_intent(goal))
+        self.assertTrue(should_lead_decompose_dispatch(plan))
+        self.assertEqual(["frontend"], [item.owner_role for item in plan.items])
 
     def test_shift_retry_skips_lead_decompose_dispatch(self) -> None:
         from app.workspace_agents.lead_task_plan import is_employee_shift_retry_request

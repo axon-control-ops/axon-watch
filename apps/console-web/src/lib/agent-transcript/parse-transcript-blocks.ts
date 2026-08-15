@@ -5,6 +5,10 @@ import {
 } from '../lead-fan-out-card';
 import { parseLeadStandupReport } from '../lead-standup-card';
 import { sanitizeResearchCardTitle, sanitizeResearchSnippet } from '../research-snippet';import { inferResearchBlockKind, type ResearchBlockKind } from '../research-provider';
+import {
+  sanitizeTerminalDisplayOutput,
+  stripOrphanAnsiFragments,
+} from '../terminal-scrollback';
 import type { AgentTranscriptSegment, ResearchTranscriptItem } from './types';
 import {
   dedupeProseText,
@@ -15,6 +19,7 @@ import {
 import {
   ASK_HEADER_RE,
   DEBUG_REPRODUCE_HEADER_RE,
+  EDIT_FAILED_HEADER_RE,
   EDIT_HEADER_RE,
   IMAGE_HEADER_RE,
   LEAD_FAN_OUT_HEADER_RE,
@@ -112,7 +117,11 @@ export function parseAgentTranscriptBlocksUncached(
   let index = 0;
 
   function flushText(): void {
-    const text = dedupeProseText(textBuffer.join('\n').replace(/^\n+|\n+$/g, ''));
+    let raw = textBuffer.join('\n').replace(/^\n+|\n+$/g, '');
+    if (raw.length > 8_000 && /\[[0-9;?]*[A-Za-z]/.test(raw)) {
+      raw = stripOrphanAnsiFragments(raw);
+    }
+    const text = dedupeProseText(raw);
     if (text.trim()) {
       segments.push({ kind: 'text', text });
     }
@@ -175,10 +184,45 @@ export function parseAgentTranscriptBlocksUncached(
       continue;
     }
 
+    const editFailedMatch = line.match(EDIT_FAILED_HEADER_RE);
+    if (editFailedMatch) {
+      flushText();
+      const bodyStart = index + 1;
+      index += 1;
+      let closed = false;
+      let bodyEnd = lines.length;
+      while (index < lines.length) {
+        if (lines[index].trimEnd() === ':::') {
+          closed = true;
+          bodyEnd = index;
+          index += 1;
+          break;
+        }
+        index += 1;
+      }
+      const reason = lines.slice(bodyStart, bodyEnd).join('\n').trim();
+      segments.push({
+        kind: 'edit-failed',
+        path: editFailedMatch[1].trim(),
+        reason: reason || 'Edit was rejected.',
+      });
+      continue;
+    }
+
     const toolMatch = line.match(TOOL_HEADER_RE);
     if (toolMatch) {
       flushText();
-      segments.push({ kind: 'tool', label: toolMatch[1].trim() });
+      const label = toolMatch[1].trim();
+      const legacyEditFailed = label.match(/^Edit failed\s+(.+)$/i);
+      if (legacyEditFailed) {
+        segments.push({
+          kind: 'edit-failed',
+          path: legacyEditFailed[1].trim(),
+          reason: 'Edit was rejected (path may be outside write scope or patch did not apply).',
+        });
+      } else {
+        segments.push({ kind: 'tool', label });
+      }
       index += 1;
       continue;
     }
@@ -355,10 +399,13 @@ export function parseAgentTranscriptBlocksUncached(
         body.push(lines[index]);
         index += 1;
       }
+      const command = terminalMatch[1].trim();
       segments.push({
         kind: 'terminal',
-        command: terminalMatch[1].trim(),
-        output: compactTerminalOutputForDisplay(body.join('\n')),
+        command,
+        output: compactTerminalOutputForDisplay(
+          sanitizeTerminalDisplayOutput(body.join('\n'), command),
+        ),
         open: !closed,
       });
       continue;

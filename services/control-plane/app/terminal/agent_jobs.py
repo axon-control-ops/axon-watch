@@ -31,6 +31,7 @@ from app.terminal.ship_command_guards import assert_ship_command_allowed
 from app.terminal.workspace_roots import WorkspaceRootError, resolve_workspace_root
 
 _MAX_COMMAND_CHARS = 32_768
+_MAX_OUTPUT_TAIL_CHARS = 20_000
 _EXIT_SENTINEL_RE = re.compile(r"__AXON_JOB_EXIT:(-?\d+)__")
 _STREAM_FLUSH_SECONDS = 0.15
 _lock = threading.Lock()
@@ -60,18 +61,49 @@ def _wrap_with_exit_sentinel(command: str) -> str:
     return f"bash -c {quoted}; printf '\\n__AXON_JOB_EXIT:%s__\\n' \"$?\""
 
 
+def _append_job_output_tail(job_id: str, text: str) -> None:
+    if not text:
+        return
+    with _lock:
+        record = _jobs.get(job_id)
+        if record is None:
+            return
+        existing = str(record.get("output_tail") or "")
+        record["output_tail"] = (existing + text)[-_MAX_OUTPUT_TAIL_CHARS:]
+
+
 def _resolve_stream_target(
     *,
     workspace_id: str,
     thread_id: str | None,
     message_id: str | None,
 ) -> tuple[str, str] | None:
+    from app.persistence import chat_store
+
     clean_thread = str(thread_id or "").strip()
     clean_message = str(message_id or "").strip()
     if clean_thread and clean_message:
-        return clean_thread, clean_message
+        thread = chat_store.get_thread(clean_thread)
+        message = chat_store.get_message(clean_message)
+        if (
+            thread is not None
+            and message is not None
+            and str(thread.get("workspace_id") or "") == str(workspace_id or "").strip()
+            and str(message.get("thread_id") or "") == clean_thread
+        ):
+            return clean_thread, clean_message
+        return None
     active = get_active_chat_stream(workspace_id)
     if active is None:
+        return None
+    thread = chat_store.get_thread(active.thread_id)
+    message = chat_store.get_message(active.message_id)
+    if (
+        thread is None
+        or message is None
+        or str(thread.get("workspace_id") or "") != str(workspace_id or "").strip()
+        or str(message.get("thread_id") or "") != active.thread_id
+    ):
         return None
     return active.thread_id, active.message_id
 
@@ -181,6 +213,7 @@ def _start_chat_tee(
                 visible, buffer = safe[:-hold], safe[-hold:]
                 if visible:
                     append_live_job_fence_body(job_id, message_id, visible)
+                    _append_job_output_tail(job_id, visible)
                     _maybe_flush()
                 return
 
@@ -189,6 +222,7 @@ def _start_chat_tee(
             buffer = buffer[match.end() :]
             if before:
                 append_live_job_fence_body(job_id, message_id, before)
+                _append_job_output_tail(job_id, before)
             closed = close_live_job_fence(job_id, message_id, exit_code=exit_code)
             finished = True
             body = closed.body if closed is not None else before
@@ -221,6 +255,7 @@ def _start_chat_tee(
                 return
             if buffer:
                 append_live_job_fence_body(job_id, message_id, buffer)
+                _append_job_output_tail(job_id, buffer)
                 buffer = ""
             closed = close_live_job_fence(job_id, message_id, exit_code=None)
             finished = True
@@ -348,6 +383,7 @@ def enqueue_agent_terminal_job(
         "thread_id": stream_target[0] if stream_target else None,
         "message_id": stream_target[1] if stream_target else None,
         "receipt": receipt,
+        "output_tail": "",
         "agent_terminal_session": serialize_session(session),
     }
     with _lock:

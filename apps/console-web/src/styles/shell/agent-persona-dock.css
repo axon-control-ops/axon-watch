@@ -290,8 +290,8 @@
 .agent-persona-dock {
   display: flex;
   flex-direction: column;
-  gap: 0.7rem;
-  padding: 0.7rem 0.65rem 0.8rem;
+  gap: 0;
+  padding: 0.75rem 0.7rem 0.85rem;
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 0.55rem;
   background: linear-gradient(
@@ -300,6 +300,35 @@
     rgba(10, 18, 28, 0.88) 100%
   );
   animation: agent-persona-dock-in 240ms ease-out;
+  min-width: 0;
+  position: relative;
+  max-height: min(36rem, 62vh);
+  overflow: hidden;
+}
+
+.agent-persona-dock__scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  margin-top: 0.55rem;
+  padding-right: 0.05rem;
+}
+
+.agent-persona-dock__hero {
+  flex-shrink: 0;
+}
+
+.agent-persona-dock__body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  min-height: 0;
+  flex: 0 0 auto;
 }
 
 .agent-persona-dock[data-presence='failed'] {
@@ -326,6 +355,7 @@
   grid-template-columns: auto 1fr auto;
   gap: 0.65rem;
   align-items: start;
+  padding-right: 1.4rem;
 }
 
 .agent-persona-dock__avatar-btn {
@@ -430,7 +460,8 @@
   min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 0.2rem;
+  gap: 0.28rem;
+  overflow: hidden;
 }
 
 .agent-persona-dock__name-row {
@@ -438,14 +469,19 @@
   flex-wrap: wrap;
   align-items: center;
   gap: 0.35rem;
+  min-width: 0;
 }
 
 .agent-persona-dock__name {
   margin: 0;
-  font-size: 1rem;
+  font-size: clamp(0.92rem, 2.5vw, 1rem);
   font-weight: 650;
   letter-spacing: 0.01em;
   color: rgba(235, 245, 255, 0.96);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .agent-persona-dock__meta {
@@ -454,13 +490,48 @@
   color: rgba(155, 185, 210, 0.72);
 }
 
-.agent-persona-dock__owns {
+.agent-persona-dock__owns-info {
+  position: absolute;
+  top: 0.55rem;
+  right: 0.55rem;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.15rem;
+  height: 1.15rem;
   margin: 0;
-  font-size: 0.7rem;
-  line-height: 1.35;
-  color: rgba(170, 200, 220, 0.82);
+  padding: 0;
+  border: 1px solid rgba(120, 170, 210, 0.35);
+  border-radius: 999px;
+  background: rgba(12, 26, 38, 0.92);
+  color: rgba(170, 210, 240, 0.88);
+  font-size: 0.62rem;
+  font-weight: 800;
+  font-style: italic;
+  line-height: 1;
+  cursor: help;
 }
 
+.agent-persona-dock__owns-info:hover,
+.agent-persona-dock__owns-info:focus-visible {
+  border-color: rgba(0, 242, 255, 0.55);
+  color: rgba(210, 245, 255, 0.98);
+  outline: none;
+}
+
+.agent-persona-dock__beat {
+  margin: 0;
+  padding: 0.55rem 0.6rem;
+  border-radius: 0.4rem;
+  font-size: 0.72rem;
+  line-height: 1.45;
+  color: rgba(200, 225, 240, 0.9);
+  background: rgba(0, 0, 0, 0.22);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
 .agent-persona-dock__status {
   font-size: 0.58rem;
   letter-spacing: 0.03em;
@@ -493,15 +564,29 @@
   color: rgba(180, 210, 230, 0.88);
 }
 
-.agent-persona-dock__beat {
-  margin: 0;
-  padding: 0.5rem 0.55rem;
-  border-radius: 0.4rem;
-  font-size: 0.74rem;
-  line-height: 1.4;
-  color: rgba(200, 225, 240, 0.9);
-  background: rgba(0, 0, 0, 0.22);
-  border: 1px solid rgba(255, 255, 255, 0.06);
+.agent-persona-dock__beat-btn {
+  display: block;
+  width: 100%;
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+}
+
+.agent-persona-dock__beat-btn:hover,
+.agent-persona-dock__beat-btn:focus-visible {
+  filter: brightness(1.08);
+  outline: 1px solid rgba(0, 245, 212, 0.45);
+  outline-offset: 1px;
+}
+
+.agent-persona-dock__beat-cta {
+  display: block;
+  margin-top: 0.35rem;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: rgba(150, 231, 255, 0.92);
 }
 
 .agent-persona-dock__beat--failed {
@@ -534,11 +619,12 @@
 .agent-persona-dock__receipt {
   display: flex;
   flex-direction: column;
-  gap: 0.25rem;
-  padding: 0.45rem 0.5rem;
+  gap: 0.3rem;
+  padding: 0.5rem 0.55rem;
   border-radius: 0.35rem;
   background: rgba(255, 255, 255, 0.03);
   border: 1px solid rgba(255, 255, 255, 0.06);
+  flex: 0 0 auto;
 }
 
 .agent-persona-dock__receipt-label {
@@ -551,9 +637,11 @@
 
 .agent-persona-dock__receipt-detail {
   margin: 0;
-  font-size: 0.7rem;
-  line-height: 1.35;
+  font-size: 0.72rem;
+  line-height: 1.45;
   color: rgba(200, 220, 235, 0.88);
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
 }
 
 .agent-persona-dock__receipt-run {
@@ -584,9 +672,41 @@
 }
 
 .agent-persona-dock__actions {
+  flex-shrink: 0;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.38rem;
+  align-items: stretch;
+}
+
+.agent-persona-dock__action-stack {
+  flex-shrink: 0;
+  padding-top: 0.15rem;
+  padding-bottom: 0.1rem;
   display: flex;
-  flex-wrap: wrap;
-  gap: 0.35rem;
+  flex-direction: column;
+  gap: 0.38rem;
+}
+
+.agent-persona-dock__actions--primary {
+  padding-top: 0;
+  border-top: 0;
+}
+
+.agent-persona-dock__actions--secondary .company-roster__action {
+  min-height: 1.65rem;
+  font-size: 0.58rem;
+  opacity: 0.92;
+}
+
+.agent-persona-dock__actions .company-roster__action {
+  min-height: 1.75rem;
+  padding: 0.22rem 0.35rem;
+  font-size: 0.6rem;
+}
+
+.agent-persona-dock__actions--secondary .company-roster__action--surface {
+  grid-column: 1 / -1;
 }
 
 @keyframes presence-avatar-working-glow {

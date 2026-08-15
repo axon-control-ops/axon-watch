@@ -12,6 +12,14 @@ from app.cli_runtime.approval_gate import (
     resolve_runtime_execution_tier,
 )
 from app.cli_runtime.catalog import runtime_status_snapshot
+from app.cli_runtime.claude_usage_probe import (
+    claude_usage_allows_agent_retry,
+    record_claude_usage_limit_hit,
+)
+from app.cli_runtime.codex_usage_probe import (
+    codex_usage_allows_agent_retry,
+    record_codex_usage_limit_hit,
+)
 from app.cli_runtime.codex_models import default_codex_model
 from app.cli_runtime.mcp_registry import mcp_tools_for_composer_mode
 from app.cli_runtime.non_cursor_dispatch import run_non_cursor_local
@@ -20,6 +28,7 @@ from app.cli_runtime.runtime_failure import (
     fallback_reply as _fallback_reply,
     runtime_unready_reason as _runtime_unready_reason,
 )
+from app.workspace_agents.failure_detail import is_billing_failure, is_usage_limit_failure
 from app.cli_runtime.sentry_context import sentry_monitor_context
 from app.cli_runtime.subprocess_runner import RuntimeProcessStoppedError
 from app.cli_runtime.sandbox_policy_adapter import prepare_execution_sandbox
@@ -29,6 +38,7 @@ from app.cli_runtime.cursor_agent import (
     run_cursor_local_with_recursion_retry,
 )
 from app.cli_runtime.runtime_auth import (
+    api_key_fallback_env,
     claude_dispatch_env,
     codex_dispatch_env,
     cursor_dispatch_env,
@@ -43,6 +53,7 @@ from app.chat.scanned_workbook_gate import assignment_workbook_policy_appendix
 from app.debug_prompt import build_debug_system_prompt
 from app.kairo_ask_prompt import build_ask_system_prompt
 from app.cli_runtime.long_running_shell_prompt import LONG_RUNNING_SHELL_CLAUSE
+from app.instructions_engine import build_instructions_system_prompt
 from app.cli_runtime.plan_system_prompt import (
     ask_fence_instruction,
     build_plan_system_prompt,
@@ -69,6 +80,10 @@ _REPLY_STYLE = (
 )
 
 _INSTRUCTION_TAKING = (
+    "The current turn's explicit request block is the sole active task. "
+    "Do not continue, complete, commit, push, or clean up work from earlier thread "
+    "messages, Kairo memory, prior runs, or visible terminal history unless the current "
+    "request explicitly asks you to continue that specific earlier task. "
     "Before acting, treat the request as binding Instructions when it includes "
     "Goal / In scope / Out of scope / Steps / Constraints. "
     "Out of scope is strict: if commit, push, merge, release, or git status was not asked for, "
@@ -101,6 +116,8 @@ def _system_prompt(
     if composer_mode == "ask":
         enabled = persona_enabled if persona_enabled is not None else _operator_persona_enabled()
         return f"{build_ask_system_prompt(persona_enabled=enabled)} {research_line}"
+    if composer_mode == "instructions":
+        return build_instructions_system_prompt()
     if composer_mode == "plan":
         offline_clause = (
             "Ground the plan in the local repo and provided context. "
@@ -153,6 +170,7 @@ def _build_prompt(
     context_block: str,
     execution_tier: str = "consultative",
     research_snapshot: dict[str, object] | None = None,
+    write_scope_hint: str = "",
 ) -> str:
     from app.workspace_agents.employee_persona_prompt import (
         adapt_lane_b_system_prompt_for_employee,
@@ -171,12 +189,14 @@ def _build_prompt(
     workspace_body = remainder_context if persona_block else context_block
     sentry_context = _sentry_monitor_context(user_prompt)
     sentry_section = f"\n\n{sentry_context}" if sentry_context else ""
+    scope_section = f"\n\nSandbox write scope: {write_scope_hint}" if write_scope_hint else ""
     return (
         f"{system}"
         f"{policy_block}"
         f"{persona_section}\n\n"
         f"Workspace context:\n{workspace_body}\n\n"
-        f"{sentry_section}\n\n"
+        f"{sentry_section}"
+        f"{scope_section}\n\n"
         f"Operator request:\n{user_prompt.strip()}"
     )
 def _resolve_workspace_root(workspace_id: str) -> Path | None:
@@ -192,11 +212,28 @@ def _cloud_runtime_message(record: dict[str, object]) -> str:
     )
 
 
+_CLAUDE_EFFORT_LEVELS = frozenset({"low", "medium", "high", "xhigh", "max"})
+_CODEX_EFFORT_LEVELS = frozenset({"low", "medium", "high", "xhigh"})
+
+
+def _split_claude_model_selection(model: str) -> tuple[str, str]:
+    """Decode the UI's model@effort preference into Claude CLI arguments.
+
+    The Claude CLI accepts --effort low|medium|high|xhigh|max.
+    UI sends e.g. "sonnet@max" or "opus@high"; strip the suffix before --model.
+    """
+    selected = str(model or "").strip()
+    model_id, marker, effort = selected.rpartition("@")
+    if marker and model_id and effort in _CLAUDE_EFFORT_LEVELS:
+        return model_id, effort
+    return selected, ""
+
+
 def _split_codex_model_selection(model: str) -> tuple[str, str]:
     """Decode the UI's model@effort preference into Codex CLI arguments."""
     selected = str(model or "").strip()
     model_id, marker, effort = selected.rpartition("@")
-    if marker and model_id and effort in {"low", "medium", "high", "xhigh"}:
+    if marker and model_id and effort in _CODEX_EFFORT_LEVELS:
         return model_id, effort
     return selected, ""
 
@@ -237,14 +274,14 @@ def dispatch_ide_composer(
     cursor_trust_policy: str = "operator",
     workspace_root: Path | None = None,
     execution_policy: AgentExecutionPolicy | None = None,
+    fallback_runtime_families: tuple[str, ...] = (),
 ) -> dict[str, object]:
     def _finish(payload: dict[str, object]) -> dict[str, object]:
         return _attach_dispatch_metadata(payload, composer_mode=composer_mode)
 
     subprocess_env = runtime_subprocess_env()
-    snapshot = runtime_status_snapshot(
-        force_refresh=bool(subprocess_env.get("CURSOR_API_KEY")),
-    )
+    # Only autonomous dispatch opts into provider-key fallback.
+    snapshot = runtime_status_snapshot(force_refresh=bool(subprocess_env.get("CURSOR_API_KEY")))
     resolved_root = workspace_root if workspace_root is not None else _resolve_workspace_root(workspace_id)
     if resolved_root is None:
         return _finish({
@@ -270,12 +307,19 @@ def dispatch_ide_composer(
     research_snapshot = research_capability_snapshot()
     if workspace_root is not None:
         ensure_workspace_research_mcp(workspace_root)
+    from app.cli_runtime.agent_sandbox import _write_scope_specialist_hint
+    write_scope_hint = (
+        _write_scope_specialist_hint(execution_policy.write_paths)
+        if execution_policy is not None
+        else ""
+    )
     prompt = _build_prompt(
         composer_mode=composer_mode,
         user_prompt=user_prompt,
         context_block=context_block,
         execution_tier=execution_tier,
         research_snapshot=research_snapshot,
+        write_scope_hint=write_scope_hint,
     )
     approval_notice = consultative_only_notice(
         composer_mode=composer_mode,
@@ -290,7 +334,11 @@ def dispatch_ide_composer(
     # label here previously mislabeled the failure (e.g. "failed on Codex"
     # when the operator had Cursor selected and Cursor failed first).
     first_ready_runtime_label = ""
-    ordered_candidates = ordered_candidates_for_dispatch(snapshot, runtime_target)
+    ordered_candidates = ordered_candidates_for_dispatch(
+        snapshot,
+        runtime_target,
+        fallback_runtime_families=fallback_runtime_families,
+    )
     # The model pin travels with the family it was chosen for. Candidates are
     # already ordered preferred-first, so the first candidate's family is the
     # one `runtime_model` was picked against — carrying it into a fallback of
@@ -306,28 +354,53 @@ def dispatch_ide_composer(
         binary = str(record.get("binary") or "")
         family = str(record.get("family") or "")
         target_type = str(record.get("target_type") or "local")
+        usage = snapshot.get(f"{family}_usage")
+        allows_retry = (
+            claude_usage_allows_agent_retry(usage if isinstance(usage, dict) else None)
+            if family == "claude"
+            else codex_usage_allows_agent_retry(usage if isinstance(usage, dict) else None)
+            if family == "codex"
+            else True
+        )
+        auth = record.get("auth") if isinstance(record.get("auth"), dict) else {}
+        subscription_auth = str(auth.get("auth_method") or "") in {
+            "oauth",
+            "chatgpt",
+            "claude.ai",
+        }
+        use_provider_key_after_known_subscription_limit = (
+            not allows_retry
+            and subscription_auth
+            and fallback_runtime_families
+            and env_has_api_key(subprocess_env, family=family)
+        )
+        if not allows_retry and not use_provider_key_after_known_subscription_limit:
+            label = str(record.get("label") or runtime_id)
+            errors.append(f"{label} usage limit is still active")
+            continue
         candidate_runtime_model = runtime_model if family == preferred_family else ""
         model = effective_cli_model(family, str(candidate_runtime_model or ""))
         reasoning_effort = ""
         runtime_label = str(record.get("label") or runtime_id)
         if not first_ready_runtime_label:
             first_ready_runtime_label = runtime_label
-        dispatch_env = subprocess_env
+        dispatch_env = (
+            api_key_fallback_env(subprocess_env, family=family)
+            if use_provider_key_after_known_subscription_limit
+            else subprocess_env
+        )
         if family == "cursor":
-            dispatch_env = cursor_dispatch_env(
-                subprocess_env,
-                auth=record.get("auth") if isinstance(record.get("auth"), dict) else None,
-            )
+            if not use_provider_key_after_known_subscription_limit:
+                dispatch_env = cursor_dispatch_env(subprocess_env, auth=auth)
         elif family == "claude":
-            dispatch_env = claude_dispatch_env(
-                subprocess_env,
-                auth=record.get("auth") if isinstance(record.get("auth"), dict) else None,
-            )
+            model, reasoning_effort = _split_claude_model_selection(model)
+            if not use_provider_key_after_known_subscription_limit:
+                dispatch_env = claude_dispatch_env(subprocess_env, auth=auth)
         elif family == "codex":
             model, reasoning_effort = _split_codex_model_selection(model)
             dispatch_env = codex_dispatch_env(
-                subprocess_env,
-                auth=record.get("auth") if isinstance(record.get("auth"), dict) else None,
+                dispatch_env,
+                auth={} if use_provider_key_after_known_subscription_limit else auth,
             )
             if not model:
                 model = default_codex_model(binary, env=dispatch_env)
@@ -411,6 +484,11 @@ def dispatch_ide_composer(
                     "failure_phase": "run_error",
                 })
             detail = str(exc)
+            if is_usage_limit_failure(detail):
+                if family == "claude":
+                    record_claude_usage_limit_hit(detail)
+                elif family == "codex":
+                    record_codex_usage_limit_hit(detail)
             logger.exception(
                 "lane_b_dispatch_failed runtime_id=%s family=%s composer_mode=%s "
                 "workspace_id=%s exc_type=%s",
@@ -420,8 +498,21 @@ def dispatch_ide_composer(
                 workspace_id,
                 type(exc).__name__,
             )
-            if looks_like_auth_error(detail) and env_has_api_key(dispatch_env, family=family):
-                retry_env = env_without_api_keys(dispatch_env, family=family)
+            if (
+                looks_like_auth_error(detail)
+                or is_usage_limit_failure(detail)
+                or is_billing_failure(detail)
+            ):
+                retry_env = None
+                if looks_like_auth_error(detail) and env_has_api_key(dispatch_env, family=family):
+                    # A configured key failed: retry the signed-in subscription.
+                    retry_env = env_without_api_keys(dispatch_env, family=family)
+                elif fallback_runtime_families and env_has_api_key(subprocess_env, family=family):
+                    # Subscription OAuth/quota/billing failed after its readiness
+                    # probe. Use the separately configured Vault provider key.
+                    retry_env = api_key_fallback_env(subprocess_env, family=family)
+                if retry_env is None:
+                    retry_env = dispatch_env
                 if retry_env != dispatch_env:
                     try:
                         if family == "cursor":

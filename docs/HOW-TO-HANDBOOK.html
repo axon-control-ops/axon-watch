@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <title>Axon-X How-To Handbook</title>
-  <link rel="stylesheet" href="file:///home/edp/axon-nvme/repos/axon-watch/docs/how-to-handbook-print.css" />
+  <link rel="stylesheet" href="file:///run/media/vaxon/axon-data/repos/axon-nvme/repos/axon-watch/docs/how-to-handbook-print.css" />
 </head>
 <body>
   <main class="page">
@@ -26,7 +26,7 @@
     <div class="cover-footer">
       <div class="cover-meta">
         <strong>Last verified</strong> · 2026-07-29 — IDE Soft Attention actions (**Try again** / **Explain** / **Open team**) live on the agent review strip with **Review N files**; **Try again** hides after a successful shift. Claude Code CLI is a local runtime target. After every push: `./scripts/ops/watch-fast-gate.sh`.<br/>
-        Generated 29 Jul 2026
+        Generated 10 Aug 2026
       </div>
       <div class="cover-chips">
         <span class="cover-chip">console-web</span>
@@ -41,9 +41,9 @@
 <nav class="toc" id="table-of-contents">
   <div class="toc-header">
     <div class="toc-kicker">Field guide</div>
-    <h2>53 chapters</h2>
+    <h2>56 chapters</h2>
   </div>
-  <ol class="toc-grid"><li class="toc-card"><span class="toc-num">1</span><a href="#chapter-table-of-contents">Table of Contents</a></li><li class="toc-card"><span class="toc-num">2</span><a href="#chapter-handbook-map">Handbook map</a></li><li class="toc-card"><span class="toc-num">3</span><a href="#chapter-quick-start">Quick Start</a></li><li class="toc-card"><span class="toc-num">4</span><a href="#chapter-runtime-auth-cli-and-tools">Runtime auth, CLI, and tools</a></li><li class="toc-card"><span class="toc-num">5</span><a href="#chapter-vaxon-desktop">VAXON Desktop</a></li><li class="toc-card"><span class="toc-num">6</span><a href="#chapter-terminology-and-abbreviations">Terminology And Abbreviations</a></li><li class="toc-card"><span class="toc-num">7</span><a href="#chapter-what-axon-x-is">What Axon-X Is</a></li><li class="toc-card"><span class="toc-num">8</span><a href="#chapter-what-state-the-repo-is-in-right-now">What State The Repo Is In Right Now</a></li><li class="toc-card"><span class="toc-num">9</span><a href="#chapter-source-of-truth-rules">Source Of Truth Rules</a></li><li class="toc-card"><span class="toc-num">10</span><a href="#chapter-repo-layout">Repo Layout</a></li><li class="toc-card"><span class="toc-num">11</span><a href="#chapter-the-current-architecture-in-plain-english">The Current Architecture In Plain English</a></li><li class="toc-card"><span class="toc-num">12</span><a href="#chapter-detailed-setup-first-install">Detailed setup (first install)</a></li><li class="toc-card"><span class="toc-num">13</span><a href="#chapter-what-the-current-app-does-on-boot">What The Current App Does On Boot</a></li><li class="toc-card"><span class="toc-num">14</span><a href="#chapter-locked-shell-layout">Locked Shell Layout</a></li><li class="toc-card"><span class="toc-num">15</span><a href="#chapter-current-shell-layout">Current Shell Layout</a></li><li class="toc-card"><span class="toc-num">16</span><a href="#chapter-mockup-live-parity-notes">Mockup / Live Parity Notes</a></li><li class="toc-card"><span class="toc-num">17</span><a href="#chapter-the-most-important-files-right-now">The Most Important Files Right Now</a></li><li class="toc-card"><span class="toc-num">18</span><a href="#chapter-verification-commands">Verification Commands</a></li><li class="toc-card"><span class="toc-num">19</span><a href="#chapter-test-0-acceptance-workspacesmoke">TEST-0 acceptance (`workspace_smoke`)</a></li><li class="toc-card"><span class="toc-num">20</span><a href="#chapter-latency-evidence-d1">Latency evidence (D1)</a></li><li class="toc-card"><span class="toc-num">21</span><a href="#chapter-what-pass-pending-fail-mean-in-verification">What PASS / PENDING / FAIL Mean In Verification</a></li><li class="toc-card"><span class="toc-num">22</span><a href="#chapter-common-working-patterns">Common Working Patterns</a></li><li class="toc-card"><span class="toc-num">23</span><a href="#chapter-troubleshooting">Troubleshooting</a></li><li class="toc-card"><span class="toc-num">24</span><a href="#chapter-debugging-playbook">Debugging playbook</a></li><li class="toc-card"><span class="toc-num">25</span><a href="#chapter-tips-and-tricks">Tips And Tricks</a></li><li class="toc-card"><span class="toc-num">26</span><a href="#chapter-snippet-cookbook">Snippet cookbook</a></li><li class="toc-card"><span class="toc-num">27</span><a href="#chapter-upgrading-and-updating">Upgrading and updating</a></li><li class="toc-card"><span class="toc-num">28</span><a href="#chapter-what-a-good-next-slice-looks-like">What A Good Next Slice Looks Like</a></li><li class="toc-card"><span class="toc-num">29</span><a href="#chapter-final-guidance">Final Guidance</a></li><li class="toc-card"><span class="toc-num">30</span><a href="#chapter-ci-merge-workflow-and-worker-agents">CI, merge workflow, and worker agents</a></li><li class="toc-card"><span class="toc-num">31</span><a href="#chapter-or-follow-a-known-run-id">or follow a known run id:</a></li><li class="toc-card"><span class="toc-num">32</span><a href="#chapter-typical-fast-gate-early-fail-file-size-ratchets-in-scripts-guardrails-hotspotbudgets-json">Typical Fast Gate early fail: file-size ratchets in scripts/guardrails/hotspot_budgets.json</a></li><li class="toc-card"><span class="toc-num">33</span><a href="#chapter-ci-locally">CI locally</a></li><li class="toc-card"><span class="toc-num">34</span><a href="#chapter-open-pr">Open PR</a></li><li class="toc-card"><span class="toc-num">35</span><a href="#chapter-pr-checks">PR checks</a></li><li class="toc-card"><span class="toc-num">36</span><a href="#chapter-worker-scheduler-tests">Worker scheduler tests</a></li><li class="toc-card"><span class="toc-num">37</span><a href="#chapter-stale-reconcile-when-loaded-on-cp">Stale reconcile (when loaded on CP)</a></li><li class="toc-card"><span class="toc-num">38</span><a href="#chapter-gate-9-ci-remediation-unaware-operator-loop">Gate 9 — CI remediation (unaware-operator loop)</a></li><li class="toc-card"><span class="toc-num">39</span><a href="#chapter-autonomy-gates-service-identity-operator-directives">Autonomy gates & service identity (operator directives)</a></li><li class="toc-card"><span class="toc-num">40</span><a href="#chapter-config-axon-watch-deployment-env">~/.config/axon-watch/deployment.env</a></li><li class="toc-card"><span class="toc-num">41</span><a href="#chapter-unlock-vault-in-the-ui-remember-me-then">unlock Vault in the UI (Remember me), then:</a></li><li class="toc-card"><span class="toc-num">42</span><a href="#chapter-config-axon-watch-deployment-env">~/.config/axon-watch/deployment.env</a></li><li class="toc-card"><span class="toc-num">43</span><a href="#chapter-vault-enable-auto-unlock-keyfile-already-present-will-auto-unlock-on-next-start">/vault → Enable auto-unlock (keyfile already present will auto-unlock on next start)</a></li><li class="toc-card"><span class="toc-num">44</span><a href="#chapter-cloudflare-api-token-with-account-cloudflare-tunnel-edit">Cloudflare API token with Account → Cloudflare Tunnel → Edit</a></li><li class="toc-card"><span class="toc-num">45</span><a href="#chapter-writes-config-axon-watch-mtls-ca-client-server-crt-key">writes ~/.config/axon-watch/mtls/{ca,client,server}.{crt,key}</a></li><li class="toc-card"><span class="toc-num">46</span><a href="#chapter-then-push-and-confirm-axon-x-fast-gate-is-green-on-github">then push and confirm Axon-X Fast Gate is green on GitHub</a></li><li class="toc-card"><span class="toc-num">47</span><a href="#chapter-recent-operator-features-gate-3-5-console-ux">Recent operator features (Gate 3–5 + console UX)</a></li><li class="toc-card"><span class="toc-num">48</span><a href="#chapter-from-repo-root-polls-the-latest-fast-gate-run-for-this-branch">From repo root — polls the latest Fast Gate run for this branch</a></li><li class="toc-card"><span class="toc-num">49</span><a href="#chapter-auto-loop-status-credits-budget-operator-brief">Auto-loop status & credits budget (operator brief)</a></li><li class="toc-card"><span class="toc-num">50</span><a href="#chapter-company-hierarchy-lead-check-in-and-monitoring-close-out">Company hierarchy, Lead check-in, and monitoring close-out</a></li><li class="toc-card"><span class="toc-num">51</span><a href="#chapter-reliability-and-deliberate-controls">Reliability and deliberate controls</a></li><li class="toc-card"><span class="toc-num">52</span><a href="#chapter-online-research-searxng-and-legacy-google">Online research: SearXNG and legacy Google</a></li><li class="toc-card"><span class="toc-num">53</span><a href="#chapter-then-set-axonwatchsearxngurl-http-127-0-0-1-8080-in-env-or-vault">then set AXON_WATCH_SEARXNG_URL=http://127.0.0.1:8080 in .env (or vault)</a></li></ol>
+  <ol class="toc-grid"><li class="toc-card"><span class="toc-num">1</span><a href="#chapter-table-of-contents">Table of Contents</a></li><li class="toc-card"><span class="toc-num">2</span><a href="#chapter-handbook-map">Handbook map</a></li><li class="toc-card"><span class="toc-num">3</span><a href="#chapter-quick-start">Quick Start</a></li><li class="toc-card"><span class="toc-num">4</span><a href="#chapter-axon-x-constitution-registries">AXON-X Constitution registries</a></li><li class="toc-card"><span class="toc-num">5</span><a href="#chapter-runtime-auth-cli-and-tools">Runtime auth, CLI, and tools</a></li><li class="toc-card"><span class="toc-num">6</span><a href="#chapter-vaxon-desktop">VAXON Desktop</a></li><li class="toc-card"><span class="toc-num">7</span><a href="#chapter-terminology-and-abbreviations">Terminology And Abbreviations</a></li><li class="toc-card"><span class="toc-num">8</span><a href="#chapter-what-axon-x-is">What Axon-X Is</a></li><li class="toc-card"><span class="toc-num">9</span><a href="#chapter-what-state-the-repo-is-in-right-now">What State The Repo Is In Right Now</a></li><li class="toc-card"><span class="toc-num">10</span><a href="#chapter-source-of-truth-rules">Source Of Truth Rules</a></li><li class="toc-card"><span class="toc-num">11</span><a href="#chapter-repo-layout">Repo Layout</a></li><li class="toc-card"><span class="toc-num">12</span><a href="#chapter-the-current-architecture-in-plain-english">The Current Architecture In Plain English</a></li><li class="toc-card"><span class="toc-num">13</span><a href="#chapter-detailed-setup-first-install">Detailed setup (first install)</a></li><li class="toc-card"><span class="toc-num">14</span><a href="#chapter-what-the-current-app-does-on-boot">What The Current App Does On Boot</a></li><li class="toc-card"><span class="toc-num">15</span><a href="#chapter-locked-shell-layout">Locked Shell Layout</a></li><li class="toc-card"><span class="toc-num">16</span><a href="#chapter-current-shell-layout">Current Shell Layout</a></li><li class="toc-card"><span class="toc-num">17</span><a href="#chapter-mockup-live-parity-notes">Mockup / Live Parity Notes</a></li><li class="toc-card"><span class="toc-num">18</span><a href="#chapter-the-most-important-files-right-now">The Most Important Files Right Now</a></li><li class="toc-card"><span class="toc-num">19</span><a href="#chapter-verification-commands">Verification Commands</a></li><li class="toc-card"><span class="toc-num">20</span><a href="#chapter-test-0-acceptance-workspacesmoke">TEST-0 acceptance (`workspace_smoke`)</a></li><li class="toc-card"><span class="toc-num">21</span><a href="#chapter-latency-evidence-d1">Latency evidence (D1)</a></li><li class="toc-card"><span class="toc-num">22</span><a href="#chapter-what-pass-pending-fail-mean-in-verification">What PASS / PENDING / FAIL Mean In Verification</a></li><li class="toc-card"><span class="toc-num">23</span><a href="#chapter-common-working-patterns">Common Working Patterns</a></li><li class="toc-card"><span class="toc-num">24</span><a href="#chapter-troubleshooting">Troubleshooting</a></li><li class="toc-card"><span class="toc-num">25</span><a href="#chapter-debugging-playbook">Debugging playbook</a></li><li class="toc-card"><span class="toc-num">26</span><a href="#chapter-tips-and-tricks">Tips And Tricks</a></li><li class="toc-card"><span class="toc-num">27</span><a href="#chapter-snippet-cookbook">Snippet cookbook</a></li><li class="toc-card"><span class="toc-num">28</span><a href="#chapter-upgrading-and-updating">Upgrading and updating</a></li><li class="toc-card"><span class="toc-num">29</span><a href="#chapter-what-a-good-next-slice-looks-like">What A Good Next Slice Looks Like</a></li><li class="toc-card"><span class="toc-num">30</span><a href="#chapter-final-guidance">Final Guidance</a></li><li class="toc-card"><span class="toc-num">31</span><a href="#chapter-ci-merge-workflow-and-worker-agents">CI, merge workflow, and worker agents</a></li><li class="toc-card"><span class="toc-num">32</span><a href="#chapter-or-follow-a-known-run-id">or follow a known run id:</a></li><li class="toc-card"><span class="toc-num">33</span><a href="#chapter-typical-fast-gate-early-fail-file-size-ratchets-in-scripts-guardrails-hotspotbudgets-json">Typical Fast Gate early fail: file-size ratchets in scripts/guardrails/hotspot_budgets.json</a></li><li class="toc-card"><span class="toc-num">34</span><a href="#chapter-ci-locally">CI locally</a></li><li class="toc-card"><span class="toc-num">35</span><a href="#chapter-open-pr">Open PR</a></li><li class="toc-card"><span class="toc-num">36</span><a href="#chapter-pr-checks">PR checks</a></li><li class="toc-card"><span class="toc-num">37</span><a href="#chapter-dashpro-self-hosted-runner-this-pc">DashPro self-hosted runner (this PC)</a></li><li class="toc-card"><span class="toc-num">38</span><a href="#chapter-worker-scheduler-tests">Worker scheduler tests</a></li><li class="toc-card"><span class="toc-num">39</span><a href="#chapter-stale-reconcile-when-loaded-on-cp">Stale reconcile (when loaded on CP)</a></li><li class="toc-card"><span class="toc-num">40</span><a href="#chapter-gate-9-ci-remediation-unaware-operator-loop">Gate 9 — CI remediation (unaware-operator loop)</a></li><li class="toc-card"><span class="toc-num">41</span><a href="#chapter-autonomy-gates-service-identity-operator-directives">Autonomy gates & service identity (operator directives)</a></li><li class="toc-card"><span class="toc-num">42</span><a href="#chapter-config-axon-watch-deployment-env">~/.config/axon-watch/deployment.env</a></li><li class="toc-card"><span class="toc-num">43</span><a href="#chapter-unlock-vault-in-the-ui-remember-me-then">unlock Vault in the UI (Remember me), then:</a></li><li class="toc-card"><span class="toc-num">44</span><a href="#chapter-config-axon-watch-deployment-env">~/.config/axon-watch/deployment.env</a></li><li class="toc-card"><span class="toc-num">45</span><a href="#chapter-vault-enable-auto-unlock-keyfile-already-present-will-auto-unlock-on-next-start">/vault → Enable auto-unlock (keyfile already present will auto-unlock on next start)</a></li><li class="toc-card"><span class="toc-num">46</span><a href="#chapter-cloudflare-api-token-with-account-cloudflare-tunnel-edit">Cloudflare API token with Account → Cloudflare Tunnel → Edit</a></li><li class="toc-card"><span class="toc-num">47</span><a href="#chapter-writes-config-axon-watch-mtls-ca-client-server-crt-key">writes ~/.config/axon-watch/mtls/{ca,client,server}.{crt,key}</a></li><li class="toc-card"><span class="toc-num">48</span><a href="#chapter-then-push-and-confirm-axon-x-fast-gate-is-green-on-github">then push and confirm Axon-X Fast Gate is green on GitHub</a></li><li class="toc-card"><span class="toc-num">49</span><a href="#chapter-recent-operator-features-gate-3-5-console-ux">Recent operator features (Gate 3–5 + console UX)</a></li><li class="toc-card"><span class="toc-num">50</span><a href="#chapter-from-repo-root-polls-the-latest-fast-gate-run-for-this-branch">From repo root — polls the latest Fast Gate run for this branch</a></li><li class="toc-card"><span class="toc-num">51</span><a href="#chapter-auto-loop-status-credits-budget-operator-brief">Auto-loop status & credits budget (operator brief)</a></li><li class="toc-card"><span class="toc-num">52</span><a href="#chapter-company-hierarchy-lead-check-in-and-monitoring-close-out">Company hierarchy, Lead check-in, and monitoring close-out</a></li><li class="toc-card"><span class="toc-num">53</span><a href="#chapter-recovering-a-stuck-agent-and-running-school-operations-phase-1">Recovering a stuck agent and running School Operations Phase 1</a></li><li class="toc-card"><span class="toc-num">54</span><a href="#chapter-reliability-and-deliberate-controls">Reliability and deliberate controls</a></li><li class="toc-card"><span class="toc-num">55</span><a href="#chapter-online-research-searxng-and-legacy-google">Online research: SearXNG and legacy Google</a></li><li class="toc-card"><span class="toc-num">56</span><a href="#chapter-then-set-axonwatchsearxngurl-http-127-0-0-1-8080-in-env-or-vault">then set AXON_WATCH_SEARXNG_URL=http://127.0.0.1:8080 in .env (or vault)</a></li></ol>
 </nav>
 
     
@@ -62,11 +62,13 @@
 <ol>
 <li><a href="#quick-start">Quick Start</a> — first 5 minutes</li><li><a href="#handbook-map">Handbook map</a> — who reads what</li><li><a href="#operator-manual">Operator manual</a> — daily rituals
 3.5. <a href="#runtime-auth-cli-and-tools">Runtime auth, CLI, and tools</a> — Pro vs API key, native vs Cursor
-3.6. <a href="how-to/ci-merge-and-worker-agents.md">CI, merge, and worker agents</a> — Fast Gate, <code>dev</code>, roster; <a href="how-to/ci-remediation-gate9.md">Gate 9 CI remediation</a>
+3.6. <a href="how-to/ci-merge-and-worker-agents.md">CI, merge, and worker agents</a> — Fast Gate, <code>dev</code>, roster; DashPro self-hosted CI + RAM; canary OTA vs EAS Build; <a href="how-to/ci-remediation-gate9.md">Gate 9 CI remediation</a>
 3.65. <a href="how-to/autonomy-gates-and-service-identity.md">Autonomy gates &amp; service identity</a> — Gate 4 tasks, scheduler off, watch token + mTLS
 3.66. <a href="how-to/recent-operator-features.md">Recent operator features</a> — task board, concurrent tabs, galaxy labels, Lead planner, CI watch
 3.67. <a href="how-to/auto-loop-and-credits.md">Auto-loop status &amp; credits</a> — are we autonomous yet? Cursor / API budget for multi-project
 3.68. <a href="how-to/company-hierarchy-and-lead-checkin.md">Company hierarchy &amp; Lead check-in</a> — VAXON attend loop + AUTONOMOUS ON safety matrix
+3.69. <a href="how-to/agent-recovery-and-school-operations.md">Stuck agent recovery &amp; School Operations Phase 1</a> — restart decisions, VAXON's recovery contract, and daily homework approval
+3.70. <a href="#axon-x-constitution-registries">AXON-X Constitution registries</a> — missions, evidence, decisions, capabilities, ADRs, debt, health, and self-healing proof
 3.7. <a href="#vaxon-desktop">VAXON Desktop</a> — packaged Linux install</li><li><a href="#teaching-axon-x-to-someone-else">Teaching Axon-X</a> — explain it to others</li><li><a href="#codebase-in-plain-english">Codebase in plain English</a> — what happens under the hood</li><li><a href="#source-index">Source index</a> — where truth lives</li><li><a href="#snippet-cookbook">Snippet cookbook</a> — copy-paste commands</li><li><a href="#terminology-and-abbreviations">Terminology</a></li><li><a href="#what-axon-x-is">Architecture &amp; repo layout</a> — structure and ownership</li><li><a href="#detailed-setup-first-install">Detailed setup</a> — first install</li><li><a href="#what-the-current-app-does-on-boot">Boot flow</a> — what loads on refresh</li><li><a href="#locked-shell-layout">Shell layout</a> — regions and modes</li><li><a href="#the-most-important-files-right-now">Key files</a> — start reading here</li><li><a href="#verification-commands">Verification</a> — gates and PASS/PENDING/FAIL</li><li><a href="#common-working-patterns">Working patterns</a> — how to add code safely</li><li><a href="#debugging-playbook">Debugging playbook</a> — step-by-step fixes</li><li><a href="#tips-hints-and-tricks">Tips, hints &amp; tricks</a></li><li><a href="#upgrading-and-updating">Upgrading &amp; updating</a> — pulls, deps, planning sync</li><li><a href="#what-a-good-next-slice-looks-like">Next slices</a> — what to build next</li>
 </ol>
 </div></section><section class="chapter" id="chapter-handbook-map"><div class="chapter-header"><span class="chapter-num">02</span><h2 id="handbook-map">Handbook map</h2></div><div class="chapter-body">
@@ -103,6 +105,16 @@
 <td><strong>Autonomy / remote host</strong></td>
 <td><a href="how-to/auto-loop-and-credits.md">Auto-loop status &amp; credits</a></td>
 <td><a href="how-to/autonomy-gates-and-service-identity.md">Autonomy gates &amp; service identity</a>, <a href="how-to/recent-operator-features.md">Recent operator features</a></td>
+</tr>
+<tr>
+<td><strong>Stuck agent / school operator</strong></td>
+<td><a href="how-to/agent-recovery-and-school-operations.md">Stuck agent recovery &amp; School Operations Phase 1</a></td>
+<td><a href="#debugging-playbook">Debugging playbook</a>, <a href="how-to/company-hierarchy-and-lead-checkin.md">Company hierarchy &amp; Lead check-in</a></td>
+</tr>
+<tr>
+<td><strong>Lead / autonomous agent</strong></td>
+<td><a href="#axon-x-constitution-registries">AXON-X Constitution registries</a></td>
+<td><a href="#verification-commands">Verification</a>, <code>docs/ops/agent-reports/axon-x-constitution-gap-audit-2026-08-09.md</code></td>
 </tr>
 <tr>
 <td><strong>Debugger</strong></td>
@@ -158,7 +170,7 @@ axonfixconnectors  # required connector / tunnel / vault 503 — diagnose (+ opt
 <p>See <a href="how-to/reliability-and-deliberate-controls.md">Reliability and deliberate controls</a>
 for Vite recovery, manual STAND-UP, speech onset, and AgentDock hover actions.</p>
 <p><strong>Dev bootstrap (alternate, not used when systemd owns the ports):</strong></p>
-<pre><code class="language-bash">cd /home/edp/axon-nvme/repos/axon-watch
+<pre><code class="language-bash">cd /run/media/vaxon/axon-data/repos/axon-nvme/repos/axon-watch
 ./scripts/dev/up.sh
 ./scripts/dev/check-health.sh
 </code></pre>
@@ -166,6 +178,69 @@ for Vite recovery, manual STAND-UP, speech onset, and AgentDock hover actions.</
 <blockquote>
 <p><strong>Important:</strong> <code>./scripts/dev/down.sh</code> does <strong>not</strong> stop systemd always-on units. On this host use <code>axonrestart</code> / <code>axonrevive</code>.</p>
 </blockquote>
+</div></section><section class="chapter" id="chapter-axon-x-constitution-registries"><div class="chapter-header"><span class="chapter-num">04</span><h2 id="axon-x-constitution-registries">AXON-X Constitution registries</h2></div><div class="chapter-body">
+<p>The Constitution work adds a durable executive memory layer for AXON-X. It does <strong>not</strong> replace the original execution stores; it indexes them so VAXON, Dana, specialists, and the operator can answer: what mission is active, what evidence exists, what decision was made, what capability owns it, and what platform health looked like at the time.</p>
+<h3>What changed</h3>
+<p>The control plane now has these SQLite-backed registries:</p>
+<table>
+<thead>
+<tr>
+<th>Registry</th>
+<th>What it means</th>
+<th>Why it makes AXON-X stronger</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Evidence</td>
+<td>Pointers to run history, Lead receipts, autonomy receipts, deliveries, and host-action receipts</td>
+<td>Agents stop inventing receipts and can point to source records.</td>
+</tr>
+<tr>
+<td>Missions</td>
+<td>Operator goals with workspace, risk, Lead-plan link, checkpoint, and success criteria</td>
+<td>Lead work becomes durable mission progress, not only chat text.</td>
+</tr>
+<tr>
+<td>Decisions</td>
+<td>Autonomous/operator-gated decisions with actor, tier, risk, confidence note, and evidence IDs</td>
+<td>“Why did VAXON/Dana do that?” has a queryable answer.</td>
+</tr>
+<tr>
+<td>Capabilities</td>
+<td>Stable <code>CAP-###</code> anchors for major platform abilities</td>
+<td>Blockers can name the exact capability that is missing or degraded.</td>
+</tr>
+<tr>
+<td>ADRs</td>
+<td>Canonical <code>docs/adr/ADR-*.md</code> records</td>
+<td>Architecture choices are visible to agents without rereading the repo.</td>
+</tr>
+<tr>
+<td>Technical debt</td>
+<td>Known gaps with severity, area, and evidence links</td>
+<td>Gaps survive handoffs instead of being rediscovered.</td>
+</tr>
+<tr>
+<td>Platform health</td>
+<td>Runtime/watch/degraded snapshots</td>
+<td>Self-healing decisions can prove current service posture first.</td>
+</tr>
+</tbody>
+</table>
+<h3>How agents should use it</h3>
+<ul>
+<li>Before claiming a dispatch, recovery, or blocker is real, look for evidence through <code>/api/operator/constitution/evidence</code>.</li><li>When a Lead plan is persisted, the system creates a linked mission automatically and attaches Lead receipt evidence to that mission.</li><li>When VAXON/autonomous attention records a safe action, the system records both evidence and a decision row.</li><li>If platform health matters, capture it with <code>POST /api/operator/constitution/health/capture-runtime-summary</code>.</li><li>If seed data is missing, run <code>POST /api/operator/constitution/seed</code>; this indexes canonical ADR markdown and seeds stable capability anchors such as <code>CAP-007</code>, <code>CAP-034</code>, and <code>CAP-070</code>.</li>
+</ul>
+<h3>Operator console surface</h3>
+<p>Open <strong>Settings → Constitution</strong> to view the registry counts and recent human-readable summaries for missions, decisions, capabilities, ADRs, debt, and health. This surface is read-only on purpose: it gives visibility without letting a UI refresh mutate planning state.</p>
+<h3>Verification</h3>
+<p>Use:</p>
+<pre><code class="language-bash">npm run verify:constitution
+python -m pytest tests/test_constitution_registry.py tests/test_constitution_gate_script.py -q
+npm run test -w @axon-watch/console-web -- constitution-overview-view
+</code></pre>
+<p><code>verify:constitution</code> checks the registry spine, required routes, ADR/capability seed anchors, auth coverage for mutating routes, focused tests, and the handoff ledger.</p>
 <h3>Pick a real workspace</h3>
 <p>The left sidebar should show <strong>axon-watch</strong> and <strong>axon-local</strong> (bound project
 roots). Start with <strong>axon-watch</strong> for Axon-X development, or <strong>axon-local</strong> when
@@ -447,7 +522,7 @@ with full runtime summary expected.</p>
 KAIRO <strong>ADVISE</strong> uses the same friendly names (e.g. “Resume Health check.” not “Resume health.”).</p>
 <p>When <strong>2+ paused tasks</strong> appear, Mission Control lists each friendly name — click <strong>COMPLETE RUN</strong>
 for the current one, repeat until the queue clears.</p>
-</div></section><section class="chapter" id="chapter-runtime-auth-cli-and-tools"><div class="chapter-header"><span class="chapter-num">04</span><h2 id="runtime-auth-cli-and-tools">Runtime auth, CLI, and tools</h2></div><div class="chapter-body">
+</div></section><section class="chapter" id="chapter-runtime-auth-cli-and-tools"><div class="chapter-header"><span class="chapter-num">05</span><h2 id="runtime-auth-cli-and-tools">Runtime auth, CLI, and tools</h2></div><div class="chapter-body">
 <p>This section explains how Axon-X authenticates agent runtimes, when you need
 secrets in <strong>/vault</strong>, and when Axon uses its own executors vs external CLIs.</p>
 <p>Official Cursor CLI reference:
@@ -782,9 +857,9 @@ cursor agent status   # expect: Logged in as other@domain
 echo &quot;${CURSOR_API_KEY:+set}&quot; # empty = good for Pro path
 curl -s http://127.0.0.1:8787/api/runtime/cursor/status | python3 -m json.tool
 </code></pre>
-</div></section><section class="chapter" id="chapter-vaxon-desktop"><div class="chapter-header"><span class="chapter-num">05</span><h2 id="vaxon-desktop">VAXON Desktop</h2></div><div class="chapter-body">
+</div></section><section class="chapter" id="chapter-vaxon-desktop"><div class="chapter-header"><span class="chapter-num">06</span><h2 id="vaxon-desktop">VAXON Desktop</h2></div><div class="chapter-body">
 <p>See <a href="how-to/vaxon-desktop.md"><code>docs/how-to/vaxon-desktop.md</code></a>.</p>
-</div></section><section class="chapter" id="chapter-terminology-and-abbreviations"><div class="chapter-header"><span class="chapter-num">06</span><h2 id="terminology-and-abbreviations">Terminology And Abbreviations</h2></div><div class="chapter-body">
+</div></section><section class="chapter" id="chapter-terminology-and-abbreviations"><div class="chapter-header"><span class="chapter-num">07</span><h2 id="terminology-and-abbreviations">Terminology And Abbreviations</h2></div><div class="chapter-body">
 <p>Use this glossary when reading plans, ADRs, code, or agent summaries.</p>
 <table>
 <thead>
@@ -929,7 +1004,7 @@ curl -s http://127.0.0.1:8787/api/runtime/cursor/status | python3 -m json.tool
 </tr>
 </tbody>
 </table>
-</div></section><section class="chapter" id="chapter-what-axon-x-is"><div class="chapter-header"><span class="chapter-num">07</span><h2 id="what-axon-x-is">What Axon-X Is</h2></div><div class="chapter-body">
+</div></section><section class="chapter" id="chapter-what-axon-x-is"><div class="chapter-header"><span class="chapter-num">08</span><h2 id="what-axon-x-is">What Axon-X Is</h2></div><div class="chapter-body">
 <p><strong>Axon-X</strong> is the next-generation Axon console and operator environment.</p>
 <p>The code lives in the <code>axon-watch</code> repo folder for now. That folder name is
 legacy/internal; the product name is <strong>Axon-X</strong>.</p>
@@ -939,18 +1014,18 @@ legacy/internal; the product name is <strong>Axon-X</strong>.</p>
 </ul>
 <p>The implementation repo is here:</p>
 <ul>
-<li><code>/home/edp/axon-nvme/repos/axon-watch</code></li>
+<li><code>/run/media/vaxon/axon-data/repos/axon-nvme/repos/axon-watch</code></li>
 </ul>
 <p>The frozen planning source-of-truth still lives here:</p>
 <ul>
-<li><code>/home/edp/axon-nvme/repos/axon-local/Plans/Axon-Watch/</code></li>
+<li><code>/run/media/vaxon/axon-data/repos/axon-nvme/repos/axon-local/Plans/Axon-Watch/</code></li>
 </ul>
 <p>Important rule:</p>
 <ul>
 <li>read plans from <code>axon-local</code></li><li>implement in <code>axon-watch</code></li>
 </ul>
 <p>Do not casually move back and forth inventing new semantics in both places.</p>
-</div></section><section class="chapter" id="chapter-what-state-the-repo-is-in-right-now"><div class="chapter-header"><span class="chapter-num">08</span><h2 id="what-state-the-repo-is-in-right-now">What State The Repo Is In Right Now</h2></div><div class="chapter-body">
+</div></section><section class="chapter" id="chapter-what-state-the-repo-is-in-right-now"><div class="chapter-header"><span class="chapter-num">09</span><h2 id="what-state-the-repo-is-in-right-now">What State The Repo Is In Right Now</h2></div><div class="chapter-body">
 <p>The repo is in an early but real bootstrap state.</p>
 <p>What already exists:</p>
 <ul>
@@ -999,7 +1074,7 @@ curl -s http://127.0.0.1:8787/api/chat/threads/&lt;thread_id&gt;/history
 </ul>
 <p>So this repo is not a fake mockup, but it is also not feature-complete or a
 drop-in replacement for the current Axon UI.</p>
-</div></section><section class="chapter" id="chapter-source-of-truth-rules"><div class="chapter-header"><span class="chapter-num">09</span><h2 id="source-of-truth-rules">Source Of Truth Rules</h2></div><div class="chapter-body">
+</div></section><section class="chapter" id="chapter-source-of-truth-rules"><div class="chapter-header"><span class="chapter-num">10</span><h2 id="source-of-truth-rules">Source Of Truth Rules</h2></div><div class="chapter-body">
 <p>When you are unsure what something should mean, check the planning bundle.</p>
 <p>The most important frozen planning docs are:</p>
 <ul>
@@ -1014,7 +1089,7 @@ drop-in replacement for the current Axon UI.</p>
 <ul>
 <li>do not silently change it</li><li>raise a proposed amendment instead</li>
 </ul>
-</div></section><section class="chapter" id="chapter-repo-layout"><div class="chapter-header"><span class="chapter-num">10</span><h2 id="repo-layout">Repo Layout</h2></div><div class="chapter-body">
+</div></section><section class="chapter" id="chapter-repo-layout"><div class="chapter-header"><span class="chapter-num">11</span><h2 id="repo-layout">Repo Layout</h2></div><div class="chapter-body">
 <p>Top-level structure:</p>
 <pre><code class="language-text">axon-watch/
   apps/
@@ -1063,7 +1138,7 @@ here, not in ad hoc local types.</p>
 <ul>
 <li>dependency direction checks</li><li>DTO size checks</li><li>ADR governance checks</li><li>latency-budget check scaffolding</li>
 </ul>
-</div></section><section class="chapter" id="chapter-the-current-architecture-in-plain-english"><div class="chapter-header"><span class="chapter-num">11</span><h2 id="the-current-architecture-in-plain-english">The Current Architecture In Plain English</h2></div><div class="chapter-body">
+</div></section><section class="chapter" id="chapter-the-current-architecture-in-plain-english"><div class="chapter-header"><span class="chapter-num">12</span><h2 id="the-current-architecture-in-plain-english">The Current Architecture In Plain English</h2></div><div class="chapter-body">
 <p>Think of the new app as three cooperating parts:</p>
 <ol>
 <li>the shell the user sees</li><li>the control plane that serves user-facing APIs</li><li>the watcher service that will eventually observe and normalize signals</li>
@@ -1077,9 +1152,9 @@ here, not in ad hoc local types.</p>
 <ul>
 <li>giant rewrites</li><li>hidden semantic drift</li><li>UI and backend inventing different meanings</li>
 </ul>
-</div></section><section class="chapter" id="chapter-detailed-setup-first-install"><div class="chapter-header"><span class="chapter-num">12</span><h2 id="detailed-setup-first-install">Detailed setup (first install)</h2></div><div class="chapter-body">
+</div></section><section class="chapter" id="chapter-detailed-setup-first-install"><div class="chapter-header"><span class="chapter-num">13</span><h2 id="detailed-setup-first-install">Detailed setup (first install)</h2></div><div class="chapter-body">
 <h2>1. Go to the repo</h2>
-<pre><code class="language-bash">cd /home/edp/axon-nvme/repos/axon-watch
+<pre><code class="language-bash">cd /run/media/vaxon/axon-data/repos/axon-nvme/repos/axon-watch
 </code></pre>
 <h2>2. Install JavaScript dependencies</h2>
 <pre><code class="language-bash">npm install
@@ -1117,7 +1192,7 @@ here, not in ad hoc local types.</p>
 <h2>6. Stop the stack</h2>
 <pre><code class="language-bash">./scripts/dev/down.sh
 </code></pre>
-</div></section><section class="chapter" id="chapter-what-the-current-app-does-on-boot"><div class="chapter-header"><span class="chapter-num">13</span><h2 id="what-the-current-app-does-on-boot">What The Current App Does On Boot</h2></div><div class="chapter-body">
+</div></section><section class="chapter" id="chapter-what-the-current-app-does-on-boot"><div class="chapter-header"><span class="chapter-num">14</span><h2 id="what-the-current-app-does-on-boot">What The Current App Does On Boot</h2></div><div class="chapter-body">
 <p>Right now, the shell boots and loads five control-plane seams in parallel.</p>
 <p>That flow looks like this:</p>
 <ol>
@@ -1141,7 +1216,7 @@ here, not in ad hoc local types.</p>
   action-type, and a thin watch-owned workspace priority map</li>
 </ul>
 <p>That is okay for this stage.</p>
-</div></section><section class="chapter" id="chapter-locked-shell-layout"><div class="chapter-header"><span class="chapter-num">14</span><h2 id="locked-shell-layout">Locked Shell Layout</h2></div><div class="chapter-body">
+</div></section><section class="chapter" id="chapter-locked-shell-layout"><div class="chapter-header"><span class="chapter-num">15</span><h2 id="locked-shell-layout">Locked Shell Layout</h2></div><div class="chapter-body">
 <p><strong>Locked 2026-07-04</strong> — see <code>docs/UI_LAYOUT_LOCK.md</code> and
 <code>docs/adr/ADR-004-locked-console-shell-layout.md</code>.</p>
 <p>Do not rearrange shell regions or dock seam order without a superseding ADR.
@@ -1185,7 +1260,7 @@ to match this geometry.</p>
 </tbody>
 </table>
 <p>KAIRO Briefing height tracks the workbench terminal dock via <code>--briefing-dock-height</code>.</p>
-</div></section><section class="chapter" id="chapter-current-shell-layout"><div class="chapter-header"><span class="chapter-num">15</span><h2 id="current-shell-layout">Current Shell Layout</h2></div><div class="chapter-body">
+</div></section><section class="chapter" id="chapter-current-shell-layout"><div class="chapter-header"><span class="chapter-num">16</span><h2 id="current-shell-layout">Current Shell Layout</h2></div><div class="chapter-body">
 <p>The locked shell matches the mockup/live screenshots:</p>
 <ul>
 <li><code>TopBar</code> — brand frame, mockup breadcrumb/version context panel, DTO runtime
@@ -1195,7 +1270,7 @@ to match this geometry.</p>
 </ul>
 <p>This is the layout you should compare against the mockup and live screenshots,
 not the older single-file shell description from earlier thin slices.</p>
-</div></section><section class="chapter" id="chapter-mockup-live-parity-notes"><div class="chapter-header"><span class="chapter-num">16</span><h2 id="mockup-live-parity-notes">Mockup / Live Parity Notes</h2></div><div class="chapter-body">
+</div></section><section class="chapter" id="chapter-mockup-live-parity-notes"><div class="chapter-header"><span class="chapter-num">17</span><h2 id="mockup-live-parity-notes">Mockup / Live Parity Notes</h2></div><div class="chapter-body">
 <p>Parity observations from the current mockup and live screenshots:</p>
 <ul>
 <li>the region geometry now largely matches the mockup: topbar, workspace rail,
@@ -1205,7 +1280,7 @@ not the older single-file shell description from earlier thin slices.</p>
   Command → KAIRO Briefing</strong> with the briefing card anchored at the bottom of the dock</li><li>the workbench terminal dock default height is ~240px (responsive cap 280px) unless the
   operator resizes it; height persists in session storage when customized</li>
 </ul>
-</div></section><section class="chapter" id="chapter-the-most-important-files-right-now"><div class="chapter-header"><span class="chapter-num">17</span><h2 id="the-most-important-files-right-now">The Most Important Files Right Now</h2></div><div class="chapter-body">
+</div></section><section class="chapter" id="chapter-the-most-important-files-right-now"><div class="chapter-header"><span class="chapter-num">18</span><h2 id="the-most-important-files-right-now">The Most Important Files Right Now</h2></div><div class="chapter-body">
 <p>If you need to understand the current implementation quickly, read these first:</p>
 <h3>Shared contracts</h3>
 <ul>
@@ -1227,7 +1302,7 @@ not the older single-file shell description from earlier thin slices.</p>
 <ul>
 <li><code>scripts/verify/README.md</code></li><li><code>scripts/verify/verification_config.json</code></li><li><code>tests/test_shared_contract_fixtures.py</code></li><li><code>tests/test_control_plane_runtime_summary.py</code></li><li><code>tests/test_verify_harness.py</code></li>
 </ul>
-</div></section><section class="chapter" id="chapter-verification-commands"><div class="chapter-header"><span class="chapter-num">18</span><h2 id="verification-commands">Verification Commands</h2></div><div class="chapter-body">
+</div></section><section class="chapter" id="chapter-verification-commands"><div class="chapter-header"><span class="chapter-num">19</span><h2 id="verification-commands">Verification Commands</h2></div><div class="chapter-body">
 <p>Use these from the repo root.</p>
 <p><strong>CI, merge to <code>dev</code>, and employee agents:</strong> see
 <strong><a href="how-to/ci-merge-and-worker-agents.md">CI, merge, and worker agents</a></strong>.</p>
@@ -1259,7 +1334,7 @@ not the older single-file shell description from earlier thin slices.</p>
    <code>workspace_smoke</code> (briefing Notice/Advise, git status, resume from review, inbox/runs)</li><li><code>npm run verify</code></li>
 </ol>
 <p>See also <code>docs/OPERATOR_MISSION_CONTROL_V1.md</code> for the manual UI checklist.</p>
-</div></section><section class="chapter" id="chapter-latency-evidence-d1"><div class="chapter-header"><span class="chapter-num">20</span><h2 id="latency-evidence-d1">Latency evidence (D1)</h2></div><div class="chapter-body">
+</div></section><section class="chapter" id="chapter-latency-evidence-d1"><div class="chapter-header"><span class="chapter-num">21</span><h2 id="latency-evidence-d1">Latency evidence (D1)</h2></div><div class="chapter-body">
 <p>When the dev stack is running, collect warm-route timing samples and re-run verify
 with evidence files:</p>
 <pre><code class="language-bash">./scripts/dev/up.sh
@@ -1293,7 +1368,7 @@ npm run build -w @axon-watch/console-web
 <h2>Service tests</h2>
 <pre><code class="language-bash">python3 -m unittest discover -s tests
 </code></pre>
-</div></section><section class="chapter" id="chapter-what-pass-pending-fail-mean-in-verification"><div class="chapter-header"><span class="chapter-num">21</span><h2 id="what-pass-pending-fail-mean-in-verification">What PASS / PENDING / FAIL Mean In Verification</h2></div><div class="chapter-body">
+</div></section><section class="chapter" id="chapter-what-pass-pending-fail-mean-in-verification"><div class="chapter-header"><span class="chapter-num">22</span><h2 id="what-pass-pending-fail-mean-in-verification">What PASS / PENDING / FAIL Mean In Verification</h2></div><div class="chapter-body">
 <p>The verify harness uses explicit states.</p>
 <h3><code>PASS</code></h3>
 <p>The supplied evidence met the rule.</p>
@@ -1313,7 +1388,7 @@ evidence yet.</p>
 <h3><code>FAIL</code></h3>
 <p>The rule was violated or the harness itself is broken.</p>
 <p>This is the one that should stop you.</p>
-</div></section><section class="chapter" id="chapter-common-working-patterns"><div class="chapter-header"><span class="chapter-num">22</span><h2 id="common-working-patterns">Common Working Patterns</h2></div><div class="chapter-body">
+</div></section><section class="chapter" id="chapter-common-working-patterns"><div class="chapter-header"><span class="chapter-num">23</span><h2 id="common-working-patterns">Common Working Patterns</h2></div><div class="chapter-body">
 <h2>When adding frontend work</h2>
 <p>Use real shared types from <code>packages/shared-types/</code>.</p>
 <p>Do not:</p>
@@ -1342,8 +1417,12 @@ evidence yet.</p>
 <ul>
 <li>pulling UI logic into the watch service</li><li>importing control-plane domain semantics directly</li><li>inventing competing signal vocabulary</li>
 </ul>
-</div></section><section class="chapter" id="chapter-troubleshooting"><div class="chapter-header"><span class="chapter-num">23</span><h2 id="troubleshooting">Troubleshooting</h2></div><div class="chapter-body">
-</div></section><section class="chapter" id="chapter-debugging-playbook"><div class="chapter-header"><span class="chapter-num">24</span><h2 id="debugging-playbook">Debugging playbook</h2></div><div class="chapter-body">
+</div></section><section class="chapter" id="chapter-troubleshooting"><div class="chapter-header"><span class="chapter-num">24</span><h2 id="troubleshooting">Troubleshooting</h2></div><div class="chapter-body">
+</div></section><section class="chapter" id="chapter-debugging-playbook"><div class="chapter-header"><span class="chapter-num">25</span><h2 id="debugging-playbook">Debugging playbook</h2></div><div class="chapter-body">
+<p>For failed employee agents, first use the cause-specific recovery table in
+<a href="how-to/agent-recovery-and-school-operations.md">Stuck agent recovery &amp; School Operations Phase 1</a>.
+In particular, do not restart a healthy control plane just to clear a failed
+card: a restart interrupts in-flight shifts.</p>
 <p>Use this order when something breaks:</p>
 <ol>
 <li><strong>Stack health</strong> — <code>axonhealth</code> (or <code>./scripts/dev/check-health.sh</code>).</li><li><strong>Empty shell / Runtime unavailable</strong> — <code>axonrevive</code>, then hard-refresh <code>:4173</code>. Do <strong>not</strong> rely on <code>./scripts/dev/down.sh</code> when systemd owns the ports.</li><li><strong>Soft refresh</strong> — <code>axonrestart</code> after backend route changes (if the API still answers).</li><li><strong>Required connector / tunnel / vault 503</strong> — <code>axonfixconnectors</code> (see below). Local <code>axonhealth</code> can still be green while the <strong>public</strong> console probe is red.</li><li><strong>Stale UI on <code>:4173</code></strong> — rebuild console-web (<code>npm run build -w @axon-watch/console-web</code>), <code>systemctl --user restart console-web.service</code>, then hard-refresh. Source-only / <code>:5173</code> Vite edits do <strong>not</strong> update the systemd bundle.</li><li><strong>Browser cache</strong> — hard refresh <code>:4173</code> (<code>Ctrl+Shift+R</code>) after console-web bundle changes.</li><li><strong>Connectors truth</strong> — Mission Control → <strong>Connectors</strong> rail or <code>GET /api/connectors</code>.</li><li><strong>Gate scripts</strong> — <code>npm run verify:production-operator</code>, then the slice gate (<code>verify:testN</code> / <code>verify:shell-commands</code>).</li><li><strong>Logs</strong> — <code>journalctl --user -u control-plane.service -n 80</code> (always-on) or <code>.local/logs/</code> (dev bootstrap).</li>
@@ -1590,8 +1669,8 @@ another live process. Free the port or stop the other process before retrying.</
 <ul>
 <li>accepted ADRs should be numbered</li><li>accepted ADRs should not be rewritten materially</li><li>changed decisions should be superseded, not silently edited</li>
 </ul>
-</div></section><section class="chapter" id="chapter-tips-and-tricks"><div class="chapter-header"><span class="chapter-num">25</span><h2 id="tips-and-tricks">Tips And Tricks</h2></div><div class="chapter-body">
-</div></section><section class="chapter" id="chapter-snippet-cookbook"><div class="chapter-header"><span class="chapter-num">26</span><h2 id="snippet-cookbook">Snippet cookbook</h2></div><div class="chapter-body">
+</div></section><section class="chapter" id="chapter-tips-and-tricks"><div class="chapter-header"><span class="chapter-num">26</span><h2 id="tips-and-tricks">Tips And Tricks</h2></div><div class="chapter-body">
+</div></section><section class="chapter" id="chapter-snippet-cookbook"><div class="chapter-header"><span class="chapter-num">27</span><h2 id="snippet-cookbook">Snippet cookbook</h2></div><div class="chapter-body">
 <h3>One-word stack commands (always-on host)</h3>
 <p>Installed on PATH via <code>~/.local/bin</code> → repo <code>bin/</code>:</p>
 <table>
@@ -1655,9 +1734,9 @@ systemctl --user restart console-web.service
 ./scripts/dev/down.sh
 ./scripts/dev/check-health.sh
 </code></pre>
-</div></section><section class="chapter" id="chapter-upgrading-and-updating"><div class="chapter-header"><span class="chapter-num">27</span><h2 id="upgrading-and-updating">Upgrading and updating</h2></div><div class="chapter-body">
+</div></section><section class="chapter" id="chapter-upgrading-and-updating"><div class="chapter-header"><span class="chapter-num">28</span><h2 id="upgrading-and-updating">Upgrading and updating</h2></div><div class="chapter-body">
 <p>After pulling new commits or changing dependencies:</p>
-<pre><code class="language-bash">cd /home/edp/axon-nvme/repos/axon-watch
+<pre><code class="language-bash">cd /run/media/vaxon/axon-data/repos/axon-nvme/repos/axon-watch
 git pull
 npm install
 ./scripts/dev/down.sh &amp;&amp; ./scripts/dev/up.sh
@@ -1698,7 +1777,7 @@ meaning.</p>
 <p>That distinction matters during review.</p>
 <h2>Tip 7: Do not overreact to incomplete polish</h2>
 <p>Prefer contracts and verify harness first; cosmetic cleanup can wait.</p>
-</div></section><section class="chapter" id="chapter-what-a-good-next-slice-looks-like"><div class="chapter-header"><span class="chapter-num">28</span><h2 id="what-a-good-next-slice-looks-like">What A Good Next Slice Looks Like</h2></div><div class="chapter-body">
+</div></section><section class="chapter" id="chapter-what-a-good-next-slice-looks-like"><div class="chapter-header"><span class="chapter-num">29</span><h2 id="what-a-good-next-slice-looks-like">What A Good Next Slice Looks Like</h2></div><div class="chapter-body">
 <p>A good next slice should:</p>
 <ul>
 <li>keep shared contract semantics stable</li><li>improve one owned behavior</li><li>preserve boot simplicity</li><li>come with verification</li>
@@ -1722,21 +1801,24 @@ meaning.</p>
 <li>broad UI rewrite</li><li>expanding multiple semantic families at once</li><li>changing run-state and signal-state in one uncontrolled pass</li><li>skipping verification because “it is still early”</li><li>claiming full IDE parity when workspace file operations are still intentionally
   thin-slice (open, edit, save, create, rename) rather than a full VS Code clone</li>
 </ul>
-</div></section><section class="chapter" id="chapter-final-guidance"><div class="chapter-header"><span class="chapter-num">29</span><h2 id="final-guidance">Final Guidance</h2></div><div class="chapter-body">
+</div></section><section class="chapter" id="chapter-final-guidance"><div class="chapter-header"><span class="chapter-num">30</span><h2 id="final-guidance">Final Guidance</h2></div><div class="chapter-body">
 <p>If you are unsure what to do next, choose the smaller move that:</p>
 <ul>
 <li>preserves ownership</li><li>strengthens verification</li><li>reduces placeholders</li><li>keeps the shell boot-safe</li>
 </ul>
 <p>That is the design center of this repo right now.</p>
 <hr>
-</div></section><section class="chapter" id="chapter-ci-merge-workflow-and-worker-agents"><div class="chapter-header"><span class="chapter-num">30</span><h2 id="ci-merge-workflow-and-worker-agents">CI, merge workflow, and worker agents</h2></div><div class="chapter-body">
-<p><strong>Updated:</strong> 2026-07-29</p>
+</div></section><section class="chapter" id="chapter-ci-merge-workflow-and-worker-agents"><div class="chapter-header"><span class="chapter-num">31</span><h2 id="ci-merge-workflow-and-worker-agents">CI, merge workflow, and worker agents</h2></div><div class="chapter-body">
+<p><strong>Updated:</strong> 2026-07-30</p>
 <p>This chapter explains how Axon-X lands code through GitHub CI, how that relates
 to the <code>dev</code> branch, and how <strong>company employee agents</strong> (the roster in IDE /
 Mission Control) work — including how to tell whether they are actually running
 and how good the automation is today.</p>
+<p>It also covers <strong>DashPro self-hosted CI</strong> (plain English + RAM) and why
+<strong>canary OTA</strong> is not an “EAS Build” in the Expo UI.</p>
 <p><strong>Related:</strong> <a href="../CI_GATES.md"><code>docs/CI_GATES.md</code></a>, <a href="../planning/EXECUTION_PLAN.md"><code>docs/planning/EXECUTION_PLAN.md</code></a>,
-<a href="recent-operator-features.md"><code>recent-operator-features.md</code></a></p>
+<a href="recent-operator-features.md"><code>recent-operator-features.md</code></a>,
+<a href="../planning/DASHPRO_CI_AGENT_PLAYBOOK.md"><code>docs/planning/DASHPRO_CI_AGENT_PLAYBOOK.md</code></a></p>
 <hr>
 <h3>Names — do not confuse these</h3>
 <table>
@@ -2104,6 +2186,112 @@ scheduler only created an <code>executing</code> row.</p>
 <p><strong>They are not yet:</strong> a full autonomous company that manages its own PRs,
 branches, or SA-2 coaching — that is the next execution slices on <code>dev</code>.</p>
 <hr>
+<h3>DashPro self-hosted CI — plain English</h3>
+<h4>The one-sentence version</h4>
+<p>GitHub Actions for DashPro’s heavy Android / Quality pipeline does <strong>not</strong> rent
+GitHub’s cloud machines by default. It asks <strong>your PC</strong> (a registered “runner”
+named like <code>edudashpro-dashpro-2</code>) to do the work. If that runner is offline or
+busy, the Actions UI shows <strong>Queued</strong>.</p>
+<h4>How it works (kitchen analogy)</h4>
+<ol>
+<li>You push a branch or open a PR → GitHub posts a job on the Actions board.</li><li>The workflow says: “Only a machine tagged <code>self-hosted</code> + <code>dashpro</code> may take this.”</li><li>The runner service on this host (<code>actions-runner-dashpro.service</code>) is the waiter
+   that claims those jobs and runs the scripts (npm, Jest, Android tools, …).</li><li>When the waiter is asleep (GitHub status <strong>offline</strong>) or already serving another
+   table (<strong>busy</strong>), new jobs wait in line — that is the yellow <strong>Queued</strong> state.</li><li>Axon company agents (Cass / Soren / Dana) are <strong>not</strong> the GitHub runner. They
+   are separate Cursor workers. The Actions “Agents” tab on github.com is also
+   unrelated GitHub product UI.</li>
+</ol>
+<h4>Will this drain our RAM?</h4>
+<p><strong>It can — and it has before.</strong> Quality Gates previously peaked near ~18G RAM /
+heavy swap and froze the desktop. That is why the runner unit is capped:</p>
+<table>
+<thead>
+<tr>
+<th>Limit</th>
+<th>Value</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>MemoryHigh</code></td>
+<td>8G</td>
+<td>Soft pressure — kernel starts reclaiming</td>
+</tr>
+<tr>
+<td><code>MemoryMax</code></td>
+<td>10G</td>
+<td>Hard kill ceiling for the runner cgroup</td>
+</tr>
+<tr>
+<td><code>MemorySwapMax</code></td>
+<td>4G</td>
+<td>Cap on swap the runner may use</td>
+</tr>
+</tbody>
+</table>
+<p>Idle listener is usually well under <strong>1G</strong>. A Quality Gates / Unit Tests /
+Android job can climb toward the cap. <strong>Do not</strong> stack a full Android CI graph
+with Cursor open <strong>and</strong> a local Expo/EAS OTA export (OTA scripts also set
+<code>NODE_OPTIONS=--max-old-space-size=8192</code>). Prefer one heavy job at a time.</p>
+<p>Check live pressure:</p>
+<pre><code class="language-bash">systemctl --user status actions-runner-dashpro.service
+free -h
+gh api repos/axon-control-ops/dashpro/actions/runners --jq '.runners[] | {name,status,busy}'
+</code></pre>
+<p>If systemd shows the service <strong>running</strong> but GitHub still says <strong>offline</strong>, the
+listener lost its session — restart the user unit, then confirm GitHub status
+flips to <code>online</code>:</p>
+<pre><code class="language-bash">systemctl --user restart actions-runner-dashpro.service
+</code></pre>
+<h4>What “worker / run_…” means in the Actions header</h4>
+<p>That string is usually the <strong>git branch name</strong> from a company worker
+(<code>worker/run_&lt;id&gt;</code>), not proof that a runner is currently executing the job.</p>
+<hr>
+<h3>DashPro canary OTA vs EAS Build — why you may not see a build</h3>
+<h4>Plain English</h4>
+<p><strong>Canary OTA</strong> (<code>npm run ota:canary</code> in the DashPro project) publishes a
+<strong>JavaScript/asset update</strong> to the Expo <strong><code>operator-canary</code></strong> branch via
+<code>eas update</code>. That is <strong>not</strong> a native store binary rebuild.</p>
+<table>
+<thead>
+<tr>
+<th>You might look for</th>
+<th>What canary OTA actually is</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>EAS Build</strong> (new APK/AAB/IPA)</td>
+<td><strong>No</strong> — not this path</td>
+</tr>
+<tr>
+<td><strong>EAS Update</strong> / Updates feed for branch <code>operator-canary</code></td>
+<td><strong>Yes</strong> — after local export finishes</td>
+</tr>
+<tr>
+<td>GitHub Actions “Android CI/CD Pipeline”</td>
+<td>Separate — PR/push CI on the self-hosted runner</td>
+</tr>
+<tr>
+<td>Team dock “Watch CI” / draft PR chips</td>
+<td>GitHub delivery receipts — <strong>not</strong> Expo Update URLs</td>
+</tr>
+</tbody>
+</table>
+<h4>Why Dana’s thread looks busy but Expo still shows no build</h4>
+<p>Typical sequence for <code>ota:canary</code>:</p>
+<ol>
+<li>Release guard checks the branch/gates.</li><li><code>eas update …</code> starts → <strong>local</strong> <code>expo export</code> (iOS + Android) with a large
+   Node heap — this can take many minutes and uses ~1G+ RSS on the host.</li><li>Only after export succeeds does the update upload to Expo’s cloud.</li><li>Until step 3, the Expo dashboard has <strong>no new Update</strong> (and never an EAS Build
+   for this command).</li>
+</ol>
+<p>Watch progress on:</p>
+<ul>
+<li>Dana’s <strong>IDE thread / terminal</strong> (the live <code>expo export</code> / <code>eas update</code> lines)</li><li>Expo dashboard → <strong>Updates</strong> (branch <code>operator-canary</code>), not Builds</li><li>Host processes: <code>pgrep -af 'eas update|expo export'</code></li>
+</ul>
+<p>Axon Mission Control does <strong>not</strong> currently mirror Expo Update URLs the way it
+mirrors GitHub PR/CI links on the Team dock.</p>
+<hr>
 <h3>Quick reference commands</h3>
 <pre><code class="language-bash">## CI locally
 npm run verify:contracts
@@ -2115,6 +2303,10 @@ gh pr create --base dev --head feat/my-slice --title &quot;...&quot; --body &quo
 ## PR checks
 gh pr checks
 
+## DashPro self-hosted runner (this PC)
+systemctl --user status actions-runner-dashpro.service
+gh api repos/axon-control-ops/dashpro/actions/runners --jq '.runners[] | {name,status,busy}'
+
 ## Worker scheduler tests
 PYTHONPATH=services/control-plane python3 -B -m unittest tests.test_workspace_agent_scheduler -q
 
@@ -2124,7 +2316,7 @@ curl -X POST http://127.0.0.1:8787/api/runs/reconcile-stale
 <p><strong>PDF:</strong> This chapter is bundled into <code>~/Desktop/Axon-X-How-To-Handbook.pdf</code> when you run
 <code>./scripts/docs/build-howto-handbook-pdf.sh</code> (rebuild after handbook edits).</p>
 <hr>
-</div></section><section class="chapter" id="chapter-gate-9-ci-remediation-unaware-operator-loop"><div class="chapter-header"><span class="chapter-num">38</span><h2 id="gate-9-ci-remediation-unaware-operator-loop">Gate 9 — CI remediation (unaware-operator loop)</h2></div><div class="chapter-body">
+</div></section><section class="chapter" id="chapter-gate-9-ci-remediation-unaware-operator-loop"><div class="chapter-header"><span class="chapter-num">40</span><h2 id="gate-9-ci-remediation-unaware-operator-loop">Gate 9 — CI remediation (unaware-operator loop)</h2></div><div class="chapter-body">
 <p><strong>Updated:</strong> 2026-07-29</p>
 <p>When <strong>Axon-X Fast Gate</strong> goes red, control-plane can ingest the GitHub
 <code>workflow_run</code> event, raise an inbox signal, lease a repair task to Rowan
@@ -2248,6 +2440,38 @@ a repair task.</p>
 </tr>
 </tbody>
 </table>
+<h3>Stale CI-infra hint (branch predates a trunk fix)</h3>
+<p><strong>Incident:</strong> <code>worker/run_96147146e311</code> (dashpro PR #39) burned its whole
+<code>attempt_budget</code> on Database SQL Linting without ever touching the real
+cause: its own <code>.github/workflows/db-lint.yml</code> still used
+<code>actions/setup-python@v5</code>, which cannot resolve a Python build for the
+<code>dashpro</code> self-hosted runner's OS and fails before any SQL is even linted.
+<code>development</code> had already fixed this (system-Python venv instead of
+<code>setup-python</code>) — the branch was just never rebased onto it. No content
+edit on the branch could have made this check pass.</p>
+<p><code>services/control-plane/app/ci_remediation/staleness.py</code> now checks for
+exactly this shape before a repair goal is built: if the failing workflow is
+currently <strong>green on the PR's base branch</strong>, and the base branch has commits
+touching CI-infra paths (<code>.github/workflows/**</code>, <code>.sqlfluff</code>,
+<code>scripts/check-migration-filenames.sh</code>, <code>scripts/workflow/**</code>, …) that the
+failing head is missing, <code>build_repair_goal()</code> appends a hint telling the
+worker to merge the base branch in (fast-forward-safe merge commit, never
+force-push) <strong>before</strong> editing SQL/app content. The check is fail-open — any
+<code>gh</code> error, missing PR, or nothing-stale result silently omits the hint, it
+never blocks goal-building.</p>
+<p>This is a hint, not a gate: the worker still decides what to do. It exists so
+the worker doesn't have to rediscover "merge trunk first" by trial and error
+across <code>attempt_budget</code> tries, the way <code>worker_96147146e311</code> did.</p>
+<p>Related, separate fix landed from the same investigation: <code>Database SQL
+Linting</code> itself was failing on <strong>every</strong> PR touching <code>supabase/migrations/**</code>
+regardless of content, because <code>PG01</code> (CREATE INDEX CONCURRENTLY) flagged
+pre-existing indexes and the filename checker had no grandfathering for
+legacy names. See dashpro PR #66 — <code>.sqlfluff</code> now excludes <code>PG01</code> and
+<code>scripts/check-migration-filenames.sh</code> grandfathers a small, explicit
+<code>scripts/migration-filename-legacy-allowlist.txt</code>. A worker hitting a
+systemic, content-independent lint failure like this should fix the trunk
+config in its own small PR rather than trying to rewrite unrelated legacy
+migrations in its own branch.</p>
 <h3>Enabled workspaces</h3>
 <ul>
 <li>Axon-X: <code>Axon-X Fast Gate</code></li><li>DashPro: <code>CI</code>, <code>Android CI/CD Pipeline</code>, <code>Database SQL Linting</code>,
@@ -2256,7 +2480,7 @@ a repair task.</p>
 <p>For another workspace, add an enabled binding in <code>config/ci-remediation.json</code>
 with the correct repository and workflow names. No new core code is required.</p>
 <h3>Local verify</h3>
-<pre><code class="language-bash">./scripts/dev/python.sh -m unittest tests.test_ci_remediation -v
+<pre><code class="language-bash">./scripts/dev/python.sh -m unittest tests.test_ci_remediation tests.test_ci_remediation_staleness -v
 </code></pre>
 <p>Manual red-path drill: use a throwaway branch and a deliberate Fast Gate ratchet
 overshoot, confirm webhook/poller → signal → leased task → Rowan repair draft PR
@@ -2492,7 +2716,7 @@ npm run verify:console-web
 <li>Drive Critical Review + <code>Confidence: N/10</code> failure rate near zero (today’s biggest auto-loop blocker in Mission Control)</li><li>Keep scheduler off by default; enable only for watched single-workspace drills</li><li>Harden multi-workspace work sources (CI repair + file-size patrol) under credit/RAM caps</li><li>Do not expand mobile mutation until this page’s remote auth + mTLS steps are live on that host</li><li>Re-read <a href="auto-loop-and-credits.md"><code>auto-loop-and-credits.md</code></a> before buying Ultra / enabling 3+ projects</li>
 </ol>
 <hr>
-</div></section><section class="chapter" id="chapter-recent-operator-features-gate-3-5-console-ux"><div class="chapter-header"><span class="chapter-num">47</span><h2 id="recent-operator-features-gate-3-5-console-ux">Recent operator features (Gate 3–5 + console UX)</h2></div><div class="chapter-body">
+</div></section><section class="chapter" id="chapter-recent-operator-features-gate-3-5-console-ux"><div class="chapter-header"><span class="chapter-num">49</span><h2 id="recent-operator-features-gate-3-5-console-ux">Recent operator features (Gate 3–5 + console UX)</h2></div><div class="chapter-body">
 <p><strong>Updated:</strong> 2026-07-27<br>
 <strong>Audience:</strong> operators and agents who need plain-language “what changed and how to use it.”</p>
 <p>Companion to <a href="../HOW-TO-HANDBOOK.md"><code>docs/HOW-TO-HANDBOOK.md</code></a> and
@@ -3145,7 +3369,7 @@ drills before buying more seats.</p>
 <li><a href="autonomy-gates-and-service-identity.md"><code>autonomy-gates-and-service-identity.md</code></a></li><li><a href="recent-operator-features.md"><code>recent-operator-features.md</code></a></li><li><a href="../AXON-X-AUTONOMY-MASTER-PLAN.md"><code>docs/AXON-X-AUTONOMY-MASTER-PLAN.md</code></a></li><li><a href="../AXON-X-AUTONOMY-READINESS.md"><code>docs/AXON-X-AUTONOMY-READINESS.md</code></a></li>
 </ul>
 <hr>
-</div></section><section class="chapter" id="chapter-company-hierarchy-lead-check-in-and-monitoring-close-out"><div class="chapter-header"><span class="chapter-num">50</span><h2 id="company-hierarchy-lead-check-in-and-monitoring-close-out">Company hierarchy, Lead check-in, and monitoring close-out</h2></div><div class="chapter-body">
+</div></section><section class="chapter" id="chapter-company-hierarchy-lead-check-in-and-monitoring-close-out"><div class="chapter-header"><span class="chapter-num">52</span><h2 id="company-hierarchy-lead-check-in-and-monitoring-close-out">Company hierarchy, Lead check-in, and monitoring close-out</h2></div><div class="chapter-body">
 <p><strong>Audience:</strong> operator + company Leads (Mira, Dana, Lindi, …)<br>
 <strong>Clock:</strong> continuous worker scheduler tick (<code>services/control-plane/app/workspace_agents/scheduler.py</code>)<br>
 <strong>Work source:</strong> <code>lead_team_checkin</code> in <code>config/autonomy-work-sources.json</code></p>
@@ -3326,7 +3550,131 @@ role-owned tasks on the clock.</p>
 wired and unit-tested; live multi-company assignment under load still depends on
 scheduler enablement and vault credentials.</p>
 <hr>
-</div></section><section class="chapter" id="chapter-reliability-and-deliberate-controls"><div class="chapter-header"><span class="chapter-num">51</span><h2 id="reliability-and-deliberate-controls">Reliability and deliberate controls</h2></div><div class="chapter-body">
+</div></section><section class="chapter" id="chapter-recovering-a-stuck-agent-and-running-school-operations-phase-1"><div class="chapter-header"><span class="chapter-num">53</span><h2 id="recovering-a-stuck-agent-and-running-school-operations-phase-1">Recovering a stuck agent and running School Operations Phase 1</h2></div><div class="chapter-body">
+<p><strong>Updated:</strong> 2026-08-07</p>
+<p>This chapter answers two practical questions:</p>
+<ol>
+<li>What should happen when an Axon-X employee agent is stuck or failed?</li><li>How should the first Young Eagles homework workflow operate safely?</li>
+</ol>
+<p>It is written for an operator. VAXON should explain the reason and recommend
+the next safe action; it should not turn an Ask-mode conversation into work or
+retry a failure blindly.</p>
+<hr>
+<h3>A stuck agent: read the reason before retrying</h3>
+<p>Open the agent's report and use the exact failure text to choose the next step.
+The label <strong>FAILED</strong> tells you the outcome, not the cause.</p>
+<table>
+<thead>
+<tr>
+<th>What the report says</th>
+<th>What it means</th>
+<th>Your next action</th>
+<th>What VAXON should do</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>control-plane restart</code>, <code>cancelled after restart</code>, or a run vanished while the service restarted</td>
+<td>The platform interrupted the shift; it is not evidence that the agent's work failed.</td>
+<td>Wait for health to return, then check that the task is <strong>Open</strong>, not stuck <strong>Leased</strong>. Retry only after that.</td>
+<td>Preserve the cancelled-run receipt; release the exact interrupted lease without using up an attempt; explain that the retry is safe.</td>
+</tr>
+<tr>
+<td><code>sandbox mount</code>, <code>approved writable root</code>, or read-only filesystem</td>
+<td>The worker did not get the workspace/scope it needed.</td>
+<td>Do not keep pressing <strong>Try again</strong>. Report the exact error or ask VAXON to diagnose it.</td>
+<td>Classify it as a runtime/configuration fault; repair or route the task to an editing specialist with a narrow writable scope, then retry once.</td>
+</tr>
+<tr>
+<td><code>consultative-only</code>, no tool access, or no files changed</td>
+<td>The task was sent to a conversational/observer context rather than an execution-capable specialist.</td>
+<td>Keep <strong>Ask</strong> for advice; use <strong>Assign</strong> or an execution task for implementation.</td>
+<td>Explain the distinction, preserve the advice as a plan, and route the bounded implementation to the right role.</td>
+</tr>
+<tr>
+<td><code>Confidence: N/10</code> missing, missing receipt, or Gate 6/critical review failure</td>
+<td>The evidence is incomplete or the result is not trustworthy yet.</td>
+<td>Review the named check and the changed files. Do not approve it just to clear the card.</td>
+<td>State the missing proof, request a concrete correction, and retry only when the evidence requirement is satisfiable.</td>
+</tr>
+<tr>
+<td>missing credential, approval, parent decision, or external service failure</td>
+<td>An authorised human or external system must act.</td>
+<td>Supply the missing approval/credential through the approved channel, or decide to stop the task.</td>
+<td>Mark the task <code>awaiting_input</code>/<code>waiting_external</code>, name exactly what is needed, and avoid speculative retries.</td>
+</tr>
+<tr>
+<td>a real test/assertion failure</td>
+<td>The implementation needs repair.</td>
+<td>Use <strong>Explain</strong> first if the failure is unclear; use <strong>Try again</strong> only after the agent identifies a changed, testable fix.</td>
+<td>Summarise the failing check, propose a bounded fix and test, then hand it to the owning specialist.</td>
+</tr>
+</tbody>
+</table>
+<h4>Restart decision: do not restart by default</h4>
+<p>Run <code>axonhealth</code> first. If it reports healthy and the UI is merely showing a
+failed agent card, restarting the control plane is usually the wrong first
+action: it interrupts other in-flight work.</p>
+<p>Restart only when one of these is true:</p>
+<ul>
+<li>health/API is unavailable or the shell is genuinely empty/hung;</li><li>a deployed backend change explicitly needs a reload; or</li><li>VAXON's diagnosis identifies a control-plane fault and there are no active
+  shifts that must be allowed to finish.</li>
+</ul>
+<p>On this host:</p>
+<pre><code class="language-bash">axonhealth       # inspect first
+axonrestart      # controlled soft restart when the service is the problem
+axonrevive       # only for a wedged/unavailable runtime
+</code></pre>
+<p>After a restart, wait for <code>axonhealth</code> to return healthy, refresh the browser,
+then verify the affected task's state before retrying it. A restart-interrupted
+role task should return to <strong>Open</strong> with its retry budget intact. If it remains
+<strong>Leased</strong>, stop retrying and report the task ID and run ID to VAXON: that is a
+runtime recovery defect, not operator error.</p>
+<h4>VAXON's recovery contract</h4>
+<p>For every failed or stuck employee, VAXON should provide a short report in this
+order:</p>
+<ol>
+<li><strong>What happened</strong> — the exact class of failure in plain language.</li><li><strong>What changed / did not change</strong> — files, tests, and receipts; never claim
+   evidence it did not obtain.</li><li><strong>Who acts next</strong> — operator, named specialist, or external owner.</li><li><strong>One safe next action</strong> — explain, repair, request input, or retry.</li><li><strong>Confidence: N/10</strong> — only after the summary.</li>
+</ol>
+<p>It should not create a loop of retries. Two genuine, corrected attempts are a
+reasonable escalation point; infrastructure interruptions do not count as a
+genuine agent attempt.</p>
+<hr>
+<h3>Young Eagles Phase 1: daily homework with human approval</h3>
+<p>Phase 1 is deliberately narrow: publish daily homework safely. It is not an
+authorisation for an AI to issue grades, send parent messages, or make child
+welfare decisions on its own.</p>
+<h4>Daily operating flow</h4>
+<ol>
+<li>The teacher prepares the room-specific homework in <strong>Teacher Workspace</strong> and
+   selects <strong>Submit homework</strong>.</li><li>The post enters <strong>pending approval</strong>. Parents must not receive it at this
+   stage.</li><li>The principal or authorised administrator checks age group, wording, date,
+   learning activity, and any attached practice material.</li><li>Approval changes the post to <strong>posted</strong> for the relevant room/age group.</li><li>At close of day, the team records what was posted and prepares the next
+   draft; missed posts go onto the next opening checklist.</li>
+</ol>
+<p>The existing Young Eagles Command Centre implementation follows this shape:
+homework posts create approval entries, and an approved homework entry is
+published for its room. Its current test suite covers syntax, role navigation,
+login/RBAC, API behaviour, and the related operations flows. It does <strong>not</strong>
+prove that an AI-generated message is educationally appropriate; the approving
+human remains accountable.</p>
+<h4>What Imani may do in this phase</h4>
+<p>Imani can act as a school-operations coordinator:</p>
+<ul>
+<li>prepare drafts from the teacher's supplied lesson plan;</li><li>remind staff about missing homework, approvals, and weekly updates;</li><li>prepare a practice-test or report draft from approved source records;</li><li>summarise trends for a teacher, principal, or parent meeting; and</li><li>suggest aftercare activities from the approved programme.</li>
+</ul>
+<p>Imani must not, without the named human approval path:</p>
+<ul>
+<li>publish homework or parent communications;</li><li>assign final marks, diagnose a child, or make promotion/disciplinary decisions;</li><li>expose another child's information in a report or message; or</li><li>make safety, pickup, medical, or safeguarding decisions.</li>
+</ul>
+<h4>Ready-for-Phase-2 checklist</h4>
+<p>Do not automate grading, reports, parent updates, or aftercare decisions until
+the centre has named owners, approval checkpoints, record-retention rules, and
+a clear parent escalation route for each of them. Start with one supervised
+room and review a week's audit trail before extending the workflow.</p>
+<hr>
+</div></section><section class="chapter" id="chapter-reliability-and-deliberate-controls"><div class="chapter-header"><span class="chapter-num">54</span><h2 id="reliability-and-deliberate-controls">Reliability and deliberate controls</h2></div><div class="chapter-body">
 <p><strong>Updated:</strong> 2026-07-29</p>
 <p>This chapter records the operator-facing reliability contract for the local
 console, Command Theater, voice playback, and IDE AgentDock.</p>
@@ -3388,7 +3736,7 @@ sudo apt-get install -y ./apps/console-desktop/src-tauri/target/release/bundle/d
 </code></pre>
 <p>Requires Debian-family x86_64 + WebKitGTK 4.1; current sidecars need <strong>glibc ≥ 2.42</strong>. Full first-run / tray / update notes: <a href="../VAXON_DESKTOP_VERIFY_EVIDENCE.md"><code>docs/VAXON_DESKTOP_VERIFY_EVIDENCE.md</code></a> and <a href="../DUAL_RUNTIME_STARTUP_CONTRACT.md"><code>docs/DUAL_RUNTIME_STARTUP_CONTRACT.md</code></a>.</p>
 <hr>
-</div></section><section class="chapter" id="chapter-online-research-searxng-and-legacy-google"><div class="chapter-header"><span class="chapter-num">52</span><h2 id="online-research-searxng-and-legacy-google">Online research: SearXNG and legacy Google</h2></div><div class="chapter-body">
+</div></section><section class="chapter" id="chapter-online-research-searxng-and-legacy-google"><div class="chapter-header"><span class="chapter-num">55</span><h2 id="online-research-searxng-and-legacy-google">Online research: SearXNG and legacy Google</h2></div><div class="chapter-body">
 <p>Preferred → fallback order (matches the control-plane research path):</p>
 <ol>
 <li><strong>SearXNG</strong> when <code>AXON_WATCH_SEARXNG_URL</code> is set (recommended local path)</li><li><strong>Google Custom Search</strong> (legacy) when <code>AXON_WATCH_GOOGLE_CSE_API_KEY</code> and

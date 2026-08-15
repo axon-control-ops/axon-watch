@@ -48,6 +48,7 @@ export interface WorkspaceFileContent {
   path: string;
   content: string;
   size_bytes: number;
+  content_sha256: string;
 }
 
 export interface WorkspaceFileRenameResponse {
@@ -159,7 +160,11 @@ export async function fetchWorkspace(workspaceId: string): Promise<WorkspaceReco
 export type WorkspaceComposerPrefs = {
   workspace_id: string;
   cursor_cli_model: string;
+  claude_cli_model: string;
+  codex_cli_model: string;
   runtime_target: string;
+  auto_allowed_runtimes: string[];
+  max_concurrent_runtimes: number;
   updated_at: string | null;
 };
 
@@ -176,7 +181,14 @@ export async function fetchWorkspaceComposerPrefs(
 
 export async function saveWorkspaceComposerPrefs(
   workspaceId: string,
-  body: { cursor_cli_model?: string; runtime_target?: string },
+  body: {
+    cursor_cli_model?: string;
+    claude_cli_model?: string;
+    codex_cli_model?: string;
+    runtime_target?: string;
+    auto_allowed_runtimes?: string[];
+    max_concurrent_runtimes?: number;
+  },
 ): Promise<WorkspaceComposerPrefs> {
   const encoded = encodeURIComponent(workspaceId);
   return fetchJson<WorkspaceComposerPrefs>(
@@ -246,15 +258,20 @@ export async function saveWorkspaceFile(
   workspaceId: string,
   filePath: string,
   content: string,
-): Promise<{ saved: boolean; path: string; size_bytes: number }> {
+  /** content_sha256 from the last read/save of this file. Omit to force-save
+   * without a conflict check (last-write-wins). Pass it to get a 409 (throws
+   * ApiRequestError, check with isApiConflictError) if the file changed on
+   * disk since it was loaded. */
+  baseSha256?: string,
+): Promise<{ saved: boolean; path: string; size_bytes: number; content_sha256: string }> {
   const encodedWorkspace = encodeURIComponent(workspaceId);
   const encodedPath = encodeWorkspaceFilePath(filePath);
-  return fetchJson<{ saved: boolean; path: string; size_bytes: number }>(
+  return fetchJson<{ saved: boolean; path: string; size_bytes: number; content_sha256: string }>(
     `/api/workspaces/${encodedWorkspace}/files/${encodedPath}`,
     {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ content }),
+      body: JSON.stringify(baseSha256 ? { content, base_sha256: baseSha256 } : { content }),
     },
     'workspace file save failed',
   );
@@ -391,5 +408,21 @@ export async function enqueueWorkspaceAgentTerminalJob(
       }),
     },
     'workspace agent terminal job enqueue failed',
+  );
+}
+
+/** Independent of the terminal output stream — reads the job's actual
+ * server-tracked status (set from the PTY exit sentinel), so a dropped/dead
+ * terminal connection doesn't leave the job looking stuck forever. */
+export async function fetchAgentTerminalJobStatus(
+  workspaceId: string,
+  jobId: string,
+): Promise<AgentTerminalJobRecord> {
+  const encodedWorkspaceId = encodeURIComponent(workspaceId);
+  const encodedJobId = encodeURIComponent(jobId);
+  return fetchJson<AgentTerminalJobRecord>(
+    `/api/workspaces/${encodedWorkspaceId}/terminal/agent-jobs/${encodedJobId}`,
+    {},
+    'workspace agent terminal job status request failed',
   );
 }

@@ -15,10 +15,21 @@ from app.safe_improvement.isolated_executor import (
 from app.terminal.workspace_roots import WorkspaceRootError, resolve_workspace_root
 
 
-def create_worker_isolation(*, workspace_id: str, run_id: str) -> Path:
+def create_worker_isolation(
+    *,
+    workspace_id: str,
+    run_id: str,
+    baseline_commit: str | None = None,
+    baseline_ref: str | None = None,
+) -> Path:
     """Create a disposable checkout for one continuous-worker run."""
     bound = resolve_workspace_root(workspace_id)
-    return create_isolation_root(proposal_id=run_id, bound_project_root=bound)
+    return create_isolation_root(
+        proposal_id=run_id,
+        bound_project_root=bound,
+        baseline_commit=baseline_commit,
+        baseline_ref=baseline_ref,
+    )
 
 
 def worker_agent_workspace(isolation_root: Path) -> Path:

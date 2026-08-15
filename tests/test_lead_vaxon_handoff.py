@@ -89,6 +89,55 @@ class LeadVaxonHandoffTests(unittest.TestCase):
         again = synthesize_lead_plan(result["plan_id"])
         self.assertEqual("already_posted", (again.get("vaxon_handoff") or {}).get("status"))
 
+    def test_repeated_identical_shift_flash_is_suppressed_but_change_still_posts(self) -> None:
+        from app.persistence import chat_store
+        from app.workspace_agents.lead_vaxon_handoff import post_ad_hoc_lead_takeover_to_vaxon
+
+        with patch("app.live_events.broadcast_material_change"):
+            first = post_ad_hoc_lead_takeover_to_vaxon(
+                workspace_id="workspace_axon_watch",
+                run_id="run_shift_one",
+                employee_role="lead",
+                employee_name="Dana",
+                phase="completed",
+                lead_next="Monitor CI",
+                lead_summary="Nothing new since last check.",
+            )
+            self.assertEqual("posted", first["status"])
+
+            # Next continuous shift, nothing changed — must not add more noise.
+            second = post_ad_hoc_lead_takeover_to_vaxon(
+                workspace_id="workspace_axon_watch",
+                run_id="run_shift_two",
+                employee_role="lead",
+                employee_name="Dana",
+                phase="completed",
+                lead_next="Monitor CI",
+                lead_summary="Nothing new since last check.",
+            )
+            self.assertEqual("skipped_duplicate_flash", second["status"])
+
+            # A genuine change (new blocker) must still post.
+            third = post_ad_hoc_lead_takeover_to_vaxon(
+                workspace_id="workspace_axon_watch",
+                run_id="run_shift_three",
+                employee_role="lead",
+                employee_name="Dana",
+                phase="failed",
+                lead_next="Fix Codex auth",
+                lead_summary="Codex login expired, dispatch blocked.",
+            )
+            self.assertEqual("posted", third["status"])
+
+        thread = chat_store.get_latest_thread_for_workspace(
+            "workspace_axon_watch",
+            thread_kind="operator",
+        )
+        assert thread is not None
+        messages = chat_store.list_thread_messages(str(thread["thread_id"]))
+        # Two real flashes (system + agent each) = 4 messages; the duplicate added none.
+        self.assertEqual(4, len(messages))
+
     def test_stale_engagement_without_handoff_is_closed_when_work_is_settled(self) -> None:
         from app.persistence import task_store
         from app.workspace_agents import lead_plan_store

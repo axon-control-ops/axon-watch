@@ -5,6 +5,7 @@ from __future__ import annotations
 from copy import deepcopy
 from contextlib import contextmanager
 import json
+import logging
 import os
 import uuid
 from datetime import datetime, timedelta, timezone
@@ -16,6 +17,8 @@ from app.persistence.autonomous_attention_redaction import (
     redact_payload as _redact_payload,
     redact_text as _redact_text,
 )
+
+logger = logging.getLogger(__name__)
 
 _RECEIPT_COLUMNS = (
     "receipt_id",
@@ -250,7 +253,59 @@ def append_receipt(
         "ask_operator": bool(record["ask_operator"]),
         "payload": _redact_payload(payload or {}),
     }
+    _index_constitution_receipt(stored)
     return deepcopy(stored)
+
+
+def _index_constitution_receipt(receipt: dict[str, Any]) -> None:
+    """Best-effort constitution trace for autonomy decisions.
+
+    The autonomy receipt remains the source of truth. The constitution registry
+    stores an index + canonical decision record so VAXON can later explain why
+    a dispatch/escalation/skip happened without duplicating execution.
+    """
+    try:
+        from app.persistence import constitution_registry_store as registry
+        from app.persistence.evidence_ref_adapters import index_autonomy_receipt
+
+        receipt_id = str(receipt.get("receipt_id") or "").strip()
+        if not receipt_id:
+            return
+        evidence = index_autonomy_receipt(
+            receipt_id=receipt_id,
+            workspace_id=str(receipt.get("workspace_id") or ""),
+            decision=str(receipt.get("decision") or ""),
+            tier=str(receipt.get("tier") or ""),
+            risk=str(receipt.get("risk") or ""),
+            task_id=receipt.get("task_id"),
+            summary=str(receipt.get("title") or receipt.get("detail") or ""),
+        )
+        decision = registry.record_decision(
+            actor="autonomous_attention",
+            capability_id="CAP-034",
+            decision=str(receipt.get("decision") or "skip"),
+            tier=str(receipt.get("tier") or "unclassified"),
+            risk=str(receipt.get("risk") or "normal"),
+            explanation=str(receipt.get("detail") or receipt.get("title") or ""),
+            confidence=None,
+            confidence_note="confidence_unavailable",
+            task_id=receipt.get("task_id"),
+            source_table="autonomy_attention_receipts",
+            source_id=receipt_id,
+            evidence_ids=[str(evidence["evidence_id"])],
+        )
+        index_autonomy_receipt(
+            receipt_id=receipt_id,
+            workspace_id=str(receipt.get("workspace_id") or ""),
+            decision=str(receipt.get("decision") or ""),
+            tier=str(receipt.get("tier") or ""),
+            risk=str(receipt.get("risk") or ""),
+            task_id=receipt.get("task_id"),
+            summary=str(receipt.get("title") or receipt.get("detail") or ""),
+            decision_id=str(decision["decision_id"]),
+        )
+    except Exception:
+        logger.exception("constitution indexing failed for autonomy receipt")
 
 
 def get_receipt(receipt_id: str) -> dict[str, Any] | None:

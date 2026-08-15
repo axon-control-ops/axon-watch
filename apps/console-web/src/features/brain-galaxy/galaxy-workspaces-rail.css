@@ -243,6 +243,46 @@
   background: rgba(0, 60, 80, 0.95);
 }
 
+.galaxy-workspaces-rail__autonomy-switch {
+  position: relative;
+  align-self: center;
+  flex-shrink: 0;
+  width: 1.9rem;
+  height: 1.05rem;
+  margin-right: 0.2rem;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 999px;
+  background: rgba(8, 20, 28, 0.75);
+  cursor: pointer;
+  padding: 0;
+  transition: background 150ms ease, border-color 150ms ease;
+}
+
+.galaxy-workspaces-rail__autonomy-switch:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.galaxy-workspaces-rail__autonomy-switch--on {
+  background: rgba(0, 242, 255, 0.35);
+  border-color: rgba(0, 242, 255, 0.6);
+}
+
+.galaxy-workspaces-rail__autonomy-switch-knob {
+  position: absolute;
+  top: 0.1rem;
+  left: 0.1rem;
+  width: 0.75rem;
+  height: 0.75rem;
+  border-radius: 999px;
+  background: rgba(220, 240, 255, 0.92);
+  transition: transform 150ms ease;
+}
+
+.galaxy-workspaces-rail__autonomy-switch--on .galaxy-workspaces-rail__autonomy-switch-knob {
+  transform: translateX(0.85rem);
+}
+
 .galaxy-workspaces-rail__glyph {
   width: 1.2rem;
   height: 1.2rem;

@@ -20,6 +20,8 @@ interface CreateOperatorFocusSliceInput {
   highlightedSignalId: Ref<string | null>;
   ideAttentionPanelOpen: Ref<boolean>;
   ideBriefingPanelOpen: Ref<boolean>;
+  ideVaxonDockPinned: Ref<boolean>;
+  ideActivityView: Ref<string>;
   ideExplorerCollapsed: Ref<boolean>;
   signalsSeamEmphasized: Ref<boolean>;
   missionControlEmphasized: Ref<boolean>;
@@ -43,6 +45,7 @@ export function createOperatorFocusSlice(input: CreateOperatorFocusSliceInput) {
 
   function closeIdeBriefingPanel(): void {
     input.ideBriefingPanelOpen.value = false;
+    input.ideVaxonDockPinned.value = false;
   }
 
   function openIdeBriefingPanel(): void {
@@ -270,7 +273,12 @@ export function createOperatorFocusSlice(input: CreateOperatorFocusSliceInput) {
 
   function focusKairoBriefing(): void {
     if (input.layoutMode.value === 'ide') {
-      openIdeBriefingPanel();
+      input.ideVaxonDockPinned.value = true;
+      // On Team, keep the roster visible and pop the talking card at the bottom.
+      // Written briefing replaces the main panel on other IDE views.
+      if (input.ideActivityView.value !== 'team') {
+        openIdeBriefingPanel();
+      }
     } else {
       input.setDockHeroMode('briefing');
       collapseOperatorThreadForBriefing();
@@ -280,8 +288,13 @@ export function createOperatorFocusSlice(input: CreateOperatorFocusSliceInput) {
     if (typeof window !== 'undefined') {
       window.requestAnimationFrame(() => {
         input.briefingSeamEmphasized.value = true;
-        const targetId =
-          input.layoutMode.value === 'ide' ? 'ide-briefing-panel' : 'dock-seam-briefing';
+        const onTeam =
+          input.layoutMode.value === 'ide' && input.ideActivityView.value === 'team';
+        const targetId = onTeam
+          ? 'ide-vaxon-talk-panel'
+          : input.layoutMode.value === 'ide'
+            ? 'ide-briefing-panel'
+            : 'dock-seam-briefing';
         const target = document.getElementById(targetId);
         target?.classList.add('dock-hero-panel--focus-reveal');
         target?.scrollIntoView({

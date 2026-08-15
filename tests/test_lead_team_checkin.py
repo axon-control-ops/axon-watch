@@ -14,7 +14,8 @@ CONTROL_PLANE_ROOT = Path(__file__).resolve().parents[1] / "services" / "control
 REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(CONTROL_PLANE_ROOT))
 
-from app.persistence import run_store, task_store  # noqa: E402
+from app.persistence import autonomous_attention_store, run_store, task_store  # noqa: E402
+from app.runs.service import create_run, fail_run  # noqa: E402
 from app.workspace_agents.company_work_sources import list_enabled_work_sources  # noqa: E402
 from app.workspace_agents.lead_team_checkin import (  # noqa: E402
     ASSIGN_GOAL_PREFIX,
@@ -88,7 +89,9 @@ class LeadTeamCheckinTests(unittest.TestCase):
     def setUp(self) -> None:
         isolate_control_plane_db(self, run_store)
         task_store.reset_store()
+        autonomous_attention_store.reset_store()
         self.addCleanup(task_store.reset_store)
+        self.addCleanup(autonomous_attention_store.reset_store)
         self.state_dir = tempfile.TemporaryDirectory()
         self.addCleanup(self.state_dir.cleanup)
         self.state_path = Path(self.state_dir.name) / "lead-team-checkin.json"
@@ -188,6 +191,38 @@ class LeadTeamCheckinTests(unittest.TestCase):
             state_path=self.state_path,
         )
         self.assertIn("workspace_axon_watch", again["skipped_cooldown"])
+
+    def test_failed_lead_shift_escalates_to_vaxon_without_specialist_task(self) -> None:
+        run = create_run(
+            workspace_id="workspace_dashpro",
+            mode="agent",
+            summary="Dana lead shift",
+            employee_role="lead",
+        )
+        fail_run(
+            str(run["run_id"]),
+            receipt_summary="Workspace delivery blocked: no publishable changes",
+        )
+
+        with patch(
+            "app.workspace_agents.lead_team_checkin._post_lead_checkin_message",
+            return_value="message_test",
+        ):
+            result = run_lead_team_checkin(
+                min_interval_seconds=0,
+                max_assignments_per_workspace=2,
+                workspace_ids=["workspace_dashpro"],
+                state_path=self.state_path,
+                post_lead_message=True,
+            )
+
+        self.assertEqual([], result["created_tasks"])
+        self.assertEqual(1, len(result["escalated"]))
+        receipt = result["escalated"][0]
+        self.assertTrue(receipt["ask_operator"])
+        self.assertEqual("operator_blocker", receipt["kind"])
+        self.assertIn("lead", receipt["title"].lower())
+        self.assertIn("must not remain stuck", receipt["detail"])
 
 
 if __name__ == "__main__":

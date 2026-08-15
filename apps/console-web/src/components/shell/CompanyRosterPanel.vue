@@ -3,6 +3,7 @@ import { computed, nextTick, ref, watch } from 'vue';
 
 import AgentPersonaDock from './AgentPersonaDock.vue';
 import CompanyPresenceStrip from './CompanyPresenceStrip.vue';
+import RosterDecisionBadge from './RosterDecisionBadge.vue';
 import VaxonRosterVoiceDock from './VaxonRosterVoiceDock.vue';
 import {
   shouldShowVaxonRosterVoiceDock,
@@ -23,6 +24,7 @@ import {
   pickDefaultRosterEmployee,
   resolveLiveBusyEmployeeIds,
   resolveReportingEmployeeId,
+  employeeRuntimeShiftHint,
 } from '../../features/workspace-agents/company-roster-view';
 import {
   markIntroSpokenToday,
@@ -40,10 +42,16 @@ import { requestIdeComposerMode } from '../../lib/ide-composer-restore-request';
 import { employeeVoiceSpeaker } from '../../lib/kairo-voice-utterance';
 import { runEmployeeShiftRetry } from '../../lib/run-employee-shift-retry';
 import { navigateToSettingsSection } from '../../lib/settings-section-route';
+import {
+  buildPendingDecisionComposerDraft,
+  companyPendingDecisionHint,
+  pendingDecisionDirectResolution,
+} from '../../features/workspace-agents/company-roster-focus';
+import { submitQuestionAnswer } from '../../lib/submit-question-answer';
+import { resolveAutonomyDecision } from '../../api/autonomy-api';
 import { useCompanyRosterControlActions } from '../../composables/use-company-roster-control-actions';
 import { useCompanyRosterQuickActionState } from '../../composables/use-company-roster-quick-action-state';
 import { useShellStore } from '../../stores/shell';
-
 const shell = useShellStore();
 const currentWorkspaceId = computed(() => shell.currentWorkspace?.workspace_id ?? null);
 const vaxonVoiceDock = useVaxonRosterVoiceDock(
@@ -73,7 +81,10 @@ async function loadCompany(): Promise<void> {
   if (!workspaceId) {
     return;
   }
-  await shell.loadCompanyEmployees(workspaceId);
+  await Promise.all([
+    shell.loadCompanyEmployees(workspaceId),
+    shell.loadWorkspaceTasks(workspaceId),
+  ]);
 }
 const selectedEmployeeId = ref<string | null>(null);
 const dockRootRef = ref<HTMLElement | null>(null);
@@ -121,6 +132,7 @@ watch(
       scrollDockIntoView();
     }
   },
+  { immediate: true },
 );
 
 watch(
@@ -208,6 +220,10 @@ const rosterAlertBadge = computed(() =>
 
 const busyCount = computed(() => liveBusyEmployeeIds.value.length);
 
+const pendingDecisionEmployees = computed(() => employees.value.filter((employee) => employee.pending_decision_id));
+
+const pendingDecisionHint = computed(() => companyPendingDecisionHint(employees.value));
+
 const busyBadgeLabel = computed(() => {
   if (!employees.value.length) {
     return null;
@@ -227,9 +243,9 @@ const selectedEmployee = computed(
   () => employees.value.find((row) => row.employee_id === selectedEmployeeId.value) ?? null,
 );
 
-// True only while the SELECTED teammate's own thread is the one live-streaming — this
-// is what expands their persona-dock card over the roster grid so the operator can
-// read the report, then collapses back once the stream ends.
+// True only while the SELECTED teammate's own thread is the one live-streaming.
+// The dock shows that live report in place; the team header and presence strip remain
+// available so the operator can still see and switch between the rest of the roster.
 const selectedEmployeeIsReporting = computed(
   () =>
     Boolean(selectedEmployee.value) &&
@@ -241,7 +257,18 @@ const selectedEmployeeIsReporting = computed(
     }) === selectedEmployee.value?.employee_id,
 );
 
-const { selectedActions, handoffWaitingEmployeeIds } = useCompanyRosterQuickActionState({
+const selectedRuntimeShiftHint = computed(() =>
+  selectedEmployee.value
+    ? employeeRuntimeShiftHint({
+        employee: selectedEmployee.value,
+        runs: shell.runs,
+        tasks: shell.workspaceTasksForCurrentWorkspace,
+      })
+    : null,
+);
+
+const { selectedActions, handoffWaitingEmployeeIds, selectedHandoffBlockedReason } =
+  useCompanyRosterQuickActionState({
   shell,
   employees,
   selectedEmployee,
@@ -352,7 +379,99 @@ async function focusFailedEmployee(): Promise<void> {
   selectEmployee(target);
   presenceStripRef.value?.focusEmployee(target.employee_id);
   await shell.openOrFocusEmployeeIdeThread(target);
+  shell.openIdeComposer({ keepActivityView: true });
+  focusAgentDockComposerInput();
   scrollDockIntoView();
+}
+
+async function focusPendingDecisionEmployee(employee?: CompanyEmployeeRecord): Promise<void> {
+  const target = employee?.pending_decision_id ? employee : pendingDecisionEmployees.value[0];
+  if (!target) {
+    return;
+  }
+  selectEmployee(target);
+  presenceStripRef.value?.focusEmployee(target.employee_id);
+
+  // Keep Team on the left — the agent dock on the right owns the decision thread.
+  if (shell.ideActivityView !== 'team') {
+    shell.setIdeActivityView('team');
+  }
+  if (shell.agentDockCollapsed) {
+    shell.toggleAgentDock();
+  }
+
+  const threadId = await shell.openOrFocusEmployeeIdeThread(target);
+  if (!threadId) {
+    shell.commandMutationError = 'Could not open the teammate thread for this decision.';
+    return;
+  }
+
+  const draft = buildPendingDecisionComposerDraft(target);
+  if (draft) {
+    shell.openIdeComposerWithDraft(draft, { keepActivityView: true });
+  } else {
+    shell.openIdeComposer({ keepActivityView: true });
+  }
+  focusAgentDockComposerInput();
+  scrollDockIntoView();
+}
+
+async function applyPendingDecisionOption(
+  employee: CompanyEmployeeRecord,
+  option: { id: string; label: string },
+): Promise<void> {
+  if (!employee.pending_decision_id || !option.id?.trim()) {
+    return;
+  }
+  const directResolution = pendingDecisionDirectResolution(option.id);
+  if (directResolution) {
+    controlBusyId.value = employee.employee_id;
+    controlError.value = null;
+    try {
+      await resolveAutonomyDecision(
+        employee.pending_decision_id,
+        directResolution,
+      );
+      await Promise.all([loadCompany(), shell.loadRuns({ sync: false })]);
+    } catch (error) {
+      controlError.value =
+        error instanceof Error ? error.message : 'Could not resolve operator decision';
+    } finally {
+      controlBusyId.value = null;
+    }
+    return;
+  }
+  selectEmployee(employee);
+  presenceStripRef.value?.focusEmployee(employee.employee_id);
+  if (shell.ideActivityView !== 'team') {
+    shell.setIdeActivityView('team');
+  }
+  if (shell.agentDockCollapsed) {
+    shell.toggleAgentDock();
+  }
+  const threadId = await shell.openOrFocusEmployeeIdeThread(employee);
+  if (!threadId) {
+    shell.commandMutationError = 'Could not open the teammate thread for this decision.';
+    return;
+  }
+  await submitQuestionAnswer(shell, {
+    workspaceId: currentWorkspaceId.value,
+    option,
+    prompt:
+      employee.pending_decision_prompt?.trim()
+      || employee.pending_decision_title?.replace(/^.+? needs a decision:\s*/i, '').trim()
+      || undefined,
+  });
+  focusAgentDockComposerInput();
+  scrollDockIntoView();
+}
+
+async function recoverSelectedEmployeeFailure(): Promise<void> {
+  const target = selectedEmployee.value;
+  if (!target || !employeeFailureLine(target)) {
+    return;
+  }
+  await startChat(target, 'retry');
 }
 
 async function onPresenceSelect(employee: CompanyEmployeeRecord): Promise<void> {
@@ -368,10 +487,9 @@ async function onPresenceSelect(employee: CompanyEmployeeRecord): Promise<void> 
   <section
     v-if="currentWorkspaceId"
     class="company-roster company-roster--ide company-roster--persona-dock"
-    :class="{ 'company-roster--reporting': selectedEmployeeIsReporting }"
     aria-label="Company employees"
   >
-    <header class="company-roster__header" :aria-hidden="selectedEmployeeIsReporting">
+    <header class="company-roster__header">
       <div class="company-roster__header-row">
         <div>
           <p class="company-roster__eyebrow">Company team</p>
@@ -401,6 +519,10 @@ async function onPresenceSelect(employee: CompanyEmployeeRecord): Promise<void> 
             >
               {{ busyBadgeLabel }}
             </span>
+            <RosterDecisionBadge
+              :count="pendingDecisionEmployees.length"
+              @open="focusPendingDecisionEmployee"
+            />
           </h3>
         </div>
         <button
@@ -413,6 +535,14 @@ async function onPresenceSelect(employee: CompanyEmployeeRecord): Promise<void> 
           Fleet controls
         </button>
       </div>
+      <button
+        v-if="pendingDecisionHint"
+        type="button"
+        class="company-roster__hint company-roster__hint--alert company-roster__hint--action company-roster__hint--decision"
+        @click="focusPendingDecisionEmployee()"
+      >
+        {{ pendingDecisionHint }}
+      </button>
       <button
         v-if="hasFailedEmployees && failedEmployeesHint"
         type="button"
@@ -445,12 +575,17 @@ async function onPresenceSelect(employee: CompanyEmployeeRecord): Promise<void> 
       >
         {{ controlError }}
       </p>
+      <p
+        v-else-if="selectedHandoffBlockedReason"
+        class="company-roster__empty company-roster__hint"
+        role="status"
+      >
+        {{ selectedHandoffBlockedReason }}
+      </p>
 
       <CompanyPresenceStrip
         ref="presenceStripRef"
         class="company-roster__presence-strip"
-        :class="{ 'company-roster__presence-strip--collapsed': selectedEmployeeIsReporting }"
-        :aria-hidden="selectedEmployeeIsReporting"
         :employees="employees"
         :selected-employee-id="selectedEmployeeId"
         :live-busy-employee-ids="liveBusyEmployeeIds"
@@ -476,9 +611,13 @@ async function onPresenceSelect(employee: CompanyEmployeeRecord): Promise<void> 
           :control-busy="controlBusyId === selectedEmployee.employee_id"
           :live-busy="liveBusyEmployeeIds.includes(selectedEmployee.employee_id)"
           :handoff-waiting="handoffWaitingEmployeeIds.includes(selectedEmployee.employee_id)"
+          :runtime-shift-hint="selectedRuntimeShiftHint"
           :reporting="selectedEmployeeIsReporting"
           :transcript="selectedEmployeeIsReporting ? shell.latestWorkspaceAgentOutput ?? '' : ''"
           @talk="void startChat(selectedEmployee, 'talk')"
+          @decision="void focusPendingDecisionEmployee(selectedEmployee)"
+          @decision-option="void applyPendingDecisionOption(selectedEmployee, $event)"
+          @recover-failure="void recoverSelectedEmployeeFailure()"
           @action="onQuickAction(selectedEmployee, $event)"
         />
       </div>

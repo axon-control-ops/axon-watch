@@ -1,5 +1,4 @@
 from __future__ import annotations
-
 import json
 import os
 import shutil
@@ -10,10 +9,8 @@ import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import patch
-
 CONTROL_PLANE_ROOT = Path(__file__).resolve().parents[1] / "services" / "control-plane"
 sys.path.insert(0, str(CONTROL_PLANE_ROOT))
-
 from app.cli_runtime.agent_sandbox import (  # noqa: E402
     AgentSandboxPolicy,
     SandboxConfigurationError,
@@ -22,7 +19,6 @@ from app.cli_runtime.agent_sandbox import (  # noqa: E402
     wrap_command_in_agent_sandbox,
 )
 from app.cli_runtime.agent_shell_hook import evaluate_hook_payload, run_hook  # noqa: E402
-
 
 def _make_tree_removable(root: Path) -> None:
     if not root.exists():
@@ -34,12 +30,14 @@ def _make_tree_removable(root: Path) -> None:
         for filename in files:
             os.chmod(Path(current) / filename, 0o600)
 
-
 class AgentSandboxTests(unittest.TestCase):
     def setUp(self) -> None:
         self.temp_root = Path(tempfile.mkdtemp(prefix="axon-agent-sandbox-test-"))
         self.workspace = self.temp_root / "workspace"
         self.workspace.mkdir()
+        # Bubblewrap reserves .agents only in disposable worker/composer
+        # checkouts; this fixture models that boundary.
+        (self.workspace / ".axon-si").mkdir()
         (self.workspace / "write").mkdir()
         (self.workspace / "readonly").mkdir()
         (self.workspace / ".env").write_text("TOP_SECRET=value", encoding="utf-8")
@@ -69,7 +67,16 @@ class AgentSandboxTests(unittest.TestCase):
             run_id="run-sandbox-1",
             workspace_root=self.workspace,
             policy_root=self.policy_root,
+            user_home=self.home,
         )
+
+    def test_materialize_seeds_writable_cursor_state(self) -> None:
+        config = self.home / ".cursor" / "cli-config.json"
+        config.write_text('{"version":1}', encoding="utf-8")
+        material = self._material()
+        seeded = material.sandbox_home / ".cursor" / "cli-config.json"
+        self.assertTrue(seeded.is_file())
+        self.assertEqual('{"version":1}', seeded.read_text(encoding="utf-8"))
 
     def test_no_policy_leaves_command_unwrapped(self) -> None:
         with patch(
@@ -110,6 +117,67 @@ class AgentSandboxTests(unittest.TestCase):
         self.assertEqual(0o444, stat.S_IMODE(first.policy_json.stat().st_mode))
         self.assertEqual(0o555, stat.S_IMODE(first.hook_script.stat().st_mode))
         self.assertEqual(0o555, stat.S_IMODE(first.root.stat().st_mode))
+
+    def test_builtin_terminal_wrapper_never_uses_a_workspace_path(self) -> None:
+        workspace_wrapper = self.workspace / "bin" / "axon-agent-terminal-job"
+        workspace_wrapper.parent.mkdir()
+        workspace_wrapper.write_text("#!/bin/sh\necho compromised\n", encoding="utf-8")
+        workspace_wrapper.chmod(0o755)
+        policy = self._policy(approved_wrappers=("axon-agent-terminal-job",))
+
+        with patch(
+            "app.cli_runtime.agent_sandbox.shutil.which",
+            return_value=str(workspace_wrapper),
+        ):
+            material = self._material(policy)
+
+        wrapper = material.root / "bin" / "axon-agent-terminal-job"
+        source = wrapper.read_text(encoding="utf-8")
+        self.assertTrue(wrapper.is_file())
+        self.assertEqual(0o555, stat.S_IMODE(wrapper.stat().st_mode))
+        self.assertNotIn(str(workspace_wrapper), source)
+        self.assertNotIn("compromised", source)
+
+    def test_workspace_agents_scratch_is_private_and_mountable(self) -> None:
+        material = self._material()
+        command = build_bwrap_command(
+            ["/bin/true"],
+            policy=self._policy(),
+            workspace_root=self.workspace,
+            hook_material=material,
+            bwrap_path="/usr/bin/bwrap",
+            user_home=self.home,
+        )
+        self.assertTrue((self.workspace / ".agents").is_dir())
+        self.assertFalse(any((self.workspace / ".agents").iterdir()))
+        self.assertTrue((self.workspace / ".codex").is_dir())
+        self.assertFalse(any((self.workspace / ".codex").iterdir()))
+        self.assertIn(str(material.workspace_scratch), command)
+        self.assertIn(str(material.workspace_codex_scratch), command)
+        self.assertIn(str(self.workspace / ".agents"), command)
+        self.assertIn(str(self.workspace / ".codex"), command)
+
+    def test_workspace_agents_scratch_supports_a_selected_ide_workspace(self) -> None:
+        ordinary = self.temp_root / "ordinary-workspace"
+        ordinary.mkdir()
+        material = materialize_cursor_hook_policy(
+            policy=self._policy(),
+            run_id="run-ordinary-workspace",
+            workspace_root=ordinary,
+            policy_root=self.policy_root,
+        )
+        command = build_bwrap_command(
+            ["/bin/true"],
+            policy=self._policy(),
+            workspace_root=ordinary,
+            hook_material=material,
+            bwrap_path="/usr/bin/bwrap",
+            user_home=self.home,
+        )
+        self.assertTrue((ordinary / ".agents").is_dir())
+        self.assertTrue((ordinary / ".codex").is_dir())
+        self.assertIn(str(ordinary / ".agents"), command)
+        self.assertIn(str(ordinary / ".codex"), command)
 
     def test_policy_material_cannot_be_written_inside_workspace(self) -> None:
         with self.assertRaisesRegex(SandboxConfigurationError, "outside the workspace"):
@@ -168,6 +236,23 @@ class AgentSandboxTests(unittest.TestCase):
         self.assertIn("/run/axon-agent-home/.cursor/hooks.json", command)
         self.assertEqual(["/bin/echo", "ok"], command[-2:])
 
+    def test_codex_auth_file_mounts_only_into_private_codex_home(self) -> None:
+        auth = self.temp_root / "profiles" / "codex" / "auth.json"
+        auth.parent.mkdir(parents=True)
+        auth.write_text("{}", encoding="utf-8")
+        policy = self._policy(codex_auth_path=str(auth))
+        command = build_bwrap_command(
+            ["/bin/true"],
+            policy=policy,
+            workspace_root=self.workspace,
+            hook_material=self._material(policy),
+            bwrap_path="/usr/bin/bwrap",
+            user_home=self.home,
+        )
+        destination = "/run/axon-agent-home/.codex/auth.json"
+        self.assertIn(str(auth), command)
+        self.assertIn(destination, command)
+
     def test_symlinked_binary_resolves_to_its_real_target(self) -> None:
         """npm/nvm-managed CLIs are commonly invoked via a symlink (e.g.
         ~/.local/bin/cursor-agent -> .../versions/<ver>/cursor-agent).
@@ -215,6 +300,56 @@ class AgentSandboxTests(unittest.TestCase):
                         user_home=self.home,
                     )
 
+    def test_missing_writable_root_is_created_instead_of_failing_dispatch(self) -> None:
+        """Role-baseline writable roots (e.g. "docs/ops") are the same for every
+        workspace regardless of that project's actual directory layout — a
+        workspace that simply hadn't created the directory yet used to fail
+        every dispatch outright. It's an already-approved write target, so
+        create it rather than treating "not created yet" as fatal.
+        """
+        material = self._material(self._policy(writable_roots=("docs/ops",)))
+        self.assertFalse((self.workspace / "docs" / "ops").exists())
+        command = build_bwrap_command(
+            ["/bin/true"],
+            policy=self._policy(writable_roots=("docs/ops",)),
+            workspace_root=self.workspace,
+            hook_material=material,
+            bwrap_path="/usr/bin/bwrap",
+            user_home=self.home,
+        )
+        self.assertTrue((self.workspace / "docs" / "ops").is_dir())
+        self.assertIn(str(self.workspace / "docs" / "ops"), command)
+
+    def test_writable_root_rejects_missing_escape_without_creating_it(self) -> None:
+        material = self._material()
+        outside = self.temp_root / "outside-missing"
+        self.assertFalse(outside.exists())
+        with self.assertRaisesRegex(SandboxConfigurationError, "escapes"):
+            build_bwrap_command(
+                ["/bin/true"],
+                policy=self._policy(writable_roots=("../outside-missing",)),
+                workspace_root=self.workspace,
+                hook_material=material,
+                bwrap_path="/usr/bin/bwrap",
+                user_home=self.home,
+            )
+        self.assertFalse(outside.exists())
+
+    def test_writable_root_can_narrow_to_an_existing_file(self) -> None:
+        (self.workspace / "docs").mkdir()
+        target = self.workspace / "docs" / "ops"
+        target.write_text("before", encoding="utf-8")
+        material = self._material(self._policy(writable_roots=("docs/ops",)))
+        command = build_bwrap_command(
+            ["/bin/true"],
+            policy=self._policy(writable_roots=("docs/ops",)),
+            workspace_root=self.workspace,
+            hook_material=material,
+            bwrap_path="/usr/bin/bwrap",
+            user_home=self.home,
+        )
+        self.assertIn(str(target), command)
+
     def test_cursor_mount_cannot_shadow_run_hooks(self) -> None:
         material = self._material()
         with self.assertRaisesRegex(SandboxConfigurationError, "shadow"):
@@ -239,6 +374,8 @@ class AgentSandboxTests(unittest.TestCase):
                 (
                     "from pathlib import Path\n"
                     "Path('write/allowed.txt').write_text('yes')\n"
+                    "Path('.agents/runtime.txt').write_text('private')\n"
+                    "Path('.codex/runtime.txt').write_text('private')\n"
                     "try:\n"
                     " Path('readonly/denied.txt').write_text('no')\n"
                     "except OSError:\n"
@@ -265,6 +402,16 @@ class AgentSandboxTests(unittest.TestCase):
         )
         self.assertEqual(0, result.returncode, result.stderr)
         self.assertEqual("yes", (self.workspace / "write" / "allowed.txt").read_text())
+        self.assertFalse((self.workspace / ".agents" / "runtime.txt").exists())
+        self.assertEqual(
+            "private",
+            (launch.hook_material.workspace_scratch / "runtime.txt").read_text(),
+        )
+        self.assertFalse((self.workspace / ".codex" / "runtime.txt").exists())
+        self.assertEqual(
+            "private",
+            (launch.hook_material.workspace_codex_scratch / "runtime.txt").read_text(),
+        )
         self.assertFalse((self.workspace / "readonly" / "denied.txt").exists())
         self.assertIn("DENIED", result.stdout)
         self.assertIn("SECRET_DENIED", result.stdout)

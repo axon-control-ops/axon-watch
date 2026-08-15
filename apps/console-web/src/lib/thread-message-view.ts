@@ -1,5 +1,5 @@
 import { agentMessageLooksLikeMarkdown } from './agent-message-markdown';
-import type { ThreadMessageRole } from './operator-thread';
+import type { OperatorThreadEntry, ThreadMessageRole } from './operator-thread';
 
 export function formatThreadTimestamp(iso: string): string {
   const parsed = Date.parse(iso);
@@ -23,6 +23,61 @@ export function formatThreadRole(role: ThreadMessageRole): string {
     return 'AGENT';
   }
   return role.toUpperCase();
+}
+
+const SPEAKER_ROLE_PALETTE: Record<string, { background: string; foreground: string }> = {
+  lead: { background: '#1e3a5f', foreground: '#ffe9a8' },
+  watcher: { background: '#1a5a42', foreground: '#c8ffe8' },
+  frontend: { background: '#1f4f6e', foreground: '#c8ecff' },
+  backend: { background: '#3d2f6e', foreground: '#e0d6ff' },
+  integrations: { background: '#6a4520', foreground: '#ffe2b8' },
+  agent: { background: '#2f3d4d', foreground: '#d0e0f0' },
+};
+
+function normalizeSpeakerRole(role: string | null | undefined): string {
+  return String(role || '').trim().toLowerCase().replace(/[\s-]+/g, '_');
+}
+
+function titleCaseRole(role: string): string {
+  return role.replace(/_/g, ' ').replace(/\b\w/g, (value) => value.toUpperCase());
+}
+
+function badgeCaseLabel(value: string): string {
+  return value.trim().replace(/\s+/g, ' ').toUpperCase();
+}
+
+export function threadMessageSpeakerLabel(message: Pick<OperatorThreadEntry, 'role' | 'speaker_name' | 'speaker_role'>): string {
+  if (message.role !== 'agent' && !String(message.speaker_name || '').trim()) {
+    return formatThreadRole(message.role);
+  }
+  const name = String(message.speaker_name || '').trim();
+  const role = normalizeSpeakerRole(message.speaker_role);
+  const label = role ? titleCaseRole(role) : 'Agent';
+  return name
+    ? `${badgeCaseLabel(name)} · ${badgeCaseLabel(label)}`
+    : badgeCaseLabel(label);
+}
+
+export function threadMessageSpeakerStyle(
+  message: Pick<OperatorThreadEntry, 'role' | 'speaker_name' | 'speaker_role' | 'speaker_employee_id'>,
+): Record<string, string> {
+  if (message.role !== 'agent' && !String(message.speaker_name || '').trim()) {
+    return {};
+  }
+  const role = normalizeSpeakerRole(message.speaker_role) || 'agent';
+  const base = SPEAKER_ROLE_PALETTE[role] ?? SPEAKER_ROLE_PALETTE.agent;
+  const seed = String(message.speaker_employee_id || role);
+  let hash = 2166136261;
+  for (let index = 0; index < seed.length; index += 1) {
+    hash ^= seed.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  const alphaNudge = ((hash >>> 0) % 9) / 100;
+  return {
+    '--thread-speaker-bg': base.background,
+    '--thread-speaker-fg': base.foreground,
+    '--thread-speaker-border': `rgba(255, 255, 255, ${0.18 + alphaNudge})`,
+  };
 }
 
 export function shortenRunId(runId: string): string {
@@ -118,6 +173,39 @@ export function systemMessagePreview(content: string): string {
     return trimmed;
   }
   return `${trimmed.slice(0, 117).trim()}…`;
+}
+
+const STICKY_PROMPT_PREVIEW_LINES = 3;
+const STICKY_PROMPT_PREVIEW_CHARS = 220;
+
+/**
+ * The operator's own message renders as raw pre-wrapped text (no markdown),
+ * so blank lines between "# Instructions" / "## Goal" sections burn through
+ * a line-clamp budget without showing any real content. This strips blank
+ * lines for the collapsed preview only — the full raw text (blank lines
+ * included) still shows once expanded or in the edit view.
+ */
+export function stickyPromptCanExpand(text: string): boolean {
+  const normalized = text.trim();
+  if (!normalized) {
+    return false;
+  }
+  const meaningfulLines = normalized.split(/\r?\n/).filter((line) => line.trim().length > 0);
+  return (
+    normalized.length > STICKY_PROMPT_PREVIEW_CHARS ||
+    meaningfulLines.length > STICKY_PROMPT_PREVIEW_LINES
+  );
+}
+
+export function stickyPromptPreviewText(text: string): string {
+  const meaningfulLines = text
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0);
+  const preview = meaningfulLines.slice(0, STICKY_PROMPT_PREVIEW_LINES).join('\n');
+  return preview.length > STICKY_PROMPT_PREVIEW_CHARS
+    ? `${preview.slice(0, STICKY_PROMPT_PREVIEW_CHARS).trim()}…`
+    : preview;
 }
 
 export function shouldCollapseSystemMessage(content: string): boolean {

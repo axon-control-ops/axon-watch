@@ -7,11 +7,14 @@
 **/.axon_terminal_history
 **/.axon_terminal_history_*
 .cursor/debug-*.log
+.claude/
+*.code-workspace
 .pytest_cache/
 __pycache__/
 *.pyc
 *.pyo
 /control-plane.sqlite3
+/.axon-control-plane.sqlite3
 data/*.sqlite3
 node_modules/
 dist/

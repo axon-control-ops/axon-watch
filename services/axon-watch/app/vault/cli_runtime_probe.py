@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import os
+import base64
+import json
 import shutil
 import subprocess
 import time
@@ -13,6 +15,25 @@ from typing import Any
 _PROBE_CACHE_TTL_SECONDS = 90.0
 _PROBE_TIMEOUT_SECONDS = 2
 _probe_cache: dict[str, tuple[float, dict[str, Any]]] = {}
+
+
+def _codex_account_email() -> str:
+    """Read only the email claim from Codex's local ID token.
+
+    The token is never returned, logged, or sent to the browser. `codex login
+    status` intentionally omits the account name for ChatGPT login, while the
+    settings card needs a harmless human-readable identity like the other CLIs.
+    """
+    try:
+        auth_path = os.path.expanduser("~/.codex/auth.json")
+        with open(auth_path, encoding="utf-8") as handle:
+            token = str((json.load(handle).get("tokens") or {}).get("id_token") or "")
+        payload = token.split(".")[1]
+        decoded = base64.urlsafe_b64decode(payload + "=" * (-len(payload) % 4))
+        email = str((json.loads(decoded).get("email") or "")).strip()
+        return email if "@" in email else ""
+    except (OSError, ValueError, IndexError, KeyError, TypeError, json.JSONDecodeError):
+        return ""
 
 
 def _is_executable(path: str) -> bool:
@@ -108,7 +129,7 @@ def probe_cursor_cli_subscription() -> dict[str, Any]:
             and "not logged in" not in lowered
             and "authentication required" not in lowered
         ):
-            account = raw.splitlines()[0].strip()
+            account = _codex_account_email() or raw.splitlines()[0].strip()
             if account.startswith("✓"):
                 account = account.lstrip("✓").strip()
             if account.lower().startswith("logged in as "):

@@ -3,7 +3,7 @@
   "enabled": true,
   "workspace_id": "workspace_dashpro",
   "workspace_label": "DashPro",
-  "project_root": "/home/edp/Projectx/product/dashpro",
+  "project_root": "/run/media/vaxon/axon-data/projectx/product/dashpro",
   "checks": [
     {
       "id": "dashpro_sentry_recent_issues",
@@ -18,8 +18,8 @@
       "type": "posthog_recent_events",
       "service": "PostHog",
       "limit": 5,
-      "timeout_seconds": 20,
-      "retries": 1
+      "timeout_seconds": 45,
+      "retries": 3
     },
     {
       "id": "dashpro_supabase_storage_quota",

@@ -16,9 +16,13 @@ from app.chat.lane_b_agent import (  # noqa: E402
     generate_lane_b_result,
     should_use_lane_b,
 )
+from tests.support.control_plane_db import isolate_workspace_bindings  # noqa: E402
 
 
 class LaneBAgentTests(unittest.TestCase):
+    def setUp(self) -> None:
+        isolate_workspace_bindings(self)
+
     def test_should_use_lane_b_for_ide_modes_only(self) -> None:
         self.assertTrue(should_use_lane_b(composer_mode="ask", command_intent="unsupported"))
         self.assertTrue(should_use_lane_b(composer_mode="plan", command_intent="unsupported"))
@@ -39,6 +43,8 @@ class LaneBAgentTests(unittest.TestCase):
         self.assertIn("edit files", executing.lower())
         self.assertIn("audited commands", executing.lower())
         self.assertIn("Reply in first person", executing)
+        self.assertIn("current turn's explicit request block is the sole active task", executing)
+        self.assertIn("Do not continue, complete, commit, push, or clean up work from earlier", executing)
         self.assertNotIn("consultative", executing.lower())
 
         consultative = _build_prompt(
@@ -180,6 +186,22 @@ class LaneBAgentTests(unittest.TestCase):
         mcp_tools = result.get("mcp_tools")
         self.assertIsInstance(mcp_tools, dict)
         self.assertGreaterEqual(mcp_tools.get("count"), 1)
+        mock_dispatch.assert_called_once()
+
+    @patch("app.chat.lane_b_agent.try_lane_b_git_commit_dispatch")
+    @patch(
+        "app.chat.lane_b_agent.dispatch_ide_composer",
+        return_value={"content": "Worker reply", "dispatched": True},
+    )
+    def test_worker_prompt_skips_direct_git_dispatch(self, mock_dispatch, mock_git) -> None:
+        result = generate_lane_b_result(
+            context=LaneBContext(workspace_id="workspace_axon_watch", composer_mode="agent"),
+            user_prompt="Do not commit, push, or merge. End with Confidence: N/10.",
+            execution_access="full",
+            allow_git_dispatch=False,
+        )
+        self.assertEqual("Worker reply", result["content"])
+        mock_git.assert_not_called()
         mock_dispatch.assert_called_once()
 
 

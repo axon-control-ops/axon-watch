@@ -439,3 +439,29 @@
   line-height: 1.3;
   opacity: 0.55;
 }
+
+.runtime-auth-settings__policy-section {
+  margin-top: 0.5rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.runtime-auth-settings__policy-header {
+  margin-bottom: 1rem;
+}
+
+.runtime-auth-settings__policy-header h2 {
+  margin: 0 0 0.25rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: rgba(0, 242, 255, 0.7);
+}
+
+.runtime-auth-settings__policy-header p {
+  margin: 0;
+  font-size: 0.8rem;
+  color: rgba(180, 210, 230, 0.65);
+  line-height: 1.45;
+}

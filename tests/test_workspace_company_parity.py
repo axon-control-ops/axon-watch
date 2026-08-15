@@ -5,6 +5,7 @@ from __future__ import annotations
 import sys
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 CONTROL_PLANE_ROOT = Path(__file__).resolve().parents[1] / "services" / "control-plane"
 sys.path.insert(0, str(CONTROL_PLANE_ROOT))
@@ -65,6 +66,26 @@ class WorkspaceCompanyParityTests(unittest.TestCase):
         # Must not be the exact Axon-X five for every unconfigured workspace.
         self.assertNotEqual(names, axon_clone)
         self.assertTrue(all(row.get("azure_voice_id") for row in roster["employees"]))  # type: ignore[index]
+
+    def test_pending_operator_decision_keeps_lead_out_of_idle(self) -> None:
+        with patch(
+            "app.workspace_agents._pending_decision_for_role",
+            side_effect=lambda _workspace, role: (
+                {"receipt_id": "ask-1", "title": "Dana needs a decision"}
+                if role == "lead" else None
+            ),
+        ):
+            roster = build_company_roster(
+                "workspace_demo_decision",
+                record={"workspace_id": "workspace_demo_decision", "display_name": "Demo"},
+                configs={},
+                defaults={"role": "lead", "company_name_template": "{display_name}"},
+                companies={},
+                staffing_template=[{"role": "lead", "schedule": "on_demand"}],
+            )
+        lead = roster["employees"][0]  # type: ignore[index]
+        self.assertEqual("waiting_approval", lead["status"])
+        self.assertEqual("ask-1", lead["pending_decision_id"])
 
 
 if __name__ == "__main__":

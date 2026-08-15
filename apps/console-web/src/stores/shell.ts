@@ -1,10 +1,12 @@
 import { computed, ref, watch, type ComputedRef } from 'vue';
 import { defineStore } from 'pinia';
 
+import { isApiConflictError } from '../api/client';
 import {
   approveRun,
   completeRun,
   fetchThreadHistory,
+  syncThreadExecutionAccessNotices,
   fetchWorkspaceChatThread,
   hasWorkspaceChatThread,
   fetchWorkspaceFile,
@@ -384,6 +386,7 @@ export const useShellStore = defineStore('shell', () => {
   const chatStreamSessionsByWorkspace = new Map<string, ChatStreamSession>();
   const composerRuntimePrefsRevision = ref(0);
   const cursorPickerVisibleRevision = ref(0);
+  let readSelectedRuntimeTargetIdForStatusBar = (): string => '';
   const activeRun = ref<RunRecord | null>(null);
   const runs = ref<RunRecord[]>([]);
   const runsLoadState = ref<RunsLoadState>('idle');
@@ -413,6 +416,16 @@ export const useShellStore = defineStore('shell', () => {
   const operatorFleetHealth = ref<FleetHealthSnapshot | null>(null);
   const operatorFleetHealthLoadState = ref<'idle' | 'loading' | 'loaded' | 'error'>('idle');
   const operatorFleetHealthError = ref<string | null>(null);
+  const workspaceDetailWorkspaceId = ref<string | null>(null);
+  function openWorkspaceDetail(workspaceId: string): void {
+    const trimmed = workspaceId.trim();
+    if (trimmed) {
+      workspaceDetailWorkspaceId.value = trimmed;
+    }
+  }
+  function closeWorkspaceDetail(): void {
+    workspaceDetailWorkspaceId.value = null;
+  }
   const operatorBrainGraph = ref<BrainGraphSnapshot | null>(null);
   const operatorBrainGraphLoadState = ref<'idle' | 'loading' | 'loaded' | 'error'>('idle');
   const operatorBrainGraphError = ref<string | null>(null);
@@ -492,6 +505,10 @@ export const useShellStore = defineStore('shell', () => {
   const fileContents = ref<Record<string, string>>({});
   const fileSavedContents = ref<Record<string, string>>({});
   const fileContentLoadStates = ref<Record<string, FileContentLoadState>>({});
+  // sha256 of each file's content as last read/saved from the server — sent back
+  // on save so the backend can reject stale writes instead of clobbering changes
+  // made by an agent or another operator tab since this one loaded the file.
+  const fileContentShas = ref<Record<string, string>>({});
   const openedFilePaths = ref<string[]>([]);
   const draftDocuments = ref<WorkspaceDocumentDescriptor[]>([]);
   const fileSaveState = ref<'idle' | 'saving'>('idle');
@@ -526,11 +543,15 @@ export const useShellStore = defineStore('shell', () => {
   const ideExplorerCollapsed = ref(readStoredIdeExplorerCollapsed());
   const ideAttentionPanelOpen = ref(false);
   const ideBriefingPanelOpen = ref(false);
+  const ideVaxonDockPinned = ref(false);
   const agentDockCollapsed = ref(readStoredAgentDockCollapsed());
   const ideTerminalRevealToken = ref(0);
+  const ideTerminalProblemsRevealToken = ref(0);
   const ideTerminalToggleToken = ref(0);
   const workbenchTerminalPanelVisible = ref(false);
   const teamRosterRevealToken = ref(0);
+  const ideExplorerInlineCreateToken = ref(0);
+  const ideExplorerInlineCreateKind = ref<'file' | 'folder'>('file');
   const workspaceRuns = computed(() =>
     currentWorkspace.value
       ? runs.value.filter((run) => run.workspace_id === currentWorkspace.value?.workspace_id)
@@ -601,8 +622,8 @@ export const useShellStore = defineStore('shell', () => {
     connectorsItems,
     connectorsSummary,
     connectorsLoadState,
+    getSelectedRuntimeTargetId: () => readSelectedRuntimeTargetIdForStatusBar(),
   });
-
   const runHistoryRows = computed(() => buildRunHistoryRows(runHistorySnapshot.value));
 
   const currentWorkspaceIdeThreadMessages = computed(() => {
@@ -972,7 +993,7 @@ export const useShellStore = defineStore('shell', () => {
 
   watch(
     activeIdeThreadId,
-    (threadId) => {
+    (threadId, previousThreadId) => {
       ideStreamFocusThreadId.value = threadId;
       if (threadId) {
         applyWorkspaceStreamUiToGlobals(threadId);
@@ -1622,6 +1643,8 @@ export const useShellStore = defineStore('shell', () => {
     highlightedSignalId,
     ideAttentionPanelOpen,
     ideBriefingPanelOpen,
+    ideVaxonDockPinned,
+    ideActivityView,
     ideExplorerCollapsed,
     signalsSeamEmphasized,
     missionControlEmphasized,
@@ -1752,8 +1775,12 @@ export const useShellStore = defineStore('shell', () => {
       workspaceId: () => workspaceId,
       narration: () => effectiveKairoNarrationLevel.value,
       operatorPresenceSettings: () => operatorPresenceSettings.value,
-      voiceDeliveryAllowed: () =>
-        voiceDeliveryAllowed() && ideStreamFocusThreadId.value === threadId,
+      voiceDeliveryAllowed: () => {
+        const globallyAllowed = voiceDeliveryAllowed();
+        const isFocused = ideStreamFocusThreadId.value === threadId;
+        const result = globallyAllowed && isFocused;
+        return result;
+      },
       operatorPrompt: () => operatorPrompt,
       fullAccess: () => voiceContext.fullAccess,
       layoutMode: () => layoutMode.value,
@@ -2146,12 +2173,24 @@ export const useShellStore = defineStore('shell', () => {
 
     commandMutationState.value = 'submitting';
     commandMutationError.value = null;
-    ideComposerActivity.value = {
-      label: buildIdeComposerActivityLabel(composerMode, agentExecutionAccess.value),
-      mode: composerMode,
-      executionAccess: agentExecutionAccess.value,
-      operatorPrompt: content,
-    };
+    {
+      const target = [
+        ...(runtimeStatus.value?.local ?? []),
+        ...(runtimeStatus.value?.cloud ?? []),
+      ].find((record) => record.id === selectedRuntimeTargetId.value);
+      const family = target?.family ?? 'cursor';
+      const activityLabel = buildIdeComposerActivityLabel(
+        composerMode,
+        agentExecutionAccess.value,
+        family,
+      );
+      ideComposerActivity.value = {
+        label: activityLabel,
+        mode: composerMode,
+        executionAccess: agentExecutionAccess.value,
+        operatorPrompt: content,
+      };
+    }
 
     try {
       const linkedRunId = isRunLinkedComposerMode(composerMode)
@@ -2302,10 +2341,35 @@ export const useShellStore = defineStore('shell', () => {
       clearFullAccessSessionConsent();
       persistAgentExecutionAccess('consultative');
       agentExecutionAccess.value = 'consultative';
+      void syncActiveThreadExecutionAccessNotices('consultative');
       return;
     }
     agentExecutionAccess.value = normalized;
     persistAgentExecutionAccess(normalized);
+    void syncActiveThreadExecutionAccessNotices(normalized);
+  }
+
+  /**
+   * Retroactively flips any "consultative-only" / "Full Access enabled" notice
+   * already in the open thread's history to match the toggle just set — the
+   * operator wants old notices to track the live setting, not stay frozen at
+   * whatever was true when they were written.
+   */
+  async function syncActiveThreadExecutionAccessNotices(
+    executionAccess: AgentExecutionAccess,
+  ): Promise<void> {
+    const threadId = activeThreadId.value;
+    if (!threadId) {
+      return;
+    }
+    try {
+      const result = await syncThreadExecutionAccessNotices(threadId, executionAccess);
+      if (result.updated > 0) {
+        await refreshThreadHistory(threadId);
+      }
+    } catch {
+      // Best-effort cosmetic sync — a failure here shouldn't block the toggle itself.
+    }
   }
 
   function resolveActiveIdeStopRun(): RunRecord | null {
@@ -2492,6 +2556,7 @@ export const useShellStore = defineStore('shell', () => {
     persistLayoutMode(mode);
     ideAttentionPanelOpen.value = false;
     ideBriefingPanelOpen.value = false;
+    ideVaxonDockPinned.value = false;
     expandedDockSeams.value = new Set();
     dockHeroModeTouched.value = false;
     leftSidebarModeTouched.value = false;
@@ -2521,21 +2586,27 @@ export const useShellStore = defineStore('shell', () => {
 
   const {
     revealIdeTerminalPanel,
+    revealIdeWorkbenchProblems,
     toggleIdeTerminalPanel,
     focusIdeSidebarView,
     setIdeActivityView,
     toggleIdeExplorer,
     toggleAgentDock,
     revealTeamRosterForActiveEmployee,
+    requestIdeExplorerInlineCreate,
   } = createIdeWorkbenchChromeSlice({
     ideTerminalRevealToken,
+    ideTerminalProblemsRevealToken,
     ideTerminalToggleToken,
+    ideExplorerInlineCreateToken,
+    ideExplorerInlineCreateKind,
     teamRosterRevealToken,
     ideActivityView,
     ideExplorerCollapsed,
     agentDockCollapsed,
     ideAttentionPanelOpen,
     ideBriefingPanelOpen,
+    ideVaxonDockPinned,
   });
 
   function syncWorkbenchTerminalPanelVisible(visible: boolean): void {
@@ -2551,6 +2622,7 @@ export const useShellStore = defineStore('shell', () => {
   });
   const {
     activeTerminalSession,
+    agentTerminalJobStatuses,
     applyAgentTerminalSession,
     backgroundIdeAgentRun,
     closeTerminalSession,
@@ -2686,6 +2758,10 @@ export const useShellStore = defineStore('shell', () => {
         ...fileSavedContents.value,
         [path]: payload.content,
       };
+      fileContentShas.value = {
+        ...fileContentShas.value,
+        [path]: payload.content_sha256,
+      };
       fileContentLoadStates.value = {
         ...fileContentLoadStates.value,
         [path]: 'loaded',
@@ -2733,6 +2809,12 @@ export const useShellStore = defineStore('shell', () => {
         fileSavedContents.value = {
           ...fileSavedContents.value,
           [path]: payload.content,
+        };
+      }
+      if (fileContentShas.value[path] === undefined) {
+        fileContentShas.value = {
+          ...fileContentShas.value,
+          [path]: payload.content_sha256,
         };
       }
       fileContentLoadStates.value = {
@@ -3068,13 +3150,24 @@ export const useShellStore = defineStore('shell', () => {
 
     try {
       const content = fileContents.value[document.filePath] ?? '';
-      await saveWorkspaceFile(workspaceId, document.filePath, content);
+      const baseSha = fileContentShas.value[document.filePath];
+      const saved = await saveWorkspaceFile(workspaceId, document.filePath, content, baseSha);
       fileSavedContents.value = {
         ...fileSavedContents.value,
         [document.filePath]: content,
       };
+      fileContentShas.value = {
+        ...fileContentShas.value,
+        [document.filePath]: saved.content_sha256,
+      };
     } catch (error) {
-      fileSaveError.value = error instanceof Error ? error.message : 'workspace file save failed';
+      if (isApiConflictError(error)) {
+        fileSaveError.value =
+          'This file changed on disk since you opened it (likely an agent edit). ' +
+          'Reload it to see the current version before saving again — your changes here are still in the editor.';
+      } else {
+        fileSaveError.value = error instanceof Error ? error.message : 'workspace file save failed';
+      }
     } finally {
       fileSaveState.value = 'idle';
     }
@@ -3113,14 +3206,16 @@ export const useShellStore = defineStore('shell', () => {
     toggleCursorPickerVisibleModel,
   } = createComposerRuntimePrefsSlice({
     currentWorkspace,
+    activeIdeThreadId,
     runtimeStatus,
     cursorRuntimeStatus,
     claudeRuntimeStatus,
     codexRuntimeStatus,
+    operatorPresenceSettings,
     composerRuntimePrefsRevision,
     cursorPickerVisibleRevision,
   });
-
+  readSelectedRuntimeTargetIdForStatusBar = () => selectedRuntimeTargetId.value;
   const {
     loadCursorCatalog,
     migrateCursorComposerModelIfNeeded,
@@ -3803,6 +3898,7 @@ export const useShellStore = defineStore('shell', () => {
     ideThreadsForCurrentWorkspace,
     openIdeThreadTabsForCurrentWorkspace,
     activeTerminalSession,
+    agentTerminalJobStatuses,
     ideDisplayKairoPresenceState,
     idePresenceProfile,
     inboxItems,
@@ -3830,12 +3926,17 @@ export const useShellStore = defineStore('shell', () => {
     ideBriefingPanelOpen,
     closeIdeBriefingPanel,
     openIdeBriefingPanel,
+    ideVaxonDockPinned,
     ideTerminalRevealToken,
+    ideTerminalProblemsRevealToken,
     ideTerminalToggleToken,
+    ideExplorerInlineCreateToken,
+    ideExplorerInlineCreateKind,
     workbenchTerminalPanelVisible,
     syncWorkbenchTerminalPanelVisible,
     teamRosterRevealToken,
     revealTeamRosterForActiveEmployee,
+    requestIdeExplorerInlineCreate,
     layoutMode,
     layoutModeLabel,
     leftSidebarAttentionBadgeCount,
@@ -3899,6 +4000,9 @@ export const useShellStore = defineStore('shell', () => {
     operatorFleetHealth,
     operatorFleetHealthError,
     operatorFleetHealthLoadState,
+    workspaceDetailWorkspaceId,
+    openWorkspaceDetail,
+    closeWorkspaceDetail,
     operatorCommandDraft,
     ideComposerDraft,
     operatorPresenceSettings,
@@ -3925,6 +4029,7 @@ export const useShellStore = defineStore('shell', () => {
     resumePrimaryRun,
     resumeIdeAgentRun,
     revealIdeTerminalPanel,
+    revealIdeWorkbenchProblems,
     toggleIdeTerminalPanel,
     runs,
     runsError,

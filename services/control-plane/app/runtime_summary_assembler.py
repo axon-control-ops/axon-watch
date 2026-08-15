@@ -18,6 +18,7 @@ from app.cli_runtime.catalog import (
     schedule_runtime_status_refresh,
 )
 from app.cli_runtime.readiness import cli_runtime_degraded_reasons, summarize_cli_runtime_readiness
+from app.local_notifications import notification_capability
 from app.operator_briefing_signals import summarize_actionable_inbox
 from app.runs.service import (
     approval_summary,
@@ -294,7 +295,7 @@ def assemble_runtime_summary(
             "watch_connected": watch_connected,
             "cli_dispatch_ready": bool(cli_runtime.get("dispatch_ready")),
             "approvals_enabled": True,
-            "notifications_enabled": False,
+            "notifications_enabled": notification_capability()["enabled"],
         },
         "degraded": {
             "active": bool(degraded_reasons),

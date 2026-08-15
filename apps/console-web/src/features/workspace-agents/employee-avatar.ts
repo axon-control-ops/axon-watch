@@ -14,6 +14,7 @@ export type EmployeePresenceTone =
   | 'idle'
   | 'working'
   | 'handoff'
+  | 'approval'
   | 'failed'
   | 'interrupted'
   | 'paused';
@@ -95,6 +96,12 @@ export function employeePresenceTone(
   }
   if (!employee.enabled) {
     return 'paused';
+  }
+  // A completed Lead task can still be waiting on a real operator decision.
+  // This takes precedence over generic busy/idle state so the roster remains
+  // a visible route back to the Ask Card.
+  if (employee.pending_decision_id) {
+    return 'approval';
   }
   if (employeeIsActivelyBusy(employee)) {
     return 'working';

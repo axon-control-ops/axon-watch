@@ -69,23 +69,43 @@ def recover_orphaned_remediation_leases() -> list[dict[str, Any]]:
     return recovered
 
 
-def run_scheduled_work_sources(*, root: Path | None = None) -> dict[str, Any]:
-    """Tick every explicit company work source that is scheduler-driven."""
+def run_scheduled_work_sources(
+    *,
+    root: Path | None = None,
+    observation_only: bool = False,
+    action_only: bool = False,
+) -> dict[str, Any]:
+    """Tick explicit company work sources.
+
+    ``observation_only`` is the always-on watcher plane: reconcile, poll, and
+    publish evidence/escalations, but do not create autonomous repair work.
+    ``action_only`` is the worker-enabled plane: create/dispatch work that is
+    allowed only when the action scheduler is enabled.
+    """
     results: dict[str, Any] = {
-        "recovered_leases": recover_orphaned_remediation_leases(),
+        "recovered_leases": [] if action_only else recover_orphaned_remediation_leases(),
         "sources": {},
+        "observation_only": bool(observation_only),
+        "action_only": bool(action_only),
     }
     for source in list_enabled_work_sources(root):
         source_id = str(source.get("id") or "").strip()
         trigger = str(source.get("trigger") or "").strip().lower()
         if source_id == "file_size_patrol" and "scheduler" in trigger:
+            if observation_only:
+                results["sources"][source_id] = {
+                    "work_source": "file_size_patrol",
+                    "skipped": True,
+                    "reason": "observation_only",
+                }
+                continue
             from app.workspace_agents.file_size_patrol import run_file_size_patrol
 
             workspace_id = (
                 str(source.get("workspace_id") or "workspace_axon_watch").strip()
                 or "workspace_axon_watch"
             )
-            owner_role = str(source.get("owner_role") or "watcher").strip() or "watcher"
+            owner_role = str(source.get("owner_role") or "auto").strip() or "auto"
             max_new = int(source.get("max_new_tasks_per_tick") or 1)
             try:
                 results["sources"][source_id] = run_file_size_patrol(
@@ -99,6 +119,8 @@ def run_scheduled_work_sources(*, root: Path | None = None) -> dict[str, Any]:
                 results["sources"][source_id] = {"error": "file_size_patrol_failed"}
             continue
         if source_id == "ci_remediation":
+            if action_only:
+                continue
             # Webhook is the fast path. Reconcile durable task outcomes when a
             # GitHub completion arrived while the local control plane was down.
             from app.ci_remediation.report import reconcile_linked_repair_task_outcomes
@@ -114,6 +136,8 @@ def run_scheduled_work_sources(*, root: Path | None = None) -> dict[str, Any]:
 
             min_interval = float(source.get("min_interval_seconds") or 900)
             max_assign = int(source.get("max_assignments_per_workspace") or 2)
+            if observation_only:
+                max_assign = 0
             # Full autonomy attend owns specialist task creation — avoid dual
             # Lead assigned: + VAXON attend: rows for the same failed_shift.
             settings = operator_presence_settings_store.load_settings()
@@ -130,6 +154,8 @@ def run_scheduled_work_sources(*, root: Path | None = None) -> dict[str, Any]:
                 results["sources"][source_id] = {"error": "lead_team_checkin_failed"}
             continue
         if source_id == "ci_stale_signal_sweep" and "scheduler" in trigger:
+            if action_only:
+                continue
             from app.ci_remediation.stale_sweep import sweep_stale_ci_signals
 
             try:
@@ -143,6 +169,8 @@ def run_scheduled_work_sources(*, root: Path | None = None) -> dict[str, Any]:
                 results["sources"][source_id] = {"error": "ci_stale_signal_sweep_failed"}
             continue
         if source_id == "attention_stale_sweep" and "scheduler" in trigger:
+            if action_only:
+                continue
             from app.workspace_agents.autonomous_attention_recovery import (
                 sweep_stale_attention_decisions,
             )
@@ -184,7 +212,10 @@ def run_scheduled_work_sources(*, root: Path | None = None) -> dict[str, Any]:
                     ),
                 )
                 dispatched: list[dict[str, Any]] = []
-                if result.dispatchable_fingerprints or result.regressed_fingerprints:
+                if (
+                    not observation_only
+                    and (result.dispatchable_fingerprints or result.regressed_fingerprints)
+                ):
                     dispatched = dispatch_dispatchable_fingerprints(
                         config=load_fleet_self_heal_config(),
                         fingerprints=[
@@ -200,6 +231,13 @@ def run_scheduled_work_sources(*, root: Path | None = None) -> dict[str, Any]:
                     "dispatchable_fingerprints": result.dispatchable_fingerprints,
                     "regressed_fingerprints": result.regressed_fingerprints,
                     "dispatched_count": len(dispatched),
+                    "dispatch_skipped": bool(
+                        observation_only
+                        and (
+                            result.dispatchable_fingerprints
+                            or result.regressed_fingerprints
+                        )
+                    ),
                     "skipped_min_interval": result.skipped_min_interval,
                 }
             except Exception:  # noqa: BLE001 — never block the scheduler tick
@@ -207,6 +245,13 @@ def run_scheduled_work_sources(*, root: Path | None = None) -> dict[str, Any]:
                 results["sources"][source_id] = {"error": "fleet_self_heal_detect_failed"}
             continue
         if source_id == "autonomous_attention" and "scheduler" in trigger:
+            if observation_only:
+                results["sources"][source_id] = {
+                    "work_source": "autonomous_attention",
+                    "skipped": True,
+                    "reason": "observation_only",
+                }
+                continue
             from app.workspace_agents.autonomous_attention import run_autonomous_attention_scan
             from app.persistence import operator_presence_settings_store
 

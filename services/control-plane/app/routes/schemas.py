@@ -9,11 +9,20 @@ from pydantic import BaseModel
 
 class WriteWorkspaceFileRequest(BaseModel):
     content: str
+    # sha256 of the content this save was based on, from the last read/save
+    # response. When present, the save is rejected with 409 if the file on disk
+    # no longer matches — someone else (agent or another tab) changed it since
+    # load. Omit to keep the old last-write-wins behavior.
+    base_sha256: str | None = None
 
 
 class WorkspaceComposerPrefsRequest(BaseModel):
     cursor_cli_model: str | None = None
+    claude_cli_model: str | None = None
+    codex_cli_model: str | None = None
     runtime_target: str | None = None
+    auto_allowed_runtimes: list[str] | None = None
+    max_concurrent_runtimes: int | None = None
 
 
 class RenameWorkspaceFileRequest(BaseModel):
@@ -52,12 +61,25 @@ class PostChatMessageRequest(BaseModel):
     kairo_session_id: str | None = None
 
 
+class GenerateInstructionsRequest(BaseModel):
+    """A model-authored, non-executing expansion of a composer draft."""
+
+    workspace_id: str
+    content: str
+    runtime_target: str | None = None
+    runtime_model: str | None = None
+
+
 class CreateWorkspaceChatThreadRequest(BaseModel):
     surface: str = "ide"
     run_id: str | None = None
     title: str | None = None
     employee_id: str | None = None
     employee_role: str | None = None
+
+
+class SyncThreadExecutionAccessRequest(BaseModel):
+    execution_access: str
 
 
 class CreateTerminalSessionRequest(BaseModel):
@@ -168,6 +190,8 @@ class OperatorPresenceSettingsRequest(BaseModel):
     stt_mode: str | None = None
     voice_routing_mode: str | None = None
     vaxon_model_id: str | None = None
+    auto_composer_runtime_override_enabled: bool | None = None
+    auto_composer_runtime_target: str | None = None
     narrate_tool_progress: bool | None = None
 
 
