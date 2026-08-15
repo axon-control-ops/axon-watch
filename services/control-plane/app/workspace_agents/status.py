@@ -108,6 +108,8 @@ def employee_status(
     # Lead-like roles mirror workspace status; specialists use role_run_status below
     # even when auto-marked primary in a single-employee company roster.
     if role in {"lead", "workspace_agent", "overview_agent"}:
+        if role_run_status:
+            return role_run_status
         if workspace_status != "idle":
             return workspace_status
         if schedule == "always_on" or role == "watcher":
