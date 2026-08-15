@@ -280,15 +280,8 @@ def dispatch_ide_composer(
         return _attach_dispatch_metadata(payload, composer_mode=composer_mode)
 
     subprocess_env = runtime_subprocess_env()
-    # Provider-key fallback is an autonomy policy, not an interactive composer
-    # side effect.  A person who explicitly selected a signed-in CLI account
-    # must not have that identity silently replaced by a Vault key when the
-    # subscription is quota-limited.  Autonomous workers opt into bounded
-    # fallback by supplying their approved runtime families.
-    allow_provider_key_fallback = bool(fallback_runtime_families)
-    snapshot = runtime_status_snapshot(
-        force_refresh=bool(subprocess_env.get("CURSOR_API_KEY")),
-    )
+    # Only autonomous dispatch opts into provider-key fallback.
+    snapshot = runtime_status_snapshot(force_refresh=bool(subprocess_env.get("CURSOR_API_KEY")))
     resolved_root = workspace_root if workspace_root is not None else _resolve_workspace_root(workspace_id)
     if resolved_root is None:
         return _finish({
@@ -378,7 +371,7 @@ def dispatch_ide_composer(
         use_provider_key_after_known_subscription_limit = (
             not allows_retry
             and subscription_auth
-            and allow_provider_key_fallback
+            and fallback_runtime_families
             and env_has_api_key(subprocess_env, family=family)
         )
         if not allows_retry and not use_provider_key_after_known_subscription_limit:
@@ -514,9 +507,7 @@ def dispatch_ide_composer(
                 if looks_like_auth_error(detail) and env_has_api_key(dispatch_env, family=family):
                     # A configured key failed: retry the signed-in subscription.
                     retry_env = env_without_api_keys(dispatch_env, family=family)
-                elif allow_provider_key_fallback and env_has_api_key(
-                    subprocess_env, family=family
-                ):
+                elif fallback_runtime_families and env_has_api_key(subprocess_env, family=family):
                     # Subscription OAuth/quota/billing failed after its readiness
                     # probe. Use the separately configured Vault provider key.
                     retry_env = api_key_fallback_env(subprocess_env, family=family)
