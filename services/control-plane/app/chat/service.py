@@ -87,7 +87,6 @@ _remember_lane_b_turn = remember_lane_b_turn
 class ChatValidationError(ValueError):
     pass
 
-
 _KAIRO_CONTINUATION_RE = re.compile(
     r"\b(continue|pick up|resume|as we discussed|the plan|that in the ide)\b",
     re.IGNORECASE,
