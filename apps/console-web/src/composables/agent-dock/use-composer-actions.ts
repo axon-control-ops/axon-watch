@@ -38,8 +38,7 @@ import type { TeammateRouteNotice } from '../../lib/teammate-route-notice';
 import { resolveComposerWorkspaceScopeMismatch } from '../../lib/composer-workspace-scope';
 import {
   clearWorkspaceScopeNotice, stayInCurrentWorkspaceScope,
-  setWorkspaceScopeNotice,
-  workspaceScopeNotice,
+  setWorkspaceScopeNotice, workspaceScopeNotice, isWorkspaceScopePairSuppressed,
   type WorkspaceScopeNotice,
 } from '../../lib/workspace-scope-notice';
 import { applyChatUiAction } from '../../lib/chat-ui-action';
@@ -224,7 +223,8 @@ export function useComposerActions(options: UseComposerActionsOptions) {
 
     const workspaceId = shell.currentWorkspace?.workspace_id ?? '';
     const scopeMismatch = resolveComposerWorkspaceScopeMismatch(workspaceId, submitDraft);
-    if (scopeMismatch) {
+    // A suppressed pair must fall through and send, never abort silently.
+    if (scopeMismatch && !isWorkspaceScopePairSuppressed(scopeMismatch.currentWorkspaceId, scopeMismatch.inferredWorkspaceId)) {
       setWorkspaceScopeNotice({
         currentWorkspaceId: scopeMismatch.currentWorkspaceId,
         inferredWorkspaceId: scopeMismatch.inferredWorkspaceId,
