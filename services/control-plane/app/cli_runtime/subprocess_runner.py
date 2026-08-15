@@ -8,6 +8,7 @@ from collections.abc import Callable
 from pathlib import Path
 
 from app.cli_runtime.agent_sandbox import AgentSandboxPolicy, wrap_command_in_agent_sandbox
+from app.cli_runtime.agent_sandbox_cleanup import cleanup_run_sandbox, prune_stale_run_sandboxes
 from app.cli_runtime.process_registry import register, unregister
 from app.cli_runtime.agent_process_scope import wrap_command_in_agent_scope
 from app.cli_runtime.user_bin_path import runtime_path_with_user_bins
@@ -50,6 +51,7 @@ def _prepare_command(
         return wrap_command_in_agent_scope(command)
     if cwd is None:
         raise RuntimeError("Sandboxed agent execution requires a workspace root.")
+    prune_stale_run_sandboxes()
     sandbox_command = list(command)
     executable = Path(sandbox_command[0]).expanduser()
     if executable.is_absolute():
@@ -83,19 +85,19 @@ def communicate_registered_process(
     sandbox_policy: AgentSandboxPolicy | None = None,
 ) -> tuple[str, str, int]:
     env = headless_cli_env(subprocess_env)
-    proc = subprocess.Popen(
-        _prepare_command(
-            command,
-            sandbox_policy=sandbox_policy,
-            cwd=cwd,
-            run_id=run_id,
-        ),
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        text=True,
-        env=env,
-        cwd=cwd or None,
-    )
+    try:
+        proc = subprocess.Popen(
+            _prepare_command(command, sandbox_policy=sandbox_policy, cwd=cwd, run_id=run_id),
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            env=env,
+            cwd=cwd or None,
+        )
+    except BaseException:
+        if sandbox_policy is not None:
+            cleanup_run_sandbox(run_id)
+        raise
     clean_run_id = str(run_id or "").strip()
     if clean_run_id:
         register(clean_run_id, proc)
@@ -110,6 +112,8 @@ def communicate_registered_process(
     finally:
         if clean_run_id:
             unregister(clean_run_id)
+        if sandbox_policy is not None:
+            cleanup_run_sandbox(run_id)
 
 
 def stream_registered_process(
@@ -123,20 +127,20 @@ def stream_registered_process(
     sandbox_policy: AgentSandboxPolicy | None = None,
 ) -> tuple[str, str, int]:
     env = headless_cli_env(subprocess_env)
-    proc = subprocess.Popen(
-        _prepare_command(
-            command,
-            sandbox_policy=sandbox_policy,
-            cwd=cwd,
-            run_id=run_id,
-        ),
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        text=True,
-        bufsize=1,
-        env=env,
-        cwd=cwd or None,
-    )
+    try:
+        proc = subprocess.Popen(
+            _prepare_command(command, sandbox_policy=sandbox_policy, cwd=cwd, run_id=run_id),
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            bufsize=1,
+            env=env,
+            cwd=cwd or None,
+        )
+    except BaseException:
+        if sandbox_policy is not None:
+            cleanup_run_sandbox(run_id)
+        raise
     clean_run_id = str(run_id or "").strip()
     if clean_run_id:
         register(clean_run_id, proc)
@@ -161,6 +165,8 @@ def stream_registered_process(
     finally:
         if clean_run_id:
             unregister(clean_run_id)
+        if sandbox_policy is not None:
+            cleanup_run_sandbox(run_id)
         for pipe in (proc.stdout, proc.stderr):
             if pipe is not None and not pipe.closed:
                 pipe.close()
