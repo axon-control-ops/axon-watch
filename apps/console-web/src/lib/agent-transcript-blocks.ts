@@ -108,16 +108,22 @@ export function collapseClosedEditSegmentsForDisplay(
   return collapsed;
 }
 
+const DISPLAY_PARSE_MAX_CHARS = 400_000;
+
 export function prepareAgentTranscriptSegmentsForDisplay(
   content: string,
   options?: { collapseClosedEditsAt?: number },
 ): AgentTranscriptSegment[] {
+  const normalizedContent =
+    content.length > DISPLAY_PARSE_MAX_CHARS
+      ? `${content.slice(0, DISPLAY_PARSE_MAX_CHARS)}\n\n… [transcript truncated for display performance] …`
+      : content;
   const threshold = options?.collapseClosedEditsAt ?? 12;
-  const editCount = countAgentTranscriptHeaders(content).edit;
+  const editCount = countAgentTranscriptHeaders(normalizedContent).edit;
   const segments =
     editCount >= threshold
-      ? parseAgentTranscriptBlocksUncached(content, { omitClosedEditDiffs: true })
-      : parseAgentTranscriptBlocks(content);
+      ? parseAgentTranscriptBlocksUncached(normalizedContent, { omitClosedEditDiffs: true })
+      : parseAgentTranscriptBlocks(normalizedContent);
   return collapseClosedEditSegmentsForDisplay(segments, threshold);
 }
 

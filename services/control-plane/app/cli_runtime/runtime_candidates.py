@@ -26,6 +26,8 @@ def effective_cli_model(family: str, runtime_model: str) -> str:
 def ordered_candidates_for_dispatch(
     snapshot: dict[str, object],
     runtime_target: str | None,
+    *,
+    fallback_runtime_families: tuple[str, ...] = (),
 ) -> list[dict[str, object]]:
     candidates = ordered_runtime_candidates(snapshot)
     preferred = str(runtime_target or "").strip()
@@ -33,11 +35,23 @@ def ordered_candidates_for_dispatch(
         return candidates
     by_id = {str(record.get("id") or ""): record for record in candidates}
     selected = by_id.get(preferred)
-    # A value passed by the composer is an explicit operator selection, not a
-    # ranking hint. Falling through to another provider made the UI say Codex
-    # while a failed turn actually consumed Claude/Cursor capacity. Automatic
-    # fallback remains available only when the composer leaves the target auto.
-    return [selected] if selected else []
+    # A value passed by an interactive composer remains a strict operator
+    # selection. Autonomous workers may additionally supply the workspace's
+    # explicitly approved Auto families; keep the selected runtime first and
+    # never consume an unapproved provider.
+    if not selected:
+        return []
+    allowed = {str(family).strip() for family in fallback_runtime_families if family}
+    if not allowed:
+        return [selected]
+    return [
+        selected,
+        *[
+            record
+            for record in candidates
+            if record is not selected and str(record.get("family") or "") in allowed
+        ],
+    ]
 
 
 __all__ = ["effective_cli_model", "ordered_candidates_for_dispatch"]

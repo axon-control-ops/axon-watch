@@ -1,0 +1,12 @@
+[Unit]
+Description=Poll DashPro CI failures into local Gate 9 when webhook is unreachable
+
+[Timer]
+OnBootSec=3min
+OnUnitActiveSec=3min
+AccuracySec=30s
+Persistent=true
+Unit=axon-dashpro-ci-remediation-poll.service
+
+[Install]
+WantedBy=timers.target

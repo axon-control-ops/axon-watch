@@ -17,6 +17,7 @@ import {
   employeeFailureLine,
   employeeMetaLine,
   employeeRoleBadge,
+  employeeRuntimeShiftHint,
   employeeShiftNeedsContinuation,
   employeeStatusLabel,
   employeeTalkLine,
@@ -24,6 +25,7 @@ import {
 } from '../../features/workspace-agents/company-roster-view';
 import {
   failedShiftSubjectFromDecisionTitle,
+  pendingDecisionCardOptions,
   pendingDecisionPrompt as resolvePendingDecisionPrompt,
 } from '../../features/workspace-agents/company-roster-focus';
 import { resolveEmployeeDeliveryLinks } from '../../features/workspace-agents/employee-delivery-handoff-view';
@@ -38,6 +40,8 @@ const props = defineProps<{
   controlBusy: boolean;
   liveBusy?: boolean;
   handoffWaiting?: boolean;
+  /** Short hint while a headless worker shift is in flight. */
+  runtimeShiftHint?: string | null;
   /** True while THIS employee's own thread is the one live-streaming right
    * now — reveals `transcript` while the roster stays available. */
   reporting?: boolean;
@@ -82,7 +86,13 @@ const deliveryLinks = computed(() =>
 );
 const liveBeat = computed(() => {
   if (props.reporting) {
-    return 'Live shift in progress — activity streams below. Open the agent dock for full detail.';
+    return (
+      props.runtimeShiftHint?.trim() ||
+      'Live shift in progress — activity streams below. Open the agent dock for full detail.'
+    );
+  }
+  if (props.liveBusy && props.runtimeShiftHint?.trim()) {
+    return props.runtimeShiftHint.trim();
   }
   if (failure.value) {
     return failure.value;
@@ -114,6 +124,13 @@ const receiptsAction = computed(() =>
 const displayActions = computed(() =>
   employeeDockDisplayActions(props.actions, props.employee),
 );
+const dockPrimaryActionIds = new Set(['start_now', 'retry', 'talk', 'stop']);
+const dockPrimaryActions = computed(() =>
+  displayActions.value.filter((action) => dockPrimaryActionIds.has(action.id)),
+);
+const dockSecondaryActions = computed(() =>
+  displayActions.value.filter((action) => !dockPrimaryActionIds.has(action.id)),
+);
 const pendingDecision = computed(() => Boolean(props.employee.pending_decision_id));
 const pendingDecisionCopy = computed(
   () => resolvePendingDecisionPrompt(props.employee) || 'Review the pending decision',
@@ -122,7 +139,7 @@ const pendingDecisionSubject = computed(() =>
   failedShiftSubjectFromDecisionTitle(props.employee.pending_decision_title),
 );
 const pendingDecisionOptions = computed(() =>
-  (props.employee.pending_decision_options ?? []).filter((option) => option.id && option.label).slice(0, 3),
+  pendingDecisionCardOptions(props.employee).slice(0, 3),
 );
 const retryActionLabel = computed(
   () => displayActions.value.find((action) => action.id === 'retry')?.label ?? 'Try again',
@@ -158,6 +175,15 @@ watch(
     :data-role="employee.role"
     :aria-label="`${employee.name} agent dock`"
   >
+    <button
+      v-if="employee.owns?.trim()"
+      type="button"
+      class="agent-persona-dock__owns-info"
+      :title="employee.owns"
+      :aria-label="`${employee.name} scope: ${employee.owns}`"
+    >
+      <span aria-hidden="true">i</span>
+    </button>
     <header class="agent-persona-dock__hero">
       <button
         type="button"
@@ -206,6 +232,13 @@ watch(
             {{ employeeRoleBadge(employee) }}
           </span>
           <span
+            v-if="runtimeShiftHint"
+            class="company-roster__badge company-roster__badge--runtime"
+            :title="runtimeShiftHint"
+          >
+            Headless
+          </span>
+          <span
             v-if="!employee.enabled"
             class="company-roster__badge company-roster__badge--paused"
           >
@@ -215,7 +248,6 @@ watch(
         <p v-if="employeeMetaLine(employee)" class="agent-persona-dock__meta">
           {{ employeeMetaLine(employee) }}
         </p>
-        <p class="agent-persona-dock__owns">{{ employee.owns }}</p>
       </div>
       <span
         class="agent-persona-dock__status"
@@ -225,7 +257,33 @@ watch(
       </span>
     </header>
 
+    <div class="agent-persona-dock__scroll">
     <div class="agent-persona-dock__body">
+    <button
+      v-if="failure"
+      type="button"
+      class="agent-persona-dock__beat agent-persona-dock__beat-btn"
+      :class="{
+        'agent-persona-dock__beat--failed': !interruptedShift,
+        'agent-persona-dock__beat--interrupted': interruptedShift,
+      }"
+      :title="beatDetailTooltip ?? undefined"
+      :aria-label="`${failureBeatAriaLabel ?? liveBeat}. Tap to ${retryActionLabel}.`"
+      @click="emit('recoverFailure')"
+    >
+      {{ liveBeat }}
+      <span class="agent-persona-dock__beat-cta">{{ retryActionLabel }} →</span>
+    </button>
+    <p
+      v-else
+      class="agent-persona-dock__beat"
+      :class="{ 'agent-persona-dock__beat--live': reporting }"
+      :title="beatDetailTooltip ?? undefined"
+      role="status"
+    >
+      {{ liveBeat }}
+    </p>
+
     <section
       v-if="pendingDecision"
       class="agent-persona-dock__decision-alert"
@@ -270,31 +328,6 @@ watch(
         </button>
       </div>
     </section>
-
-    <button
-      v-if="failure"
-      type="button"
-      class="agent-persona-dock__beat agent-persona-dock__beat-btn"
-      :class="{
-        'agent-persona-dock__beat--failed': !interruptedShift,
-        'agent-persona-dock__beat--interrupted': interruptedShift,
-      }"
-      :title="beatDetailTooltip ?? undefined"
-      :aria-label="`${failureBeatAriaLabel ?? liveBeat}. Tap to ${retryActionLabel}.`"
-      @click="emit('recoverFailure')"
-    >
-      {{ liveBeat }}
-      <span class="agent-persona-dock__beat-cta">{{ retryActionLabel }} →</span>
-    </button>
-    <p
-      v-else
-      class="agent-persona-dock__beat"
-      :class="{ 'agent-persona-dock__beat--live': reporting }"
-      :title="beatDetailTooltip ?? undefined"
-      role="status"
-    >
-      {{ liveBeat }}
-    </p>
 
     <ul
       v-if="transcriptLines.length"
@@ -369,28 +402,56 @@ watch(
     </div>
 
     <div
-      v-if="displayActions.length"
-      class="agent-persona-dock__actions"
+      v-if="dockPrimaryActions.length || dockSecondaryActions.length"
+      class="agent-persona-dock__action-stack"
       role="group"
       :aria-label="`Actions for ${employee.name}`"
     >
-      <button
-        v-for="action in displayActions"
-        :key="action.id"
-        type="button"
-        class="company-roster__action"
-        :class="{
-          'company-roster__action--surface': action.kind === 'surface',
-          'company-roster__action--retry': action.id === 'retry',
-          'company-roster__action--receipts': action.id === 'receipts',
-          'company-roster__action--control': action.kind === 'control',
-          'company-roster__action--start-now': action.id === 'start_now',
-        }"
-        :disabled="controlBusy && action.kind === 'control'"
-        @click="emit('action', action)"
+      <div
+        v-if="dockPrimaryActions.length"
+        class="agent-persona-dock__actions agent-persona-dock__actions--primary"
       >
-        {{ action.label }}
-      </button>
+        <button
+          v-for="action in dockPrimaryActions"
+          :key="action.id"
+          type="button"
+          class="company-roster__action"
+          :class="{
+            'company-roster__action--surface': action.kind === 'surface',
+            'company-roster__action--retry': action.id === 'retry',
+            'company-roster__action--receipts': action.id === 'receipts',
+            'company-roster__action--control': action.kind === 'control',
+            'company-roster__action--start-now': action.id === 'start_now',
+          }"
+          :disabled="controlBusy && action.kind === 'control'"
+          @click="emit('action', action)"
+        >
+          {{ action.label }}
+        </button>
+      </div>
+      <div
+        v-if="dockSecondaryActions.length"
+        class="agent-persona-dock__actions agent-persona-dock__actions--secondary"
+      >
+        <button
+          v-for="action in dockSecondaryActions"
+          :key="action.id"
+          type="button"
+          class="company-roster__action"
+          :class="{
+            'company-roster__action--surface': action.kind === 'surface',
+            'company-roster__action--retry': action.id === 'retry',
+            'company-roster__action--receipts': action.id === 'receipts',
+            'company-roster__action--control': action.kind === 'control',
+            'company-roster__action--start-now': action.id === 'start_now',
+          }"
+          :disabled="controlBusy && action.kind === 'control'"
+          @click="emit('action', action)"
+        >
+          {{ action.label }}
+        </button>
+      </div>
+    </div>
     </div>
   </article>
 </template>

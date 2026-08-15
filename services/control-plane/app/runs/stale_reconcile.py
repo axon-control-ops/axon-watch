@@ -38,6 +38,30 @@ BUSY_EMPLOYEE_PHASES = frozenset(
 _EARLY_BUSY_PHASES = frozenset({"queued", "starting", "planning"})
 # Heartbeat receipts prove the dispatch thread is alive but not that work progressed.
 _STALE_IDLE_SKIP_RECEIPT_TYPES = frozenset({"worker_heartbeat"})
+# Executing runs without worker_dispatch_started are operator-visible zombies.
+DEFAULT_UNDISPATCHED_WORKER_SECONDS = 90.0
+
+
+def undispatched_worker_seconds() -> float:
+    raw = os.environ.get("AXON_WATCH_UNDISPATCHED_WORKER_SECONDS", "").strip()
+    if not raw:
+        return DEFAULT_UNDISPATCHED_WORKER_SECONDS
+    try:
+        return max(30.0, float(raw))
+    except ValueError:
+        return DEFAULT_UNDISPATCHED_WORKER_SECONDS
+
+
+def _run_has_receipt_type(record: dict[str, Any], receipt_type: str) -> bool:
+    history_ref = str(record.get("history_ref") or "").strip()
+    if not history_ref:
+        return False
+    want = receipt_type.strip()
+    for item in run_store.list_history(history_ref):
+        receipt = item.get("receipt")
+        if isinstance(receipt, dict) and str(receipt.get("type") or "").strip() == want:
+            return True
+    return False
 
 
 def employee_run_stale_seconds() -> float:
@@ -298,10 +322,48 @@ def reap_stale_employee_runs(
             continue
         cutoff = _normalize_cutoff(stale_seconds, role=role, record=record)
         age = _run_idle_age_seconds(record, now=moment)
-        if age is None or age < cutoff:
+        if age is None:
             continue
         run_id = str(record.get("run_id") or "").strip()
         if not run_id:
+            continue
+
+        undispatch_cutoff = undispatched_worker_seconds()
+        if (
+            phase in {"executing", "starting", "planning"}
+            and str(record.get("task_id") or "").strip()
+            and not _run_has_receipt_type(record, "worker_dispatch_started")
+            and age >= undispatch_cutoff
+        ):
+            from app.persistence import task_store
+
+            try:
+                fail_run(
+                    run_id,
+                    receipt_summary=(
+                        "Continuous worker run never received worker_dispatch_started "
+                        f"({int(age)}s > {int(undispatch_cutoff)}s)"
+                    ),
+                    actor="workspace_scheduler",
+                )
+            except (RunLifecycleError, RunNotFoundError):
+                logger.exception("undispatched employee-run reap skipped for %s", run_id)
+                continue
+            task_store.reopen_orphaned_leased_tasks(
+                terminal_run_ids=[run_id],
+                terminal_outcome="run failed without worker dispatch; task reopened",
+                refund_attempts=True,
+            )
+            reaped.append(run_id)
+            logger.warning(
+                "reaped undispatched employee run %s role=%s idle_s=%.0f",
+                run_id,
+                role,
+                age,
+            )
+            continue
+
+        if age < cutoff:
             continue
 
         # OTA ships often block Cursor shell with no stream chunks — idle age looks

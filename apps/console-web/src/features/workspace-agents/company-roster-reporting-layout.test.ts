@@ -12,6 +12,7 @@ function source(path: string): string {
 describe('company roster reporting layout', () => {
   it('keeps the team roster visible while a selected teammate streams a report', () => {
     const panel = source('components/shell/CompanyRosterPanel.vue');
+    const dockCss = source('styles/shell/agent-persona-dock.css');
     const reportingCss = source('styles/shell/agent-persona-dock-reporting.css');
 
     expect(panel).not.toContain("company-roster--reporting");
@@ -19,6 +20,7 @@ describe('company roster reporting layout', () => {
     expect(panel).not.toContain(':aria-hidden="selectedEmployeeIsReporting"');
     expect(panel).toContain(':reporting="selectedEmployeeIsReporting"');
     expect(reportingCss).not.toContain('max-height: 0');
-    expect(reportingCss).toContain('max-height: min(32rem, 58vh)');
+    expect(dockCss).toContain('agent-persona-dock__scroll');
+    expect(dockCss).toContain('max-height: min(36rem, 62vh)');
   });
 });

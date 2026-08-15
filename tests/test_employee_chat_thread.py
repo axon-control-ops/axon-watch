@@ -252,16 +252,17 @@ class EmployeeChatThreadRouteTests(unittest.TestCase):
         self.assertEqual(200, created.status_code)
         thread_id = created.json()["thread_id"]
 
-        response = self.client.post(
-            "/api/chat/messages",
-            json={
-                "workspace_id": "workspace_axon_watch",
-                "thread_id": thread_id,
-                "content": "Hey VAXON",
-                "composer_mode": "agent",
-                "execution_access": "full",
-            },
-        )
+        with patch("app.routes.chat.execute_lane_b_stream", return_value=None):
+            response = self.client.post(
+                "/api/chat/messages",
+                json={
+                    "workspace_id": "workspace_axon_watch",
+                    "thread_id": thread_id,
+                    "content": "Hey VAXON",
+                    "composer_mode": "agent",
+                    "execution_access": "full",
+                },
+            )
 
         self.assertEqual(200, response.status_code)
         payload = response.json()

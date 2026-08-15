@@ -5,10 +5,15 @@ from __future__ import annotations
 import re
 from typing import Any
 
+from app.workspace_agents.agent_voice_style import append_agent_voice_style
 from app.workspace_agents.backend_agent_training import backend_agent_training_clause
 from app.workspace_agents.catalog import _DEFAULT_OWNS
 from app.workspace_agents.config_loader import EmployeeConfig
-from app.workspace_agents.critical_review_clause import append_critical_review_clause
+from app.workspace_agents.critical_review_clause import (
+    append_agent_standing_accuracy_clause,
+    append_critical_review_clause,
+    is_review_type_task,
+)
 from app.workspace_agents.employee_persona_prompt import build_employee_identity_line
 from app.workspace_agents.lead_text import truncate_text as _truncate
 from app.workspace_agents.run_outcome import latest_role_run_outcome
@@ -221,8 +226,15 @@ def _current_task_packet(
     goal: str,
     acceptance: str,
     allowed_paths: list[str],
+    exclusive_paths: list[str] | None = None,
 ) -> str:
-    expected = ", ".join(f"`{path}`" for path in allowed_paths[:12]) or "role/task scoped files"
+    # exclusive_paths (literal paths named in the goal, never backfilled) is the
+    # honest, task-specific file list for display. Do NOT fall back to
+    # allowed_paths here — that's the full role write-scope enforcement
+    # ceiling, backfilled to a static per-role default when the goal names no
+    # path, and showing it would present a generic template as task-specific.
+    display_paths = exclusive_paths or []
+    expected = ", ".join(f"`{path}`" for path in display_paths[:12]) or "role/task scoped files"
     return (
         " Current task packet (authoritative; ignore stale thread context): "
         f"workspace=`{workspace_id.strip() or 'unknown'}`; "
@@ -394,6 +406,12 @@ def build_continuous_worker_prompt(
         if isinstance(allowed_paths_raw, list)
         else []
     )
+    exclusive_paths_raw = task_payload.get("exclusive_paths")
+    exclusive_paths = (
+        [str(item).strip() for item in exclusive_paths_raw if str(item).strip()]
+        if isinstance(exclusive_paths_raw, list)
+        else []
+    )
     scope_clause = _task_scope_clause(
         goal=goal,
         acceptance=acceptance,
@@ -498,6 +516,7 @@ def build_continuous_worker_prompt(
         goal=goal,
         acceptance=acceptance,
         allowed_paths=allowed_paths,
+        exclusive_paths=exclusive_paths,
     )
     roster_block = build_team_roster_context(workspace_id, viewer_role=role)
     roster_clause = f"\n\n{roster_block}" if roster_block else ""
@@ -546,7 +565,15 @@ def build_continuous_worker_prompt(
         "it as a blocker instead of trying to include or discard it."
     )
     tools_clause = _role_tools_clause(role)
-    return append_critical_review_clause(
+    from app.workspace_agents.lead_verification_handoff import (
+        verification_worker_prompt_clause,
+    )
+
+    verification_clause = verification_worker_prompt_clause(
+        workspace_id=workspace_id,
+        task=task_payload,
+    )
+    assembled = (
         f"{identity} "
         f"This is a bounded continuous shift ({schedule}) for leased task {task_id}. "
         f"{prior_failure}"
@@ -557,6 +584,7 @@ def build_continuous_worker_prompt(
         "Do it with verified receipts and summarize what changed. "
         "Stay inside your role boundary. Never hallucinate outcomes."
         f"{scope_clause}"
+        f"{verification_clause}"
         f"{continuity_clause}"
         f"{lead_clause}"
         f"{delivery_clause}"
@@ -568,3 +596,11 @@ def build_continuous_worker_prompt(
         "never a bare FAILED."
         f"{roster_clause}"
     )
+    assembled = append_agent_voice_style(assembled)
+    # The full "critically review, rewrite, end with Confidence: N/10" ritual
+    # is reserved for genuine review/verification tasks. Routine shifts still
+    # get the standing no-hallucination contract, just not the forced
+    # self-critique rewrite — see is_review_type_task().
+    if is_review_type_task(task_payload):
+        return append_critical_review_clause(assembled)
+    return append_agent_standing_accuracy_clause(assembled)

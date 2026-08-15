@@ -24,6 +24,22 @@ class LeadReplanTests(unittest.TestCase):
         isolate_control_plane_db(self, run_store)
         task_store.reset_store()
         lead_plan_store.reset_store()
+        planner = patch(
+            "app.workspace_agents.teammate_route.dispatch_model_tiebreak",
+            return_value={
+                "content": (
+                    '{"items":['
+                    '{"owner_role":"frontend","goal":"Fix the dashboard UI",'
+                    '"dependencies":[],"acceptance_criteria":"UI validation passes"},'
+                    '{"owner_role":"backend",'
+                    '"goal":"Fix assignment idempotency and data cleanup",'
+                    '"dependencies":[],"acceptance_criteria":"Backend validation passes"}'
+                    "]}"
+                )
+            },
+        )
+        planner.start()
+        self.addCleanup(planner.stop)
 
     def _restore(self) -> None:
         for name in list(sys.modules):

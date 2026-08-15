@@ -333,6 +333,12 @@
   cursor: not-allowed;
 }
 
+.agent-dock-notice__primary:focus-visible,
+.agent-dock-notice__link:focus-visible {
+  outline: 2px solid var(--accent-brand, #00f2ff);
+  outline-offset: 2px;
+}
+
 .agent-dock-composer__approval-banner {
   border: 1px solid rgba(255, 196, 120, 0.35);
   background: rgba(255, 196, 120, 0.08);

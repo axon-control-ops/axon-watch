@@ -7,6 +7,7 @@ import re
 from typing import Any
 
 from app.persistence import chat_store
+from app.persistence.autonomous_attention_redaction import redact_text
 from app.chat.stream_hub import publish_chat_stream_event
 
 _RESEARCH_HEADER_RE = re.compile(r"^:::research\s+(.+)$", re.MULTILINE)
@@ -182,7 +183,10 @@ def persist_stream_delta(
     from app.cli_runtime.research_stream_blocks import normalize_transcript_content
     from app.terminal.agent_job_chat import merge_active_agent_job_terminals
 
-    normalized_accumulated = normalize_transcript_content(accumulated)
+    normalized_accumulated = redact_text(
+        normalize_transcript_content(accumulated)
+    )
+    safe_delta = redact_text(delta)
     # Preserve live Axon agent-terminal job fences when Cursor assembler overwrites.
     normalized_accumulated = merge_active_agent_job_terminals(
         message_id,
@@ -200,7 +204,7 @@ def persist_stream_delta(
             "thread_id": thread_id,
             "message_id": message_id,
             "content": normalized_accumulated,
-            "delta": delta,
+            "delta": safe_delta,
         },
     )
     publish_research_milestones_for_delta(
@@ -210,4 +214,3 @@ def persist_stream_delta(
         content=normalized_accumulated,
     )
     return normalized_accumulated
-

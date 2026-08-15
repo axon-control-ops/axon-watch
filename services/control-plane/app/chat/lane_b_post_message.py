@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import shutil
+from pathlib import Path
+
 from app.chat.lane_b_agent import EditorSelectionContext, LaneBContext, generate_lane_b_result
 from app.chat.lane_b_fast_paths import post_image_redisplay_message, post_workspace_switch_message
 from app.chat.lane_b_generated_image_actions import (
@@ -32,6 +35,42 @@ from app.workspace_agents.employee_first_person import (
     employee_name_from_persona_block,
     rewrite_employee_third_person_to_first,
 )
+
+
+def _localize_attachment_paths_for_sandbox(
+    paths: tuple[str, ...],
+    *,
+    sandbox_workspace_root: Path | None,
+) -> tuple[str, ...]:
+    """Copy attachments into the agent's own sandbox so it can actually read them.
+
+    ``image_paths`` carries real absolute host paths under the control
+    plane's own state directory (attachment_store._attachments_root()). An
+    agent executing in an isolated sandbox checkout has no access to that
+    directory at all, so handing it that path as-is guarantees a "No such
+    file or directory" the moment it tries to read it (confirmed live: an
+    agent given an attached image path ran `find`/`rg` against its own
+    workspace root and never found the file). Copy each attachment into the
+    sandbox and rewrite the path to the reachable copy instead.
+    """
+    if not paths or sandbox_workspace_root is None:
+        return paths
+    dest_dir = sandbox_workspace_root / ".attachments"
+    localized: list[str] = []
+    for raw_path in paths:
+        source = Path(raw_path)
+        try:
+            if not source.is_file():
+                localized.append(raw_path)
+                continue
+            dest_dir.mkdir(parents=True, exist_ok=True)
+            dest = dest_dir / source.name
+            shutil.copy2(source, dest)
+            localized.append(str(dest))
+        except OSError:
+            # Fail open: worst case matches today's unreachable-path behavior.
+            localized.append(raw_path)
+    return tuple(localized)
 
 
 def post_lane_b_message(
@@ -356,7 +395,10 @@ def post_lane_b_message(
             payload["agent_terminal_session"] = serialize_session(agent_terminal_session)
         return payload
 
-    image_paths = _attachment_paths_for_ids(attachment_ids, workspace_id)
+    image_paths = _localize_attachment_paths_for_sandbox(
+        _attachment_paths_for_ids(attachment_ids, workspace_id),
+        sandbox_workspace_root=sandbox_workspace_root,
+    )
     context = LaneBContext(
         workspace_id=workspace_id,
         composer_mode=composer_mode,

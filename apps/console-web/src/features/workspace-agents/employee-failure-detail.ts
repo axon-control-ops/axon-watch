@@ -113,6 +113,20 @@ export function isCompletionGateFailure(detail: string | null | undefined): bool
   );
 }
 
+/** Gate 6 acceptance / verification evidence did not pass. */
+export function isGate6AcceptanceFailure(detail: string | null | undefined): boolean {
+  const normalized = normalizeOperatorFailureDetail(detail).toLowerCase();
+  if (!normalized) {
+    return false;
+  }
+  return (
+    normalized.includes('gate 6') ||
+    normalized.includes('acceptance_evidence') ||
+    normalized.includes('acceptance evidence') ||
+    normalized.includes('lane b finalization failed')
+  );
+}
+
 /** Strip Lane B fallback wrappers so dock and retry drafts show the root cause. */
 export function normalizeOperatorFailureDetail(detail: string | null | undefined): string {
   const cleaned = (detail ?? '').replace(/\s+/g, ' ').trim();

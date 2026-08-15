@@ -1,0 +1,32 @@
+.mc-live-ops__reply .mc-live-ops__mic:focus-visible,
+.mc-live-ops__reply .mc-live-ops__send:focus-visible {
+  outline: 2px solid var(--accent-brand, #00f2ff);
+  outline-offset: 2px;
+}
+
+.mc-exec-composer__notice {
+  display: flex;
+  align-items: stretch;
+  gap: 0.5rem;
+  padding: 0.4rem 0.5rem 0.4rem 0;
+  border: 1px solid rgba(255, 77, 77, 0.28);
+  border-radius: 0.4rem;
+  background: rgba(22, 10, 10, 0.85);
+}
+
+.mc-exec-composer__notice-rail {
+  flex: 0 0 3px;
+  margin: 0.12rem 0 0.12rem 0.45rem;
+  border-radius: 999px;
+  background: var(--state-critical, #ff4d4d);
+}
+
+.mc-exec-composer__notice-copy {
+  margin: 0;
+  flex: 1 1 auto;
+  min-width: 0;
+  color: rgba(255, 205, 205, 0.94);
+  font-size: 0.62rem;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}

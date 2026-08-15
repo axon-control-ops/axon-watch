@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from app.workspace_agents.agent_voice_style import AGENT_VOICE_STYLE_CLAUSE
 from app.workspace_agents.catalog import ROLE_CATALOG, _DEFAULT_OWNS, _DEFAULT_ROLE_NAMES
 from app.workspace_agents.config_loader import _role_label
 from app.workspace_agents.critical_review_clause import AGENT_STANDING_ACCURACY_CLAUSE
@@ -171,6 +172,7 @@ def build_employee_persona_appendix(
         EMPLOYEE_PERSONA_MARKER,
         identity,
         AGENT_STANDING_ACCURACY_CLAUSE,
+        AGENT_VOICE_STYLE_CLAUSE,
         WORKER_ISOLATION_CLAUSE,
         f"Role label: {role_label}.",
         (

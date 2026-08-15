@@ -113,6 +113,24 @@ describe('parseAgentTranscriptBlocks', () => {
     ]);
   });
 
+  it('sanitizes jest ansi noise from terminal transcript blocks', () => {
+    const noisy = [
+      ':::terminal npm test',
+      '\x1b[1A\x1b[2K\x1b[32mPASS\x1b[0m tests/unit/foo.test.ts',
+      '[1A[2K[32mPASS[0m tests/unit/bar.test.ts',
+      'Test Suites: 2 passed, 2 total',
+      ':::',
+    ].join('\n');
+    const segments = parseAgentTranscriptBlocks(noisy);
+    const terminal = segments[0];
+    expect(terminal?.kind).toBe('terminal');
+    if (terminal?.kind !== 'terminal') throw new Error('expected terminal segment');
+    expect(terminal.output).not.toMatch(/\x1b\[/);
+    expect(terminal.output).not.toMatch(/\[1A/);
+    expect(terminal.output).toContain('PASS');
+    expect(terminal.output).toContain('Test Suites: 2 passed, 2 total');
+  });
+
   it('compacts legacy oversized terminal output before rendering', () => {
     const output = `HEAD\n${'x'.repeat(30_000)}\nTAIL`;
     const segments = parseAgentTranscriptBlocks(

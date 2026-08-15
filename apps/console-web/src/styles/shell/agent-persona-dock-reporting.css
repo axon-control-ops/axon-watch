@@ -1,34 +1,16 @@
 /* Live shift preview inside the Team panel persona card. */
 
-.agent-persona-dock {
-  min-width: 0;
-  max-height: min(32rem, 58vh);
-  overflow: hidden;
-}
-
 .agent-persona-dock__hero {
   flex-shrink: 0;
 }
 
-.agent-persona-dock__body {
-  display: flex;
-  flex-direction: column;
-  gap: 0.55rem;
-  flex: 1 1 auto;
-  min-height: 0;
-  overflow-x: hidden;
-  overflow-y: auto;
-  overscroll-behavior: contain;
+.agent-persona-dock__scroll {
   scrollbar-gutter: stable;
-  padding-right: 0.05rem;
 }
 
 .agent-persona-dock__beat:not(.agent-persona-dock__beat-btn) {
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 3;
-  overflow: hidden;
   overflow-wrap: anywhere;
+  white-space: pre-wrap;
 }
 
 .agent-persona-dock__beat--live {

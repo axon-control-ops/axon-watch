@@ -6,6 +6,8 @@ import {
   formatThreadTimestamp,
   shortenRunId,
   shouldCollapseSystemMessage,
+  stickyPromptCanExpand,
+  stickyPromptPreviewText,
   summarizeAgentErrorContent,
   threadMessageSpeakerLabel,
   threadMessageSpeakerStyle,
@@ -66,5 +68,35 @@ describe('thread-message-view', () => {
     expect(
       shouldCollapseSystemMessage('Command linked to run run_abc123 (phase executing).'),
     ).toBe(true);
+  });
+
+  it('does not offer expand for a short operator message', () => {
+    expect(stickyPromptCanExpand('Fix the login button.')).toBe(false);
+  });
+
+  it('offers expand for a multi-section Instructions doc', () => {
+    const text = [
+      '# Instructions',
+      '',
+      '## Goal',
+      '',
+      'Create the Young Eagles 2nd-week menu by rearranging the existing 1st-week menu.',
+      '',
+      '## In scope',
+      '',
+      '- Confirm which item Oats refers to.',
+    ].join('\n');
+    expect(stickyPromptCanExpand(text)).toBe(true);
+  });
+
+  it('strips blank lines from the collapsed preview so real content shows first', () => {
+    const text = ['# Instructions', '', '## Goal', '', 'Create the 2nd-week menu.'].join('\n');
+    const preview = stickyPromptPreviewText(text);
+    expect(preview.split('\n')).toEqual(['# Instructions', '## Goal', 'Create the 2nd-week menu.']);
+  });
+
+  it('caps the preview at 3 meaningful lines', () => {
+    const text = ['Line one', 'Line two', 'Line three', 'Line four'].join('\n');
+    expect(stickyPromptPreviewText(text).split('\n')).toEqual(['Line one', 'Line two', 'Line three']);
   });
 });

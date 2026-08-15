@@ -543,6 +543,7 @@ export const useShellStore = defineStore('shell', () => {
   const ideExplorerCollapsed = ref(readStoredIdeExplorerCollapsed());
   const ideAttentionPanelOpen = ref(false);
   const ideBriefingPanelOpen = ref(false);
+  const ideVaxonDockPinned = ref(false);
   const agentDockCollapsed = ref(readStoredAgentDockCollapsed());
   const ideTerminalRevealToken = ref(0);
   const ideTerminalProblemsRevealToken = ref(0);
@@ -1642,6 +1643,8 @@ export const useShellStore = defineStore('shell', () => {
     highlightedSignalId,
     ideAttentionPanelOpen,
     ideBriefingPanelOpen,
+    ideVaxonDockPinned,
+    ideActivityView,
     ideExplorerCollapsed,
     signalsSeamEmphasized,
     missionControlEmphasized,
@@ -2553,6 +2556,7 @@ export const useShellStore = defineStore('shell', () => {
     persistLayoutMode(mode);
     ideAttentionPanelOpen.value = false;
     ideBriefingPanelOpen.value = false;
+    ideVaxonDockPinned.value = false;
     expandedDockSeams.value = new Set();
     dockHeroModeTouched.value = false;
     leftSidebarModeTouched.value = false;
@@ -2602,6 +2606,7 @@ export const useShellStore = defineStore('shell', () => {
     agentDockCollapsed,
     ideAttentionPanelOpen,
     ideBriefingPanelOpen,
+    ideVaxonDockPinned,
   });
 
   function syncWorkbenchTerminalPanelVisible(visible: boolean): void {
@@ -3921,6 +3926,7 @@ export const useShellStore = defineStore('shell', () => {
     ideBriefingPanelOpen,
     closeIdeBriefingPanel,
     openIdeBriefingPanel,
+    ideVaxonDockPinned,
     ideTerminalRevealToken,
     ideTerminalProblemsRevealToken,
     ideTerminalToggleToken,

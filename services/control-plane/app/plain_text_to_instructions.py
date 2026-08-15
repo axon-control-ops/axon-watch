@@ -11,11 +11,12 @@ _FENCED_MARKDOWN_RE = re.compile(
     re.IGNORECASE,
 )
 _SECTION_RE = re.compile(
-    r"^##\s*(Goal|In scope|Out of scope|Steps|Constraints|Source request)\s*$",
+    r"^##\s*(Goal|In scope|Out of scope|Steps|Constraints|Assumptions|Source request)\s*$",
     re.IGNORECASE | re.MULTILINE,
 )
-_REQUIRED_SECTION_KEYS = ("goal", "in_scope", "out_of_scope", "steps", "constraints", "source_request")
-_MIN_STEP_LINES = 3
+_REQUIRED_SECTION_KEYS = ("goal", "in_scope", "out_of_scope", "steps", "constraints")
+_OPTIONAL_SECTION_KEYS = ("assumptions", "source_request")
+_MIN_STEP_LINES = 4
 _GIT_OUT_OF_SCOPE_RE = re.compile(
     r"\b(?:commit(?:ting|s)?|push(?:ing|es)?|merg(?:e|ing)|releas(?:e|ing))\b",
     re.IGNORECASE,
@@ -59,7 +60,7 @@ def _section_nonempty(body: str, *, key: str) -> bool:
     if key == "steps":
         numbered = [line for line in text.splitlines() if re.match(r"^\s*\d+[\).\s]", line.strip())]
         return len(numbered) >= _MIN_STEP_LINES
-    if key in {"in_scope", "out_of_scope", "constraints"}:
+    if key in {"in_scope", "out_of_scope", "constraints", "assumptions"}:
         return any(line.strip().startswith("-") for line in text.splitlines())
     return len(text) >= 12
 
@@ -145,13 +146,14 @@ def build_instructions_markdown_from_source(source: str) -> str:
     out_of_scope = [
         "Committing, pushing, merging, tagging, or releasing unless explicitly requested",
         "Inventing unrelated refactors, migrations, or cleanup chores",
-        "Claiming work was completed without verification evidence",
     ]
     constraints = [
         "Follow only the steps listed above",
         "Treat Out of scope as binding",
         "Preserve every explicit requirement from the source request",
         "Call out native-build-only gaps separately from OTA-safe fixes",
+        "Do not deploy, publish, or notify external parties unless explicitly requested",
+        "Do not claim work was implemented, tested, or verified without evidence",
     ]
     if prompt_requests_git_actions(cleaned):
         out_of_scope = [item for item in out_of_scope if "Committing" not in item]
@@ -198,6 +200,15 @@ def compose_instructions_markdown(source: str, model_markdown: str | None = None
         fallback_body = fallback_sections.get(key, "").strip()
         merged[key] = model_body if _section_nonempty(model_body, key=key) else fallback_body
 
+    # Optional sections: keep the model's choice to include or omit them. Only fall back to
+    # the deterministic source_request when the required sections above were already
+    # incomplete enough to need fallback-filling — a fully-complete model reply that omits
+    # these never reaches this branch (see the early return above).
+    assumptions = model_sections.get("assumptions", "").strip()
+    source_request = model_sections.get("source_request", "").strip()
+    if not source_request:
+        source_request = fallback_sections.get("source_request", "").strip()
+
     lines = [
         "# Instructions",
         "",
@@ -215,11 +226,12 @@ def compose_instructions_markdown(source: str, model_markdown: str | None = None
         "",
         "## Constraints",
         merged["constraints"],
-        "",
-        "## Source request",
-        merged["source_request"],
-        "",
     ]
+    if assumptions:
+        lines += ["", "## Assumptions", assumptions]
+    if source_request:
+        lines += ["", "## Source request", source_request]
+    lines.append("")
     return "\n".join(lines)
 
 

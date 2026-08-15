@@ -35,4 +35,27 @@ describe('composer workspace scope', () => {
       ),
     ).toBeNull();
   });
+
+  it('does not flag a passing DashPro mention inside dominantly Young-Eagles-scoped text', () => {
+    // Regression: an Instructions doc for Young Eagles that merely names a
+    // legitimate cross-tenant contact ("consult Dana from Edudash Pro")
+    // should not trip the mismatch banner just because the keyword appears.
+    const draft =
+      '# Instructions\n\n## Goal\n\nUpdate the Young Eagles tenant’s second menu ' +
+      'and present an expanded teacher roster table.\n\n## In scope\n\n- Consult ' +
+      'Dana from Edudash Pro on the Young Eagles tenant roster requirements.\n\n' +
+      '## Constraints\n\n- Preserve existing tenant separation for the Young Eagles tenant.';
+    expect(
+      resolveComposerWorkspaceScopeMismatch('workspace_young_eagles_day_care', draft),
+    ).toBeNull();
+  });
+
+  it('still flags when the other workspace is the dominant subject, not a passing mention', () => {
+    const draft = 'Ship the DashPro parent dashboard OTA build and notify Dana at DashPro.';
+    const mismatch = resolveComposerWorkspaceScopeMismatch(
+      'workspace_young_eagles_day_care',
+      draft,
+    );
+    expect(mismatch?.inferredWorkspaceId).toBe('workspace_dashpro');
+  });
 });

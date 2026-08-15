@@ -34,6 +34,15 @@ class LongRunningShellTests(unittest.TestCase):
         self.assertTrue(is_long_running_ship_shell("npm run ota:canary"))
         self.assertTrue(is_long_running_ship_shell("eas update --branch operator-canary"))
         self.assertTrue(is_long_running_ship_shell("npx expo export --platform android"))
+        self.assertTrue(is_long_running_ship_shell("vercel deploy --prod --yes"))
+        self.assertTrue(
+            is_long_running_ship_shell(
+                "node scripts/ops/deploy-vercel-production.mjs --method=cli"
+            )
+        )
+        self.assertTrue(is_long_running_ship_shell("npm run vercel-build"))
+        self.assertTrue(is_long_running_ship_shell("bash scripts/deploy/prod"))
+        self.assertTrue(is_long_running_ship_shell("bash scripts/deploy --prod"))
         self.assertFalse(is_long_running_ship_shell("git status"))
         self.assertFalse(is_long_running_ship_shell("npm test"))
         self.assertFalse(is_long_running_ship_shell("npm run export"))

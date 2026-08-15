@@ -31,6 +31,16 @@ def _operator_next_step(reason: str) -> str:
             "then retry. Do not raise usage/spend caps for this."
         )
     if is_usage_limit_failure(reason):
+        if "codex" in lowered:
+            return (
+                "The signed-in Codex account is currently quota-limited. Switch this "
+                "workspace to Claude/Cursor, or enable those families for Auto failover, then retry."
+            )
+        if "claude" in lowered:
+            return (
+                "The signed-in Claude account is currently quota-limited. Switch this "
+                "workspace to Codex/Cursor, or enable those families for Auto failover, then retry."
+            )
         return (
             "Check Cursor Usage in Settings → CLI runtime — Auto+Composer may still "
             "have headroom or on-demand spend. Then retry."
@@ -98,7 +108,7 @@ def fallback_reply(
         )
     if is_usage_limit_failure(reason):
         return (
-            f"Lane B ({composer_mode}) could not start — Cursor usage limits blocked the agent: "
+            f"Lane B ({composer_mode}) could not start — the selected runtime's usage limit blocked the agent: "
             f"{reason}. {next_step}"
         )
     return (

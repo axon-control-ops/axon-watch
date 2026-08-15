@@ -11,7 +11,12 @@ _SECRET_ASSIGNMENT_RE = re.compile(
     r"\s*([:=])\s*([^\s,;]+)"
 )
 _BEARER_RE = re.compile(r"(?i)\bbearer\s+[A-Za-z0-9._~+/=-]+")
-_KNOWN_TOKEN_RE = re.compile(r"\b(?:gh[pousr]_[A-Za-z0-9]{20,}|sk-[A-Za-z0-9_-]{20,})\b")
+# Providers sometimes echo a *partially masked* rejected key (for example
+# ``sk-admin********suffix``). Treat that as secret material too: even a masked
+# prefix/suffix is credential metadata and has no place in persisted chat.
+_KNOWN_TOKEN_RE = re.compile(
+    r"\b(?:gh[pousr]_[A-Za-z0-9*._-]{8,}|sk-[A-Za-z0-9*._-]{8,})\b"
+)
 _SENSITIVE_KEY_RE = re.compile(
     r"(?i)(token|secret|password|api[_-]?key|authorization|credential)"
 )

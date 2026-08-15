@@ -175,6 +175,39 @@ export function systemMessagePreview(content: string): string {
   return `${trimmed.slice(0, 117).trim()}…`;
 }
 
+const STICKY_PROMPT_PREVIEW_LINES = 3;
+const STICKY_PROMPT_PREVIEW_CHARS = 220;
+
+/**
+ * The operator's own message renders as raw pre-wrapped text (no markdown),
+ * so blank lines between "# Instructions" / "## Goal" sections burn through
+ * a line-clamp budget without showing any real content. This strips blank
+ * lines for the collapsed preview only — the full raw text (blank lines
+ * included) still shows once expanded or in the edit view.
+ */
+export function stickyPromptCanExpand(text: string): boolean {
+  const normalized = text.trim();
+  if (!normalized) {
+    return false;
+  }
+  const meaningfulLines = normalized.split(/\r?\n/).filter((line) => line.trim().length > 0);
+  return (
+    normalized.length > STICKY_PROMPT_PREVIEW_CHARS ||
+    meaningfulLines.length > STICKY_PROMPT_PREVIEW_LINES
+  );
+}
+
+export function stickyPromptPreviewText(text: string): string {
+  const meaningfulLines = text
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0);
+  const preview = meaningfulLines.slice(0, STICKY_PROMPT_PREVIEW_LINES).join('\n');
+  return preview.length > STICKY_PROMPT_PREVIEW_CHARS
+    ? `${preview.slice(0, STICKY_PROMPT_PREVIEW_CHARS).trim()}…`
+    : preview;
+}
+
 export function shouldCollapseSystemMessage(content: string): boolean {
   const trimmed = content.trim();
   if (!trimmed) {

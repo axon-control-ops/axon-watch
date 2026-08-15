@@ -79,7 +79,7 @@ function selectEngagePlan(planId: string | null | undefined): void {
     <div class="operator-task-board__plan-filter-top">
       <p class="operator-task-board__plan-filter-label">Plans</p>
       <p class="operator-task-board__plan-filter-help">
-        Filter the board. Engage opens Lead review in VAXON.
+        Filter the board. Review now opens the Lead rollup over Live operations.
       </p>
     </div>
     <section
@@ -104,7 +104,7 @@ function selectEngagePlan(planId: string | null | undefined): void {
       </div>
     </section>
     <p class="operator-task-board__plan-filter-help">
-      Review now opens the Lead rollup in VAXON. Mark review complete records that no further handoff is needed.
+      Review now overlays the verified Lead rollup on the right dock. Mark review complete when no follow-up is needed.
     </p>
     <div class="operator-task-board__plan-tabs" role="tablist" aria-label="Lead plan filter">
       <button
@@ -130,7 +130,7 @@ function selectEngagePlan(planId: string | null | undefined): void {
         :aria-selected="planFilterId === group.planId"
         :title="
           group.awaitingEngagement
-            ? `Open VAXON Lead review · ${group.planGoal}`
+            ? `Review Lead rollup · ${group.planGoal}`
             : group.planGoal
         "
         @click="

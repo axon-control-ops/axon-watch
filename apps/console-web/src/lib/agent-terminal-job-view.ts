@@ -4,6 +4,8 @@
  * read as job receipts, not raw shell noise.
  */
 
+import { sanitizeTerminalDisplayOutput } from './terminal-scrollback';
+
 export type AgentTerminalJobKind = 'job_status' | 'job_stream' | 'shell';
 
 export type AgentTerminalJobView = {
@@ -52,12 +54,13 @@ export function capTerminalJobOutput(
 }
 
 /** Drop host shell noise that otherwise dominates OTA status cards. */
-export function stripTerminalJobNoise(text: string): string {
-  return normalizeNewlines(text)
-    .replace(ZSHENV_NOISE_RE, '')
-    .replace(CARGO_ENV_NOISE_RE, '')
-    .replace(/\n{3,}/g, '\n\n')
-    .replace(/^\n+|\n+$/g, '');
+export function stripTerminalJobNoise(text: string, command = ''): string {
+  return sanitizeTerminalDisplayOutput(
+    normalizeNewlines(text)
+      .replace(ZSHENV_NOISE_RE, '')
+      .replace(CARGO_ENV_NOISE_RE, ''),
+    command,
+  );
 }
 
 export function extractAxonJobId(command: string, output: string): string | null {
@@ -219,7 +222,10 @@ export function buildAgentTerminalJobView(input: {
 
   // Fast path: ordinary shell cards — no regex noise stripping / JSON parse.
   if (!looksLikeAgentTerminalJob(command, input.output || '')) {
-    const output = normalizeNewlines(capTerminalJobOutput(input.output || '')).trim();
+    const output = stripTerminalJobNoise(
+      capTerminalJobOutput(input.output || ''),
+      command,
+    ).trim();
     return {
       kind: 'shell',
       jobId: null,
@@ -236,7 +242,7 @@ export function buildAgentTerminalJobView(input: {
   // Cap before normalize/regex — status polls stay small; live OTA can be huge.
   const capped = capTerminalJobOutput(input.output || '');
   const output = normalizeNewlines(capped);
-  const cleaned = stripTerminalJobNoise(output);
+  const cleaned = stripTerminalJobNoise(output, command);
   const jobId = extractAxonJobId(command, output);
   // Only parse JSON for status polls or short bodies — never scan multi‑MB streams.
   const json =

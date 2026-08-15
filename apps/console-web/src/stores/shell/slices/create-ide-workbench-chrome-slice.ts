@@ -18,6 +18,7 @@ interface CreateIdeWorkbenchChromeSliceInput {
   agentDockCollapsed: Ref<boolean>;
   ideAttentionPanelOpen: Ref<boolean>;
   ideBriefingPanelOpen: Ref<boolean>;
+  ideVaxonDockPinned: Ref<boolean>;
 }
 
 export function createIdeWorkbenchChromeSlice(input: CreateIdeWorkbenchChromeSliceInput) {
@@ -39,20 +40,22 @@ export function createIdeWorkbenchChromeSlice(input: CreateIdeWorkbenchChromeSli
   function focusIdeSidebarView(view: IdeActivityView): void {
     input.ideAttentionPanelOpen.value = false;
     input.ideBriefingPanelOpen.value = false;
-    input.ideActivityView.value = view;
+    input.ideVaxonDockPinned.value = false;
+    input.ideActivityView.value = view === 'agent' ? 'team' : view;
     input.ideExplorerCollapsed.value = false;
     persistIdeExplorerCollapsed(false);
   }
 
   function setIdeActivityView(view: IdeActivityView): void {
+    if (view === 'agent') {
+      focusIdeSidebarView('team');
+      input.agentDockCollapsed.value = false;
+      persistAgentDockCollapsed(false);
+      return;
+    }
     focusIdeSidebarView(view);
     if (view === 'terminal') {
       revealIdeTerminalPanel();
-      return;
-    }
-    if (view === 'agent') {
-      input.agentDockCollapsed.value = false;
-      persistAgentDockCollapsed(false);
     }
   }
 

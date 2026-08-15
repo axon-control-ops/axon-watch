@@ -24,6 +24,7 @@ import {
   pickDefaultRosterEmployee,
   resolveLiveBusyEmployeeIds,
   resolveReportingEmployeeId,
+  employeeRuntimeShiftHint,
 } from '../../features/workspace-agents/company-roster-view';
 import {
   markIntroSpokenToday,
@@ -41,8 +42,13 @@ import { requestIdeComposerMode } from '../../lib/ide-composer-restore-request';
 import { employeeVoiceSpeaker } from '../../lib/kairo-voice-utterance';
 import { runEmployeeShiftRetry } from '../../lib/run-employee-shift-retry';
 import { navigateToSettingsSection } from '../../lib/settings-section-route';
-import { buildPendingDecisionComposerDraft, companyPendingDecisionHint } from '../../features/workspace-agents/company-roster-focus';
+import {
+  buildPendingDecisionComposerDraft,
+  companyPendingDecisionHint,
+  pendingDecisionDirectResolution,
+} from '../../features/workspace-agents/company-roster-focus';
 import { submitQuestionAnswer } from '../../lib/submit-question-answer';
+import { resolveAutonomyDecision } from '../../api/autonomy-api';
 import { useCompanyRosterControlActions } from '../../composables/use-company-roster-control-actions';
 import { useCompanyRosterQuickActionState } from '../../composables/use-company-roster-quick-action-state';
 import { useShellStore } from '../../stores/shell';
@@ -75,7 +81,10 @@ async function loadCompany(): Promise<void> {
   if (!workspaceId) {
     return;
   }
-  await shell.loadCompanyEmployees(workspaceId);
+  await Promise.all([
+    shell.loadCompanyEmployees(workspaceId),
+    shell.loadWorkspaceTasks(workspaceId),
+  ]);
 }
 const selectedEmployeeId = ref<string | null>(null);
 const dockRootRef = ref<HTMLElement | null>(null);
@@ -248,6 +257,16 @@ const selectedEmployeeIsReporting = computed(
     }) === selectedEmployee.value?.employee_id,
 );
 
+const selectedRuntimeShiftHint = computed(() =>
+  selectedEmployee.value
+    ? employeeRuntimeShiftHint({
+        employee: selectedEmployee.value,
+        runs: shell.runs,
+        tasks: shell.workspaceTasksForCurrentWorkspace,
+      })
+    : null,
+);
+
 const { selectedActions, handoffWaitingEmployeeIds, selectedHandoffBlockedReason } =
   useCompanyRosterQuickActionState({
   shell,
@@ -373,7 +392,14 @@ async function focusPendingDecisionEmployee(employee?: CompanyEmployeeRecord): P
   selectEmployee(target);
   presenceStripRef.value?.focusEmployee(target.employee_id);
 
-  shell.setIdeActivityView('agent');
+  // Keep Team on the left — the agent dock on the right owns the decision thread.
+  if (shell.ideActivityView !== 'team') {
+    shell.setIdeActivityView('team');
+  }
+  if (shell.agentDockCollapsed) {
+    shell.toggleAgentDock();
+  }
+
   const threadId = await shell.openOrFocusEmployeeIdeThread(target);
   if (!threadId) {
     shell.commandMutationError = 'Could not open the teammate thread for this decision.';
@@ -397,9 +423,32 @@ async function applyPendingDecisionOption(
   if (!employee.pending_decision_id || !option.id?.trim()) {
     return;
   }
+  const directResolution = pendingDecisionDirectResolution(option.id);
+  if (directResolution) {
+    controlBusyId.value = employee.employee_id;
+    controlError.value = null;
+    try {
+      await resolveAutonomyDecision(
+        employee.pending_decision_id,
+        directResolution,
+      );
+      await Promise.all([loadCompany(), shell.loadRuns({ sync: false })]);
+    } catch (error) {
+      controlError.value =
+        error instanceof Error ? error.message : 'Could not resolve operator decision';
+    } finally {
+      controlBusyId.value = null;
+    }
+    return;
+  }
   selectEmployee(employee);
   presenceStripRef.value?.focusEmployee(employee.employee_id);
-  shell.setIdeActivityView('agent');
+  if (shell.ideActivityView !== 'team') {
+    shell.setIdeActivityView('team');
+  }
+  if (shell.agentDockCollapsed) {
+    shell.toggleAgentDock();
+  }
   const threadId = await shell.openOrFocusEmployeeIdeThread(employee);
   if (!threadId) {
     shell.commandMutationError = 'Could not open the teammate thread for this decision.';
@@ -562,6 +611,7 @@ async function onPresenceSelect(employee: CompanyEmployeeRecord): Promise<void> 
           :control-busy="controlBusyId === selectedEmployee.employee_id"
           :live-busy="liveBusyEmployeeIds.includes(selectedEmployee.employee_id)"
           :handoff-waiting="handoffWaitingEmployeeIds.includes(selectedEmployee.employee_id)"
+          :runtime-shift-hint="selectedRuntimeShiftHint"
           :reporting="selectedEmployeeIsReporting"
           :transcript="selectedEmployeeIsReporting ? shell.latestWorkspaceAgentOutput ?? '' : ''"
           @talk="void startChat(selectedEmployee, 'talk')"

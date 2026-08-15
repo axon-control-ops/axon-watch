@@ -23,6 +23,24 @@ import { humanizeEmployeeDeliveryHandoff } from './employee-delivery-handoff-vie
 
 const DOCK_RECEIPT_DETAIL_MAX = 180;
 
+function usageRuntime(detail: string | null | undefined): 'Codex' | 'Claude' | 'Cursor' {
+  const normalized = (detail ?? '').toLowerCase();
+  if (normalized.includes('codex')) return 'Codex';
+  if (normalized.includes('claude')) return 'Claude';
+  return 'Cursor';
+}
+
+function usageFailureCopy(detail: string | null | undefined): string {
+  const runtime = usageRuntime(detail);
+  if (runtime === 'Codex' || runtime === 'Claude') {
+    return (
+      `Last job could not start because the signed-in ${runtime} account is quota-limited — ` +
+      'switch runtime or enable Claude/Cursor/Codex Auto failover, then tap Try again.'
+    );
+  }
+  return 'Last job hit a Cursor usage signal — Auto+Composer may still have headroom or on-demand spend. Check Usage in Settings → CLI runtime, then Try again.';
+}
+
 function isCorrectOutOfScopeRefusal(detail: string | null | undefined): boolean {
   return /continuous worker scope guard tripped|\bout_of_scope_guard\b/i.test(detail ?? '');
 }
@@ -77,7 +95,7 @@ export function employeeFailureLine(
       return 'Last job was interrupted before it could finish — tap Continue to pick up where they left off.';
     }
     if (isUsageLimitFailure(employee.last_outcome_detail)) {
-      return 'Last job hit a Cursor usage signal — Auto+Composer may still have headroom or on-demand spend. Check Usage in Settings → CLI runtime, then Try again.';
+      return usageFailureCopy(employee.last_outcome_detail);
     }
     if (isMissingConfidenceFailure(employee.last_outcome_detail)) {
       return 'Last job almost finished — the closing Confidence line was missing. Tap Try again to close it out.';
@@ -129,7 +147,11 @@ export function employeeFailureDetailTooltip(
     return 'Runtime login is not ready. Run `cursor agent login` or unlock /vault, then retry.';
   }
   if (isUsageLimitFailure(employee.last_outcome_detail)) {
-    return 'Cursor usage signal on this shift — Auto+Composer may still have headroom or on-demand spend. Check Usage, then retry.';
+    const runtime = usageRuntime(employee.last_outcome_detail);
+    if (runtime === 'Cursor') {
+      return 'Cursor usage signal on this shift — Auto+Composer may still have headroom or on-demand spend. Check Usage, then retry.';
+    }
+    return `Signed-in ${runtime} account quota blocked this shift — switch runtime or enable Auto failover, then retry.`;
   }
   if (isMissingConfidenceFailure(employee.last_outcome_detail)) {
     return 'Closing Confidence line was missing after real work. Retry to close the Critical Review.';
@@ -188,11 +210,14 @@ function employeeFailureStatusAriaLabel(
   return spokenLine;
 }
 
-/** Dock receipt body — skip when the failure beat already carries outcome detail. */
+/** Dock receipt body — full technical detail for failures; delivery copy otherwise. */
 export function employeeDockReceiptDetail(employee: CompanyEmployeeRecord): string | null {
   const detail = employeeResolvedFailureDetail(employee);
-  if (!detail || employeeFailureLine(employee)) {
+  if (!detail) {
     return null;
+  }
+  if (employeeFailureLine(employee)) {
+    return detail;
   }
   // Prefer plain English when the last outcome is a raw delivery receipt.
   if (/delivery\b|worker\/run_|https?:\/\/|ci[_ ]green|draft.?pr/i.test(detail)) {

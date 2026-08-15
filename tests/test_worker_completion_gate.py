@@ -195,6 +195,50 @@ class WorkerCompletionGateTests(unittest.TestCase):
         self.assertFalse(result.passed)
         self.assertIn("required evidence", result.reason)
 
+    def test_specialist_verification_handoff_passes_with_terminal_jobs(self) -> None:
+        from app.terminal import agent_jobs
+        from app.workspace_agents.verifier_contract import ensure_acceptance_before_publish
+
+        opened = task_store.create_task(
+            workspace_id="workspace_dashpro",
+            owner_role="backend",
+            goal=(
+                "Verification after Marco (backend): run scoped verify commands — "
+                "`npm test -- tests/unit/services/staffVisibility.test.ts` "
+                "[from run run_demo]"
+            ),
+            acceptance_criteria="Attach stdout receipts.",
+            allowed_paths=[],
+        )
+        task = task_store.lease_task(
+            opened["task_id"],
+            lease_holder="employee-workspace_dashpro-backend",
+        )
+        run_id = self._run_for_task(task)
+        with agent_jobs._lock:
+            agent_jobs._jobs["agent-job-verify-gate"] = {
+                "job_id": "agent-job-verify-gate",
+                "workspace_id": "workspace_dashpro",
+                "run_id": run_id,
+                "command": "npm test -- tests/unit/services/staffVisibility.test.ts",
+                "status": "completed",
+                "exit_code": 0,
+                "created_at": "2026-01-01T00:00:00Z",
+            }
+        ensure_acceptance_before_publish(run_id, changed_paths=["src/out_of_scope.ts"])
+
+        with tempfile.TemporaryDirectory() as tempdir:
+            result = evaluate_pre_publish_completion_gate(
+                run_id=run_id,
+                task=task,
+                isolation_root=Path(tempdir),
+                reply_text="Tests passed with terminal stdout attached.",
+                changed_paths=["src/out_of_scope.ts"],
+            )
+
+        self.assertTrue(result.passed, result)
+        self.assertEqual("non-implementation task", result.reason)
+
     def test_integrations_fix_still_requires_a_product_diff(self) -> None:
         opened = task_store.create_task(
             workspace_id="workspace_dashpro",

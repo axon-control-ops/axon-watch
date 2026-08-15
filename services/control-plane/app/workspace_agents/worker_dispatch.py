@@ -9,9 +9,9 @@ from typing import Any
 
 from app.chat.lane_b_agent import LaneBContext, generate_lane_b_result
 from app.chat.lane_b_stream_execute import finalize_lane_b_agent_run
+from app.workspace_agents.critical_review_clause import is_review_type_task
 from app.runs.service import (
     RunLifecycleError,
-    RunNotFoundError,
     append_run_execution_receipt,
     complete_run,
     fail_run,
@@ -28,8 +28,6 @@ from app.workspace_agents.worker_ide_stream import (
 )
 from app.workspace_agents.worker_isolation import (
     IsolationError,
-    cleanup_worker_isolation,
-    create_worker_isolation,
     isolation_receipt_summary,
     worker_agent_workspace,
 )
@@ -40,35 +38,36 @@ from app.persistence import worker_scheduler_settings_store
 from app.workspace_agents.ask_autopilot import escalate_unresolved_operator_ask, maybe_resolve_safe_ask
 from app.persistence.workspace_composer_prefs_store import (
     resolve_worker_runtime_model,
+    resolve_worker_runtime_fallback_families,
     resolve_worker_runtime_target,
 )
 from app.workspace_agents.worker_dispatch_progress import (
     run_dispatch_heartbeat,
     throttled_worker_stream_progress,
 )
+from app.workspace_agents.lead_verification_handoff import (
+    complete_verification_no_change_delivery,
+    is_verification_task,
+)
 from app.workspace_agents.ops_delivery import (
     complete_ops_no_change_delivery,
     no_change_delivery_is_successful_ops_task,
 )
+from app.workspace_agents.worker_dispatch_support import (
+    claim_worker_dispatch,
+    cleanup_dispatch_isolation,
+    create_dispatch_isolation,
+    enqueue_verification_terminal_jobs,
+    fail_worker_run,
+    finalize_failed_worker_task,
+    release_worker_dispatch,
+)
 
 logger = logging.getLogger(__name__)
-
 
 def worker_dispatch_enabled() -> bool:
     raw = os.environ.get("AXON_WATCH_WORKER_SCHEDULER_DISPATCH", "1").strip().lower()
     return raw not in {"0", "false", "off", "no"}
-
-
-def _fail_worker_run(run_id: str, *, receipt_summary: str) -> dict[str, Any] | None:
-    try:
-        return fail_run(
-            run_id,
-            receipt_summary=receipt_summary,
-            actor="workspace_scheduler",
-        )
-    except (RunLifecycleError, RunNotFoundError):
-        logger.exception("continuous worker fail_run unavailable for %s", run_id)
-        return None
 
 
 def dispatch_continuous_worker_run(
@@ -82,16 +81,21 @@ def dispatch_continuous_worker_run(
     if not run_id:
         return False, None
 
+    if not claim_worker_dispatch(run_id):
+        logger.warning("continuous worker dispatch already active for %s", run_id)
+        return False, None
+
     task_id = str(run_record.get("task_id") or "").strip()
     task = task_store.get_task(task_id) if task_id else None
     if task is None or str(task.get("status") or "").strip().lower() != "leased":
-        failed = _fail_worker_run(
+        failed = fail_worker_run(
             run_id,
             receipt_summary=(
                 "Continuous worker dispatch refused: missing leased task_id "
                 f"(task_id={task_id or 'none'})"
             ),
         )
+        release_worker_dispatch(run_id)
         return False, failed
 
     stop_heartbeat = threading.Event()
@@ -115,7 +119,7 @@ def dispatch_continuous_worker_run(
                 or f"employee-{workspace_id}-{employee.role}",
             )
         except task_store.TaskLedgerError as exc:
-            failed = _fail_worker_run(
+            failed = fail_worker_run(
                 run_id,
                 receipt_summary=f"Continuous worker lease renew failed: {exc}",
             )
@@ -130,6 +134,7 @@ def dispatch_continuous_worker_run(
             actor="workspace_scheduler",
         )
         heartbeat.start()
+
         try:
             ide_stream = prepare_worker_ide_stream(
                 workspace_id=workspace_id,
@@ -138,13 +143,6 @@ def dispatch_continuous_worker_run(
                 task_id=task_id,
                 task=task,
             )
-            if ide_stream is None:
-                logger.warning(
-                    "continuous worker IDE stream prepare returned None for %s "
-                    "role=%s (employee_id unresolved — specialist dock will stay empty)",
-                    run_id,
-                    employee.role,
-                )
         except Exception:  # noqa: BLE001 — dispatch must continue even if IDE mirror fails
             logger.exception(
                 "continuous worker IDE stream prepare failed for %s role=%s",
@@ -152,7 +150,11 @@ def dispatch_continuous_worker_run(
                 employee.role,
             )
             ide_stream = None
-        isolation_root = create_worker_isolation(workspace_id=workspace_id, run_id=run_id)
+        isolation_root = create_dispatch_isolation(
+            workspace_id=workspace_id,
+            run_id=run_id,
+            task=task,
+        )
         agent_root = worker_agent_workspace(isolation_root)
         execution_policy = resolve_worker_execution_policy(
             employee=employee, task_payload=task, workspace_root=agent_root
@@ -165,6 +167,11 @@ def dispatch_continuous_worker_run(
             actor="workspace_scheduler",
             success=True,
             intent="worker_isolation",
+        )
+        enqueue_verification_terminal_jobs(
+            workspace_id=workspace_id,
+            run_id=run_id,
+            task=task,
         )
         prompt = build_continuous_worker_prompt(
             workspace_id=workspace_id,
@@ -179,6 +186,7 @@ def dispatch_continuous_worker_run(
         runtime_target = resolve_worker_runtime_target(workspace_id)
         runtime_family = (runtime_target or "cursor_local").split("_", 1)[0]
         runtime_model = resolve_worker_runtime_model(workspace_id, runtime_family)
+        fallback_runtime_families = resolve_worker_runtime_fallback_families(workspace_id)
         lane_b_result = generate_lane_b_result(
             context=context,
             user_prompt=prompt,
@@ -191,6 +199,7 @@ def dispatch_continuous_worker_run(
             workspace_root=agent_root,
             execution_policy=execution_policy,
             allow_git_dispatch=False,
+            fallback_runtime_families=fallback_runtime_families,
         )
         reply_text = str(lane_b_result.get("content") or "")
         from app.workspace_agents.employee_first_person import (
@@ -227,7 +236,7 @@ def dispatch_continuous_worker_run(
         scope_guard_detail = parse_out_of_scope_guard(reply_text)
         if scope_guard_detail:
             dispatched = False
-            finalized = _fail_worker_run(
+            finalized = fail_worker_run(
                 run_id,
                 receipt_summary=(
                     "Continuous worker scope guard tripped: "
@@ -241,6 +250,7 @@ def dispatch_continuous_worker_run(
                 reply_text=reply_text,
                 workspace_root=str(agent_root),
                 defer_complete=True,
+                require_critical_review=is_review_type_task(task),
             )
         preserve_isolation = False
         if dispatched and finalized is not None:
@@ -257,7 +267,7 @@ def dispatch_continuous_worker_run(
                     reply_text=reply_text,
                 )
                 if not gate.passed:
-                    finalized = _fail_worker_run(
+                    finalized = fail_worker_run(
                         run_id,
                         receipt_summary=gate.reason,
                     )
@@ -279,7 +289,20 @@ def dispatch_continuous_worker_run(
                         if no_change_delivery_is_successful_ops_task(task):
                             finalized = complete_ops_no_change_delivery(
                                 run_id,
-                                fail_worker_run=lambda summary: _fail_worker_run(
+                                fail_worker_run=lambda summary: fail_worker_run(
+                                    run_id,
+                                    receipt_summary=summary,
+                                ),
+                            )
+                            dispatched = (
+                                finalized is not None
+                                and finalized.get("phase") == "completed"
+                            )
+                        elif is_verification_task(task):
+                            finalized = complete_verification_no_change_delivery(
+                                run_id=run_id,
+                                task=task,
+                                fail_worker_run=lambda summary: fail_worker_run(
                                     run_id,
                                     receipt_summary=summary,
                                 ),
@@ -289,7 +312,7 @@ def dispatch_continuous_worker_run(
                                 and finalized.get("phase") == "completed"
                             )
                         elif auto_ask_resolution is not None:
-                            finalized = _fail_worker_run(
+                            finalized = fail_worker_run(
                                 run_id,
                                 receipt_summary=(
                                     auto_ask_resolution.receipt_summary
@@ -299,7 +322,7 @@ def dispatch_continuous_worker_run(
                             )
                             dispatched = False
                         else:
-                            finalized = _fail_worker_run(
+                            finalized = fail_worker_run(
                                 run_id,
                                 receipt_summary=(
                                     "Workspace delivery blocked: full-access worker produced "
@@ -312,7 +335,7 @@ def dispatch_continuous_worker_run(
                         and publish.ok
                         and publish.stage == "no_change"
                     ):
-                        finalized = _fail_worker_run(
+                        finalized = fail_worker_run(
                             run_id,
                             receipt_summary=(
                                 auto_ask_resolution.receipt_summary
@@ -326,13 +349,13 @@ def dispatch_continuous_worker_run(
                             finalized = complete_run(run_id)
                         except RunLifecycleError as exc:
                             logger.exception("complete_run after delivery failed for %s", run_id)
-                            finalized = _fail_worker_run(
+                            finalized = fail_worker_run(
                                 run_id,
                                 receipt_summary=f"Delivery succeeded but complete_run failed: {exc}",
                             )
                             dispatched = False
                     else:
-                        finalized = _fail_worker_run(
+                        finalized = fail_worker_run(
                             run_id,
                             receipt_summary=(
                                 f"Workspace delivery blocked at {publish.stage}: {publish.detail}"
@@ -412,28 +435,18 @@ def dispatch_continuous_worker_run(
             except Exception:  # noqa: BLE001
                 logger.exception("continuous worker IDE stream fail failed for %s", run_id)
             ide_stream = None
-        failed = _fail_worker_run(
+        failed = fail_worker_run(
             run_id,
             receipt_summary=f"Continuous worker isolation failed: {exc}",
         )
-        try:
-            task_store.fail_task(task_id, run_id=run_id)
-        except task_store.TaskLedgerError:
-            logger.exception("task fail after isolation error for %s", task_id)
-        try:
-            from app.workspace_agents.lead_replan import notify_lead_after_worker_task
-
-            notify_lead_after_worker_task(
-                workspace_id=workspace_id,
-                task_id=task_id,
-                run_id=run_id,
-                employee_role=str(employee.role or ""),
-                employee_name=str(employee.name or ""),
-                phase="failed",
-                reply_text=str(exc),
-            )
-        except Exception:  # noqa: BLE001
-            logger.exception("lead notify after isolation fail for %s", run_id)
+        finalize_failed_worker_task(
+            workspace_id=workspace_id,
+            task_id=task_id,
+            run_id=run_id,
+            employee_role=str(employee.role or ""),
+            employee_name=str(employee.name or ""),
+            error=str(exc),
+        )
         return False, failed
     except Exception as exc:  # noqa: BLE001 — never leave role-tagged runs stuck executing
         logger.exception(
@@ -451,48 +464,25 @@ def dispatch_continuous_worker_run(
             except Exception:  # noqa: BLE001
                 logger.exception("continuous worker IDE stream fail failed for %s", run_id)
             ide_stream = None
-        failed = _fail_worker_run(
+        failed = fail_worker_run(
             run_id,
             receipt_summary=f"Continuous worker dispatch failed: {exc}",
         )
-        try:
-            task_store.fail_task(task_id, run_id=run_id)
-        except task_store.TaskLedgerError:
-            logger.exception("task fail after dispatch crash for %s", task_id)
-        try:
-            from app.workspace_agents.lead_replan import notify_lead_after_worker_task
-
-            notify_lead_after_worker_task(
-                workspace_id=workspace_id,
-                task_id=task_id,
-                run_id=run_id,
-                employee_role=str(employee.role or ""),
-                employee_name=str(employee.name or ""),
-                phase="failed",
-                reply_text=str(exc),
-            )
-        except Exception:  # noqa: BLE001
-            logger.exception("lead notify after dispatch crash for %s", run_id)
+        finalize_failed_worker_task(
+            workspace_id=workspace_id,
+            task_id=task_id,
+            run_id=run_id,
+            employee_role=str(employee.role or ""),
+            employee_name=str(employee.name or ""),
+            error=str(exc),
+        )
         return False, failed
     finally:
         stop_heartbeat.set()
         heartbeat.join(timeout=2.0)
+        release_worker_dispatch(run_id)
         if isolation_root is not None:
-            cleanup = cleanup_worker_isolation(isolation_root)
-            try:
-                append_run_execution_receipt(
-                    run_id,
-                    receipt_type="worker_isolation_cleanup",
-                    receipt_summary=(
-                        f"worker isolation cleanup removed={cleanup.get('removed')} "
-                        f"cleaned={cleanup.get('cleaned')}"
-                    ),
-                    actor="workspace_scheduler",
-                    success=bool(cleanup.get("cleaned")),
-                    intent="worker_isolation",
-                )
-            except (RunLifecycleError, RunNotFoundError):
-                logger.exception("worker isolation cleanup receipt failed for %s", run_id)
+            cleanup_dispatch_isolation(run_id, isolation_root)
 
     if not dispatched:
         logger.warning(

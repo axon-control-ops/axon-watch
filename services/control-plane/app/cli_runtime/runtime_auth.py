@@ -19,6 +19,9 @@ def looks_like_auth_error(text: str) -> bool:
             "authentication_failed",
             "authentication failed",
             "oauth access token has been revoked",
+            "oauth session expired",
+            "oauth token expired",
+            "could not be refreshed",
             "unauthorized",
         )
     )
@@ -160,3 +163,11 @@ def codex_dispatch_env(
     if codex_subscription_ready(auth) or prefer_subscription_over_process_api_key():
         return env_without_api_keys(env, family="codex")
     return env
+
+
+def api_key_fallback_env(env: dict[str, str], *, family: str) -> dict[str, str]:
+    """Use an existing provider key after a real subscription-auth failure."""
+    shaped = dict(env)
+    if family == "codex":
+        return codex_profile_env(shaped)
+    return shaped

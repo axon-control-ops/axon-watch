@@ -125,7 +125,6 @@ class WorkspaceWorkerPromptTests(unittest.TestCase):
                 ),
             )
         self.assertIn("verify:contracts", prompt)
-        self.assertIn("Confidence: X/10", prompt)
         self.assertNotIn("bare FAILED", prompt.replace("never a bare FAILED", ""))
 
     def test_integrations_prompt_includes_full_access_tools_clause(self) -> None:

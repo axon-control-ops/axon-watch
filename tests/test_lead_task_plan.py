@@ -81,6 +81,25 @@ class LeadTaskPlanTests(unittest.TestCase):
         self.assertIn("Backend:", goals["backend"])
         self.assertNotEqual(goals["frontend"], goals["backend"])
 
+    def test_domain_agnostic_goal_flags_ambiguous_instead_of_confident_fan_out(self) -> None:
+        # Regression: a plain content-editing task (no API/database/signals system
+        # involved at all) that happens to contain a couple of generic words each
+        # role's keyword bag matches ("service", "data", "health", "signal") used to
+        # be treated as confidently decisive multi-domain work purely because two
+        # roles cleared the bare MIN_WINNER_SCORE — this is the exact failure that
+        # fanned a childcare-menu task out to mismatched Backend + Watcher specialists.
+        plan = build_lead_task_plan(
+            goal=(
+                "Rearrange the existing weekly menu items and update the room roster "
+                "service data, keeping an eye on child health signals throughout."
+            ),
+            roster=DASHPRO_ROSTER,
+            mode="decompose",
+        )
+        self.assertTrue(plan.ambiguous)
+        roles = sorted(item.owner_role for item in plan.items)
+        self.assertEqual(["backend", "watcher"], roles)
+
     def test_dashboard_plus_idempotency_data_cleanup_splits_frontend_and_backend(self) -> None:
         plan = build_lead_task_plan(
             goal=(

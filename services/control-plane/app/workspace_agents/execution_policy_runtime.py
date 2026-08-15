@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
@@ -36,7 +37,7 @@ def resolve_worker_execution_policy(
     # scope to resolve_effective_policy when a deliberately read-only run is
     # required.
     task_scope = task_paths if isinstance(task_paths, list) and task_paths else None
-    return resolve_effective_policy(
+    policy = resolve_effective_policy(
         role=employee.role,
         employee_override=employee.execution_policy,
         workspace_allowed_paths=contract.get("allowed_paths")
@@ -47,6 +48,18 @@ def resolve_worker_execution_policy(
         else (),
         task_allowed_paths=task_scope,
     )
+    from app.workspace_agents.lead_verification_handoff import (
+        is_verification_task,
+        verification_approved_command_prefixes,
+    )
+
+    if is_verification_task(task_payload):
+        extra = verification_approved_command_prefixes()
+        merged = tuple(
+            dict.fromkeys((*policy.approved_command_prefixes, *extra))
+        )
+        policy = replace(policy, approved_command_prefixes=merged)
+    return policy
 
 
 def execution_policy_payload(policy: AgentExecutionPolicy) -> dict[str, Any]:

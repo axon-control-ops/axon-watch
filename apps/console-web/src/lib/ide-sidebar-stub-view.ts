@@ -10,18 +10,13 @@ export type IdeSidebarStubTone =
   | 'failure'
   | 'interrupted';
 
-export type IdeSidebarStubActionKind = 'toggle_agent_dock' | 'open_team';
-
 export type IdeSidebarStubPanel = {
   lines: string[];
   actionLabel: string | null;
-  actionKind?: IdeSidebarStubActionKind;
-  /** Optional second CTA — e.g. Try again when the dock stays collapsed. */
-  secondaryActionLabel?: string | null;
   tone: IdeSidebarStubTone;
 };
 
-/** Whether agent/terminal stub copy should announce through a live region. */
+/** Whether terminal stub copy should announce through a live region. */
 export function ideSidebarStubUsesLiveRegion(
   tone: IdeSidebarStubTone,
   scope: 'agent' | 'terminal',
@@ -33,7 +28,7 @@ export function ideSidebarStubUsesLiveRegion(
   return tone !== 'neutral';
 }
 
-/** Descriptive label for stub CTA buttons (visible text stays short). */
+/** Descriptive label for stub and quick-guide CTA buttons (visible text stays short). */
 export function ideSidebarStubActionAriaLabel(
   actionLabel: string,
   scope: 'agent' | 'terminal',
@@ -65,116 +60,6 @@ export function ideSidebarStubActionAriaLabel(
   }
 
   return actionLabel;
-}
-
-function approvalPhrase(count: number): string {
-  return `${count} approval${count === 1 ? '' : 's'} waiting`;
-}
-
-function employeeFailureSidebarStep(interrupted: boolean): string {
-  return interrupted
-    ? 'Expand the dock, then open Team and tap Continue on their roster card.'
-    : 'Expand the dock, then open Team and tap Try again on their roster card.';
-}
-
-/** Copy and CTA for the IDE left-rail agent stub when the dock lives on the right. */
-export function buildIdeAgentSidebarStub(input: {
-  agentDockCollapsed: boolean;
-  streaming: boolean;
-  pendingApprovals: number;
-  runPhase: string | null;
-  employeeFailureLine?: string | null;
-  employeeShiftInterrupted?: boolean;
-  employeeRetryActionLabel?: string | null;
-}): IdeSidebarStubPanel {
-  if (!input.agentDockCollapsed) {
-    return {
-      tone: 'neutral',
-      lines: [
-        'Agent dock is open on the right edge.',
-        'Use Team for teammate status/action cards and dispatch follow-up.',
-      ],
-      actionLabel: 'Open Team roster',
-      actionKind: 'open_team',
-    };
-  }
-
-  if (input.pendingApprovals > 0) {
-    return {
-      tone: 'attention',
-      lines: [
-        `${approvalPhrase(input.pendingApprovals)} in the agent dock.`,
-        'Expand the dock to review and approve before more agent work runs.',
-        'Ctrl/Cmd+\\ · editor status bar AGENT chip · right-edge reopen strip.',
-      ],
-      actionLabel: 'Expand agent dock',
-      actionKind: 'toggle_agent_dock',
-    };
-  }
-
-  if (input.streaming) {
-    return {
-      tone: 'streaming',
-      lines: [
-        'Agent is responding — expand the dock to follow the conversation.',
-        'Ctrl/Cmd+\\ · editor status bar · right-edge reopen strip.',
-      ],
-      actionLabel: 'Expand agent dock',
-      actionKind: 'toggle_agent_dock',
-    };
-  }
-
-  const failureLine = (input.employeeFailureLine ?? '').trim();
-  const idleRun = input.runPhase !== 'executing' && input.runPhase !== 'review_ready';
-  if (failureLine && idleRun) {
-    const interrupted = Boolean(input.employeeShiftInterrupted);
-    const retryLabel = (input.employeeRetryActionLabel ?? '').trim();
-    return {
-      tone: interrupted ? 'interrupted' : 'failure',
-      lines: [
-        failureLine,
-        employeeFailureSidebarStep(interrupted),
-        'Ctrl/Cmd+\\ · editor status bar AGENT chip · right-edge reopen strip.',
-      ],
-      actionLabel: 'Expand agent dock',
-      actionKind: 'toggle_agent_dock',
-      secondaryActionLabel: retryLabel || null,
-    };
-  }
-
-  if (input.runPhase === 'review_ready') {
-    return {
-      tone: 'neutral',
-      lines: [
-        'Review ready — expand the dock to read command output.',
-        'Ctrl/Cmd+\\ · editor status bar AGENT chip · right-edge reopen strip.',
-      ],
-      actionLabel: 'Expand agent dock',
-      actionKind: 'toggle_agent_dock',
-    };
-  }
-
-  if (input.runPhase === 'executing') {
-    return {
-      tone: 'neutral',
-      lines: [
-        'Run in progress — expand the dock to follow along.',
-        'Ctrl/Cmd+\\ · editor status bar AGENT chip · right-edge reopen strip.',
-      ],
-      actionLabel: 'Expand agent dock',
-      actionKind: 'toggle_agent_dock',
-    };
-  }
-
-  return {
-    tone: 'neutral',
-    lines: [
-      'Agent dock is collapsed on the right.',
-      'Ctrl/Cmd+\\ expands it for conversation and composer.',
-    ],
-    actionLabel: 'Expand agent dock',
-    actionKind: 'toggle_agent_dock',
-  };
 }
 
 export type IdeRunPanelConnectorNotice = {

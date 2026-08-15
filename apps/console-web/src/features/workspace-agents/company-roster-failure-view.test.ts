@@ -159,6 +159,14 @@ describe('company-roster-failure-view', () => {
         }),
       ),
     ).toMatch(/usage/i);
+
+    const codexBlocked = employee({
+      status: 'idle',
+      last_outcome: 'failed',
+      last_outcome_detail: 'Codex usage limit is still active',
+    });
+    expect(employeeFailureLine(codexBlocked)).toMatch(/signed-in Codex account is quota-limited/i);
+    expect(employeeFailureLine(codexBlocked)).not.toMatch(/Cursor usage signal/i);
   });
 
   it('maps completion-gate failures to operator-friendly copy', () => {
@@ -343,7 +351,7 @@ describe('company-roster-failure-view', () => {
       last_outcome_detail: 'vitest: assertion failed',
       last_run_id: 'run_failed_1',
     });
-    expect(employeeDockReceiptDetail(failed)).toBeNull();
+    expect(employeeDockReceiptDetail(failed)).toBe('vitest: assertion failed');
 
     const ok = employee({
       status: 'idle',

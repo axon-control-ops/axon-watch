@@ -71,6 +71,35 @@ class AgentTerminalPolicyTests(unittest.TestCase):
         self.assertEqual("integrations", role)
         append_receipt.assert_called()
 
+    @patch("app.terminal.agent_job_access.append_run_execution_receipt")
+    @patch("app.terminal.agent_job_access.resolve_workspace_root")
+    @patch("app.terminal.agent_job_access.task_store.get_task")
+    @patch("app.terminal.agent_job_access.get_run")
+    def test_integrations_lane_b_without_task_can_enqueue_vercel_deploy(
+        self,
+        get_run,
+        get_task,
+        resolve_root,
+        append_receipt,
+    ) -> None:
+        get_run.return_value = {
+            "workspace_id": "workspace_dashpro",
+            "employee_role": "integrations",
+            "task_id": "",
+        }
+        get_task.return_value = None
+        resolve_root.return_value = Path("/tmp/workspace_dashpro")
+
+        role = assert_agent_terminal_job_allowed(
+            workspace_id="workspace_dashpro",
+            source_workspace_id="workspace_dashpro",
+            run_id="run_direct_soren",
+            command="vercel deploy --prod --yes",
+        )
+
+        self.assertEqual("integrations", role)
+        append_receipt.assert_called()
+
     @patch("app.terminal.agent_job_access.resolve_workspace_root")
     @patch("app.terminal.agent_job_access.task_store.get_task")
     @patch("app.terminal.agent_job_access.get_run")

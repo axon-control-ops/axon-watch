@@ -294,6 +294,9 @@ class WorkspaceAgentSchedulerTests(unittest.TestCase):
         with patch(
             "app.workspace_agents.worker_dispatch.generate_lane_b_result",
             side_effect=RuntimeError("simulated dispatch crash"),
+        ), patch(
+            "app.workspace_agents.worker_dispatch.prepare_worker_ide_stream",
+            return_value=None,
         ):
             dispatched, finalized = dispatch_continuous_worker_run(
                 workspace_id="workspace_worker_fail",
@@ -337,9 +340,19 @@ class WorkspaceAgentSchedulerTests(unittest.TestCase):
             require_leased_task=True,
         )
         run_id = str(created["run_id"])
-        with patch(
-            "app.workspace_agents.worker_dispatch.generate_lane_b_result",
-            return_value={"dispatched": True, "runtime_label": "test", "content": "done"},
+        with (
+            patch(
+                "app.workspace_agents.worker_dispatch.generate_lane_b_result",
+                return_value={"dispatched": True, "runtime_label": "test", "content": "done"},
+            ),
+            patch(
+                "app.workspace_agents.worker_dispatch.finalize_lane_b_agent_run",
+                return_value=(False, None),
+            ),
+            patch(
+                "app.workspace_agents.worker_dispatch.prepare_worker_ide_stream",
+                return_value=None,
+            ),
         ):
             dispatch_continuous_worker_run(
                 workspace_id="workspace_worker_heartbeat",
@@ -408,6 +421,9 @@ class WorkspaceAgentSchedulerTests(unittest.TestCase):
                 detail="no changes",
                 cleanup_isolation=True,
             ),
+        ), patch(
+            "app.workspace_agents.worker_dispatch.prepare_worker_ide_stream",
+            return_value=None,
         ):
             dispatched, finalized = dispatch_continuous_worker_run(
                 workspace_id="workspace_worker_noop",
@@ -458,14 +474,24 @@ class WorkspaceAgentSchedulerTests(unittest.TestCase):
                 ),
                 encoding="utf-8",
             )
-            with patch.dict(
-                os.environ,
-                {
-                    "AXON_WATCH_WORKSPACE_AGENTS_FILE": str(agents_file),
-                    "AXON_WATCH_WORKER_SCHEDULER": "1",
-                    "AXON_WATCH_WORKER_SCHEDULER_DISPATCH": "0",
-                },
-                clear=False,
+            with (
+                patch.dict(
+                    os.environ,
+                    {
+                        "AXON_WATCH_WORKSPACE_AGENTS_FILE": str(agents_file),
+                        "AXON_WATCH_WORKER_SCHEDULER": "1",
+                        "AXON_WATCH_WORKER_SCHEDULER_DISPATCH": "0",
+                    },
+                    clear=False,
+                ),
+                patch(
+                    "app.cli_runtime.cursor_usage_probe.probe_cursor_usage",
+                    return_value={},
+                ),
+                patch(
+                    "app.cli_runtime.cursor_usage_probe.cursor_usage_allows_agent_retry",
+                    return_value=False,
+                ),
             ):
                 worker_scheduler_settings_store.patch_settings({"scheduler_enabled": True})
                 failed = create_run(

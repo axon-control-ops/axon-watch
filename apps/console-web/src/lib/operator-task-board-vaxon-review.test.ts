@@ -7,7 +7,11 @@ describe('resolveVaxonReviewTarget', () => {
     const target = resolveVaxonReviewTarget({
       vaxon_handoff: { thread_id: 'thread_abc', message_id: 'message_xyz' },
     });
-    expect(target).toEqual({ kind: 'open_thread', threadId: 'thread_abc' });
+    expect(target).toEqual({
+      kind: 'open_thread',
+      threadId: 'thread_abc',
+      messageId: 'message_xyz',
+    });
   });
 
   it('reports not_ready when no handoff has been posted yet', () => {
@@ -28,6 +32,13 @@ describe('resolveVaxonReviewTarget', () => {
   it('reports not_ready when thread_id is blank/whitespace', () => {
     const target = resolveVaxonReviewTarget({
       vaxon_handoff: { thread_id: '   ', message_id: 'message_xyz' },
+    });
+    expect(target.kind).toBe('not_ready');
+  });
+
+  it('reports not_ready when message_id is blank/whitespace', () => {
+    const target = resolveVaxonReviewTarget({
+      vaxon_handoff: { thread_id: 'thread_abc', message_id: '   ' },
     });
     expect(target.kind).toBe('not_ready');
   });

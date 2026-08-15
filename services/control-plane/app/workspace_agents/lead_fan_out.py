@@ -360,7 +360,11 @@ def _create_ready_run_for_task(
         run_id=str(run["run_id"]),
         task_id=task_id,
         goal=str(leased.get("goal") or cleaned_goal),
-        expected_files=list(leased.get("allowed_paths") or []),
+        # exclusive_paths (never backfilled) is the honest, task-specific file
+        # list; allowed_paths is the full role write-scope enforcement ceiling
+        # and shows the same generic template for every task when the goal
+        # names no real path — misleading if displayed as "Expected files".
+        expected_files=list(leased.get("exclusive_paths") or []),
     )
     return (
         {

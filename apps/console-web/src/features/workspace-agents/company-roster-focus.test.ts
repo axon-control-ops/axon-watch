@@ -6,6 +6,8 @@ import {
   companyPendingDecisionHint,
   failedShiftSubjectFromDecisionTitle,
   findRosterEmployeeByRole,
+  pendingDecisionCardOptions,
+  pendingDecisionDirectResolution,
 } from './company-roster-focus';
 import type { CompanyEmployeeRecord } from '../../contracts/canonical';
 
@@ -96,5 +98,41 @@ describe('buildPendingDecisionComposerDraft', () => {
     expect(draft).toContain('Dana last shift failed');
     expect(draft).toContain('Retry lead shift');
     expect(draft).toContain('My decision:');
+  });
+
+  it('builds a continuation draft from title-only watcher decisions', () => {
+    const draft = buildPendingDecisionComposerDraft(
+      employee({
+        name: 'Cass',
+        role: 'watcher',
+        role_label: 'Watcher',
+        pending_decision_title: 'Dana (lead) last shift failed',
+        pending_decision_reason: 'Lead fan-out stalled on worker dispatch.',
+      }),
+    );
+
+    expect(draft).toContain('Decision required — Dana (lead) last shift failed');
+    expect(draft).toContain('Cass is holding this decision for Dana (lead)');
+    expect(draft).toContain('Context: Lead fan-out stalled');
+    expect(draft).toContain('My decision:');
+  });
+
+  it('offers executable recovery controls when a receipt has no authored options', () => {
+    const pending = employee({
+      pending_decision_id: 'auton-failed-shift',
+      pending_decision_title: 'Lila (frontend) last shift failed',
+    });
+
+    expect(pendingDecisionCardOptions(pending).map((option) => option.label)).toEqual([
+      'Approve bounded recovery',
+      'Dismiss alert',
+    ]);
+    expect(buildPendingDecisionComposerDraft(pending)).toContain(
+      'Approve bounded recovery',
+    );
+    const [approve, reject] = pendingDecisionCardOptions(pending);
+    expect(pendingDecisionDirectResolution(approve?.id)).toBe('approved');
+    expect(pendingDecisionDirectResolution(reject?.id)).toBe('rejected');
+    expect(pendingDecisionDirectResolution('1')).toBeNull();
   });
 });

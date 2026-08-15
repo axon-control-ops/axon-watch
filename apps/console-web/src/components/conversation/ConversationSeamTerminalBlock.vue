@@ -8,6 +8,7 @@ import {
   shortenTerminalCommandLabel,
 } from '../../lib/agent-terminal-job-view';
 import { shouldShowConversationTerminalOutput } from '../../lib/conversation-terminal-display';
+import { sanitizeTerminalDisplayOutput } from '../../lib/terminal-scrollback';
 
 type TerminalSegment = Extract<AgentTranscriptSegment, { kind: 'terminal' }>;
 
@@ -98,7 +99,10 @@ const statusHint = computed(() => {
 
 const bodyText = computed(() => {
   if (showRawOutput.value) {
-    return props.segment.output || '';
+    return sanitizeTerminalDisplayOutput(
+      props.segment.output || '',
+      props.segment.command,
+    );
   }
   return jobView.value.displayOutput;
 });

@@ -88,6 +88,7 @@ function createChromeSlice(
     agentDockCollapsed: ref(false),
     ideAttentionPanelOpen: ref(false),
     ideBriefingPanelOpen: ref(false),
+    ideVaxonDockPinned: ref(false),
     ...overrides,
   });
 }
@@ -159,8 +160,8 @@ describe('createIdeWorkbenchChromeSlice sidebar focus', () => {
     expect(ideTerminalRevealToken.value).toBe(1);
   });
 
-  it('setIdeActivityView agent opens the sidebar stub and expands the dock', () => {
-    const ideActivityView = ref<'explorer' | 'agent'>('explorer');
+  it('setIdeActivityView agent opens team and expands the dock', () => {
+    const ideActivityView = ref<'explorer' | 'agent' | 'team'>('explorer');
     const ideExplorerCollapsed = ref(true);
     const agentDockCollapsed = ref(true);
     const slice = createSlice({
@@ -171,13 +172,13 @@ describe('createIdeWorkbenchChromeSlice sidebar focus', () => {
 
     slice.setIdeActivityView('agent');
 
-    expect(ideActivityView.value).toBe('agent');
+    expect(ideActivityView.value).toBe('team');
     expect(ideExplorerCollapsed.value).toBe(false);
     expect(agentDockCollapsed.value).toBe(false);
   });
 
-  it('focusIdeSidebarView shows stub guidance without changing dock or terminal state', () => {
-    const ideActivityView = ref<'explorer' | 'agent' | 'terminal'>('explorer');
+  it('focusIdeSidebarView agent lands on team without changing dock or terminal state', () => {
+    const ideActivityView = ref<'explorer' | 'agent' | 'terminal' | 'team'>('explorer');
     const ideExplorerCollapsed = ref(true);
     const agentDockCollapsed = ref(true);
     const ideTerminalRevealToken = ref(0);
@@ -189,7 +190,7 @@ describe('createIdeWorkbenchChromeSlice sidebar focus', () => {
     });
 
     slice.focusIdeSidebarView('agent');
-    expect(ideActivityView.value).toBe('agent');
+    expect(ideActivityView.value).toBe('team');
     expect(ideExplorerCollapsed.value).toBe(false);
     expect(agentDockCollapsed.value).toBe(true);
     expect(ideTerminalRevealToken.value).toBe(0);

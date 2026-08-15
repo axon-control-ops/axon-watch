@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue';
+import { computed, ref, toRef } from 'vue';
 
 import type { AgentQuestionOption } from '../../lib/agent-question-view';
 import {
@@ -19,7 +19,7 @@ import {
   shouldHideAgentReportInThread,
   shouldRenderAgentProseMarkdown,
 } from '../../lib/agent-message-markdown';
-import { createTranscriptSegmentCache } from '../../lib/conversation-transcript-segment-cache';
+import { sharedTranscriptSegmentCache } from '../../lib/conversation-transcript-segment-cache';
 import { sanitizeAgentThinkingForOperator, THINKING_SPEECH_FALLBACK } from '../../lib/agent-live-line-view';
 import { prepareAgentTerminalOpen } from '../../lib/agent-terminal-open';
 import {
@@ -65,8 +65,9 @@ const shell = useShellStore();
 const expandedErrorByMessageId = ref<Record<string, boolean>>({});
 const expandedSystemByMessageId = ref<Record<string, boolean>>({});
 const expandedThinkingKeys = ref<Record<string, boolean>>({});
-const { transcriptSegments } = createTranscriptSegmentCache();
+const { transcriptSegments } = sharedTranscriptSegmentCache();
 const regenerating = ref(false);
+const messageRef = toRef(props, 'message');
 
 const regeneratePrompt = computed(() =>
   props.message.role === 'agent'
@@ -93,20 +94,34 @@ function isStreamingMessage(messageId: string): boolean {
 /** Only the newest shells in a turn get full cards — Lead OTA threads mint dozens. */
 const RECENT_FULL_TERMINAL_CARDS = 6;
 
-function isCompactTerminalCard(messageId: string, segmentIndex: number): boolean {
-  const segments = transcriptSegments(
-    messageId,
-    props.message.content,
-    isStreamingMessage(messageId),
+const messageSegments = computed(() => {
+  const message = messageRef.value;
+  if (!agentContentHasTranscriptBlocks(message.content)) {
+    return [];
+  }
+  return transcriptSegments(
+    message.message_id,
+    message.content,
+    isStreamingMessage(message.message_id),
   );
+});
+
+const compactTerminalIndexes = computed(() => {
+  const segments = messageSegments.value;
   const terminalIndexes = segments
     .map((segment, index) => (segment.kind === 'terminal' ? index : -1))
     .filter((index) => index >= 0);
   if (terminalIndexes.length <= RECENT_FULL_TERMINAL_CARDS) {
-    return false;
+    return new Set<number>();
   }
   const recent = new Set(terminalIndexes.slice(-RECENT_FULL_TERMINAL_CARDS));
-  return !recent.has(segmentIndex);
+  return new Set(
+    terminalIndexes.filter((index) => !recent.has(index)),
+  );
+});
+
+function isCompactTerminalCard(segmentIndex: number): boolean {
+  return compactTerminalIndexes.value.has(segmentIndex);
 }
 
 async function onRegenerate(): Promise<void> {
@@ -330,11 +345,7 @@ async function copyTerminalOutput(output: string): Promise<void> {
     class="conversation-seam__blocks"
   >
     <template
-      v-for="(segment, segmentIndex) in transcriptSegments(
-        message.message_id,
-        message.content,
-        isStreamingMessage(message.message_id),
-      )"
+      v-for="(segment, segmentIndex) in messageSegments"
       :key="segmentKey(message.message_id, segmentIndex)"
     >
       <div
@@ -406,7 +417,7 @@ async function copyTerminalOutput(output: string): Promise<void> {
         :segment="segment"
         :message-id="message.message_id"
         :streaming="isStreamingMessage(message.message_id)"
-        :compact="isCompactTerminalCard(message.message_id, segmentIndex)"
+        :compact="isCompactTerminalCard(segmentIndex)"
         :terminal-mirror-badge="terminalMirrorBadge"
         :show-terminal-background-control="showTerminalBackgroundControl" :agent-terminal-job-statuses="shell.agentTerminalJobStatuses"
         @reveal="revealTerminalPanel"

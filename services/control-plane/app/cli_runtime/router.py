@@ -28,7 +28,7 @@ from app.cli_runtime.runtime_failure import (
     fallback_reply as _fallback_reply,
     runtime_unready_reason as _runtime_unready_reason,
 )
-from app.workspace_agents.failure_detail import is_usage_limit_failure
+from app.workspace_agents.failure_detail import is_billing_failure, is_usage_limit_failure
 from app.cli_runtime.sentry_context import sentry_monitor_context
 from app.cli_runtime.subprocess_runner import RuntimeProcessStoppedError
 from app.cli_runtime.sandbox_policy_adapter import prepare_execution_sandbox
@@ -38,6 +38,7 @@ from app.cli_runtime.cursor_agent import (
     run_cursor_local_with_recursion_retry,
 )
 from app.cli_runtime.runtime_auth import (
+    api_key_fallback_env,
     claude_dispatch_env,
     codex_dispatch_env,
     cursor_dispatch_env,
@@ -273,11 +274,18 @@ def dispatch_ide_composer(
     cursor_trust_policy: str = "operator",
     workspace_root: Path | None = None,
     execution_policy: AgentExecutionPolicy | None = None,
+    fallback_runtime_families: tuple[str, ...] = (),
 ) -> dict[str, object]:
     def _finish(payload: dict[str, object]) -> dict[str, object]:
         return _attach_dispatch_metadata(payload, composer_mode=composer_mode)
 
     subprocess_env = runtime_subprocess_env()
+    # Provider-key fallback is an autonomy policy, not an interactive composer
+    # side effect.  A person who explicitly selected a signed-in CLI account
+    # must not have that identity silently replaced by a Vault key when the
+    # subscription is quota-limited.  Autonomous workers opt into bounded
+    # fallback by supplying their approved runtime families.
+    allow_provider_key_fallback = bool(fallback_runtime_families)
     snapshot = runtime_status_snapshot(
         force_refresh=bool(subprocess_env.get("CURSOR_API_KEY")),
     )
@@ -333,7 +341,11 @@ def dispatch_ide_composer(
     # label here previously mislabeled the failure (e.g. "failed on Codex"
     # when the operator had Cursor selected and Cursor failed first).
     first_ready_runtime_label = ""
-    ordered_candidates = ordered_candidates_for_dispatch(snapshot, runtime_target)
+    ordered_candidates = ordered_candidates_for_dispatch(
+        snapshot,
+        runtime_target,
+        fallback_runtime_families=fallback_runtime_families,
+    )
     # The model pin travels with the family it was chosen for. Candidates are
     # already ordered preferred-first, so the first candidate's family is the
     # one `runtime_model` was picked against — carrying it into a fallback of
@@ -357,7 +369,19 @@ def dispatch_ide_composer(
             if family == "codex"
             else True
         )
-        if not allows_retry:
+        auth = record.get("auth") if isinstance(record.get("auth"), dict) else {}
+        subscription_auth = str(auth.get("auth_method") or "") in {
+            "oauth",
+            "chatgpt",
+            "claude.ai",
+        }
+        use_provider_key_after_known_subscription_limit = (
+            not allows_retry
+            and subscription_auth
+            and allow_provider_key_fallback
+            and env_has_api_key(subprocess_env, family=family)
+        )
+        if not allows_retry and not use_provider_key_after_known_subscription_limit:
             label = str(record.get("label") or runtime_id)
             errors.append(f"{label} usage limit is still active")
             continue
@@ -367,23 +391,23 @@ def dispatch_ide_composer(
         runtime_label = str(record.get("label") or runtime_id)
         if not first_ready_runtime_label:
             first_ready_runtime_label = runtime_label
-        dispatch_env = subprocess_env
+        dispatch_env = (
+            api_key_fallback_env(subprocess_env, family=family)
+            if use_provider_key_after_known_subscription_limit
+            else subprocess_env
+        )
         if family == "cursor":
-            dispatch_env = cursor_dispatch_env(
-                subprocess_env,
-                auth=record.get("auth") if isinstance(record.get("auth"), dict) else None,
-            )
+            if not use_provider_key_after_known_subscription_limit:
+                dispatch_env = cursor_dispatch_env(subprocess_env, auth=auth)
         elif family == "claude":
             model, reasoning_effort = _split_claude_model_selection(model)
-            dispatch_env = claude_dispatch_env(
-                subprocess_env,
-                auth=record.get("auth") if isinstance(record.get("auth"), dict) else None,
-            )
+            if not use_provider_key_after_known_subscription_limit:
+                dispatch_env = claude_dispatch_env(subprocess_env, auth=auth)
         elif family == "codex":
             model, reasoning_effort = _split_codex_model_selection(model)
             dispatch_env = codex_dispatch_env(
-                subprocess_env,
-                auth=record.get("auth") if isinstance(record.get("auth"), dict) else None,
+                dispatch_env,
+                auth={} if use_provider_key_after_known_subscription_limit else auth,
             )
             if not model:
                 model = default_codex_model(binary, env=dispatch_env)
@@ -481,8 +505,23 @@ def dispatch_ide_composer(
                 workspace_id,
                 type(exc).__name__,
             )
-            if looks_like_auth_error(detail) and env_has_api_key(dispatch_env, family=family):
-                retry_env = env_without_api_keys(dispatch_env, family=family)
+            if (
+                looks_like_auth_error(detail)
+                or is_usage_limit_failure(detail)
+                or is_billing_failure(detail)
+            ):
+                retry_env = None
+                if looks_like_auth_error(detail) and env_has_api_key(dispatch_env, family=family):
+                    # A configured key failed: retry the signed-in subscription.
+                    retry_env = env_without_api_keys(dispatch_env, family=family)
+                elif allow_provider_key_fallback and env_has_api_key(
+                    subprocess_env, family=family
+                ):
+                    # Subscription OAuth/quota/billing failed after its readiness
+                    # probe. Use the separately configured Vault provider key.
+                    retry_env = api_key_fallback_env(subprocess_env, family=family)
+                if retry_env is None:
+                    retry_env = dispatch_env
                 if retry_env != dispatch_env:
                     try:
                         if family == "cursor":

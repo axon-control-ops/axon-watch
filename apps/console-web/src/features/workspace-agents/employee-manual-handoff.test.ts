@@ -244,6 +244,26 @@ describe('resolveEmployeeManualHandoff', () => {
     });
   });
 
+  it('shows Semi Start now for specialist verification handoffs', () => {
+    const verification = task({
+      task_id: 'task_verify',
+      owner_role: 'backend',
+      goal: 'Verification after Marco (backend): npm test',
+    });
+    expect(
+      resolveEmployeeManualHandoff({
+        employee: employee({ role: 'backend', name: 'Marco' }),
+        autonomyMode: 'semi',
+        tasks: [verification],
+      }),
+    ).toEqual({
+      waiting: true,
+      taskId: 'task_verify',
+      reason: 'open_task',
+      blockedReason: null,
+    });
+  });
+
   it('does not glow when assigned has no actionable task', () => {
     expect(
       resolveEmployeeManualHandoff({
@@ -316,6 +336,57 @@ describe('resolveEmployeeManualHandoff', () => {
       reason: 'assigned',
       taskId: 'task_1',
       blockedReason: null,
+    });
+  });
+
+  it('shows Run verification after a failed leased verification shift', () => {
+    expect(
+      resolveEmployeeManualHandoff({
+        employee: employee({ role: 'backend', name: 'Marco', status: 'idle' }),
+        autonomyMode: 'manual',
+        tasks: [
+          task({
+            task_id: 'task_verify_failed',
+            owner_role: 'backend',
+            status: 'leased',
+            run_id: 'run_failed_verify',
+            goal: 'Verification after Marco (backend): npm test',
+          }),
+        ],
+      }),
+    ).toEqual({
+      waiting: true,
+      taskId: 'task_verify_failed',
+      reason: 'open_task',
+      blockedReason: null,
+    });
+  });
+
+  it('shows Run verification when active_run_id remains set after gate 6 fail', () => {
+    expect(
+      resolveEmployeeManualHandoff({
+        employee: employee({
+          role: 'backend',
+          name: 'Marco',
+          status: 'idle',
+          active_run_id: 'run_failed_verify',
+          last_outcome: 'failed',
+          last_outcome_detail: 'acceptance_evidence did not pass (Gate 6)',
+        }),
+        autonomyMode: 'manual',
+        tasks: [
+          task({
+            task_id: 'task_verify_failed',
+            owner_role: 'backend',
+            status: 'leased',
+            run_id: 'run_failed_verify',
+            goal: 'Verification after Marco (backend): npm test',
+          }),
+        ],
+      }),
+    ).toMatchObject({
+      waiting: true,
+      taskId: 'task_verify_failed',
     });
   });
 });

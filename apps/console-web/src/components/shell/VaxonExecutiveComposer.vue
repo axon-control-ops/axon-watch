@@ -22,6 +22,8 @@ const props = defineProps<{
   focusedWorkspaceLabel: string | null;
   activityLabel?: string | null;
   activityPhase?: string | null;
+  captureError?: string | null;
+  voiceGateFeedback?: string | null;
 }>();
 
 const emit = defineEmits<{
@@ -222,6 +224,16 @@ function handleDrop(event: DragEvent): void {
       <span class="mc-exec-composer__activity-tag">{{ phaseTag }}</span>
     </div>
 
+    <!-- Mic / voice-gate error notice -->
+    <div
+      v-if="captureError || voiceGateFeedback"
+      class="mc-exec-composer__notice"
+      role="alert"
+    >
+      <span class="mc-exec-composer__notice-rail" aria-hidden="true" />
+      <p class="mc-exec-composer__notice-copy">{{ captureError || voiceGateFeedback }}</p>
+    </div>
+
     <!-- Pending attachment chips -->
     <VaxonConversationAttachControls
       v-if="hasAttachments"
@@ -412,3 +424,4 @@ function handleDrop(event: DragEvent): void {
 </template>
 
 <style scoped src="./mission-control-executive-composer.css"></style>
+<style scoped src="./mission-control-executive-notice.css"></style>

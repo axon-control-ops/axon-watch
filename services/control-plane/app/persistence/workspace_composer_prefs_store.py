@@ -224,3 +224,24 @@ def resolve_worker_runtime_target(workspace_id: str) -> str | None:
         pass
 
     return None
+
+
+def resolve_worker_runtime_fallback_families(workspace_id: str) -> tuple[str, ...]:
+    """Runtime families an autonomous worker may use after its preferred CLI fails.
+
+    The workspace setting existed in the API/UI but was not connected to worker
+    dispatch.  Keep interactive composer pins strict, while allowing continuous
+    workers to use only the explicitly approved Auto runtime families.
+    """
+    prefs = get_workspace_composer_prefs(workspace_id)
+    preferred = str(prefs.get("runtime_target") or "").split("_", 1)[0]
+    allowed = prefs.get("auto_allowed_runtimes")
+    if not isinstance(allowed, list):
+        return ()
+    return tuple(
+        family
+        for family in allowed
+        if isinstance(family, str)
+        and family in _VALID_RUNTIME_FAMILIES
+        and family != preferred
+    )

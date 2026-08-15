@@ -5,8 +5,10 @@ import {
   humanizeHandoffBlockedReason,
   taskDependenciesCompleted,
 } from '../../lib/task-dependencies';
+import { taskIsVerificationHandoff } from '../../lib/verification-handoff';
 
 import { employeeIsActivelyBusy } from './company-roster-busy';
+import { employeeFailureLine } from './company-roster-failure-view';
 
 export type EmployeeManualHandoff = {
   waiting: boolean;
@@ -41,6 +43,9 @@ export function taskLooksLikeCrossWorkspaceHandoff(task: WorkspaceTaskRecord): b
  */
 export function taskIsSemiStartFallback(task: WorkspaceTaskRecord): boolean {
   if (roleKey(task.owner_role) === 'lead') {
+    return true;
+  }
+  if (taskIsVerificationHandoff(task)) {
     return true;
   }
   return taskLooksLikeCrossWorkspaceHandoff(task);
@@ -169,6 +174,44 @@ export function resolveEmployeeManualHandoff(input: {
       reason: 'open_task',
       blockedReason: null,
     };
+  }
+
+  // Leased handoff after a failed/cancelled run — specialist is idle but the ticket
+  // is still bound. Without this, Run verification never appears post Gate 6 fail.
+  const failedShift = Boolean(employeeFailureLine(input.employee));
+  const activeRunBlocksLeasedRetry =
+    Boolean(activeRunId) &&
+    !failedShift &&
+    (IN_FLIGHT_STATUSES.has(status) || employeeIsActivelyBusy(input.employee));
+
+  if (
+    !IN_FLIGHT_STATUSES.has(status) &&
+    status !== 'assigned' &&
+    !activeRunBlocksLeasedRetry
+  ) {
+    const leasedRetry = [...input.tasks]
+      .filter(
+        (task) =>
+          roleKey(task.owner_role) === role &&
+          task.status === 'leased' &&
+          taskHasAttemptCapacity(task) &&
+          allowsTask(task) &&
+          Boolean(task.run_id?.trim()),
+      )
+      .sort((left, right) => right.updated_at.localeCompare(left.updated_at));
+
+    for (const task of leasedRetry) {
+      const blockedReason = blockedReasonFor(task);
+      if (blockedReason) {
+        return { ...idle, blockedReason };
+      }
+      return {
+        waiting: true,
+        taskId: task.task_id,
+        reason: 'open_task',
+        blockedReason: null,
+      };
+    }
   }
 
   const leasedQueued = [...input.tasks]

@@ -5,6 +5,8 @@ import AgentDock from '../ide/AgentDock.vue';
 import { useRightDockResize } from '../../composables/useRightDockResize';
 import { useShellStore } from '../../stores/shell';
 import MissionControlLiveOpsPanel from './MissionControlLiveOpsPanel.vue';
+import LeadReviewOverlay from './LeadReviewOverlay.vue';
+import { closeLeadReviewOverlay } from '../../features/lead-review/lead-review-overlay-state';
 
 const shell = useShellStore();
 const dockRef = ref<HTMLElement | null>(null);
@@ -24,6 +26,13 @@ const showLiveOpsDock = computed(
   () => shell.layoutMode === 'operator' && !shell.operatorBrainGalaxyActive,
 );
 
+async function onLeadReviewComplete(planId: string): Promise<void> {
+  const closed = await shell.closeCurrentLeadPlanEngagement(planId, 'completed');
+  if (closed) {
+    closeLeadReviewOverlay();
+    await shell.loadOperatorBriefing({ background: true, light: true });
+  }
+}
 </script>
 
 <template>
@@ -60,6 +69,7 @@ const showLiveOpsDock = computed(
     -->
     <div class="dock-stack__live-ops-frame" data-vaxon-composer="live-ops">
       <MissionControlLiveOpsPanel />
+      <LeadReviewOverlay @mark-complete="void onLeadReviewComplete($event)" />
     </div>
   </aside>
 </template>
@@ -76,6 +86,7 @@ const showLiveOpsDock = computed(
 }
 
 .dock-stack__live-ops-frame {
+  position: relative;
   flex: 1 1 auto;
   min-height: 0;
   display: flex;

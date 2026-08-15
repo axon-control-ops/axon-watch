@@ -215,8 +215,9 @@ def _owners_for_clause(
     scored = _score_specialists(clause, specialists)
     eligible = [(member, score) for member, score in scored if score >= MIN_WINNER_SCORE]
     if len(eligible) >= 2:
-        # Multi-domain: keep every role that cleared the bar.
-        return [member for member, _score in eligible], False
+        # Require every winner to clear the higher bar before automatic fan-out.
+        decisive = all(score >= MIN_WINNER_SCORE + MIN_MARGIN for _member, score in eligible)
+        return [member for member, _score in eligible], not decisive
     if len(eligible) == 1:
         return [eligible[0][0]], False
     # Soft winner: positive score but below hard threshold — ambiguous for model.

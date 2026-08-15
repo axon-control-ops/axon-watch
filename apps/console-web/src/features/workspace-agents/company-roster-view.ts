@@ -40,6 +40,8 @@ export {
   type EmployeeTalkSpeakMode,
 } from './company-roster-speak-view';
 
+export { employeeRuntimeShiftHint } from './employee-runtime-shift-view';
+
 export {
   buildCompanyRosterAlertBadge,
   companyFailedEmployees,

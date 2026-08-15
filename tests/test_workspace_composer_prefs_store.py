@@ -12,6 +12,7 @@ sys.path.insert(0, str(CONTROL_PLANE_ROOT))
 from app.persistence.workspace_composer_prefs_store import (  # noqa: E402
     get_workspace_composer_prefs,
     resolve_worker_runtime_model,
+    resolve_worker_runtime_fallback_families,
     resolve_worker_runtime_target,
     set_workspace_composer_prefs,
 )
@@ -104,6 +105,17 @@ class WorkspaceComposerPrefsStoreTests(unittest.TestCase):
         self.assertEqual(
             resolve_worker_runtime_target("workspace_axon_watch"),
             "cursor_local",
+        )
+
+    def test_auto_allowed_runtimes_become_worker_only_fallbacks(self) -> None:
+        set_workspace_composer_prefs(
+            "workspace_axon_watch",
+            runtime_target="codex_local",
+            auto_allowed_runtimes=["codex", "claude", "cursor"],
+        )
+        self.assertEqual(
+            resolve_worker_runtime_fallback_families("workspace_axon_watch"),
+            ("claude", "cursor"),
         )
 
 

@@ -77,7 +77,9 @@ function aliasInContent(normalized: string, alias: string): boolean {
 }
 
 /** Best-effort workspace inference from free-form composer text. */
-export function inferWorkspaceIdsFromContent(content: string): Array<{ workspaceId: string; hint: string }> {
+export function inferWorkspaceIdsFromContent(
+  content: string,
+): Array<{ workspaceId: string; hint: string; weight: number }> {
   const trimmed = content.trim();
   if (!trimmed) {
     return [];
@@ -129,9 +131,7 @@ export function inferWorkspaceIdsFromContent(content: string): Array<{ workspace
     }
   }
 
-  return [...deduped.values()]
-    .sort((left, right) => right.weight - left.weight)
-    .map(({ workspaceId, hint }) => ({ workspaceId, hint }));
+  return [...deduped.values()].sort((left, right) => right.weight - left.weight);
 }
 
 export function resolveComposerWorkspaceScopeMismatch(
@@ -147,6 +147,17 @@ export function resolveComposerWorkspaceScopeMismatch(
   const inferred = inferWorkspaceIdsFromContent(text);
   const winner = inferred.find((row) => row.workspaceId !== current);
   if (!winner) {
+    return null;
+  }
+
+  // A draft that's dominantly about the current workspace can still contain a
+  // passing mention of another one (e.g. "consult Dana from DashPro" inside
+  // Young-Eagles-scoped Instructions text). Only flag a mismatch when the
+  // other workspace's strongest signal actually outweighs the current
+  // workspace's own signal in the same draft — otherwise any bare keyword
+  // mention, even a quoted/reference one, would false-positive.
+  const currentWeight = inferred.find((row) => row.workspaceId === current)?.weight ?? 0;
+  if (winner.weight <= currentWeight) {
     return null;
   }
 

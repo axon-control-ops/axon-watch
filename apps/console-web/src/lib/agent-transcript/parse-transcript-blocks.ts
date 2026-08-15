@@ -5,6 +5,10 @@ import {
 } from '../lead-fan-out-card';
 import { parseLeadStandupReport } from '../lead-standup-card';
 import { sanitizeResearchCardTitle, sanitizeResearchSnippet } from '../research-snippet';import { inferResearchBlockKind, type ResearchBlockKind } from '../research-provider';
+import {
+  sanitizeTerminalDisplayOutput,
+  stripOrphanAnsiFragments,
+} from '../terminal-scrollback';
 import type { AgentTranscriptSegment, ResearchTranscriptItem } from './types';
 import {
   dedupeProseText,
@@ -113,7 +117,11 @@ export function parseAgentTranscriptBlocksUncached(
   let index = 0;
 
   function flushText(): void {
-    const text = dedupeProseText(textBuffer.join('\n').replace(/^\n+|\n+$/g, ''));
+    let raw = textBuffer.join('\n').replace(/^\n+|\n+$/g, '');
+    if (raw.length > 8_000 && /\[[0-9;?]*[A-Za-z]/.test(raw)) {
+      raw = stripOrphanAnsiFragments(raw);
+    }
+    const text = dedupeProseText(raw);
     if (text.trim()) {
       segments.push({ kind: 'text', text });
     }
@@ -391,10 +399,13 @@ export function parseAgentTranscriptBlocksUncached(
         body.push(lines[index]);
         index += 1;
       }
+      const command = terminalMatch[1].trim();
       segments.push({
         kind: 'terminal',
-        command: terminalMatch[1].trim(),
-        output: compactTerminalOutputForDisplay(body.join('\n')),
+        command,
+        output: compactTerminalOutputForDisplay(
+          sanitizeTerminalDisplayOutput(body.join('\n'), command),
+        ),
         open: !closed,
       });
       continue;

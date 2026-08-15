@@ -25,7 +25,8 @@ from app.terminal.active_chat_stream import (
 )
 from app.terminal.agent_job_chat import merge_active_agent_job_terminals
 from app.workspace_agents import build_company_roster
-from app.workspace_agents.assignment_messages import assignment_card, employee_display_name, readable_goal
+from app.workspace_agents.assignment_messages import employee_display_name, readable_goal
+from app.workspace_agents.assignment_voice import narrate_worker_started
 from app.workspace_agents.config_loader import EmployeeConfig
 
 logger = logging.getLogger(__name__)
@@ -124,14 +125,18 @@ def prepare_worker_ide_stream(
             "workspace_id": workspace_id,
             "run_id": run_id,
             "role": "agent",
-            "content": assignment_card(
+            "content": narrate_worker_started(
+                workspace_id=workspace_id,
                 assignee_name=display_name,
                 assignee_role=employee.role,
                 goal=_task_goal_preview(task),
                 task_id=task_id,
                 run_id=run_id,
-                state="started",
-                expected_files=list((task or {}).get("allowed_paths") or []),
+                # exclusive_paths (never backfilled) is the honest, task-specific
+                # file list — allowed_paths is the full role write-scope
+                # enforcement ceiling and shows a generic template for every
+                # task when the goal names no real path.
+                expected_files=list((task or {}).get("exclusive_paths") or []),
             ),
             "speaker_name": display_name,
             "speaker_role": employee.role,

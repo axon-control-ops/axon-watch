@@ -120,6 +120,7 @@ def generate_lane_b_result(
     workspace_root: Path | None = None,
     execution_policy: AgentExecutionPolicy | None = None,
     allow_git_dispatch: bool = True,
+    fallback_runtime_families: tuple[str, ...] = (),
 ) -> dict[str, object]:
     trimmed = user_prompt.strip()
     if not trimmed:
@@ -163,6 +164,7 @@ def generate_lane_b_result(
                 cursor_trust_policy=cursor_trust_policy,
                 workspace_root=workspace_root,
                 execution_policy=execution_policy,
+                fallback_runtime_families=fallback_runtime_families,
             )
         except RuntimeError as exc:
             return {
@@ -205,6 +207,7 @@ def generate_lane_b_result(
             cursor_trust_policy=cursor_trust_policy,
             workspace_root=workspace_root,
             execution_policy=execution_policy,
+            fallback_runtime_families=fallback_runtime_families,
         )
     except RuntimeError as exc:
         return {

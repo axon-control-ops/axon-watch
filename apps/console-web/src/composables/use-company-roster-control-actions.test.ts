@@ -1,6 +1,7 @@
 import { ref } from 'vue';
 import { describe, expect, it, vi } from 'vitest';
 
+import type { WorkspaceTaskRecord } from '../api/tasks-api';
 import type { CompanyEmployeeRecord } from '../contracts/canonical';
 import { useCompanyRosterControlActions } from './use-company-roster-control-actions';
 
@@ -32,6 +33,10 @@ function shellWithStart(result: {
       runPhase: result.runPhase,
     }),
     workspaceTasksError: null,
+    workspaceTasksForCurrentWorkspace: [] as WorkspaceTaskRecord[],
+    operatorPresenceSettings: { autonomy_mode: 'manual' },
+    runs: [],
+    loadWorkspaceTasks: vi.fn().mockResolvedValue(undefined),
     loadCompanyEmployees: vi.fn().mockResolvedValue(undefined),
     loadRuns: vi.fn().mockResolvedValue(undefined),
     selectIdeThread: vi.fn().mockResolvedValue(undefined),
@@ -140,5 +145,53 @@ describe('useCompanyRosterControlActions', () => {
 
     expect(actions.controlError.value).toContain('No handoff task');
     expect(shell.startCurrentWorkspaceTask).not.toHaveBeenCalled();
+  });
+
+  it('defers IDE focus for Run verification so the roster stays responsive', async () => {
+    vi.useFakeTimers();
+    const shell = shellWithStart({ runId: 'run_verify', runPhase: 'executing' });
+    shell.workspaceTasksForCurrentWorkspace = [
+      {
+        task_id: 'task_verify',
+        workspace_id: 'workspace_dashpro',
+        goal: 'Verification after Marco (backend): run scoped verify commands — `npm test`',
+        acceptance_criteria: 'Attach stdout receipts.',
+        risk: 'low',
+        owner_role: 'integrations',
+        dependencies: [],
+        status: 'open',
+        lease_holder: null,
+        lease_expires_at: null,
+        attempt_budget: 3,
+        attempts_used: 0,
+        terminal_outcome: null,
+        run_id: null,
+        created_at: '2026-01-01T00:00:00Z',
+        updated_at: '2026-01-01T00:00:00Z',
+      },
+    ];
+    const loadCompany = vi.fn().mockResolvedValue(undefined);
+    const actions = useCompanyRosterControlActions({
+      shell: shell as never,
+      currentWorkspaceId: ref('workspace_dashpro'),
+      loadCompany,
+    });
+
+    await actions.onControlAction(employee, {
+      id: 'start_now',
+      label: 'Run verification',
+      kind: 'control',
+      control: 'start_now',
+      taskId: 'task_verify',
+    });
+
+    expect(actions.controlError.value).toBeNull();
+    expect(shell.setLayoutMode).not.toHaveBeenCalled();
+    await vi.runAllTimersAsync();
+    expect(shell.selectIdeThread).toHaveBeenCalledWith('thread_soren', {
+      forceRefresh: false,
+    });
+    expect(shell.setLayoutMode).toHaveBeenCalledWith('ide');
+    vi.useRealTimers();
   });
 });

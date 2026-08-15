@@ -1,13 +1,14 @@
 """Prompt clause for long-running / external shell jobs (OTA, Expo, EAS)."""
 
 LONG_RUNNING_SHELL_CLAUSE = (
-    "Long-running ship jobs (OTA canary, Expo export/bundle, EAS update): "
+    "Long-running ship jobs (OTA canary, Expo export/bundle, EAS update, Vercel production deploy): "
     "do NOT block on Cursor shellToolCall for the heavy job — Cursor only emits shell "
     "stdout when the tool finishes, so the operator cannot watch mid-run progress, and "
     "Axon may stale-fail the Lead run (~30–90m idle) while Expo/EAS continues orphaned. "
     "Start once with the PATH helper (works from any cwd, including DashPro): "
     "`axon-agent-terminal-job --workspace <workspace_id> -- <command>` "
-    "(example: `axon-agent-terminal-job --workspace workspace_dashpro -- npm run ota:canary`). "
+    "(examples: `axon-agent-terminal-job --workspace workspace_dashpro -- npm run ota:canary`; "
+    "`axon-agent-terminal-job --workspace workspace_dashpro -- node scripts/ops/deploy-vercel-production.mjs --method=cli`). "
     "If that command is missing, run "
     "`./scripts/ops/install-bin-wrappers.sh` from the axon-watch repo, or call the script by "
     "absolute path under axon-watch `scripts/ops/axon-agent-terminal-job.sh`. "

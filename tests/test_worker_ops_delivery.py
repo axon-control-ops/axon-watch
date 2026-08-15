@@ -15,7 +15,7 @@ from app.runs.service import create_run, get_run  # noqa: E402
 from app.workspace_agents.config_loader import EmployeeConfig  # noqa: E402
 from app.workspace_agents.execution_policy import role_execution_policy  # noqa: E402
 from app.workspace_agents.ops_delivery import no_change_delivery_is_successful_ops_task  # noqa: E402
-from app.workspace_agents.worker_dispatch import dispatch_continuous_worker_run  # noqa: E402
+from app.workspace_agents import worker_dispatch  # noqa: E402
 from app.workspace_delivery.publish import PublishResult  # noqa: E402
 
 
@@ -48,18 +48,25 @@ class WorkerOpsDeliveryTests(unittest.TestCase):
             task_id=leased["task_id"],
             require_leased_task=True,
         )
-        with patch(
-            "app.workspace_agents.worker_dispatch.generate_lane_b_result",
+        with patch.object(
+            worker_dispatch,
+            "generate_lane_b_result",
             return_value={
                 "dispatched": True,
                 "runtime_label": "test",
                 "content": "OTA command completed by terminal receipt.\n\nConfidence: 10/10",
             },
-        ), patch(
-            "app.workspace_agents.worker_dispatch.resolve_worker_execution_policy",
+        ), patch.object(
+            worker_dispatch,
+            "resolve_worker_execution_policy",
             return_value=role_execution_policy("integrations"),
-        ), patch(
-            "app.workspace_agents.worker_dispatch.finalize_lane_b_agent_run",
+        ), patch.object(
+            worker_dispatch,
+            "prepare_worker_ide_stream",
+            return_value=None,
+        ), patch.object(
+            worker_dispatch,
+            "finalize_lane_b_agent_run",
             return_value=(True, {"phase": "executing"}),
         ), patch(
             "app.workspace_agents.verifier_contract.run_requires_acceptance_evidence",
@@ -76,8 +83,11 @@ class WorkerOpsDeliveryTests(unittest.TestCase):
                 detail="no changes",
                 cleanup_isolation=True,
             ),
+        ), patch(
+            "app.workspace_agents.lead_replan.notify_lead_after_worker_task",
+            return_value=None,
         ):
-            dispatched, finalized = dispatch_continuous_worker_run(
+            dispatched, finalized = worker_dispatch.dispatch_continuous_worker_run(
                 workspace_id="workspace_worker_ops_noop",
                 employee=EmployeeConfig(
                     name="Release Ops",
@@ -130,3 +140,107 @@ class WorkerOpsDeliveryTests(unittest.TestCase):
         }
 
         self.assertFalse(no_change_delivery_is_successful_ops_task(task))
+
+    def test_full_access_no_change_verification_task_completes_with_terminal_receipt(self) -> None:
+        from app.terminal import agent_jobs
+
+        opened = task_store.create_task(
+            workspace_id="workspace_worker_verify_noop",
+            goal=(
+                "Verification after Marco (backend): run scoped verify commands — "
+                "`npm test -- tests/unit/services/staffVisibility.test.ts` "
+                "[from run run_demo]"
+            ),
+            owner_role="backend",
+            acceptance_criteria="Attach stdout receipts.",
+        )
+        leased = task_store.lease_task(
+            opened["task_id"],
+            lease_holder="employee-workspace_worker_verify_noop-backend",
+        )
+        created = create_run(
+            workspace_id="workspace_worker_verify_noop",
+            mode="agent",
+            summary="Backend verification shift",
+            employee_role="backend",
+            task_id=leased["task_id"],
+            require_leased_task=True,
+        )
+        run_id = str(created["run_id"])
+        with agent_jobs._lock:
+            agent_jobs._jobs["agent-job-verify-noop"] = {
+                "job_id": "agent-job-verify-noop",
+                "workspace_id": "workspace_worker_verify_noop",
+                "run_id": run_id,
+                "command": "npm test -- tests/unit/services/staffVisibility.test.ts",
+                "status": "completed",
+                "exit_code": 0,
+                "created_at": "2026-01-01T00:00:00Z",
+            }
+        with patch.object(
+            worker_dispatch,
+            "generate_lane_b_result",
+            return_value={
+                "dispatched": True,
+                "runtime_label": "test",
+                "content": "Tests passed with terminal stdout attached.\n\nConfidence: 10/10",
+            },
+        ), patch.object(
+            worker_dispatch,
+            "resolve_worker_execution_policy",
+            return_value=role_execution_policy("backend"),
+        ), patch.object(
+            worker_dispatch,
+            "prepare_worker_ide_stream",
+            return_value=None,
+        ), patch.object(
+            worker_dispatch,
+            "finalize_lane_b_agent_run",
+            return_value=(True, {"phase": "executing"}),
+        ), patch(
+            "app.workspace_agents.verifier_contract.run_requires_acceptance_evidence",
+            return_value=True,
+        ), patch(
+            "app.workspace_agents.verifier_contract.has_passing_acceptance_evidence",
+            return_value=False,
+        ), patch(
+            "app.workspace_delivery.publish_worker_isolation",
+            return_value=PublishResult(
+                ok=True,
+                stage="no_change",
+                delivery={"delivery_id": "delivery-verify-noop"},
+                detail="no changes",
+                cleanup_isolation=True,
+            ),
+        ), patch(
+            "app.workspace_agents.lead_replan.notify_lead_after_worker_task",
+            return_value=None,
+        ):
+            dispatched, finalized = worker_dispatch.dispatch_continuous_worker_run(
+                workspace_id="workspace_worker_verify_noop",
+                employee=EmployeeConfig(
+                    name="Marco",
+                    role="backend",
+                    owns="Backend",
+                    schedule="continuous",
+                ),
+                run_record=created,
+            )
+
+        self.assertTrue(dispatched)
+        self.assertIsNotNone(finalized)
+        self.assertEqual("completed", finalized["phase"])  # type: ignore[index]
+        task = task_store.get_task(leased["task_id"])
+        self.assertEqual("completed", task["status"])  # type: ignore[index]
+        history = run_store.list_history(get_run(run_id)["history_ref"])
+        summaries = [
+            str(item.get("receipt", {}).get("summary") or "").lower() for item in history
+        ]
+        self.assertTrue(
+            any("verification shift required terminal job receipts" in summary for summary in summaries),
+            summaries,
+        )
+        self.assertTrue(
+            any("acceptance=pass" in summary for summary in summaries),
+            summaries,
+        )

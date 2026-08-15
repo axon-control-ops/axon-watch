@@ -23,8 +23,12 @@ class OperatorStartTaskTests(unittest.TestCase):
         task_store.reset_store()
         self.addCleanup(task_store.reset_store)
 
+    @patch(
+        "app.workspace_agents.operator_start_task._wait_for_worker_dispatch_started",
+        return_value=True,
+    )
     @patch("app.workspace_agents.operator_start_task._kick_queued_dispatch")
-    def test_operator_start_leases_and_dispatches_exact_run(self, kick) -> None:
+    def test_operator_start_leases_and_dispatches_exact_run(self, kick, _wait) -> None:
         kick.side_effect = lambda run_id: [
             {"run_id": run_id, "phase": "executing", "employee_role": "frontend"}
         ]
@@ -62,8 +66,12 @@ class OperatorStartTaskTests(unittest.TestCase):
         self.assertTrue(str(stored.get("run_id") or ""))
         kick.assert_called_once_with(str(stored.get("run_id") or ""))
 
+    @patch(
+        "app.workspace_agents.operator_start_task._wait_for_worker_dispatch_started",
+        return_value=True,
+    )
     @patch("app.workspace_agents.operator_start_task._kick_queued_dispatch")
-    def test_operator_retry_dispatches_the_leased_task_run(self, kick) -> None:
+    def test_operator_retry_dispatches_the_leased_task_run(self, kick, _wait) -> None:
         kick.side_effect = lambda run_id: [
             {"run_id": run_id, "phase": "executing", "employee_role": "integrations"}
         ]
@@ -194,6 +202,149 @@ class OperatorStartTaskTests(unittest.TestCase):
 
         stored = task_store.get_task(str(created["task_id"])) or {}
         self.assertEqual("open", stored.get("status"))
+
+
+    @patch(
+        "app.workspace_agents.operator_start_task._wait_for_worker_dispatch_started",
+        return_value=False,
+    )
+    @patch("app.workspace_agents.operator_start_task._kick_queued_dispatch")
+    def test_operator_start_reopens_task_when_dispatch_never_starts(self, kick, _wait) -> None:
+        kick.side_effect = lambda run_id: [
+            {"run_id": run_id, "phase": "executing", "employee_role": "backend"}
+        ]
+        created = task_store.create_task(
+            workspace_id="workspace_dashpro",
+            goal="Verification after Marco (backend): npm test",
+            owner_role="backend",
+        )
+        with self.assertRaisesRegex(OperatorStartTaskError, "did not start within timeout"):
+            operator_start_task(str(created["task_id"]))
+        stored = task_store.get_task(str(created["task_id"])) or {}
+        self.assertEqual("open", stored.get("status"))
+
+
+def _stored_run(
+    run_id: str,
+    *,
+    task_id: str,
+    employee_role: str = "backend",
+    phase: str = "failed",
+) -> dict:
+    updated_at = "2026-08-13T12:01:00Z"
+    return {
+        "run_id": run_id,
+        "workspace_id": "workspace_dashpro",
+        "lane_id": "lane_b",
+        "mode": "agent",
+        "status": phase,
+        "phase": phase,
+        "summary": "backend verify failed",
+        "detail": "acceptance_evidence did not pass (Gate 6)",
+        "started_at": "2026-08-13T12:00:00Z",
+        "updated_at": updated_at,
+        "ended_at": updated_at,
+        "can_stop": False,
+        "can_resume": False,
+        "can_approve": False,
+        "can_review": False,
+        "current_step": "",
+        "history_ref": f"history_{run_id}",
+        "employee_role": employee_role,
+        "task_id": task_id,
+    }
+
+
+class OperatorStartVerificationRepairTests(unittest.TestCase):
+    def setUp(self) -> None:
+        isolate_control_plane_db(self, run_store)
+        task_store.reset_store()
+        self.addCleanup(task_store.reset_store)
+
+    @patch(
+        "app.workspace_agents.operator_start_task._employee_for_role",
+        return_value={
+            "employee_id": "employee-marco",
+            "name": "Marco",
+            "role": "backend",
+            "enabled": True,
+        },
+    )
+    @patch(
+        "app.workspace_agents.operator_start_task._wait_for_worker_dispatch_started",
+        return_value=True,
+    )
+    @patch("app.workspace_agents.operator_start_task._kick_queued_dispatch")
+    def test_operator_start_repairs_stale_task_id_via_verification_ticket(
+        self,
+        kick,
+        _wait,
+        _employee,
+    ) -> None:
+        kick.side_effect = lambda run_id: [
+            {"run_id": run_id, "phase": "executing", "employee_role": "backend"}
+        ]
+        verify = task_store.create_task(
+            workspace_id="workspace_dashpro",
+            goal="Verification after Marco (backend): npm test [from run run_failed]",
+            owner_role="backend",
+        )
+        run_store.save_run(_stored_run("run_failed", task_id="task-vanished"))
+
+        result = operator_start_task("task-vanished")
+
+        self.assertEqual(str(verify["task_id"]), str(result["task"]["task_id"]))
+        self.assertEqual("executing", str(result["run"]["phase"]))
+
+    @patch(
+        "app.workspace_agents.operator_start_task._employee_for_role",
+        return_value={
+            "employee_id": "employee-marco",
+            "name": "Marco",
+            "role": "backend",
+            "enabled": True,
+        },
+    )
+    @patch(
+        "app.workspace_agents.operator_start_task._post_assignment_to_employee_thread",
+        return_value="thread_marco",
+    )
+    @patch(
+        "app.workspace_agents.operator_start_task._wait_for_worker_dispatch_started",
+        return_value=True,
+    )
+    @patch("app.workspace_agents.operator_start_task._kick_queued_dispatch")
+    def test_operator_start_reopens_leased_task_after_failed_run(
+        self,
+        kick,
+        _wait,
+        _thread,
+        _employee,
+    ) -> None:
+        kick.side_effect = lambda run_id: [
+            {"run_id": run_id, "phase": "executing", "employee_role": "backend"}
+        ]
+        created = task_store.create_task(
+            workspace_id="workspace_dashpro",
+            goal="Verification after Marco (backend): npm test",
+            owner_role="backend",
+        )
+        run_store.save_run(
+            _stored_run("run_failed_verify", task_id=str(created["task_id"]))
+        )
+        leased = task_store.lease_task(
+            str(created["task_id"]),
+            lease_holder="operator-start-workspace_dashpro-backend",
+            run_id="run_failed_verify",
+        )
+        self.assertEqual("leased", leased.get("status"))
+
+        result = operator_start_task(str(created["task_id"]))
+
+        self.assertEqual("executing", str(result["run"]["phase"]))
+        stored = task_store.get_task(str(created["task_id"])) or {}
+        self.assertEqual("leased", stored.get("status"))
+        self.assertNotEqual("run_failed_verify", str(stored.get("run_id") or ""))
 
 
 if __name__ == "__main__":

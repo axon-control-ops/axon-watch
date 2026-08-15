@@ -324,7 +324,11 @@ def generic_repeated_failure_blocks_auto_start(
 def continuous_auto_start_skip_reason(workspace_id: str, role: str) -> str | None:
     """Return a skip reason for continuous ticks, or None when the role may start."""
     if usage_limit_blocks_auto_start(workspace_id, role):
-        return "Cursor usage limits blocked this role's last shift"
+        outcome = latest_role_run_outcome(workspace_id, role) or {}
+        detail = str(outcome.get("detail") or "")
+        lowered = detail.lower()
+        runtime = "Codex" if "codex" in lowered else "Claude" if "claude" in lowered else "Cursor"
+        return f"{runtime} usage limits blocked this role's last shift"
     if billing_block_blocks_auto_start(workspace_id, role):
         return "Cursor unpaid invoice blocked this role's last shift"
     if billing_blocks_auto_start(workspace_id, role):

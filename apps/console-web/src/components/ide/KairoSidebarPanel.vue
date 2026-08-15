@@ -17,6 +17,7 @@ import {
 } from '../../lib/kairo-voice-followup-window';
 import {
   clearVaxonBriefingInteraction,
+  getVaxonBriefingInteraction,
   recordVaxonBriefingInteraction,
   vaxonBriefingInteractionKey,
   vaxonBriefingPendingByWorkspace,
@@ -28,6 +29,7 @@ import {
 } from '../../lib/kairo-sidebar-attend';
 import { vaxonLineAsksForReply } from '../../lib/vaxon-reply-prompt';
 import { sidebarSpeechShouldOfferReply } from '../../lib/sidebar-speech-reply-route';
+import { shouldShowIdeVaxonDock } from '../../lib/ide-vaxon-dock-visibility';
 import { employeeFailureDetailTooltip } from '../../features/workspace-agents/company-roster-view';
 import { useShellStore } from '../../stores/shell';
 import OperatorPersonaMark from '../OperatorPersonaMark.vue';
@@ -212,10 +214,23 @@ const presenceLabel = computed(() => {
   return `${presencePersonaName.value} · DEBUG${access}${activity}`;
 });
 
-/** Team roster already fills the upper rail — keep presence as a chip there. */
+/** Team roster owns the rail unless VAXON is actively speaking or awaiting a reply. */
 const teamViewOpen = computed(
   () => shell.layoutMode === 'ide' && shell.ideActivityView === 'team',
 );
+const showIdeKairoDock = computed(() => {
+  void vaxonBriefingPendingByWorkspace.value;
+  return shouldShowIdeVaxonDock({
+    layoutMode: shell.layoutMode,
+    ideActivityView: shell.ideActivityView,
+    workspaceId: shell.currentWorkspace?.workspace_id,
+    kairoSpeechActive: shell.kairoSpeechActive,
+    liveSpokenText: spokenText.value,
+    stickySpokenText: stickySpokenText.value,
+    stickyNeedsDecision: stickyNeedsDecision.value,
+    operatorPinned: shell.ideVaxonDockPinned,
+  });
+});
 const showExpandedPanel = computed(() => {
   if (teamViewOpen.value) {
     return false;
@@ -224,6 +239,9 @@ const showExpandedPanel = computed(() => {
 });
 
 const showSpeechChip = computed(() => {
+  if (!showIdeKairoDock.value && teamViewOpen.value) {
+    return false;
+  }
   if (shell.kairoSpeechActive || spokenText.value?.trim()) {
     return true;
   }
@@ -265,6 +283,41 @@ function dismissSpeechChip(): void {
   stickyNeedsDecision.value = false;
   followupTick.value += 1;
 }
+
+function clearIdleNarrationForTeamView(): void {
+  if (!teamViewOpen.value || shell.kairoSpeechActive) {
+    return;
+  }
+  const ws = shell.currentWorkspace?.workspace_id?.trim();
+  if (!ws) {
+    return;
+  }
+  const pending = getVaxonBriefingInteraction(ws);
+  if (pending?.line.trim() && !vaxonLineAsksForReply(pending.line)) {
+    clearVaxonBriefingInteraction(ws);
+  }
+  if (stickySpokenText.value.trim() && !stickyNeedsDecision.value) {
+    stickySpokenText.value = '';
+    stickySpeakerName.value = '';
+    stickySpeakerKind.value = null;
+    stickySpeakerId.value = null;
+  }
+  followupTick.value += 1;
+}
+
+watch(teamViewOpen, clearIdleNarrationForTeamView, { immediate: true });
+
+watch(
+  () => followupWindowActive.value,
+  (active, wasActive) => {
+    if (wasActive && !active && !stickyNeedsDecision.value && !pendingVaxonDecision.value) {
+      stickySpokenText.value = '';
+      stickySpeakerName.value = '';
+      stickySpeakerKind.value = null;
+      stickySpeakerId.value = null;
+    }
+  },
+);
 
 function onSpeechChipReplied(): void {
   dismissSpeechChip();
@@ -369,10 +422,13 @@ function handleStopSpeech(event?: Event): void {
 <template>
   <div
     class="kairo-sidebar-panel-host"
-    :class="{ 'kairo-sidebar-panel-host--team': teamViewOpen }"
+    :class="{
+      'kairo-sidebar-panel-host--team': teamViewOpen,
+      'kairo-sidebar-panel-host--team-speaking': teamViewOpen && showSpeechChip,
+    }"
   >
     <div
-      v-if="!showExpandedPanel"
+      v-if="!showExpandedPanel && showIdeKairoDock && !(teamViewOpen && showSpeechChip)"
       class="kairo-sidebar-panel-compact-row"
     >
       <button

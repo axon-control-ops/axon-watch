@@ -8,15 +8,21 @@ from typing import Any
 
 from app.persistence import task_store
 from app.workspace_agents.lead_text import truncate_text
+from app.workspace_agents.verification_execution import (
+    build_verification_acceptance_evaluation,
+    complete_verification_no_change_delivery,
+    extract_verification_commands,
+    is_verification_task,
+    resolve_verification_baseline,
+    source_run_from_verification_goal,
+    verification_approved_command_prefixes,
+    verification_commands_for_task,
+    verification_terminal_jobs_for_run,
+    verification_worker_prompt_clause,
+)
 
 logger = logging.getLogger(__name__)
 
-_VERIFICATION_COMMAND_RE = re.compile(
-    r"`("
-    r"(?:npm test[^\n`]*|npx tsx[^\n`]*|npx jest[^\n`]*)"
-    r")`",
-    re.IGNORECASE,
-)
 _RUNTIME_BLOCKED_RE = re.compile(
     r"\b("
     r"blocked in this (?:headless )?runtime|"
@@ -57,20 +63,6 @@ def looks_like_verification_handoff(
     return _RUNTIME_BLOCKED_RE.search(blob) is not None
 
 
-def extract_verification_commands(reply_text: str | None) -> list[str]:
-    """Pull npm test / npx tsx verify commands from fenced or inline report blocks."""
-    body = str(reply_text or "")
-    commands: list[str] = []
-    seen: set[str] = set()
-    for match in _VERIFICATION_COMMAND_RE.finditer(body):
-        command = " ".join(match.group(1).split()).strip()
-        if not command or command in seen:
-            continue
-        seen.add(command)
-        commands.append(command)
-    return commands[:4]
-
-
 def _verification_goal(
     *,
     employee_name: str,
@@ -80,7 +72,11 @@ def _verification_goal(
 ) -> str:
     name = (employee_name or employee_role or "specialist").strip()
     role = (employee_role or "specialist").strip()
-    command_hint = "; ".join(commands[:3]) if commands else "npm test and read-only verify script"
+    command_hint = (
+        "; ".join(f"`{command}`" for command in commands[:3])
+        if commands
+        else "`npm test` and read-only verify script"
+    )
     return truncate_text(
         f"Verification after {name} ({role}): run scoped verify commands and attach stdout "
         f"receipts — {command_hint} [from run {run_id}]",
@@ -199,9 +195,17 @@ def try_lease_open_verification_task(
 
 
 __all__ = [
+    "build_verification_acceptance_evaluation",
+    "complete_verification_no_change_delivery",
     "enqueue_specialist_verification_task",
     "extract_verification_commands",
     "find_open_verification_task",
+    "is_verification_task",
     "looks_like_verification_handoff",
     "try_lease_open_verification_task",
+    "verification_approved_command_prefixes",
+    "resolve_verification_baseline",
+    "source_run_from_verification_goal",
+    "verification_commands_for_task",
+    "verification_worker_prompt_clause",
 ]

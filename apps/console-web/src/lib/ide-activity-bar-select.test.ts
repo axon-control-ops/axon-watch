@@ -50,7 +50,7 @@ describe('resolveIdeActivityBarSelectAction', () => {
         agentDockCollapsed: true,
         sidebarViews,
       }),
-    ).toBe('set-view');
+    ).toBe('open-agent-dock');
   });
 
   it('toggles the workbench terminal when it is already visible', () => {

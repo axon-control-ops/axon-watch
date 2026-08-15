@@ -9,11 +9,17 @@ from pathlib import Path
 def _profile_root(env: dict[str, str]) -> Path:
     configured = str(env.get("AXON_WATCH_RUNTIME_PROFILE_ROOT") or "").strip()
     if configured:
-        return Path(configured).expanduser()
-    state_dir = str(env.get("AXON_WATCH_STATE_DIR") or "").strip()
-    if state_dir:
-        return Path(state_dir).expanduser() / "runtime-profiles"
-    return Path(__file__).resolve().parents[4] / ".local" / "state" / "runtime-profiles"
+        return Path(configured).expanduser().resolve(strict=False)
+    xdg_state = str(env.get("XDG_STATE_HOME") or "").strip()
+    state_home = (
+        Path(xdg_state).expanduser()
+        if xdg_state
+        else Path.home() / ".local" / "state"
+    )
+    # Runtime credentials must not inherit AXON_WATCH_STATE_DIR: that directory
+    # is commonly repository-local, which defeats profile isolation and makes
+    # Bubblewrap correctly reject the credential as overlapping the workspace.
+    return state_home.resolve(strict=False) / "axon-watch" / "runtime-profiles"
 
 
 def codex_profile_env(env: dict[str, str] | None = None) -> dict[str, str]:

@@ -42,6 +42,27 @@ def parse_dedupe_parts(dedupe_key: str) -> dict[str, str]:
     }
 
 
+def repo_from_dedupe_key(dedupe_key: str) -> str:
+    """Return ``owner/repo`` for gh lookups; default axon-watch when unknown."""
+    repo = str(parse_dedupe_parts(dedupe_key).get("repo") or "").strip()
+    if "/" in repo:
+        return repo
+    return "axon-control-ops/axon-watch"
+
+
+def repo_from_signal(signal: dict[str, Any]) -> str:
+    meta = signal.get("meta") if isinstance(signal.get("meta"), dict) else {}
+    workspace_id = str(signal.get("workspace_id") or meta.get("workspace_id") or "").strip()
+    if workspace_id == "workspace_dashpro":
+        return "axon-control-ops/dashpro"
+    dedupe_repo = repo_from_dedupe_key(str(signal.get("dedupe_key") or ""))
+    if dedupe_repo != "axon-control-ops/axon-watch":
+        return dedupe_repo
+    if workspace_id == "workspace_axon_watch":
+        return "axon-control-ops/axon-watch"
+    return dedupe_repo
+
+
 def is_drill_branch(head_branch: str) -> bool:
     branch = str(head_branch or "").strip().lower()
     return branch.startswith("drill/") or "/drill/" in branch or branch.startswith("drill-")
@@ -193,11 +214,11 @@ def sweep_stale_ci_signals(
     max_resolve: int = 40,
 ) -> dict[str, Any]:
     """Scan open CI alerts; resolve only after stale/useless confirmation."""
-    fetcher = branch_health_fetcher
-    if fetcher is None and confirm_with_gh:
-        fetcher = lambda workflow, branch: fetch_branch_health_via_gh(workflow, branch)
+    default_fetcher: BranchHealthFetcher | None = branch_health_fetcher
+    if default_fetcher is None and confirm_with_gh:
+        default_fetcher = lambda workflow, branch: fetch_branch_health_via_gh(workflow, branch)
 
-    health_cache: dict[tuple[str, str], BranchHealth | None] = {}
+    health_cache: dict[tuple[str, str, str], BranchHealth | None] = {}
     resolved: list[dict[str, Any]] = []
     skipped: list[dict[str, str]] = []
 
@@ -216,13 +237,23 @@ def sweep_stale_ci_signals(
         health: BranchHealth | None = None
         if include_drills and is_drill_branch(branch):
             health = None
-        elif fetcher is not None and workflow and branch:
-            key = (workflow.lower(), branch)
+        elif default_fetcher is not None and workflow and branch:
+            gh_repo = repo_from_signal(signal)
+            key = (gh_repo, workflow.lower(), branch)
             if key not in health_cache:
                 try:
-                    health_cache[key] = fetcher(workflow, branch)
+                    health_cache[key] = fetch_branch_health_via_gh(
+                        workflow,
+                        branch,
+                        repo=gh_repo,
+                    )
                 except Exception:  # noqa: BLE001 — sweep must stay fail-open
-                    logger.exception("branch health fetch failed for %s %s", workflow, branch)
+                    logger.exception(
+                        "branch health fetch failed for %s %s %s",
+                        gh_repo,
+                        workflow,
+                        branch,
+                    )
                     health_cache[key] = None
             health = health_cache[key]
 

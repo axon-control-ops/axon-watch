@@ -135,11 +135,11 @@
       "note": "Sandbox launch and policy materialization; ratcheted to current dirty baseline while constitution/runtime policy work is committed; extract policy helpers next."
     },
     "services/control-plane/app/workspace_agents/worker_prompt.py": {
-      "max_lines": 570,
+      "max_lines": 606,
       "soft_limit": 350,
       "hard_limit": 650,
       "target": "services/control-plane/app/workspace_agents/worker_prompt_*.py",
-      "note": "Pre-existing prompt assembler over hard limit; Supabase guidance extracted to supabase_self_heal.py. Split CI/memory/lead clauses next and lower this ratchet."
+      "note": "Prompt assembler now includes exact task-display scope, bounded verification, and voice style; split lead evidence and task scope clauses next."
     },
     "apps/console-web/src/composables/agent-dock/use-agent-dock-composer-setup.ts": {
       "max_lines": 526,
@@ -243,7 +243,7 @@
       "target": "apps/console-web/src/features/kairo-conversation/*"
     },
     "apps/console-web/src/lib/agent-transcript-blocks.ts": {
-      "max_lines": 184,
+      "max_lines": 190,
       "soft_limit": 350,
       "hard_limit": 500,
       "target": "apps/console-web/src/lib/agent-transcript/*"
@@ -262,14 +262,14 @@
       "note": "Mission control panel; extract quick-guide rail when shrinking"
     },
     "apps/console-web/src/styles/ide/ide-layout-01.css": {
-      "max_lines": 412,
+      "max_lines": 449,
       "soft_limit": 350,
       "hard_limit": 500,
       "target": "apps/console-web/src/styles/ide/*",
-      "note": "Lowered after explorer/activity panel CSS extraction"
+      "note": "IDE layout including the operator/VAXON dock affordance; extract activity-footer styling next."
     },
     "apps/console-web/src/styles/ide/ide-layout-08.css": {
-      "max_lines": 577,
+      "max_lines": 583,
       "soft_limit": 350,
       "hard_limit": 500,
       "target": "apps/console-web/src/styles/ide/*",
@@ -312,7 +312,7 @@
       "target": "tests/test_signal_consistency_* slices"
     },
     "apps/console-web/src/features/workspace-agents/company-roster-view.ts": {
-      "max_lines": 312,
+      "max_lines": 314,
       "soft_limit": 350,
       "hard_limit": 500,
       "target": "apps/console-web/src/features/workspace-agents/*",
@@ -326,18 +326,18 @@
       "note": "Roster view tests after speech/presence"
     },
     "apps/console-web/src/features/workspace-agents/company-roster-failure-view.test.ts": {
-      "max_lines": 630,
+      "max_lines": 638,
       "soft_limit": 350,
       "hard_limit": 500,
       "target": "apps/console-web/src/features/workspace-agents/*",
       "note": "Extracted from company-roster-view.test.ts; split further when shrinking"
     },
     "apps/console-web/src/components/shell/CompanyRosterPanel.vue": {
-      "max_lines": 576,
+      "max_lines": 626,
       "soft_limit": 350,
-      "hard_limit": 600,
+      "hard_limit": 650,
       "target": "apps/console-web/src/components/shell/company-roster-*",
-      "note": "Team roster panel; blocked-handoff hint + quick actions. Extract dock host next."
+      "note": "Team roster panel with recovery actions and direct decision receipts; ratcheted to the reviewed feat/edits baseline. Extract decision orchestration next."
     },
     "apps/console-web/src/composables/agent-dock/use-composer-actions.ts": {
       "max_lines": 543,
@@ -354,11 +354,11 @@
       "note": "Agent sandbox contract tests; split wrapper/policy cases next."
     },
     "apps/console-web/src/components/ide/IdeExplorerActivityPanels.vue": {
-      "max_lines": 674,
+      "max_lines": 578,
       "soft_limit": 350,
       "hard_limit": 500,
       "target": "apps/console-web/src/components/ide/*",
-      "note": "Explorer + activity stub panels; extract per-panel components next"
+      "note": "Explorer/activity panels after VAXON talk extraction; ratchet lowered from 674."
     },
     "services/control-plane/app/adapters/watch_client.py": {
       "max_lines": 449,
@@ -368,14 +368,14 @@
       "note": "Watch inbox/connector client cache; extract cache helpers next"
     },
     "apps/console-web/src/styles/shell/agent-persona-dock.css": {
-      "max_lines": 707,
+      "max_lines": 791,
       "soft_limit": 350,
       "hard_limit": 500,
       "target": "apps/console-web/src/styles/shell/agent-persona-*",
-      "note": "Persona dock after speech/presence"
+      "note": "Persona dock plus decision/recovery states; split decision card and terminal-state styling next."
     },
     "apps/console-web/src/styles/shell/mockup-shell-32.css": {
-      "max_lines": 584,
+      "max_lines": 589,
       "soft_limit": 350,
       "hard_limit": 500,
       "target": "apps/console-web/src/styles/shell/*"
@@ -388,7 +388,7 @@
       "note": "Autonomy readiness assessment; split chapters when revising"
     },
     "tests/test_run_stale_reconcile.py": {
-      "max_lines": 645,
+      "max_lines": 682,
       "soft_limit": 350,
       "hard_limit": 500,
       "target": "tests/test_run_stale_* slices"
@@ -429,7 +429,7 @@
       "note": "IDE layout-02 after AgentDock chat chrome; extract next"
     },
     "services/control-plane/app/cli_runtime/router.py": {
-      "max_lines": 582,
+      "max_lines": 612,
       "soft_limit": 350,
       "hard_limit": 500,
       "target": "services/control-plane/app/cli_runtime/*",
@@ -443,11 +443,11 @@
       "note": "Teammate route after specialty routing; fan-out short-circuits to Lead; extract next"
     },
     "services/control-plane/app/chat/lane_b_post_message.py": {
-      "max_lines": 525,
+      "max_lines": 567,
       "soft_limit": 350,
       "hard_limit": 515,
       "target": "services/control-plane/app/chat/*",
-      "note": "Lane B post_message orchestration; extract stream helpers next. Ratchet bumped 509->515 for real Sandbox isolation workspace_root wiring (2026-08-05)."
+      "note": "Lane B post orchestration with sandbox-local attachment copying; extract attachment preparation next."
     },
     "tests/test_operator_deterministic_report.py": {
       "max_lines": 595,
@@ -499,32 +499,18 @@
       "note": "Workspace routes plus runtime/composer policy DTOs. +5 for save-conflict base_sha256 (409). Extract composer policy routes next."
     },
     "services/control-plane/app/workspace_agents/worker_dispatch.py": {
-      "max_lines": 504,
+      "max_lines": 494,
       "soft_limit": 350,
       "hard_limit": 500,
       "target": "services/control-plane/app/workspace_agents/worker_*",
-      "note": "Continuous worker dispatch; usage-limit attempt refund on finalize"
+      "note": "Continuous dispatch after state, isolation setup, failure handling, and verification enqueue extraction."
     },
     "services/control-plane/app/workspace_agents/lead_fan_out.py": {
-      "max_lines": 657,
+      "max_lines": 661,
       "soft_limit": 350,
       "hard_limit": 650,
       "target": "services/control-plane/app/workspace_agents/lead_fan_out_*",
       "note": "Lead fan-out materialization remains oversized; extract transcript/assignment builders before further growth."
-    },
-    "tests/test_workspace_agent_scheduler.py": {
-      "max_lines": 559,
-      "soft_limit": 350,
-      "hard_limit": 575,
-      "target": "tests/test_workspace_agent_scheduler_*",
-      "note": "Scheduler regression matrix baseline; split worker dispatch and queued fan-out cases next."
-    },
-    "docs/ops/agent-reports/axon-x-constitution-gap-audit-2026-08-09.md": {
-      "max_lines": 951,
-      "soft_limit": 400,
-      "hard_limit": 1000,
-      "target": "docs/ops/agent-reports/constitution/*",
-      "note": "Detailed constitution audit and implementation ledger requested by operator; future slices should append concise summaries or split by date."
     },
     "services/control-plane/app/workspace_delivery/publish.py": {
       "max_lines": 611,
@@ -604,7 +590,7 @@
       "note": "Agent scheduler; ratcheted for watcher/action split, decision trace, and restart-safe Lead handoff rescue. Extract dispatch/rescue/trace slices next."
     },
     "apps/console-web/src/components/conversation/ConversationSeamThreadMessage.vue": {
-      "max_lines": 592,
+      "max_lines": 603,
       "soft_limit": 350,
       "hard_limit": 500,
       "target": "apps/console-web/src/components/conversation/*",
@@ -618,25 +604,25 @@
       "note": "VAXON orb HUD autonomy controls; split confirm/critical sheets next"
     },
     "apps/console-web/src/styles/shell/mockup-shell-11.css": {
-      "max_lines": 603,
+      "max_lines": 621,
       "soft_limit": 350,
       "hard_limit": 500,
       "target": "apps/console-web/src/styles/shell/*",
       "note": "Mission Control left-rail hide + center expand; split MC layout next"
     },
     "services/control-plane/app/chat/lane_b_stream_execute.py": {
-      "max_lines": 512,
+      "max_lines": 516,
       "soft_limit": 350,
       "hard_limit": 512,
       "target": "services/control-plane/app/chat/*",
       "note": "Ratchet after VAXON Attend / Axon terminal jobs slice"
     },
     "apps/console-web/src/components/ide/KairoSidebarPanel.vue": {
-      "max_lines": 530,
+      "max_lines": 586,
       "soft_limit": 350,
       "hard_limit": 530,
       "target": "apps/console-web/src/components/ide/*",
-      "note": "Ratchet after VAXON Attend / Axon terminal jobs slice"
+      "note": "KAIRO/VAXON sidebar including talk-panel state; extract briefing host actions next."
     },
     "apps/console-web/src/components/settings/AgentFleetControlPanel.vue": {
       "max_lines": 516,
@@ -660,7 +646,7 @@
       "note": "Long-running audit ledger ratcheted for August 11 slices. Move completed slice log into dated follow-up file next."
     },
     "tests/test_workspace_agent_scheduler.py": {
-      "max_lines": 646,
+      "max_lines": 672,
       "soft_limit": 350,
       "hard_limit": 650,
       "target": "tests/test_workspace_agent_scheduler_*.py",

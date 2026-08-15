@@ -3,6 +3,37 @@ import type { AgentQuestionOption } from '../../lib/agent-question-view';
 
 const FAILED_SHIFT_TITLE_RE = /^(.+?)\s+\(([^)]+)\)\s+last shift failed/i;
 
+export const APPROVE_PENDING_RECOVERY_ID = '__approve_bounded_recovery__';
+export const DISMISS_PENDING_DECISION_ID = '__dismiss_pending_decision__';
+
+/** Supply executable controls for generic gated receipts that have no choices. */
+export function pendingDecisionCardOptions(
+  employee: CompanyEmployeeRecord,
+): AgentQuestionOption[] {
+  const supplied = (employee.pending_decision_options ?? []).filter(
+    (option) => Boolean(option.id?.trim() || option.label?.trim()),
+  );
+  if (supplied.length || !employee.pending_decision_id?.trim()) {
+    return supplied;
+  }
+  return [
+    { id: APPROVE_PENDING_RECOVERY_ID, label: 'Approve bounded recovery' },
+    { id: DISMISS_PENDING_DECISION_ID, label: 'Dismiss alert' },
+  ];
+}
+
+export function pendingDecisionDirectResolution(
+  optionId: string | null | undefined,
+): 'approved' | 'rejected' | null {
+  if (optionId === APPROVE_PENDING_RECOVERY_ID) {
+    return 'approved';
+  }
+  if (optionId === DISMISS_PENDING_DECISION_ID) {
+    return 'rejected';
+  }
+  return null;
+}
+
 /** Parse "Dana (lead) last shift failed" style autonomy titles. */
 export function failedShiftSubjectFromDecisionTitle(
   title: string | null | undefined,
@@ -49,16 +80,39 @@ export function buildPendingDecisionComposerDraft(
   employee: CompanyEmployeeRecord,
 ): string {
   const prompt = pendingDecisionPrompt(employee);
-  const options = (employee.pending_decision_options ?? [])
+  const subject = failedShiftSubjectFromDecisionTitle(employee.pending_decision_title);
+  const reason = String(employee.pending_decision_reason || '').trim();
+  const holder = employee.name.trim() || employee.role_label?.trim() || 'Teammate';
+  const options = pendingDecisionCardOptions(employee)
     .map((option) => option.label?.trim())
     .filter(Boolean);
-  if (!prompt && !options.length) {
-    return '';
+
+  const lines: string[] = [];
+  if (subject) {
+    lines.push(`Decision required — ${subject.name} (${subject.role}) last shift failed`);
+    if (subject.role !== (employee.role ?? '').trim().toLowerCase()) {
+      lines.push(`${holder} is holding this decision for ${subject.name} (${subject.role}).`);
+    }
+  } else if (prompt) {
+    lines.push(`Decision required — ${prompt}`);
+  } else {
+    lines.push('Decision required — review the failed shift and choose next steps.');
   }
-  if (!options.length) {
-    return `${prompt}\n\n`;
+
+  if (prompt && !lines.some((line) => line.includes(prompt))) {
+    lines.push(prompt);
   }
-  return `${prompt}\n\nOptions: ${options.join(' · ')}\n\nMy decision: `;
+  if (reason && reason !== prompt && !lines.includes(reason)) {
+    lines.push(`Context: ${reason}`);
+  }
+
+  if (options.length) {
+    lines.push('', `Options: ${options.join(' · ')}`, '', 'My decision: ');
+    return `${lines.join('\n')}`;
+  }
+
+  lines.push('', 'My decision: ');
+  return lines.join('\n');
 }
 
 export function buildPendingDecisionOptionAnswer(

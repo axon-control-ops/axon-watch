@@ -216,6 +216,16 @@ def resolve_lead_task_plan(
             return modeled
     if not plan.items:
         return fallback_single_owner_plan(goal=goal, roster=roster)
+    if (
+        plan.mode == "decompose"
+        and plan.ambiguous
+        and len({item.owner_role for item in plan.items}) > 1
+    ):
+        # The model tie-break was unavailable, unusable, or came back empty,
+        # and the deterministic pass only produced an unconfident multi-role
+        # fan-out (see _owners_for_clause). Fail safe to one confident owner
+        # rather than dispatching mismatched specialists on a keyword tie.
+        return fallback_single_owner_plan(goal=goal, roster=roster)
     return plan
 
 

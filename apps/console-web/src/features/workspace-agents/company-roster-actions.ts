@@ -4,6 +4,9 @@ import type { IdeComposerRestoreMode } from '../../lib/ide-composer-restore-requ
 import { SERVER_RESTART_CONTINUATION_PROMPT } from '../../lib/ide-run-recovery';
 import { resolveEmployeeManualHandoff } from './employee-manual-handoff';
 import {
+  resolveOperatorStartAction,
+} from '../../lib/verification-handoff';
+import {
   employeeDockReceiptRunId,
   employeeFailureLine,
   employeeFailureRetryActionLabel,
@@ -38,6 +41,13 @@ function ownsSnippet(employee: CompanyEmployeeRecord): string {
   return owns || employee.role_label?.trim() || employee.role;
 }
 
+function usageRuntime(detail: string | null | undefined): 'Codex' | 'Claude' | 'Cursor' {
+  const normalized = (detail ?? '').toLowerCase();
+  if (normalized.includes('codex')) return 'Codex';
+  if (normalized.includes('claude')) return 'Claude';
+  return 'Cursor';
+}
+
 /** Talk opens the composer without a starter sentence — speak/status UI already introduces the teammate. */
 export function employeeTalkDraft(_employee: CompanyEmployeeRecord): string {
   return '';
@@ -68,6 +78,14 @@ export function employeeRetryDraft(employee: CompanyEmployeeRecord): string {
     );
   }
   if (isUsageLimitFailure(employee.last_outcome_detail)) {
+    const runtime = usageRuntime(employee.last_outcome_detail);
+    if (runtime !== 'Cursor') {
+      return (
+        `The signed-in ${runtime} account quota blocked my last shift on ${owns}. ` +
+        `Use an approved Auto fallback runtime, then retry my bounded continuous shift. ` +
+        `Summarize what I changed and include receipts.`
+      );
+    }
     return (
       `A Cursor usage signal blocked my last shift on ${owns}. ` +
       `Auto+Composer or on-demand may still have headroom — check Usage, then ` +
@@ -122,6 +140,14 @@ export function employeeReceiptsDraft(employee: CompanyEmployeeRecord): string {
     );
   }
   if (isUsageLimitFailure(employee.last_outcome_detail)) {
+    const runtime = usageRuntime(employee.last_outcome_detail);
+    if (runtime !== 'Cursor') {
+      return (
+        `Walk me through what happened on my last job${runHint}. ` +
+        `The signed-in ${runtime} account was quota-limited. Check that workspace's approved ` +
+        `Auto fallback runtimes, then suggest the next move.`
+      );
+    }
     return (
       `Walk me through what happened on my last job${runHint}. ` +
       `The job hit a Cursor usage signal — do not claim the whole account is exhausted. ` +
@@ -296,13 +322,20 @@ export function employeeQuickActions(
     runs: options?.runs,
     liveBusy: options?.liveBusy,
   });
-  if (handoff.waiting && handoff.taskId) {
+  const operatorStart = resolveOperatorStartAction({
+    employee,
+    tasks: options?.tasks ?? [],
+    runs: options?.runs,
+    handoffTaskId: handoff.waiting ? handoff.taskId : null,
+    liveBusy: options?.liveBusy,
+  });
+  if (operatorStart) {
     actions.unshift({
       id: 'start_now',
-      label: 'Start now',
+      label: operatorStart.label,
       kind: 'control',
       control: 'start_now',
-      taskId: handoff.taskId,
+      taskId: operatorStart.taskId,
     });
   }
 
@@ -334,4 +367,3 @@ export function employeeQuickActions(
 
   return actions;
 }
-

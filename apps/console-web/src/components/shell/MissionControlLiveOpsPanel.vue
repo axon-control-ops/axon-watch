@@ -18,6 +18,7 @@ import {
   clearKairoConversationThread,
 } from '../../features/kairo-conversation/kairo-conversation-state';
 import { useKairoConversation } from '../../features/kairo-conversation/use-kairo-conversation';
+import { formatVoiceGateFeedback } from '../../lib/kairo-voice-gate';
 import KairoGalaxyOrb from '../../features/brain-galaxy/KairoGalaxyOrb.vue';
 import { resolveGalaxyPresence } from '../../features/brain-galaxy/galaxy-presence-state';
 import { projectLiveOperationsStream } from '../../features/brain-galaxy/live-operations-stream';
@@ -146,6 +147,16 @@ const liveBadge = computed(
 
 const micLive = computed(
   () => speechCapture.capturing.value && speechCapture.captureMode.value === 'manual',
+);
+
+const speechCaptureError = computed(() => speechCapture.captureError.value);
+
+const voiceGateFeedback = computed(() =>
+  formatVoiceGateFeedback(
+    speechCapture.lastGateReason.value,
+    speechCapture.lastHeardTranscript.value,
+    speechCapture.lastAccepted.value,
+  ),
 );
 
 const focusedWorkspaceLabel = computed(() => {
@@ -386,6 +397,8 @@ onUnmounted(() => {
       :focused-workspace-label="focusedWorkspaceLabel"
       :activity-label="shell.ideComposerActivity?.label ?? null"
       :activity-phase="presencePhase !== 'idle' ? presencePhase : null"
+      :capture-error="speechCaptureError"
+      :voice-gate-feedback="voiceGateFeedback"
       @submit="void sendReply($event)"
       @toggle-mic="toggleMic"
     />

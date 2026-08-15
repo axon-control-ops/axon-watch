@@ -132,4 +132,19 @@ describe('agent-terminal-job-view', () => {
     expect(view.jobId).toBe('agent-job-big');
     expect(view.displayOutput.length).toBeLessThanOrEqual(AGENT_TERMINAL_JOB_OUTPUT_CAP);
   });
+
+  it('cleans npm test output for compact terminal cards', () => {
+    const view = buildAgentTerminalJobView({
+      command: 'npm test -- tests/unit/services/staffVisibility.test.ts',
+      output: [
+        '\u001b[1A\u001b[999D\u001b[K\u001b[1mTest Suites:\u001b[22m \u001b[32m1 passed\u001b[39m',
+        'PASS tests/unit/services/staffVisibility.test.ts',
+        'Test Suites: 1 passed, 1 total',
+        'Tests:       9 passed, 9 total',
+      ].join('\n'),
+    });
+    expect(view.displayOutput).toContain('PASS tests/unit/services/staffVisibility.test.ts');
+    expect(view.displayOutput).toContain('9 passed, 9 total');
+    expect(view.displayOutput).not.toMatch(/\[1A|\[32m/);
+  });
 });

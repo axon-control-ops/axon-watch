@@ -104,9 +104,38 @@
   overflow-wrap: anywhere;
   display: -webkit-box;
   -webkit-box-orient: vertical;
-  -webkit-line-clamp: 6;
+  -webkit-line-clamp: 3;
   overflow: hidden;
   cursor: pointer;
+}
+
+.agent-dock-sticky-prompt__text--expanded {
+  -webkit-line-clamp: unset;
+  overflow: visible;
+}
+
+.agent-dock-sticky-prompt__expand-toggle {
+  margin: 0.2rem 0 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: rgba(148, 163, 184, 0.95);
+  font-family: var(--font-ui);
+  font-size: 0.62rem;
+  font-weight: 500;
+  line-height: 1.2;
+  text-decoration: underline;
+  text-underline-offset: 0.12em;
+  cursor: pointer;
+}
+
+.agent-dock-sticky-prompt__expand-toggle:hover {
+  color: rgba(226, 232, 240, 0.98);
+}
+
+.agent-dock-sticky-prompt__expand-toggle:focus-visible {
+  outline: 2px solid var(--accent-brand, #00f2ff);
+  outline-offset: 2px;
 }
 
 .agent-dock-sticky-prompt__editor {

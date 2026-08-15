@@ -107,6 +107,9 @@ class WorkerIdeStreamTests(unittest.TestCase):
             }
 
         with patch(
+            "app.workspace_agents.teammate_route.dispatch_model_tiebreak",
+            return_value={"dispatched": False},
+        ), patch(
             "app.workspace_agents.worker_dispatch.generate_lane_b_result",
             side_effect=fake_lane_b,
         ), patch(
@@ -183,6 +186,91 @@ class WorkerIdeStreamTests(unittest.TestCase):
         self.assertIn("commit=abc123def456", str(agent.get("content") or ""))
         self.assertIn(run_id, str(agent.get("run_id") or ""))
 
+    def test_started_card_uses_real_narration_when_model_succeeds(self) -> None:
+        from app.workspace_agents.worker_dispatch import dispatch_continuous_worker_run
+
+        workspace_id = "workspace_worker_ide_voice"
+        employee_id = "employee-workspace_worker_ide_voice-backend-0"
+        created = _seed_leased_run(
+            workspace_id=workspace_id,
+            owner_role="backend",
+            goal="Ship IDE mirror for continuous workers",
+        )
+        run_id = str(created["run_id"])
+        isolation = Path(tempfile.mkdtemp(prefix="axon-worker-ide-voice-"))
+
+        def fake_lane_b(**kwargs: object) -> dict[str, object]:
+            on_chunk = kwargs.get("on_chunk")
+            assert callable(on_chunk)
+            on_chunk("Confidence: 9/10", "Confidence: 9/10")
+            return {"dispatched": True, "runtime_label": "test", "content": "Confidence: 9/10"}
+
+        with patch(
+            "app.workspace_agents.teammate_route.dispatch_model_tiebreak",
+            return_value={
+                "dispatched": True,
+                "content": "On it — wiring the IDE mirror into the backend now.",
+            },
+        ), patch(
+            "app.workspace_agents.worker_dispatch.generate_lane_b_result",
+            side_effect=fake_lane_b,
+        ), patch(
+            "app.workspace_agents.worker_dispatch.create_worker_isolation",
+            return_value=isolation,
+        ), patch(
+            "app.workspace_agents.worker_dispatch.worker_agent_workspace",
+            return_value=isolation,
+        ), patch(
+            "app.workspace_agents.worker_dispatch.cleanup_worker_isolation",
+            return_value={"cleaned": True, "removed": True},
+        ), patch(
+            "app.workspace_agents.verifier_contract.ensure_acceptance_before_publish",
+            return_value=None,
+        ), patch(
+            "app.workspace_delivery.publish.list_isolation_changed_paths",
+            return_value=[],
+        ), patch(
+            "app.workspace_delivery.publish.publish_worker_isolation",
+            return_value=SimpleNamespace(
+                ok=True,
+                stage="published",
+                cleanup_isolation=True,
+                delivery={"commit_sha": "abc123def456"},
+            ),
+        ), patch(
+            "app.workspace_delivery.publish_worker_isolation",
+            return_value=SimpleNamespace(
+                ok=True,
+                stage="published",
+                cleanup_isolation=True,
+                delivery={"commit_sha": "abc123def456"},
+            ),
+        ):
+            dispatch_continuous_worker_run(
+                workspace_id=workspace_id,
+                employee=EmployeeConfig(
+                    name="API Craft",
+                    role="backend",
+                    owns="APIs",
+                    schedule="continuous",
+                    employee_id=employee_id,
+                ),
+                run_record=created,
+            )
+
+        thread = chat_store.find_thread_for_employee(
+            workspace_id,
+            employee_id=employee_id,
+            thread_kind="ide",
+        )
+        assert thread is not None
+        messages = chat_store.list_thread_messages(str(thread["thread_id"]))
+        start_card = messages[0]
+        self.assertEqual(
+            "On it — wiring the IDE mirror into the backend now.",
+            str(start_card.get("content") or ""),
+        )
+
     def test_dispatch_crash_posts_error_into_employee_thread(self) -> None:
         from app.workspace_agents.worker_dispatch import dispatch_continuous_worker_run
 
@@ -195,6 +283,9 @@ class WorkerIdeStreamTests(unittest.TestCase):
         )
 
         with patch(
+            "app.workspace_agents.teammate_route.dispatch_model_tiebreak",
+            return_value={"dispatched": False},
+        ), patch(
             "app.workspace_agents.worker_dispatch.generate_lane_b_result",
             side_effect=RuntimeError("boom"),
         ), patch(

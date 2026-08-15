@@ -84,6 +84,39 @@ Make GIFs look like WhatsApp.
         self.assertTrue(instructions_markdown_is_complete(composed))
         self.assertIn("## Steps", composed)
 
+    def test_model_output_complete_without_source_request(self) -> None:
+        model = (
+            "# Instructions\n\n"
+            "## Goal\nFix GIF rendering on mobile before OTA.\n\n"
+            "## In scope\n- Mobile GIF renderer\n\n"
+            "## Out of scope\n- Committing or releasing unless explicitly requested\n\n"
+            "## Steps\n1. One\n2. Two\n3. Three\n4. Four\n\n"
+            "## Constraints\n- Follow only the steps listed above\n"
+        )
+        self.assertTrue(instructions_markdown_is_complete(model))
+        composed = compose_instructions_markdown("Fix GIF rendering on mobile before OTA.", model)
+        self.assertNotIn("## Source request", composed)
+
+    def test_compose_preserves_model_assumptions(self) -> None:
+        source = "Fix GIF rendering on mobile before OTA."
+        model = (
+            "# Instructions\n\n"
+            "## Goal\nFix GIF rendering on mobile before OTA.\n\n"
+            "## In scope\n- Mobile GIF renderer\n\n"
+            "## Out of scope\n- Committing or releasing unless explicitly requested\n\n"
+            "## Steps\n1. One\n2. Two\n3. Three\n4. Four\n\n"
+            "## Constraints\n- Follow only the steps listed above\n\n"
+            "## Assumptions\n- Assuming the Android build path since none was named — confirm before merging\n"
+        )
+        composed = compose_instructions_markdown(source, model)
+        self.assertIn("## Assumptions", composed)
+        self.assertIn("Android build path", composed)
+
+    def test_fallback_omits_assumptions_when_model_silent(self) -> None:
+        source = "Fix GIF rendering on mobile before OTA."
+        composed = compose_instructions_markdown(source, None)
+        self.assertNotIn("## Assumptions", composed)
+
     def test_commit_sha_reference_is_not_git_intent(self) -> None:
         self.assertFalse(
             prompt_requests_git_actions(

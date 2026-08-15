@@ -10,6 +10,10 @@ from typing import Any, Iterable
 from app.persistence import run_store
 from app.runs.service import append_run_execution_receipt
 from app.workspace_agents.diff_policy import strip_control_plane_owned_paths
+from app.workspace_agents.lead_verification_handoff import (
+    is_verification_task,
+    verification_terminal_jobs_for_run,
+)
 from app.workspace_agents.ops_delivery import no_change_delivery_is_successful_ops_task
 
 
@@ -96,6 +100,8 @@ def implementation_requested(task: dict[str, Any] | None) -> bool:
     """True when the task asks for product/code changes, not just coordination."""
     if not isinstance(task, dict):
         return False
+    if is_verification_task(task):
+        return False
     role = str(task.get("owner_role") or "").strip().lower()
     # Leads coordinate and watchers verify. Their inherited parent-plan text
     # can mention a fix, but their own delivery is a report/decision rather
@@ -179,6 +185,35 @@ def _validation_status(run_id: str, task: dict[str, Any]) -> tuple[bool, str]:
     run = run_store.get_run(run_id)
     if not isinstance(run, dict):
         return False, "missing run record"
+
+    if is_verification_task(task):
+        workspace_id = str(task.get("workspace_id") or "").strip()
+        terminal_jobs = verification_terminal_jobs_for_run(workspace_id, run_id)
+        passed_jobs = [
+            job
+            for job in terminal_jobs
+            if str(job.get("status") or "").strip().lower() == "completed"
+            and job.get("exit_code") is not None
+            and int(job.get("exit_code") or 0) == 0
+        ]
+        if passed_jobs:
+            return True, f"passed with {len(passed_jobs)} verification terminal job(s)"
+        failed_jobs = [
+            job
+            for job in terminal_jobs
+            if str(job.get("status") or "").strip().lower() == "failed"
+            or (
+                str(job.get("status") or "").strip().lower() == "completed"
+                and job.get("exit_code") is not None
+                and int(job.get("exit_code") or 0) != 0
+            )
+        ]
+        if failed_jobs:
+            return False, f"verification terminal jobs failed ({len(failed_jobs)})"
+        if terminal_jobs:
+            return False, "verification terminal jobs incomplete"
+        return False, "missing verification terminal job receipts"
+
     history = run_store.list_history(str(run.get("history_ref") or ""))
     latest_acceptance = None
     has_check_outputs = False
@@ -225,11 +260,19 @@ def evaluate_pre_publish_completion_gate(
     if not implementation_requested(task):
         if not isinstance(task, dict) or not str(task.get("goal") or "").strip():
             return CompletionGateResult(False, "assigned objective missing", paths, expected, "missing")
+        if no_change_delivery_is_successful_ops_task(task):
+            return CompletionGateResult(
+                passed=True,
+                reason="receipt-backed ops task",
+                changed_paths=paths,
+                expected_files=expected,
+                validation_status="deferred to delivery receipt",
+            )
         validation_ok, validation = _validation_status(run_id, task)
         if not validation_ok:
             return CompletionGateResult(
                 False,
-                f"verification task did not provide required evidence: {validation}",
+                f"non-implementation task did not provide required evidence: {validation}",
                 paths,
                 expected,
                 validation,
@@ -360,6 +403,7 @@ def run_worker_delivery_gate(
         run_requires_acceptance_evidence(run_snapshot)
         and not has_passing_acceptance_evidence(run_id)
         and not no_change_delivery_is_successful_ops_task(task)
+        and not is_verification_task(task)
     ):
         return WorkerDeliveryGateOutcome(
             False,

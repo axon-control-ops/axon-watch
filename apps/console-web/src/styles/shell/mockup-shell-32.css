@@ -309,6 +309,11 @@
   background: rgba(120, 80, 20, 0.35);
 }
 
+.company-roster__badge--runtime {
+  color: rgba(180, 220, 255, 0.95);
+  background: rgba(40, 90, 140, 0.35);
+}
+
 .company-roster__row--paused {
   opacity: 0.72;
 }
