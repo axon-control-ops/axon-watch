@@ -8,7 +8,7 @@ from pathlib import PurePosixPath
 from typing import Any, Iterable, Mapping
 
 from app.workspace_agents.execution_policy_prefixes import (
-    COMMON_AUDITED_WRAPPERS as _COMMON_AUDITED_WRAPPERS,
+    COMMON_AUDITED_WRAPPERS as _COMMON_AUDITED_WRAPPERS, LEAD_DISPATCH_WRAPPERS as _LEAD_DISPATCH_WRAPPERS,
     COMMON_READ_PREFIXES as _COMMON_READ_PREFIXES,
     GH_READ_PREFIXES as _GH_READ_PREFIXES,
     VALIDATION_PREFIXES as _VALIDATION_PREFIXES,
@@ -74,9 +74,9 @@ _ROLE_DEFAULTS: dict[str, AgentExecutionPolicy] = {
         read_paths=(".",),
         write_paths=("docs/planning", "docs/ops", "plans"),
         forbidden_path_globs=(),
-        approved_wrapper_names=(*_COMMON_AUDITED_WRAPPERS, "run_contract_unit_tests.sh"),
+        approved_wrapper_names=(*_COMMON_AUDITED_WRAPPERS, *_LEAD_DISPATCH_WRAPPERS, "run_contract_unit_tests.sh"),
         approved_command_prefixes=(*_COMMON_READ_PREFIXES, *_VALIDATION_PREFIXES, *_GH_READ_PREFIXES),
-        audited_capabilities=("planning_write", "test", "workspace_read", "ci_read"),
+        audited_capabilities=("planning_write", "test", "workspace_read", "ci_read", "dispatch"),
         network_mode="audited",
         timeout_seconds=900,
         trust_policy="worker",

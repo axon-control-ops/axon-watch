@@ -37,7 +37,7 @@ import { focusAgentDockComposerInput } from '../../lib/agent-dock-composer-focus
 import type { TeammateRouteNotice } from '../../lib/teammate-route-notice';
 import { resolveComposerWorkspaceScopeMismatch } from '../../lib/composer-workspace-scope';
 import {
-  clearWorkspaceScopeNotice,
+  clearWorkspaceScopeNotice, stayInCurrentWorkspaceScope,
   setWorkspaceScopeNotice,
   workspaceScopeNotice,
   type WorkspaceScopeNotice,
@@ -385,9 +385,9 @@ export function useComposerActions(options: UseComposerActionsOptions) {
     dismissEmployeeSpecialtyRoute();
   }
 
-  function dismissWorkspaceScopeNotice(): void {
-    clearWorkspaceScopeNotice();
-  }
+  /** stayHere also suppresses re-prompting for this workspace pair. */
+  const dismissWorkspaceScopeNotice = (stayHere = false): void =>
+    (stayHere ? stayInCurrentWorkspaceScope : clearWorkspaceScopeNotice)();
 
   function switchComposerWorkspaceScope(): void {
     const notice = workspaceScopeNotice.value;

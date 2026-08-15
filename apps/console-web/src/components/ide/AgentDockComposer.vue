@@ -49,7 +49,7 @@ const toolbarProps = useAgentDockComposerToolbarProps(composer);
     @undo-teammate-route="composer.undoTeammateRoute()"
     @dismiss-teammate-route="composer.dismissTeammateRoute()"
     @switch-workspace-scope="composer.switchComposerWorkspaceScope()"
-    @dismiss-workspace-scope="composer.dismissWorkspaceScopeNotice()"
+    @dismiss-workspace-scope="composer.dismissWorkspaceScopeNotice($event)"
   />
   <form
     class="agent-dock-composer"

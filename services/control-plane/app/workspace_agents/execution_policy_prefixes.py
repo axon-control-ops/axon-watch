@@ -47,9 +47,15 @@ VALIDATION_PREFIXES: tuple[tuple[str, ...], ...] = (
 
 COMMON_AUDITED_WRAPPERS: tuple[str, ...] = ("axon-agent-terminal-job",)
 
+# Lead-only: fan a goal out into role-scoped tasks and dispatch teammates.
+# A Lead without this can only describe a handoff in a document — nobody is
+# actually dispatched, which reads as "the fleet did nothing".
+LEAD_DISPATCH_WRAPPERS: tuple[str, ...] = ("axon-assign",)
+
 
 __all__ = [
     "COMMON_AUDITED_WRAPPERS",
+    "LEAD_DISPATCH_WRAPPERS",
     "COMMON_READ_PREFIXES",
     "GH_READ_PREFIXES",
     "VALIDATION_PREFIXES",

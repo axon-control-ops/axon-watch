@@ -8,7 +8,7 @@ defineProps<{
 
 const emit = defineEmits<{
   switchWorkspace: [];
-  dismiss: [];
+  dismiss: [stayHere?: boolean];
 }>();
 </script>
 
@@ -29,6 +29,14 @@ const emit = defineEmits<{
         Switch to {{ inferredLabel }}
       </button>
     </p>
+    <button
+      type="button"
+      class="agent-dock-composer__plan-switch-btn"
+      :aria-label="`Stay in ${currentLabel} and stop asking`"
+      @click="emit('dismiss', true)"
+    >
+      No — continue here
+    </button>
     <button
       type="button"
       class="agent-dock-composer__plan-switch-btn"

@@ -352,5 +352,36 @@ class SelfValidationPolicyTests(unittest.TestCase):
                 self.assertEqual("deny", self._permission("backend", command))
 
 
+class LeadDispatchWrapperTests(unittest.TestCase):
+    """A Lead without a dispatch wrapper can only write a handoff document."""
+
+    def _permission(self, role: str, command: str) -> str:
+        from app.cli_runtime.agent_shell_hook import evaluate_hook_payload
+        from app.workspace_agents.execution_policy import resolve_effective_policy
+
+        policy = resolve_effective_policy(
+            role=role, workspace_allowed_paths=(), task_allowed_paths=None
+        )
+        return evaluate_hook_payload(
+            {"hook_event_name": "beforeShellExecution", "command": command},
+            approved_wrappers=frozenset(policy.approved_wrappers),
+            approved_command_prefixes=policy.approved_command_prefixes,
+        )["permission"]
+
+    def test_lead_can_fan_work_out_to_teammates(self) -> None:
+        self.assertEqual(
+            "allow",
+            self._permission("lead", "axon-assign --workspace workspace_dashpro -- Fix red CI"),
+        )
+
+    def test_specialists_cannot_dispatch_each_other(self) -> None:
+        for role in ("backend", "frontend", "integrations", "watcher"):
+            with self.subTest(role=role):
+                self.assertEqual(
+                    "deny",
+                    self._permission(role, "axon-assign --workspace workspace_dashpro -- x"),
+                )
+
+
 if __name__ == "__main__":
     unittest.main()

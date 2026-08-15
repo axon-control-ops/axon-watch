@@ -70,7 +70,7 @@ const emit = defineEmits<{
   undoTeammateRoute: [];
   dismissTeammateRoute: [];
   switchWorkspaceScope: [];
-  dismissWorkspaceScope: [];
+  dismissWorkspaceScope: [stayHere?: boolean];
 }>();
 </script>
 
@@ -137,6 +137,6 @@ const emit = defineEmits<{
     :inferred-label="workspaceScopeNotice?.inferredLabel ?? ''"
     :current-label="workspaceScopeNotice?.currentLabel ?? ''"
     @switch-workspace="emit('switchWorkspaceScope')"
-    @dismiss="emit('dismissWorkspaceScope')"
+    @dismiss="emit('dismissWorkspaceScope', $event)"
   />
 </template>
