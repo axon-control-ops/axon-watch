@@ -24,6 +24,7 @@ import {
   employeeTalkLineDetailTooltip,
 } from '../../features/workspace-agents/company-roster-view';
 import {
+  APPROVE_PENDING_RECOVERY_ID,
   failedShiftSubjectFromDecisionTitle,
   pendingDecisionCardOptions,
   pendingDecisionPrompt as resolvePendingDecisionPrompt,
@@ -140,6 +141,9 @@ const pendingDecisionSubject = computed(() =>
 );
 const pendingDecisionOptions = computed(() =>
   pendingDecisionCardOptions(props.employee).slice(0, 3),
+);
+const hasSafeRetryDecisionOption = computed(() =>
+  pendingDecisionOptions.value.some((option) => option.id === APPROVE_PENDING_RECOVERY_ID),
 );
 const retryActionLabel = computed(
   () => displayActions.value.find((action) => action.id === 'retry')?.label ?? 'Try again',
@@ -309,8 +313,12 @@ watch(
             {{ pendingDecisionOptions.map((option) => option.label).join(' · ') }}
           </small>
         </span>
-        <span class="agent-persona-dock__decision-open">Review in composer →</span>
+        <span class="agent-persona-dock__decision-open">Open decision in composer →</span>
       </button>
+      <p class="agent-persona-dock__decision-help">
+        Opens this decision as an editable operator reply. Safe retry only approves a narrow
+        recovery for this failed shift; it does not deploy or make broad changes.
+      </p>
       <div
         v-if="pendingDecisionOptions.length"
         class="agent-persona-dock__decision-options"
@@ -322,11 +330,19 @@ watch(
           :key="option.id"
           type="button"
           class="agent-persona-dock__decision-option"
+          :class="{
+            'agent-persona-dock__decision-option--primary':
+              option.id === APPROVE_PENDING_RECOVERY_ID,
+          }"
           @click="emit('decisionOption', option)"
         >
           {{ option.label }}
         </button>
       </div>
+      <p v-if="hasSafeRetryDecisionOption" class="agent-persona-dock__decision-footnote">
+        Use safe retry for recoverable runtime, quota, connectivity, or stale-shift blockers. Use
+        composer review when you need to steer the team.
+      </p>
     </section>
 
     <ul

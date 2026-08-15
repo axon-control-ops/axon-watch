@@ -17,7 +17,7 @@ export function pendingDecisionCardOptions(
     return supplied;
   }
   return [
-    { id: APPROVE_PENDING_RECOVERY_ID, label: 'Approve bounded recovery' },
+    { id: APPROVE_PENDING_RECOVERY_ID, label: 'Approve safe retry' },
     { id: DISMISS_PENDING_DECISION_ID, label: 'Dismiss alert' },
   ];
 }

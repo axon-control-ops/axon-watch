@@ -124,11 +124,11 @@ describe('buildPendingDecisionComposerDraft', () => {
     });
 
     expect(pendingDecisionCardOptions(pending).map((option) => option.label)).toEqual([
-      'Approve bounded recovery',
+      'Approve safe retry',
       'Dismiss alert',
     ]);
     expect(buildPendingDecisionComposerDraft(pending)).toContain(
-      'Approve bounded recovery',
+      'Approve safe retry',
     );
     const [approve, reject] = pendingDecisionCardOptions(pending);
     expect(pendingDecisionDirectResolution(approve?.id)).toBe('approved');
