@@ -50,6 +50,13 @@ class WorkspaceMissionTests(unittest.TestCase):
             {"workspace_id": "consumer", "project_root": "/tmp/consumer"},
         ]
 
+    @staticmethod
+    def _complete_task(task_id: str, *, run_id: str | None = None) -> None:
+        # These tests drive mission transitions synchronously. Suppress the
+        # production daemon kick so it cannot race the temporary test database.
+        with patch.object(task_store, "notify_task_terminal"):
+            task_store.complete_task(task_id, run_id=run_id)
+
     def test_explicit_edge_creates_idempotent_dependent_tasks_and_handoff(self) -> None:
         self._write_edges([{
             "source_workspace_id": "source", "target_workspace_id": "consumer",
@@ -86,7 +93,7 @@ class WorkspaceMissionTests(unittest.TestCase):
         self._write_edges([])
         task = task_store.create_task(workspace_id="source", goal="source", mission_id="pending")
         task_store.lease_task(task["task_id"], lease_holder="test")
-        task_store.complete_task(task["task_id"], run_id="run-1")
+        self._complete_task(task["task_id"], run_id="run-1")
         mission = workspace_mission_store.create_mission({
             "mission_id": "pending", "dedupe_key": "pending", "goal": "source",
             "status": "verifying", "risk": "normal", "source_workspace_id": "source",
@@ -110,13 +117,54 @@ class WorkspaceMissionTests(unittest.TestCase):
         })
         task = task_store.create_task(workspace_id="source", goal="ready", mission_id="ready")
         task_store.lease_task(task["task_id"], lease_holder="test")
-        task_store.complete_task(task["task_id"])
+        self._complete_task(task["task_id"])
         workspace_mission_store.create_node({
             "node_id": "node-ready", "mission_id": mission["mission_id"],
             "workspace_id": "source", "task_id": task["task_id"],
             "relation": "source", "status": "completed",
         })
         self.assertEqual(service.get_workspace_mission("ready")["status"], "ready_for_promotion")
+
+    def test_green_delivery_recovers_a_delivery_blocked_mission(self) -> None:
+        task = task_store.create_task(workspace_id="source", goal="source", mission_id="recover")
+        task_store.lease_task(task["task_id"], lease_holder="test")
+        self._complete_task(task["task_id"], run_id="run-recover")
+        workspace_mission_store.create_mission({
+            "mission_id": "recover", "dedupe_key": "recover", "goal": "source",
+            "status": "verifying", "risk": "normal", "source_workspace_id": "source",
+        })
+        workspace_mission_store.create_node({
+            "node_id": "node-recover", "mission_id": "recover", "workspace_id": "source",
+            "task_id": task["task_id"], "relation": "source", "status": "completed",
+        })
+        delivery = delivery_store.create_delivery(
+            workspace_id="source", run_id="run-recover", task_id=task["task_id"],
+            stage="ci_red", baseline_sha="base", worker_branch="worker/run-recover",
+        )
+        blocked = service.verify_mission("recover")
+        self.assertEqual(blocked["blocker_code"], "delivery_gate")
+        delivery_store.update_delivery(delivery["delivery_id"], stage="ci_green")
+        recovered = service.refresh_mission("recover")
+        self.assertEqual(recovered["status"], "verifying")
+        self.assertEqual(recovered["blocker_code"], "")
+
+    def test_nonrecoverable_verification_failure_stays_blocked_on_read(self) -> None:
+        mission = workspace_mission_store.create_mission({
+            "mission_id": "failed-verify", "dedupe_key": "failed-verify", "goal": "source",
+            "status": "blocked", "risk": "normal", "source_workspace_id": "source",
+        })
+        workspace_mission_store.update_mission(
+            mission["mission_id"], blocker="verification failed", blocker_code="verification_failed"
+        )
+        self.assertEqual(service.refresh_mission("failed-verify")["status"], "blocked")
+
+    def test_legacy_blocker_text_is_backfilled_to_a_recovery_code(self) -> None:
+        mission = workspace_mission_store.create_mission({
+            "mission_id": "legacy-red", "dedupe_key": "legacy-red", "goal": "source",
+            "status": "blocked", "risk": "normal", "source_workspace_id": "source",
+            "blocker": "source delivery is not green (stage=ci_red)",
+        })
+        self.assertEqual(mission["blocker_code"], "delivery_gate")
 
 
 if __name__ == "__main__":

@@ -48,6 +48,7 @@ def ensure_schema(connection: Any) -> None:
             integration_manifest_json TEXT NOT NULL DEFAULT '{}',
             promotions_json TEXT NOT NULL DEFAULT '[]',
             blocker TEXT NOT NULL DEFAULT '',
+            blocker_code TEXT NOT NULL DEFAULT '',
             created_at TEXT NOT NULL,
             updated_at TEXT NOT NULL
         );
@@ -86,6 +87,7 @@ def ensure_schema(connection: Any) -> None:
     for name, ddl in (
         ("integration_manifest_json", "TEXT NOT NULL DEFAULT '{}'"),
         ("promotions_json", "TEXT NOT NULL DEFAULT '[]'"),
+        ("blocker_code", "TEXT NOT NULL DEFAULT ''"),
     ):
         if name not in mission_columns:
             connection.execute(f"ALTER TABLE workspace_missions ADD COLUMN {name} {ddl}")
@@ -95,7 +97,26 @@ def ensure_schema(connection: Any) -> None:
     }
     if "delivery_stage" not in columns:
         connection.execute("ALTER TABLE workspace_mission_nodes ADD COLUMN delivery_stage TEXT")
-        connection.commit()
+    connection.execute(
+        """
+        UPDATE workspace_missions
+        SET blocker_code = CASE
+            WHEN blocker = 'ambiguous workspace impact requires Lead review' THEN 'impact_review'
+            WHEN blocker = 'one or more workspace tasks failed' THEN 'task_failed'
+            WHEN blocker LIKE '% delivery is not green (stage=%' THEN 'delivery_gate'
+            WHEN blocker = 'cross-workspace verification commands are not configured' THEN 'configuration'
+            WHEN blocker LIKE 'cross-workspace verification failed in %' THEN 'verification_failed'
+            WHEN blocker LIKE 'mission verification error: %' THEN 'verification_error'
+            WHEN blocker LIKE 'operator approval required for %' THEN 'approval_required'
+            WHEN blocker LIKE 'could not mark draft PR ready in %'
+                OR blocker LIKE 'promotion failed in %' THEN 'promotion_failed'
+            WHEN status = 'cancelled' THEN 'operator_cancelled'
+            ELSE blocker_code
+        END
+        WHERE blocker_code = '' AND blocker <> ''
+        """
+    )
+    connection.commit()
 
 
 def _json(raw: Any, fallback: Any) -> Any:
@@ -128,15 +149,16 @@ def create_mission(record: dict[str, Any]) -> dict[str, Any]:
             """
             INSERT INTO workspace_missions
                 (mission_id, dedupe_key, goal, status, risk, source_workspace_id,
-                 source_task_id, source_run_id, impact_json, blocker, created_at, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                 source_task_id, source_run_id, impact_json, blocker, blocker_code,
+                 created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 record["mission_id"], record["dedupe_key"], record["goal"],
                 record.get("status", "planned"), record.get("risk", "normal"),
                 record["source_workspace_id"], record.get("source_task_id"),
                 record.get("source_run_id"), json.dumps(record.get("impact") or []),
-                record.get("blocker", ""), now, now,
+                record.get("blocker", ""), record.get("blocker_code", ""), now, now,
             ),
         )
         connection.commit()
@@ -213,7 +235,7 @@ def list_missions(*, status: str | None = None, limit: int = 100) -> list[dict[s
 
 def update_mission(mission_id: str, **fields: Any) -> dict[str, Any] | None:
     allowed = {
-        "status", "blocker", "impact", "source_task_id", "source_run_id",
+        "status", "blocker", "blocker_code", "impact", "source_task_id", "source_run_id",
         "integration_manifest", "promotions",
     }
     updates = {key: value for key, value in fields.items() if key in allowed}

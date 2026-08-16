@@ -143,7 +143,9 @@ def disable_sandbox(workspace_id: str) -> dict[str, Any]:
                 cleaned, manual_enabled=False, retained_reason="unpromoted changes"
             )
             raise DirtySandboxError("Sandbox contains unpromoted changes; publish or discard it")
-        composer_sandbox_store.save_state(cleaned, manual_enabled=False)
+        composer_sandbox_store.save_state(
+            cleaned, manual_enabled=False, retained_reason=""
+        )
         if not _auto_enabled() and root is not None:
             cleanup_isolation_root(root)
             composer_sandbox_store.save_state(

@@ -12,6 +12,7 @@ from unittest.mock import patch
 
 from app.cli_runtime import composer_sandbox
 from app.cli_runtime.composer_execution_policy import resolve_composer_execution_policy
+from app.persistence import composer_sandbox_store
 
 
 class ComposerSandboxPolicyV2Tests(unittest.TestCase):
@@ -81,6 +82,17 @@ class ComposerSandboxPolicyV2Tests(unittest.TestCase):
         status = composer_sandbox.sandbox_status("ws-clean")
         self.assertFalse(status["materialized"])
         self.assertFalse(root.exists())
+
+    def test_disable_clears_retained_marker_when_checkout_is_already_missing(self) -> None:
+        composer_sandbox_store.save_state(
+            "ws-missing", manual_enabled=True,
+            checkout_id="missing", checkout_root=str(self.project / "missing"),
+            retained_reason="Recovered unpromoted Sandbox changes",
+        )
+        with self._patch_root(), patch.object(composer_sandbox, "_auto_enabled", return_value=False):
+            status = composer_sandbox.disable_sandbox("ws-missing")
+        self.assertFalse(status["enabled"])
+        self.assertEqual(status["retained_reason"], "")
 
     def test_effective_access_changes_only_tool_capable_modes(self) -> None:
         with self._patch_root(), patch.object(composer_sandbox, "_auto_enabled", return_value=True):

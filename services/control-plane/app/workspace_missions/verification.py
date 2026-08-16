@@ -33,6 +33,7 @@ def _green_delivery_gate(mission_id: str, mission: dict[str, Any]) -> dict[str, 
             return workspace_mission_store.update_mission(
                 mission_id, status="blocked",
                 blocker=f"{node.get('workspace_id')} delivery is not green (stage={stage})",
+                blocker_code="delivery_gate",
             )
         if stage not in {"ci_green", "no_change"}:
             return workspace_mission_store.update_mission(
@@ -103,6 +104,7 @@ def verify_mission(mission_id: str) -> dict[str, Any]:
         return workspace_mission_store.update_mission(
             mission_id, status="blocked",
             blocker="cross-workspace verification commands are not configured",
+            blocker_code="configuration",
         ) or mission
     roots: dict[str, Path] = {}
     isolation_roots: list[Path] = []
@@ -136,17 +138,18 @@ def verify_mission(mission_id: str) -> dict[str, Any]:
                 return workspace_mission_store.update_mission(
                     mission_id, status="blocked",
                     blocker=f"cross-workspace verification failed in {workspace}: {command}",
+                    blocker_code="verification_failed",
                 ) or mission
         for node in mission.get("nodes") or []:
             workspace_mission_store.update_node(
                 str(node["node_id"]), verification={"status": "passed", "receipts": receipts}
             )
         return workspace_mission_store.update_mission(
-            mission_id, status="ready_for_promotion", blocker=""
+            mission_id, status="ready_for_promotion", blocker="", blocker_code=""
         ) or mission
     except ValueError as exc:
         return workspace_mission_store.update_mission(
-            mission_id, status="blocked", blocker=str(exc)
+            mission_id, status="blocked", blocker=str(exc), blocker_code="verification_error"
         ) or mission
     finally:
         from app.safe_improvement.isolated_executor import cleanup_isolation_root
@@ -179,7 +182,8 @@ def promote_mission(mission_id: str) -> dict[str, Any]:
         raise ValueError(f"mission is not ready for promotion ({mission.get('status')})")
     if str(mission.get("risk") or "normal") not in {"low", "normal"}:
         return workspace_mission_store.update_mission(
-            mission_id, blocker="operator approval required for elevated mission risk"
+            mission_id, blocker="operator approval required for elevated mission risk",
+            blocker_code="approval_required",
         ) or mission
     for node in mission.get("nodes") or []:
         if node.get("relation") == "impact_review":
@@ -189,7 +193,8 @@ def promote_mission(mission_id: str) -> dict[str, Any]:
         if policy is None or is_protected_branch(policy, policy.base_branch):
             _record_promotion(mission_id, node, "approval_required", "protected integration branch")
             return workspace_mission_store.update_mission(
-                mission_id, blocker=f"operator approval required for protected promotion in {workspace}"
+                mission_id, blocker=f"operator approval required for protected promotion in {workspace}",
+                blocker_code="approval_required",
             ) or mission
         if str(node.get("delivery_stage") or "") == "no_change":
             _record_promotion(mission_id, node, "no_change", "nothing to promote")
@@ -207,6 +212,7 @@ def promote_mission(mission_id: str) -> dict[str, Any]:
             return workspace_mission_store.update_mission(
                 mission_id, status="blocked",
                 blocker=f"could not mark draft PR ready in {workspace}: {detail}",
+                blocker_code="promotion_failed",
             ) or mission
         result = subprocess.run(
             ["gh", "pr", "merge", pr_url, "--merge", "--delete-branch"],
@@ -216,11 +222,12 @@ def promote_mission(mission_id: str) -> dict[str, Any]:
             detail = (result.stderr or result.stdout).strip()
             _record_promotion(mission_id, node, "failed", detail)
             return workspace_mission_store.update_mission(
-                mission_id, status="blocked", blocker=f"promotion failed in {workspace}: {detail}"
+                mission_id, status="blocked", blocker=f"promotion failed in {workspace}: {detail}",
+                blocker_code="promotion_failed",
             ) or mission
         _record_promotion(mission_id, node, "promoted", pr_url)
     return workspace_mission_store.update_mission(
-        mission_id, status="completed", blocker=""
+        mission_id, status="completed", blocker="", blocker_code=""
     ) or mission
 
 

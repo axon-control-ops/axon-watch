@@ -75,6 +75,7 @@ export interface WorkspaceMission {
   integration_manifest: WorkspaceMissionIntegrationManifest | Record<string, never>;
   promotions: WorkspaceMissionPromotion[];
   blocker: string;
+  blocker_code: string;
   nodes: WorkspaceMissionNode[];
   created_at: string;
   updated_at: string;

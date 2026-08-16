@@ -240,19 +240,27 @@ def refresh_mission(mission_id: str) -> dict[str, Any] | None:
             mission_id,
             status="blocked",
             blocker="ambiguous workspace impact requires Lead review",
+            blocker_code="impact_review",
         )
     statuses = {str(node.get("status") or "") for node in nodes}
     if statuses & {"failed", "cancelled"}:
         return workspace_mission_store.update_mission(
-            mission_id, status="blocked", blocker="one or more workspace tasks failed"
+            mission_id, status="blocked", blocker="one or more workspace tasks failed",
+            blocker_code="task_failed",
         )
-    if mission.get("status") in {"blocked", "ready_for_promotion"}:
+    if mission.get("status") == "ready_for_promotion":
+        return workspace_mission_store.get_mission(mission_id)
+    if mission.get("status") == "blocked" and str(mission.get("blocker_code") or "") not in {
+        "delivery_gate", "impact_review", "task_failed",
+    }:
         return workspace_mission_store.get_mission(mission_id)
     if nodes and statuses <= {"completed"}:
         return workspace_mission_store.update_mission(
-            mission_id, status="verifying", blocker=""
+            mission_id, status="verifying", blocker="", blocker_code=""
         )
-    return workspace_mission_store.update_mission(mission_id, status="running", blocker="")
+    return workspace_mission_store.update_mission(
+        mission_id, status="running", blocker="", blocker_code=""
+    )
 
 
 def _dependencies_complete(node: dict[str, Any]) -> bool:
@@ -310,7 +318,7 @@ def retry_mission(mission_id: str) -> dict[str, Any]:
             status="open", blocker="", verification=verification,
         )
     updated = workspace_mission_store.update_mission(
-        mission_id, status="running", blocker=""
+        mission_id, status="running", blocker="", blocker_code=""
     ) or mission
     _start_ready_nodes(updated)
     return updated
@@ -328,7 +336,8 @@ def cancel_mission(mission_id: str) -> dict[str, Any]:
             except Exception:
                 pass
     return workspace_mission_store.update_mission(
-        mission_id, status="cancelled", blocker="cancelled by operator"
+        mission_id, status="cancelled", blocker="cancelled by operator",
+        blocker_code="operator_cancelled",
     ) or mission
 
 
@@ -356,6 +365,7 @@ def kick_missions_for_task(task_id: str) -> None:
                     workspace_mission_store.update_mission(
                         str(mission["mission_id"]), status="blocked",
                         blocker=f"mission verification error: {exc}",
+                        blocker_code="verification_error",
                     )
 
     threading.Thread(target=_work, daemon=True, name=f"mission-{task_id[:12]}").start()
