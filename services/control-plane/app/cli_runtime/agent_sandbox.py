@@ -13,6 +13,7 @@ from pathlib import Path
 from typing import Sequence
 from app.cli_runtime.agent_sandbox_paths import append_hidden_mounts, hidden_workspace_paths
 from app.cli_runtime.codex_profile_mount import append_codex_auth_mount, resolve_codex_auth_path
+from app.cli_runtime.agent_sandbox_hook_docs import _claude_settings_document, _hooks_document
 from app.cli_runtime.user_bin_path import existing_user_local_bin, sandbox_path_with_user_bins
 
 _SANDBOX_HOME = Path("/run/axon-agent-home")
@@ -198,25 +199,6 @@ def _prepare_workspace_scratch(workspace: Path, target: Path, name: str) -> None
         raise SandboxConfigurationError("Private agent scratch is not a safe directory.")
 
 
-def _hooks_document() -> dict[str, object]:
-    hook_command = (
-        f"/usr/bin/python3 {_SANDBOX_POLICY_ROOT}/hook.py "
-        f"{_SANDBOX_POLICY_ROOT}/policy.json"
-    )
-    definition = {
-        "command": hook_command,
-        "failClosed": True,
-        "timeout": _HOOK_TIMEOUT_SECONDS,
-    }
-    return {
-        "version": 1,
-        "hooks": {
-            "beforeShellExecution": [definition],
-            "preToolUse": [{**definition, "matcher": "Shell"}],
-        },
-    }
-
-
 def default_policy_root() -> Path:
     runtime_root = Path(f"/run/user/{os.getuid()}")
     if runtime_root.is_dir():
@@ -317,7 +299,13 @@ def materialize_cursor_hook_policy(
         or workspace_codex_scratch.is_symlink()
     ):
         raise SandboxConfigurationError("Sandbox policy scratch contains an unsafe directory.")
+    claude_dir = generated_home / ".claude"
+    claude_dir.mkdir(mode=0o700, parents=True, exist_ok=True)
+    if claude_dir.is_symlink() or not claude_dir.is_dir():
+        raise SandboxConfigurationError("Sandbox policy contains an unsafe directory.")
+    claude_settings_path = claude_dir / "settings.json"
     _write_immutable(hooks_path, _canonical_json(_hooks_document()))
+    _write_immutable(claude_settings_path, _canonical_json(_claude_settings_document()))
     _write_immutable(policy_path, policy_bytes)
     _write_immutable(hook_path, hook_source, executable=True)
     for wrapper in policy.approved_wrappers:
@@ -329,6 +317,7 @@ def materialize_cursor_hook_policy(
         _write_immutable(wrapper_dir / wrapper, proxy, executable=True)
 
     wrapper_dir.chmod(0o555)
+    claude_dir.chmod(0o700)
     cursor_dir.chmod(0o700)
     generated_home.chmod(0o700)
     target.chmod(0o555)
@@ -548,6 +537,7 @@ def build_bwrap_command(
     destination_paths = [
         workspace,
         _SANDBOX_HOME / ".cursor" / "hooks.json",
+        _SANDBOX_HOME / ".claude" / "settings.json",
         _SANDBOX_HOME / ".codex" / "auth.json",
     ]
     if user_local_bin is not None:

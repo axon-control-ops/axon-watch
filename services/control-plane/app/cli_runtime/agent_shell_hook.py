@@ -143,7 +143,8 @@ def _extract_shell_command(payload: Mapping[str, Any]) -> str:
             or payload.get("tool_type")
             or ""
         ).lower()
-        if tool_name and tool_name not in {"shell", "terminal"}:
+        # Cursor emits shell/terminal; Claude Code emits Bash. Same gate.
+        if tool_name and tool_name not in {"shell", "terminal", "bash"}:
             raise ValueError("unsupported preToolUse tool")
         tool_input = payload.get("tool_input", payload.get("input"))
         command = tool_input.get("command") if isinstance(tool_input, Mapping) else None
@@ -251,13 +252,33 @@ def run_hook(policy_path: Path, raw_input: str) -> dict[str, str]:
         return _deny(f"hook policy unavailable: {type(exc).__name__}")
 
 
+def to_claude_hook_response(response: Mapping[str, Any]) -> dict[str, Any]:
+    """Express one policy decision in Claude Code's PreToolUse schema.
+
+    The decision is identical; only the wire format differs. Cursor reads
+    ``permission``; Claude Code reads ``hookSpecificOutput.permissionDecision``.
+    Emitting both keeps one policy evaluator for every runtime.
+    """
+    allowed = str(response.get("permission") or "") == "allow"
+    reason = str(response.get("agent_message") or "")
+    return {
+        **response,
+        "hookSpecificOutput": {
+            "hookEventName": "PreToolUse",
+            "permissionDecision": "allow" if allowed else "deny",
+            "permissionDecisionReason": reason or "approved by Axon sandbox policy",
+        },
+    }
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     arguments = list(sys.argv[1:] if argv is None else argv)
     policy_path = Path(arguments[0]) if len(arguments) == 1 else Path("")
     response = run_hook(policy_path, sys.stdin.read()) if arguments else _deny(
         "hook policy path is required"
     )
-    sys.stdout.write(json.dumps(response, sort_keys=True, separators=(",", ":")) + "\n")
+    payload = to_claude_hook_response(response)
+    sys.stdout.write(json.dumps(payload, sort_keys=True, separators=(",", ":")) + "\n")
     return 0
 
 
