@@ -11,6 +11,7 @@ import json
 import logging
 import subprocess
 from typing import Any, Callable
+from urllib.parse import quote
 
 from app.adapters.watch_client import reset_watch_inbox_cache
 from app.ci_remediation import store as ci_store
@@ -88,6 +89,8 @@ def classify_stale_reason(
 
     if not branch_health:
         return None
+    if str(branch_health.get("branch_state") or "").strip().lower() == "missing":
+        return "stale_branch_missing"
     conclusion = str(branch_health.get("conclusion") or "").strip().lower()
     latest_sha = str(branch_health.get("head_sha") or "").strip().lower()
     if conclusion != "success":
@@ -146,12 +149,21 @@ def fetch_branch_health_via_gh(
     row = rows[0]
     if not isinstance(row, dict):
         return None
-    return {
+    health = {
         "conclusion": str(row.get("conclusion") or "").strip().lower(),
         "head_sha": str(row.get("headSha") or "").strip(),
         "run_id": str(row.get("databaseId") or "").strip(),
         "status": str(row.get("status") or "").strip().lower(),
     }
+    if health["conclusion"] == "success":
+        return health
+    branch_probe = subprocess.run(
+        ["gh", "api", f"repos/{repo}/branches/{quote(branch, safe='')}"],
+        check=False, capture_output=True, text=True, timeout=20,
+    )
+    if branch_probe.returncode != 0 and "HTTP 404" in (branch_probe.stderr or ""):
+        health["branch_state"] = "missing"
+    return health
 
 
 def resolve_open_for_branch_success(
@@ -214,9 +226,7 @@ def sweep_stale_ci_signals(
     max_resolve: int = 40,
 ) -> dict[str, Any]:
     """Scan open CI alerts; resolve only after stale/useless confirmation."""
-    default_fetcher: BranchHealthFetcher | None = branch_health_fetcher
-    if default_fetcher is None and confirm_with_gh:
-        default_fetcher = lambda workflow, branch: fetch_branch_health_via_gh(workflow, branch)
+    use_health_lookup = branch_health_fetcher is not None or confirm_with_gh
 
     health_cache: dict[tuple[str, str, str], BranchHealth | None] = {}
     resolved: list[dict[str, Any]] = []
@@ -237,15 +247,15 @@ def sweep_stale_ci_signals(
         health: BranchHealth | None = None
         if include_drills and is_drill_branch(branch):
             health = None
-        elif default_fetcher is not None and workflow and branch:
+        elif use_health_lookup and workflow and branch:
             gh_repo = repo_from_signal(signal)
             key = (gh_repo, workflow.lower(), branch)
             if key not in health_cache:
                 try:
-                    health_cache[key] = fetch_branch_health_via_gh(
-                        workflow,
-                        branch,
-                        repo=gh_repo,
+                    health_cache[key] = (
+                        branch_health_fetcher(workflow, branch)
+                        if branch_health_fetcher is not None
+                        else fetch_branch_health_via_gh(workflow, branch, repo=gh_repo)
                     )
                 except Exception:  # noqa: BLE001 — sweep must stay fail-open
                     logger.exception(

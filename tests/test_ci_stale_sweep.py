@@ -127,6 +127,27 @@ class CiStaleSweepTests(unittest.TestCase):
         self.assertEqual(1, len(cleared))
         self.assertEqual([], self.ci_store.list_open_signals())
 
+    def test_confirmed_missing_branch_is_stale_even_when_last_run_failed(self) -> None:
+        signal = self.emit(
+            dedupe_key=(
+                "ci:axon-control-ops/dashpro:CI:worker/deleted:deadbeef"
+            ),
+            workspace_id="workspace_dashpro",
+            workflow_name="CI",
+            head_branch="worker/deleted",
+            html_url="",
+            failing_step="tests",
+            run_id="44",
+        )
+        result = self.sweep_stale_ci_signals(
+            confirm_with_gh=False,
+            branch_health_fetcher=lambda _workflow, _branch: {
+                "conclusion": "failure", "branch_state": "missing",
+            },
+        )
+        self.assertEqual([signal["signal_id"]], result["resolved_signal_ids"])
+        self.assertEqual([], self.ci_store.list_open_signals())
+
     def test_acknowledge_resolves_ci_signals(self) -> None:
         signal = self.emit(
             dedupe_key="ci:axon-control-ops/axon-watch:axon-x fast gate:feat/y:sha",
