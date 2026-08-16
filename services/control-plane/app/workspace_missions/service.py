@@ -3,20 +3,16 @@
 from __future__ import annotations
 
 import hashlib
-import json
 import os
-from pathlib import Path
-import re
-import subprocess
-import tempfile
 import threading
 from typing import Any
 from uuid import uuid4
 
 from app.persistence import handoff_store, task_store, workspace_mission_store
 from app.workspace_agents.teammate_route import route_teammate_decision
-from app.workspace_delivery import delivery_store, get_workspace_delivery_policy, is_protected_branch
+from app.workspace_delivery import delivery_store
 from app.workspace_missions.impact_graph import impact_edges
+from app.workspace_missions.verification import promote_mission, verify_mission
 
 
 def _enabled() -> bool:
@@ -284,204 +280,6 @@ def list_workspace_missions(*, status: str | None = None, limit: int = 100) -> l
     for mission in workspace_mission_store.list_missions(status=status, limit=limit):
         refresh_mission(str(mission["mission_id"]))
     return workspace_mission_store.list_missions(status=status, limit=limit)
-
-
-def _verification_commands(mission: dict[str, Any]) -> list[tuple[str, str]]:
-    commands: list[tuple[str, str]] = []
-    for edge in mission.get("impact") or []:
-        target = str(edge.get("target_workspace_id") or "").strip()
-        raw = edge.get("verification_commands")
-        if isinstance(raw, list):
-            commands.extend((target, str(command).strip()) for command in raw if str(command).strip())
-    return commands
-
-
-def verify_mission(mission_id: str) -> dict[str, Any]:
-    mission = refresh_mission(mission_id)
-    if mission is None:
-        raise ValueError(f"mission not found: {mission_id}")
-    if mission.get("status") != "verifying":
-        raise ValueError(f"mission is not ready for verification ({mission.get('status')})")
-    for node in mission.get("nodes") or []:
-        if node.get("relation") == "impact_review":
-            continue
-        stage = str(node.get("delivery_stage") or "")
-        if stage in {"ci_red", "blocked", "escalated"}:
-            return workspace_mission_store.update_mission(
-                mission_id,
-                status="blocked",
-                blocker=(
-                    f"{node.get('workspace_id')} delivery is not green "
-                    f"(stage={stage or 'missing'})"
-                ),
-            ) or mission
-        if stage not in {"ci_green", "no_change"}:
-            return workspace_mission_store.update_mission(
-                mission_id,
-                status="verifying",
-                blocker=f"waiting for green delivery in {node.get('workspace_id')}",
-            ) or mission
-    commands = _verification_commands(mission)
-    if len(mission.get("nodes") or []) > 1 and not commands:
-        return workspace_mission_store.update_mission(
-            mission_id,
-            status="blocked",
-            blocker="cross-workspace verification commands are not configured",
-        ) or mission
-    node_roots: dict[str, Path] = {}
-    isolation_roots: list[Path] = []
-    try:
-        from app.safe_improvement.isolated_executor import cleanup_isolation_root, create_isolation_root
-        from app.terminal.workspace_roots import resolve_workspace_root
-
-        for node in mission.get("nodes") or []:
-            if node.get("relation") == "impact_review":
-                continue
-            workspace_id = str(node.get("workspace_id") or "")
-            commit = str(node.get("commit_sha") or "").strip()
-            if not commit:
-                return workspace_mission_store.update_mission(
-                    mission_id, status="blocked",
-                    blocker=f"{workspace_id} has no pinned delivery commit",
-                ) or mission
-            root = create_isolation_root(
-                proposal_id=f"verify-{mission_id}-{workspace_id}",
-                bound_project_root=resolve_workspace_root(workspace_id),
-                baseline_commit=commit,
-            )
-            node_roots[workspace_id] = root
-            isolation_roots.append(root)
-        pinned_manifest = {
-            "mission_id": mission_id,
-            "workspaces": {
-                workspace: {"commit_sha": next(
-                    str(node.get("commit_sha") or "") for node in mission["nodes"]
-                    if node.get("workspace_id") == workspace
-                )}
-                for workspace in node_roots
-            },
-        }
-        workspace_mission_store.update_mission(mission_id, integration_manifest=pinned_manifest)
-        manifest = {
-            **pinned_manifest,
-            "workspaces": {
-                workspace: {**pinned_manifest["workspaces"][workspace], "root": str(root)}
-                for workspace, root in node_roots.items()
-            },
-        }
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as handle:
-            json.dump(manifest, handle, sort_keys=True)
-            manifest_path = handle.name
-        env = dict(os.environ)
-        env["AXON_MISSION_MANIFEST"] = manifest_path
-        for workspace, root in node_roots.items():
-            key = re.sub(r"[^A-Z0-9]+", "_", workspace.upper()).strip("_")
-            env[f"AXON_MISSION_{key}_ROOT"] = str(root)
-        receipts: list[dict[str, Any]] = []
-        for workspace, command in commands:
-            root = node_roots.get(workspace)
-            if root is None:
-                raise ValueError(f"verification target workspace missing: {workspace}")
-            result = subprocess.run(
-                command, cwd=str(root), env=env, shell=True, capture_output=True,
-                text=True, timeout=900, check=False,
-            )
-            receipts.append({
-                "workspace_id": workspace, "command": command,
-                "exit_code": result.returncode,
-                "output": (result.stdout or result.stderr or "")[-4000:],
-            })
-            if result.returncode != 0:
-                return workspace_mission_store.update_mission(
-                    mission_id, status="blocked",
-                    blocker=f"cross-workspace verification failed in {workspace}: {command}",
-                ) or mission
-        for node in mission.get("nodes") or []:
-            workspace_mission_store.update_node(
-                str(node["node_id"]), verification={"status": "passed", "receipts": receipts}
-            )
-        return workspace_mission_store.update_mission(
-            mission_id, status="ready_for_promotion", blocker=""
-        ) or mission
-    finally:
-        for root in isolation_roots:
-            cleanup_isolation_root(root)
-        if "manifest_path" in locals():
-            Path(manifest_path).unlink(missing_ok=True)
-
-
-def promote_mission(mission_id: str) -> dict[str, Any]:
-    mission = workspace_mission_store.get_mission(mission_id)
-    if mission is None:
-        raise ValueError(f"mission not found: {mission_id}")
-    if mission.get("status") != "ready_for_promotion":
-        raise ValueError(f"mission is not ready for promotion ({mission.get('status')})")
-    if str(mission.get("risk") or "normal") not in {"low", "normal"}:
-        return workspace_mission_store.update_mission(
-            mission_id, blocker="operator approval required for elevated mission risk"
-        ) or mission
-    for node in mission.get("nodes") or []:
-        if node.get("relation") == "impact_review":
-            continue
-        workspace = str(node.get("workspace_id") or "")
-        policy = get_workspace_delivery_policy(workspace)
-        if policy is None or is_protected_branch(policy, policy.base_branch):
-            _record_promotion(mission_id, node, "approval_required", "protected integration branch")
-            return workspace_mission_store.update_mission(
-                mission_id,
-                blocker=f"operator approval required for protected promotion in {workspace}",
-            ) or mission
-        pr_url = str(node.get("draft_pr_url") or "").strip()
-        if str(node.get("delivery_stage") or "") == "no_change":
-            _record_promotion(mission_id, node, "no_change", "nothing to promote")
-            continue
-        if not pr_url:
-            raise ValueError(f"mission node has no draft PR: {workspace}")
-        ready = subprocess.run(
-            ["gh", "pr", "ready", pr_url],
-            capture_output=True, text=True, timeout=120, check=False,
-        )
-        if ready.returncode != 0 and "already marked ready" not in (
-            ready.stderr or ready.stdout
-        ).lower():
-            _record_promotion(mission_id, node, "failed", (ready.stderr or ready.stdout).strip())
-            return workspace_mission_store.update_mission(
-                mission_id, status="blocked",
-                blocker=f"could not mark draft PR ready in {workspace}: "
-                f"{(ready.stderr or ready.stdout).strip()}",
-            ) or mission
-        result = subprocess.run(
-            ["gh", "pr", "merge", pr_url, "--merge", "--delete-branch"],
-            capture_output=True, text=True, timeout=120, check=False,
-        )
-        if result.returncode != 0:
-            _record_promotion(mission_id, node, "failed", (result.stderr or result.stdout).strip())
-            return workspace_mission_store.update_mission(
-                mission_id, status="blocked",
-                blocker=f"promotion failed in {workspace}: {(result.stderr or result.stdout).strip()}",
-            ) or mission
-        _record_promotion(mission_id, node, "promoted", pr_url)
-    return workspace_mission_store.update_mission(
-        mission_id, status="completed", blocker=""
-    ) or mission
-
-
-def _record_promotion(
-    mission_id: str, node: dict[str, Any], status: str, detail: str
-) -> None:
-    mission = workspace_mission_store.get_mission(mission_id) or {}
-    records = list(mission.get("promotions") or [])
-    record = {
-        "node_id": node.get("node_id"),
-        "workspace_id": node.get("workspace_id"),
-        "commit_sha": node.get("commit_sha"),
-        "draft_pr_url": node.get("draft_pr_url"),
-        "status": status,
-        "detail": detail,
-    }
-    records = [item for item in records if item.get("node_id") != node.get("node_id")]
-    records.append(record)
-    workspace_mission_store.update_mission(mission_id, promotions=records)
 
 
 def retry_mission(mission_id: str) -> dict[str, Any]:

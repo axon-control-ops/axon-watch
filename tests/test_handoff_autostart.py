@@ -27,7 +27,8 @@ class HandoffAutostartTests(unittest.TestCase):
         self.addCleanup(handoff_store.reset_store)
 
     @patch("app.workspace_agents.operator_start_task._kick_queued_dispatch")
-    def test_try_autostart_calls_operator_start_under_scheduler_off(self, kick) -> None:
+    @patch("app.workspace_agents.operator_start_task._wait_for_worker_dispatch_started", return_value=True)
+    def test_try_autostart_calls_operator_start_under_scheduler_off(self, _wait, kick) -> None:
         kick.side_effect = lambda run_id: [
             {"run_id": run_id, "phase": "executing", "employee_role": "frontend"}
         ]
