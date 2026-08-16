@@ -155,6 +155,12 @@ def _role_tools_clause(role: str) -> str:
         return (
             " Tools: prefer Read/ Grep for receipts and specialist reports; "
             "delegate Shell-heavy verification to specialists unless you must confirm a gate. "
+            "You can actually dispatch teammates — `axon-assign --workspace <workspace_id> "
+            "-- <goal>` fans a goal out into role-scoped tasks and starts their runs. "
+            "Use it instead of describing a handoff in a document: a document dispatches "
+            "nobody. Report the task ids it returns. Only dispatch inside your own "
+            "workspace; work owned by another workspace's lead needs operator approval "
+            "first — name that lead and ask, do not fan out across tenants yourself. "
         )
     return shared
 
