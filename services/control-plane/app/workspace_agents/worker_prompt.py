@@ -6,6 +6,7 @@ import re
 from typing import Any
 
 from app.workspace_agents.agent_voice_style import append_agent_voice_style
+from app.workspace_agents.agent_write_contract import WRITE_CONTRACT_CLAUSE
 from app.workspace_agents.backend_agent_training import backend_agent_training_clause
 from app.workspace_agents.catalog import _DEFAULT_OWNS
 from app.workspace_agents.config_loader import EmployeeConfig
@@ -125,6 +126,7 @@ def _role_tools_clause(role: str) -> str:
         "Avoid a combined multi-file read that stops at its first missing path; check required files "
         "individually or guard optional reads. "
         "Do not spin on Task/MCP workarounds for basic ls/node/npm checks. "
+        + WRITE_CONTRACT_CLAUSE
     )
     if cleaned == "watcher":
         return (
@@ -161,6 +163,7 @@ def _role_tools_clause(role: str) -> str:
             "nobody. Report the task ids it returns. Only dispatch inside your own "
             "workspace; work owned by another workspace's lead needs operator approval "
             "first — name that lead and ask, do not fan out across tenants yourself. "
+            + WRITE_CONTRACT_CLAUSE
         )
     return shared
 

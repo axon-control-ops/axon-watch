@@ -134,6 +134,7 @@ main_tests=(
   tests.test_composer_sandbox_policy_v2
   tests.test_direct_reply_acceptance
   tests.test_lead_text
+  tests.test_agent_write_contract
   tests.test_cli_runtime_agent_sandbox_hook_policy
   tests.test_ci_remediation
   tests.test_safe_improvement
