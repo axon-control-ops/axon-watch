@@ -33,6 +33,14 @@ class WriteContractPromptTests(unittest.TestCase):
             with self.subTest(role=role):
                 self.assertIn("never a shell interpreter", self._prompt(role))
 
+    def test_every_role_is_told_to_call_wrappers_directly(self) -> None:
+        for role in ROLES:
+            with self.subTest(role=role):
+                prompt = self._prompt(role)
+                self.assertIn("Never wrap one in", prompt)
+                self.assertIn("route shell work through", prompt)
+                self.assertIn("never that the tool does not exist", prompt)
+
     def test_every_role_is_told_to_name_the_exact_receipt_path(self) -> None:
         for role in ROLES:
             with self.subTest(role=role):
@@ -53,6 +61,28 @@ class InterpreterWritesAreActuallyDeniedTests(unittest.TestCase):
             approved_wrappers=frozenset(policy.approved_wrappers),
             approved_command_prefixes=policy.approved_command_prefixes,
         )["permission"]
+
+    def test_wrapping_an_approved_wrapper_in_a_shell_is_denied(self) -> None:
+        # Regression: a Lead ran zsh -lc "axon-assign ...", got denied, and
+        # reported axon-assign as missing rather than as mis-invoked.
+        self.assertEqual(
+            "deny",
+            self._permission("lead", '/usr/bin/zsh -lc "axon-assign --workspace w -- goal"'),
+        )
+        self.assertEqual(
+            "allow", self._permission("lead", "axon-assign --workspace w -- goal")
+        )
+
+    def test_headless_form_reaches_the_full_frontend_toolchain(self) -> None:
+        for command in (
+            "npx jest tests/components/x.test.tsx",
+            "npm test -- tests/components/x.test.tsx",
+            "npx tsc --noEmit",
+            "axon-agent-terminal-job --workspace w -- npx jest tests/components/x.test.tsx",
+            "axon-agent-terminal-job --workspace w -- npx tsc --noEmit",
+        ):
+            with self.subTest(command=command):
+                self.assertEqual("allow", self._permission("frontend", command))
 
     def test_interpreter_file_writes_are_denied_for_every_role(self) -> None:
         commands = (

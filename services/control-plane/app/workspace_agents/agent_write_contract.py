@@ -1,6 +1,6 @@
-"""How agents are expected to write files and declare what they wrote.
+"""How agents are expected to invoke tools, write files, and declare receipts.
 
-Two failure modes this closes, both observed in real shifts:
+Three failure modes this closes, all observed in real shifts:
 
 1. Agents reach for `node -e` / `python -c` / `bash -c` to do file I/O. Those
    are categorical interpreter escapes in the shell hook and are denied no
@@ -9,6 +9,9 @@ Two failure modes this closes, both observed in real shifts:
    naming what they actually wrote. ``docs/ops/agent-reports/`` holds machine
    ``*.json`` watcher receipts next to human ``*.md`` shift reports, so a
    markdown report gets declared as ``.json`` and fails path verification.
+3. Agents wrap an approved wrapper in a shell (``zsh -lc "<wrapper> ..."``).
+   The shell is an interpreter escape, so the whole command is denied, and the
+   agent reports the wrapper as missing rather than as wrongly invoked.
 """
 
 from __future__ import annotations
@@ -26,6 +29,16 @@ WRITE_CONTRACT_CLAUSE = (
     "watcher receipts alongside human `*.md` shift reports, so a markdown "
     "report declared as `.json` fails verification and your completion claim "
     "is marked unverified. "
+    "Invoking approved wrappers: call them directly, e.g. "
+    "`axon-agent-terminal-job --workspace <id> -- <command>`. Never wrap one in "
+    "`zsh -lc`, `bash -c`, or `sh -c`: the shell is an interpreter escape, so the "
+    "whole command is denied and the wrapper looks missing when it is simply "
+    "mis-invoked. On a headless shift, route shell work through "
+    "`axon-agent-terminal-job --workspace <id> -- <command>`, where the inner "
+    "command must itself be approved (for example `npx jest <path>`, "
+    "`npm test -- <path>`, `npx tsc --noEmit`). A denial means wrong form or wrong "
+    "role for your policy — never that the tool does not exist. Quote the exact "
+    "denial text rather than concluding the tool is unavailable. "
 )
 
 
