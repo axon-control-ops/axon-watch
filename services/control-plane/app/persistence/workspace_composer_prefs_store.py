@@ -198,14 +198,14 @@ def resolve_worker_runtime_model(workspace_id: str, runtime_family: str = "curso
 def resolve_worker_runtime_target(workspace_id: str) -> str | None:
     """Runtime family (e.g. ``claude_local``) workers should dispatch through.
 
-    Mirrors the operator's Agent Dock runtime-target pick so continuous/fleet
-    workers don't silently fall back to the server's default runtime.
+    Uses the workspace's worker preference first, then the legacy-named global
+    Full Auto worker fallback. Interactive PC composer selection is resolved
+    separately in the console and is never overridden by autonomy mode.
     """
     prefs = get_workspace_composer_prefs(workspace_id)
     target = str(prefs.get("runtime_target") or "").strip()
-    # The visible Agent Dock selection is an explicit operator preference. It
-    # must win over an Auto-mode default for continuous workers too; otherwise
-    # a worker can silently run a different provider than the composer shows.
+    # A workspace worker pin wins over the operator-global Full Auto fallback.
+    # Interactive Agent Dock picks are thread-local and never enter this store.
     if target:
         return target
 

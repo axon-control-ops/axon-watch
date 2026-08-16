@@ -25,7 +25,7 @@ import {
 } from '../../features/workspace-agents/company-roster-view';
 import {
   APPROVE_PENDING_RECOVERY_ID,
-  failedShiftSubjectFromDecisionTitle,
+  failedShiftSubject,
   pendingDecisionCardOptions,
   pendingDecisionPrompt as resolvePendingDecisionPrompt,
 } from '../../features/workspace-agents/company-roster-focus';
@@ -95,6 +95,14 @@ const liveBeat = computed(() => {
   if (props.liveBusy && props.runtimeShiftHint?.trim()) {
     return props.runtimeShiftHint.trim();
   }
+  const decisionSubject = failedShiftSubject(props.employee);
+  if (
+    props.employee.pending_decision_id
+    && decisionSubject
+    && decisionSubject.role !== (props.employee.role ?? '').trim().toLowerCase()
+  ) {
+    return `${props.employee.name} is holding a recovery review for ${decisionSubject.name} (${decisionSubject.role}).`;
+  }
   if (failure.value) {
     return failure.value;
   }
@@ -137,12 +145,12 @@ const pendingDecisionCopy = computed(
   () => resolvePendingDecisionPrompt(props.employee) || 'Review the pending decision',
 );
 const pendingDecisionSubject = computed(() =>
-  failedShiftSubjectFromDecisionTitle(props.employee.pending_decision_title),
+  failedShiftSubject(props.employee),
 );
 const pendingDecisionOptions = computed(() =>
   pendingDecisionCardOptions(props.employee).slice(0, 3),
 );
-const hasSafeRetryDecisionOption = computed(() =>
+const hasRecoveryDecisionOption = computed(() =>
   pendingDecisionOptions.value.some((option) => option.id === APPROVE_PENDING_RECOVERY_ID),
 );
 const retryActionLabel = computed(
@@ -301,10 +309,12 @@ watch(
       >
         <span class="agent-persona-dock__decision-icon" aria-hidden="true">!</span>
         <span class="agent-persona-dock__decision-copy">
-          <span class="agent-persona-dock__decision-kicker">Decision required</span>
+          <span class="agent-persona-dock__decision-kicker">
+            {{ pendingDecisionSubject ? `Recovery review for ${pendingDecisionSubject.name}` : 'Decision required' }}
+          </span>
           <strong id="agent-pending-decision-title">{{ pendingDecisionCopy }}</strong>
           <small v-if="pendingDecisionSubject && pendingDecisionSubject.role !== (employee.role ?? '').trim().toLowerCase()">
-            {{ employee.name }} is holding this decision for {{ pendingDecisionSubject.name }} ({{ pendingDecisionSubject.role }})
+            Decision owner: {{ employee.name }} ({{ employee.role }}) · Affected agent: {{ pendingDecisionSubject.name }} ({{ pendingDecisionSubject.role }})
           </small>
           <small v-else-if="pendingDecisionSubject">
             Shift failure · {{ pendingDecisionSubject.name }} ({{ pendingDecisionSubject.role }})
@@ -316,8 +326,9 @@ watch(
         <span class="agent-persona-dock__decision-open">Open decision in composer →</span>
       </button>
       <p class="agent-persona-dock__decision-help">
-        Opens this decision as an editable operator reply. Safe retry only approves a narrow
-        recovery for this failed shift; it does not deploy or make broad changes.
+        Opens this decision as an editable operator reply. The primary action creates a narrow
+        diagnosis task for the decision owner; it does not silently rerun the affected agent,
+        deploy, or make broad changes.
       </p>
       <div
         v-if="pendingDecisionOptions.length"
@@ -339,9 +350,9 @@ watch(
           {{ option.label }}
         </button>
       </div>
-      <p v-if="hasSafeRetryDecisionOption" class="agent-persona-dock__decision-footnote">
-        Use safe retry for recoverable runtime, quota, connectivity, or stale-shift blockers. Use
-        composer review when you need to steer the team.
+      <p v-if="hasRecoveryDecisionOption" class="agent-persona-dock__decision-footnote">
+        Use diagnosis for recoverable runtime, quota, connectivity, or stale-shift blockers. Use
+        composer review when you need to steer the team or explicitly retry the affected agent.
       </p>
     </section>
 

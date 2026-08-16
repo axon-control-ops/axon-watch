@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import re
 
+from app.chat.direct_reply_acceptance import narrative_outside_receipts
+
 _CONFIDENCE_LINE_RE = re.compile(r"^\s*confidence\s*:?\s*\d+\s*/\s*10\s*$", re.I)
 _CONFIDENCE_INLINE_RE = re.compile(r"\bConfidence:?\s*\d+\s*/\s*10\b", re.I)
 
@@ -53,9 +55,9 @@ def strip_confidence_lines(text: str | None) -> str:
 
 def lead_summary_from_reply(reply_text: str | None) -> str:
     """One short Lead-facing summary line — never a full specialist dump."""
-    body = strip_thinking(reply_text)
+    body = narrative_outside_receipts(strip_thinking(reply_text))
     if not body:
-        return ""
+        return "No verified final narrative was produced; inspect the failed run receipts."
     peeled_changed = ""
     for line in body.splitlines():
         cleaned = line.strip().lstrip("-*• ").strip()

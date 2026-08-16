@@ -41,9 +41,11 @@ def _build_codex_exec_command(
         #
         # Keep Codex unrestricted only inside the outer Axon sandbox; the outer
         # sandbox still enforces writable paths, approved wrappers, hidden
-        # metadata mounts, and process cancellation.
+        # metadata mounts, and process cancellation. It also removes the need
+        # for nested per-command approvals on routine pre-approved work.
         codex_sandbox = "danger-full-access" if outer_sandboxed else "workspace-write"
-        command.extend(["--sandbox", codex_sandbox, "-c", 'approval_policy="on-request"'])
+        approval = "never" if outer_sandboxed else "on-request"
+        command.extend(["--sandbox", codex_sandbox, "-c", f'approval_policy="{approval}"'])
     else:
         command.extend(["--sandbox", "read-only", "-c", 'approval_policy="never"'])
     if model:

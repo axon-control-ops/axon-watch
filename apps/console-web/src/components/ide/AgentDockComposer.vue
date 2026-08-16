@@ -137,7 +137,7 @@ const toolbarProps = useAgentDockComposerToolbarProps(composer);
               @switch-consultative="composer.switchToConsultativeAccess"
               @request-sandbox-session="composer.requestSandboxSession"
               @disable-sandbox-session="composer.disableSandboxSessionAccess"
-              @open-vault="composer.openVaultSurface"
+              @review-sandbox-session="composer.reviewSandboxSessionChanges" @publish-sandbox-session="composer.publishSandboxSessionChanges" @discard-sandbox-session="composer.discardSandboxSessionChanges" @open-vault="composer.openVaultSurface"
             />
           </template>
         </AgentDockComposerInput>

@@ -22,7 +22,7 @@ from app.workspace_delivery.config import (
 )
 from app.workspace_delivery.gh_cli import gh_missing_hint, resolve_gh_cli
 from app.workspace_delivery import store as delivery_store
-from app.workspace_delivery.receipts import delivery_refs_from_record, emit_delivery_receipt
+from app.workspace_delivery.receipts import delivery_refs_from_record, emit_delivery_receipt, mission_refs_for_task
 from app.workspace_delivery.changed_paths import list_changed_paths
 
 logger = logging.getLogger(__name__)
@@ -349,7 +349,7 @@ def publish_worker_isolation(
         worker_branch=worker_branch,
         isolation_root=str(isolation_root),
         attempt_budget=policy.attempt_budget,
-        refs={"worker_branch": worker_branch, "baseline_sha": baseline_sha},
+        refs={"worker_branch": worker_branch, "baseline_sha": baseline_sha, **mission_refs_for_task(task_id)},
     )
     if not paths:
         emit_delivery_receipt(

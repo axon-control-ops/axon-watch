@@ -206,7 +206,6 @@ class DispatchRecursionRecoveryTests(unittest.TestCase):
                     context_block="ctx",
                     runtime_target="cursor_local",
                 )
-
         self.assertTrue(result.get("dispatched"))
         self.assertEqual("Recovered without research MCP.", result.get("content"))
         self.assertEqual([None, False], calls)
@@ -320,8 +319,8 @@ class DispatchRecursionRecoveryTests(unittest.TestCase):
                     context_block="ctx",
                     runtime_target="codex_local",
                     fallback_runtime_families=("cursor",),
+                    respect_cached_usage_limit=True,
                 )
-
         self.assertTrue(result.get("dispatched"))
         self.assertEqual("cursor_local", result.get("runtime_id"))
         self.assertTrue(
@@ -382,7 +381,7 @@ class DispatchRecursionRecoveryTests(unittest.TestCase):
             mock_non_cursor.call_args_list[1].kwargs["subprocess_env"]["ANTHROPIC_API_KEY"],
         )
 
-    def test_explicit_codex_quota_does_not_replace_signed_in_account_with_vault_key(self) -> None:
+    def test_cached_codex_limit_blocks_workers_but_manual_retry_probes_again(self) -> None:
         snapshot = {
             "default_runtime": "codex_local",
             "local": [
@@ -418,11 +417,22 @@ class DispatchRecursionRecoveryTests(unittest.TestCase):
                     user_prompt="Continue the bounded task.",
                     context_block="ctx",
                     runtime_target="codex_local",
+                    respect_cached_usage_limit=True,
                 )
-
-        self.assertFalse(result.get("dispatched"))
-        self.assertIn("usage limit is still active", str(result.get("reason") or ""))
-        run_codex.assert_not_called()
+                self.assertFalse(result.get("dispatched"))
+                self.assertIn("usage limit is still active", str(result.get("reason") or ""))
+                run_codex.assert_not_called()
+                run_codex.return_value = "Manual retry succeeded."
+                manual_result = dispatch_ide_composer(
+                    workspace_id="workspace_young_eagles_day_care",
+                    composer_mode="agent",
+                    user_prompt="Try again now.",
+                    context_block="ctx",
+                    runtime_target="codex_local",
+                )
+        self.assertTrue(manual_result.get("dispatched"))
+        self.assertEqual("Manual retry succeeded.", manual_result.get("content"))
+        run_codex.assert_called_once()
 
     def test_codex_subscription_limit_retries_configured_vault_key(self) -> None:
         snapshot = {

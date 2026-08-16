@@ -1,9 +1,12 @@
-import { computed, type Ref, ref } from 'vue';
+import { computed, type Ref, ref, watch } from 'vue';
 
 import {
   disableComposerSandbox,
+  discardComposerSandbox,
   enableComposerSandbox,
   fetchComposerSandboxStatus,
+  publishComposerSandbox,
+  reviewComposerSandbox,
 } from '../../api/composer-sandbox-api';
 import {
   agentExecutionAccessHint,
@@ -72,8 +75,13 @@ export function useComposerMenus(shell: ShellStore, options: UseComposerMenusOpt
   const sandboxConsentChecked = ref(false);
   const sandboxSessionEnabled = ref(false);
   const sandboxEnvForced = ref(false);
+  const sandboxAutoEnabled = ref(false);
+  const sandboxManualEnabled = ref(false);
+  const sandboxDirty = ref(false);
+  const sandboxSource = ref('off');
   const sandboxSessionPending = ref(false);
   const sandboxSessionError = ref('');
+  const sandboxChangedPaths = ref<string[]>([]);
   const showAddModelsPanel = ref(false);
   const showRuntimeTargetsPanel = ref(false);
   const modelSearchQuery = ref('');
@@ -87,20 +95,37 @@ export function useComposerMenus(shell: ShellStore, options: UseComposerMenusOpt
       shell.agentExecutionAccess === 'full' &&
       shell.ideAgentLinkedRun?.phase === 'awaiting_approval',
   );
-  const executionAccessLabel = computed(() =>
-    agentExecutionAccessLabel(shell.agentExecutionAccess),
+  const effectiveExecutionAccess = computed(() =>
+    sandboxSessionEnabled.value && isToolCapableComposerMode(composerMode.value)
+      ? 'full'
+      : shell.agentExecutionAccess,
   );
+  const executionAccessLabel = computed(() => agentExecutionAccessLabel(effectiveExecutionAccess.value));
   const executionAccessHint = computed(() =>
-    agentExecutionAccessHint(shell.agentExecutionAccess),
+    sandboxSessionEnabled.value && effectiveExecutionAccess.value === 'full'
+      ? 'Full Access inside disposable isolation; external and protected effects remain gated'
+      : agentExecutionAccessHint(effectiveExecutionAccess.value),
   );
   const isFullAccessAgent = computed(
     () =>
-      isToolCapableComposerMode(composerMode.value) && shell.agentExecutionAccess === 'full',
+      isToolCapableComposerMode(composerMode.value) && effectiveExecutionAccess.value === 'full',
   );
-  const sandboxHint = computed(() =>
-    sandboxSessionHint(sandboxSessionEnabled.value, sandboxEnvForced.value),
-  );
-  const sandboxLabel = computed(() => sandboxSessionLabel(sandboxSessionEnabled.value));
+  const sandboxHint = computed(() => {
+    if (sandboxDirty.value && sandboxSource.value === 'retained') {
+      return 'Full Auto ended; unpromoted changes are retained for review';
+    }
+    if (sandboxAutoEnabled.value) {
+      return 'Full Auto provides lazy disposable isolation for this workspace';
+    }
+    return sandboxSessionHint(sandboxSessionEnabled.value, sandboxEnvForced.value);
+  });
+  const sandboxLabel = computed(() => {
+    if (!sandboxSessionEnabled.value) return sandboxSessionLabel(false);
+    if (sandboxSource.value === 'retained') return 'Sandbox · Retained changes';
+    if (sandboxAutoEnabled.value && sandboxManualEnabled.value) return 'Sandbox · Auto + Manual';
+    if (sandboxAutoEnabled.value) return 'Sandbox · Auto';
+    return 'Sandbox · Manual';
+  });
   const modeButtonLabel = computed(() =>
     buildComposerModeAccessLabel({
       modeLabel: activeMode.value.label,
@@ -124,18 +149,44 @@ export function useComposerMenus(shell: ShellStore, options: UseComposerMenusOpt
   async function refreshSandboxSession(): Promise<void> {
     const workspaceId = shell.currentWorkspace?.workspace_id;
     if (!workspaceId) {
+      sandboxSessionEnabled.value = false;
+      sandboxEnvForced.value = false;
       return;
     }
     try {
       const status = await fetchComposerSandboxStatus(workspaceId);
+      if (shell.currentWorkspace?.workspace_id !== workspaceId) {
+        return;
+      }
       sandboxSessionEnabled.value = status.enabled;
       sandboxEnvForced.value = status.env_forced;
+      sandboxAutoEnabled.value = status.auto_enabled;
+      sandboxManualEnabled.value = status.manual_enabled;
+      sandboxDirty.value = status.dirty;
+      sandboxSource.value = status.source;
       sandboxSessionError.value = '';
     } catch (error) {
       sandboxSessionError.value =
         error instanceof Error ? error.message : 'Could not load Sandbox status.';
     }
   }
+
+  // Sandbox sessions are explicitly per-workspace. Never carry the prior
+  // workspace's badge/state into the next composer while its status loads.
+  watch(
+    () => `${shell.currentWorkspace?.workspace_id ?? ''}:${shell.operatorPresenceSettings.autonomy_mode}`,
+    () => {
+      sandboxSessionEnabled.value = false;
+      sandboxEnvForced.value = false;
+      sandboxAutoEnabled.value = false;
+      sandboxManualEnabled.value = false;
+      sandboxDirty.value = false;
+      sandboxSource.value = 'off';
+      sandboxSessionError.value = '';
+      void refreshSandboxSession();
+    },
+    { immediate: true },
+  );
 
   function closeMenus(): void {
     showContextMenu.value = false;
@@ -244,6 +295,10 @@ export function useComposerMenus(shell: ShellStore, options: UseComposerMenusOpt
       const status = await enableComposerSandbox(workspaceId);
       sandboxSessionEnabled.value = status.enabled;
       sandboxEnvForced.value = status.env_forced;
+      sandboxAutoEnabled.value = status.auto_enabled;
+      sandboxManualEnabled.value = status.manual_enabled;
+      sandboxDirty.value = status.dirty;
+      sandboxSource.value = status.source;
       showSandboxConsent.value = false;
       sandboxConsentChecked.value = false;
     } catch (error) {
@@ -255,7 +310,7 @@ export function useComposerMenus(shell: ShellStore, options: UseComposerMenusOpt
   }
 
   async function disableSandboxSessionAccess(): Promise<void> {
-    if (sandboxEnvForced.value || sandboxSessionPending.value) {
+    if (sandboxEnvForced.value || sandboxAutoEnabled.value || sandboxSessionPending.value) {
       return;
     }
     const workspaceId = shell.currentWorkspace?.workspace_id;
@@ -268,10 +323,66 @@ export function useComposerMenus(shell: ShellStore, options: UseComposerMenusOpt
       const status = await disableComposerSandbox(workspaceId);
       sandboxSessionEnabled.value = status.enabled;
       sandboxEnvForced.value = status.env_forced;
+      sandboxAutoEnabled.value = status.auto_enabled;
+      sandboxManualEnabled.value = status.manual_enabled;
+      sandboxDirty.value = status.dirty;
+      sandboxSource.value = status.source;
       showModeMenu.value = false;
     } catch (error) {
       sandboxSessionError.value =
         error instanceof Error ? error.message : 'Could not turn Sandbox off.';
+    } finally {
+      sandboxSessionPending.value = false;
+    }
+  }
+
+  async function reviewSandboxSessionChanges(): Promise<void> {
+    const workspaceId = shell.currentWorkspace?.workspace_id;
+    if (!workspaceId || sandboxSessionPending.value) return;
+    sandboxSessionPending.value = true;
+    try {
+      const review = await reviewComposerSandbox(workspaceId);
+      sandboxChangedPaths.value = review.changed_paths;
+      sandboxDirty.value = review.dirty;
+      sandboxSessionError.value = review.changed_paths.length
+        ? `Retained changes: ${review.changed_paths.join(', ')}`
+        : 'Sandbox has no unpromoted changes.';
+    } catch (error) {
+      sandboxSessionError.value = error instanceof Error ? error.message : 'Review failed.';
+    } finally {
+      sandboxSessionPending.value = false;
+    }
+  }
+
+  async function publishSandboxSessionChanges(): Promise<void> {
+    const workspaceId = shell.currentWorkspace?.workspace_id;
+    if (!workspaceId || sandboxSessionPending.value) return;
+    sandboxSessionPending.value = true;
+    try {
+      const status = await publishComposerSandbox(workspaceId);
+      sandboxDirty.value = status.dirty;
+      sandboxSessionEnabled.value = status.enabled;
+      sandboxSessionError.value = 'Sandbox changes were published through workspace delivery.';
+      await refreshSandboxSession();
+    } catch (error) {
+      sandboxSessionError.value = error instanceof Error ? error.message : 'Publish failed.';
+    } finally {
+      sandboxSessionPending.value = false;
+    }
+  }
+
+  async function discardSandboxSessionChanges(): Promise<void> {
+    const workspaceId = shell.currentWorkspace?.workspace_id;
+    if (!workspaceId || sandboxSessionPending.value) return;
+    if (!window.confirm('Permanently discard every unpromoted change in this Sandbox?')) return;
+    sandboxSessionPending.value = true;
+    try {
+      await discardComposerSandbox(workspaceId);
+      sandboxChangedPaths.value = [];
+      sandboxSessionError.value = '';
+      await refreshSandboxSession();
+    } catch (error) {
+      sandboxSessionError.value = error instanceof Error ? error.message : 'Discard failed.';
     } finally {
       sandboxSessionPending.value = false;
     }
@@ -286,6 +397,7 @@ export function useComposerMenus(shell: ShellStore, options: UseComposerMenusOpt
     confirmFullAccessConsent,
     confirmSandboxConsent,
     disableSandboxSessionAccess,
+    discardSandboxSessionChanges,
     executionAccessHint,
     executionAccessLabel,
     fullAccessConsentChecked,
@@ -295,10 +407,17 @@ export function useComposerMenus(shell: ShellStore, options: UseComposerMenusOpt
     modelSearchQuery,
     requestFullAccess,
     requestSandboxSession,
+    publishSandboxSessionChanges,
+    reviewSandboxSessionChanges,
     sandboxConsentChecked,
+    sandboxChangedPaths,
+    sandboxAutoEnabled,
+    sandboxDirty,
     sandboxEnvForced,
     sandboxHint,
     sandboxLabel,
+    sandboxManualEnabled,
+    sandboxSource,
     sandboxSessionEnabled,
     sandboxSessionError,
     sandboxSessionPending,

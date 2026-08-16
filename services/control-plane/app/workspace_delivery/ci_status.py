@@ -50,6 +50,16 @@ def _safe_emit(
         broadcast_material_change(receipt_id=f"workspace_delivery_{run_id}_{stage}")
     except Exception:  # noqa: BLE001 — receipt durability is the primary outcome
         logger.exception("delivery live update failed for %s stage=%s", run_id, stage)
+    if stage in {"ci_green", "ci_red", "escalated", "blocked"}:
+        try:
+            delivery = delivery_store.get_delivery_by_run(run_id)
+            task_id = str((delivery or {}).get("task_id") or "").strip()
+            if task_id:
+                from app.workspace_missions.service import kick_missions_for_task
+
+                kick_missions_for_task(task_id)
+        except Exception:  # noqa: BLE001 — mission projection must not break CI ingestion
+            logger.exception("mission delivery refresh failed for %s", run_id)
 
 
 def _utc_now_iso() -> str:

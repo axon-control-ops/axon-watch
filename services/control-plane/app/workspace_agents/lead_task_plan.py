@@ -15,12 +15,12 @@ from app.workspace_agents.teammate_route import (
     MIN_WINNER_SCORE,
     score_teammate_role,
 )
+from app.workspace_agents.lead_query_intent import detect_specialist_query_intent
 
 PlanMode = Literal["auto", "fan_out", "sequential", "decompose"]
 
 _SPECIALIST_ROLES = frozenset({"frontend", "backend", "integrations", "watcher"})
 _SKIP_PLAN_ROLES = frozenset({"lead", "overview_agent"})
-
 _FAN_OUT_RE = re.compile(
     r"\b(?:check|ask|poll|sync|brief|consult)\b.{0,40}\b(?:all|every|each)\b.{0,40}"
     r"\b(?:sub[- ]?agents?|teammates?|specialists?|agents?|roles?)\b"
@@ -476,7 +476,7 @@ def should_lead_decompose_dispatch(plan: LeadTaskPlan) -> bool:
         return False
     if len(plan.items) >= 2:
         return True
-    return detect_implement_intent(plan.goal)
+    return detect_implement_intent(plan.goal) or detect_specialist_query_intent(plan.goal)
 
 
 __all__ = [

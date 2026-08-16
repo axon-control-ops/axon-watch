@@ -69,7 +69,7 @@ class ControlPlaneChatLaneBTests(unittest.TestCase):
     @patch(
         "app.chat.lane_b_post_message.generate_lane_b_result",
         return_value={
-            "content": "Consultative agent reply",
+            "content": "Consultative agent reply.\n\nConfidence: 8/10",
             "dispatched": True,
             "runtime_id": "cursor_local",
             "runtime_label": "Cursor CLI (local)",
@@ -102,7 +102,10 @@ class ControlPlaneChatLaneBTests(unittest.TestCase):
     @patch(
         "app.chat.lane_b_post_message.generate_lane_b_result",
         return_value={
-            "content": "I inspected the workspace and propose the next bounded steps.",
+            "content": (
+                "I inspected the workspace and propose the next bounded steps."
+                "\n\nConfidence: 8/10"
+            ),
             "dispatched": True,
             "runtime_id": "cursor_local",
             "runtime_label": "Cursor CLI (local)",
@@ -186,6 +189,33 @@ class ControlPlaneChatLaneBTests(unittest.TestCase):
         payload = response.json()
         self.assertFalse(payload["dispatched"])
         self.assertEqual("failed", payload["run"]["phase"])
+
+    @patch(
+        "app.chat.lane_b_post_message.generate_lane_b_result",
+        return_value={
+            "content": ":::terminal query\ncount failed\n:::",
+            "dispatched": True,
+            "runtime_id": "codex_local",
+            "runtime_label": "Codex CLI (local)",
+            "reason": "",
+        },
+    )
+    def test_agent_terminal_only_reply_does_not_complete(self, _mock_runtime) -> None:
+        response = self.client.post(
+            "/api/chat/messages",
+            json={
+                "workspace_id": "workspace_alpha",
+                "content": "How many active children are in this tenant?",
+                "composer_mode": "agent",
+                "execution_access": "full",
+            },
+        )
+
+        self.assertEqual(200, response.status_code)
+        payload = response.json()
+        self.assertFalse(payload["dispatched"])
+        self.assertEqual("failed", payload["run"]["phase"])
+        self.assertIn("no human-facing conclusion", payload["run"]["current_step"])
 
     def test_post_chat_message_lane_b_streaming_returns_placeholder_agent(self) -> None:
         def _streaming_lane_b_result(**kwargs):

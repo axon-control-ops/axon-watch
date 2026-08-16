@@ -14,6 +14,7 @@ from typing import Any
 
 from app.persistence import autonomous_attention_store, handoff_store, task_store
 from app.workspace_agents.autonomous_attention_policy import classify_attention_item
+from app.workspace_agents.autonomous_attention_subject import decision_subject_payload
 from app.workspace_agents.autonomous_attention_findings import (
     collect_attend_findings,
     collect_handoff_findings,
@@ -36,8 +37,6 @@ logger = logging.getLogger(__name__)
 DEFAULT_MAX_DISPATCH_PER_TICK = 3
 DEFAULT_MAX_ESCALATIONS_PER_TICK = 5
 _ATTEND_ENQUEUE_LOCK = threading.Lock()
-
-
 def _open_attend_tasks(workspace_id: str) -> list[dict[str, Any]]:
     openish: list[dict[str, Any]] = []
     for status in ("open", "leased"):
@@ -151,6 +150,7 @@ def _enqueue_attend_actions(
                     "owner_role": finding.owner_role,
                     "reason": policy.reason,
                     "finding_kind": finding.kind,
+                    **decision_subject_payload(finding),
                 },
             )
             escalated.append(receipt)
@@ -303,6 +303,16 @@ def resolve_autonomy_decision(
         autonomous_attention_store.release_decision_resolution(receipt_id)
         raise ValueError("autonomy decision is missing workspace_id")
     dedupe_key = str(receipt.get("dedupe_key") or receipt_id).strip()
+    subject_role = str(payload.get("subject_role") or "").strip().lower()
+    subject_run_id = str(payload.get("subject_run_id") or "").strip()
+    recovery_scope = ""
+    if subject_role and subject_role != owner_role:
+        recovery_scope = (
+            f" Decision owner={owner_role}; affected role={subject_role}"
+            + (f"; failed run={subject_run_id}." if subject_run_id else ".")
+            + " Diagnose and recommend or perform only the approved bounded recovery; "
+            "do not impersonate or silently rerun the affected role."
+        )
     task: dict[str, Any] | None = None
     try:
         task = task_store.create_task(
@@ -314,6 +324,7 @@ def resolve_autonomy_decision(
             ),
             acceptance_criteria=(
                 f"Exact approved effect: {str(receipt.get('detail') or receipt.get('title') or '')}. "
+                f"{recovery_scope} "
                 f"Approval receipt={receipt_id}. Stay inside disposable worker isolation. "
                 "Report receipts and end with Confidence: N/10."
             ),

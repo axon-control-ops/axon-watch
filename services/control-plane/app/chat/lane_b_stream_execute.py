@@ -14,6 +14,8 @@ from app.chat.lane_b_generated_image_actions import (
 )
 from app.chat.chat_stream_defer import finish_chat_stream
 from app.chat.lane_b_stream_progress import build_lane_b_stream_on_chunk
+from app.chat.direct_reply_acceptance import enforce_direct_reply_acceptance
+from app.chat.lane_b_turn_memory import remember_lane_b_turn
 from app.chat.reply_verification import verify_lane_b_reply
 from app.cli_runtime.approval_gate import is_tool_capable_composer_mode
 from app.cli_runtime.research_stream_blocks import normalize_transcript_content
@@ -22,7 +24,6 @@ from app.chat.progress_milestones import (
     publish_stream_error_milestone,
 )
 from app.plans.service import maybe_attach_plan_artifact
-from app.kairo.turn_memory import remember_turn
 from app.persistence import chat_store
 from app.workspace_agents.execution_policy import AgentExecutionPolicy
 from app.runs.service import (
@@ -80,21 +81,6 @@ class LaneBStreamJob:
 
 def _utc_now() -> str:
     return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
-
-
-def remember_lane_b_turn(
-    *,
-    kairo_session_id: str | None,
-    operator_content: str,
-    agent_content: str,
-) -> None:
-    session = str(kairo_session_id or "").strip()
-    if not session:
-        return
-    if str(operator_content or "").strip():
-        remember_turn(session, "user", operator_content)
-    if str(agent_content or "").strip():
-        remember_turn(session, "assistant", agent_content)
 
 
 def lane_b_system_content(
@@ -172,6 +158,17 @@ def finalize_lane_b_agent_run(
     )
     try:
         if dispatched:
+            accepted, acceptance_record = enforce_direct_reply_acceptance(
+                dispatch_run_id, reply_text
+            )
+            run_record = acceptance_record or run_record
+            if not accepted:
+                _maybe_notify_lead_after_lane_b(
+                    dispatch_run_id=dispatch_run_id,
+                    run_record=run_record,
+                    reply_text=reply_text,
+                )
+                return False, run_record
             confidence, auto_recovered = resolve_critical_review_confidence(reply_text)
             if confidence is None:
                 if require_critical_review:

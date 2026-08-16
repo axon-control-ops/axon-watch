@@ -200,12 +200,12 @@ def dispatch_continuous_worker_run(
             execution_policy=execution_policy,
             allow_git_dispatch=False,
             fallback_runtime_families=fallback_runtime_families,
+            respect_cached_usage_limit=True,
         )
         reply_text = str(lane_b_result.get("content") or "")
         from app.workspace_agents.employee_first_person import (
             rewrite_employee_third_person_to_first,
         )
-
         reply_text = rewrite_employee_third_person_to_first(
             reply_text,
             str(employee.name or "").strip() or None,

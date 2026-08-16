@@ -176,6 +176,7 @@ class CliRuntimeAgentTests(unittest.TestCase):
         )
         self.assertIn("danger-full-access", command)
         self.assertNotIn("workspace-write", command)
+        self.assertIn('approval_policy="never"', command)
 
     def test_codex_passes_the_selected_reasoning_effort(self) -> None:
         command = _build_codex_exec_command(

@@ -34,8 +34,8 @@ function usageFailureCopy(detail: string | null | undefined): string {
   const runtime = usageRuntime(detail);
   if (runtime === 'Codex' || runtime === 'Claude') {
     return (
-      `Last job could not start because the signed-in ${runtime} account is quota-limited — ` +
-      'switch runtime or enable Claude/Cursor/Codex Auto failover, then tap Try again.'
+      `Last job could not start because the ${runtime} CLI reported a usage-limit block; ` +
+      'Axon cannot verify the live account quota. Tap Try again once, or switch runtime.'
     );
   }
   return 'Last job hit a Cursor usage signal — Auto+Composer may still have headroom or on-demand spend. Check Usage in Settings → CLI runtime, then Try again.';

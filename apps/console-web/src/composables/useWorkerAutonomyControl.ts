@@ -14,11 +14,11 @@ export type AutonomyActionTone = 'idle' | 'ok' | 'error' | 'pending' | 'warn';
 
 export const AUTONOMY_MODE_COPY: Record<AutonomyMode, string> = {
   manual:
-    'VAXON speaks only for approvals and interruptive signals. Continuous workers stay paused. The monitoring lane can still watch for blockers and bugs.',
+    'VAXON speaks only for approvals and interruptive signals. Continuous workers stay paused. Composer access, runtime, and Sandbox remain under your separate PC controls.',
   semi:
-    'VAXON stays proactive with advisory briefs. Continuous workers stay paused (no idle Cursor burn). The monitoring lane keeps observing; Full is required for always-on leasing.',
+    'VAXON stays proactive with advisory briefs. Continuous workers pause; clean Auto-only Sandboxes close, dirty ones are retained, and manual workspace Sandboxes remain.',
   full:
-    'VAXON advisory plus continuous workers that lease tasks and run Cursor shifts without per-run approval. Monitoring remains separate and always-on unless explicitly braked.',
+    'VAXON advisory plus isolated continuous workers. Every bound workspace becomes Sandbox-ready; Agent/Debug gets effective Full Access inside isolation while Ask stays read-only.',
 };
 
 export function useWorkerAutonomyControl(options?: {
@@ -109,8 +109,8 @@ export function useWorkerAutonomyControl(options?: {
           : mode === 'semi'
             ? 'Semi-autonomous — VAXON stays proactive; continuous workers paused'
             : mode === 'manual'
-              ? 'Manual — VAXON quiet except approvals; workers paused'
-              : 'Full autonomous — continuous workers will start leased tasks';
+              ? 'Manual — workers paused; Auto-only Sandboxes reconciled; manual preferences preserved'
+              : 'Full autonomous — workers active; workspaces are lazily Sandbox-ready';
       return true;
     } catch (error) {
       actionTone.value = 'error';

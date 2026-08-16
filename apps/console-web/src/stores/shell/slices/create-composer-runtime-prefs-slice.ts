@@ -6,7 +6,6 @@ import type {
   CursorRuntimeStatusSnapshot,
   RuntimeStatusSnapshot,
 } from '../../../api/control-plane';
-import type { OperatorPresenceSettings } from '../../../contracts/canonical';
 import {
   buildClaudeCatalogRows,
   claudeRuntimeLabel,
@@ -24,12 +23,10 @@ import {
   readComposerRuntimePrefs,
   writeComposerRuntimePrefs,
 } from '../../../lib/composer-runtime-prefs';
-import { resolveAutoComposerRuntimeOverride } from '../../../lib/operator-presence-settings';
 import {
   readCursorPickerVisibleModelIds,
   toggleCursorPickerVisibleModel as toggleCursorPickerVisibleModelPref,
 } from '../../../lib/cursor-picker-prefs';
-import { saveWorkspaceComposerPrefs } from '../../../api/workspace-api';
 import type { WorkspaceRecord } from '../../../contracts/canonical';
 
 interface CreateComposerRuntimePrefsSliceInput {
@@ -40,7 +37,6 @@ interface CreateComposerRuntimePrefsSliceInput {
   cursorRuntimeStatus: Ref<CursorRuntimeStatusSnapshot | null>;
   claudeRuntimeStatus: Ref<ClaudeRuntimeStatusSnapshot | null>;
   codexRuntimeStatus: Ref<CodexRuntimeStatusSnapshot | null>;
-  operatorPresenceSettings: Ref<OperatorPresenceSettings>;
   composerRuntimePrefsRevision: Ref<number>;
   cursorPickerVisibleRevision: Ref<number>;
 }
@@ -54,15 +50,7 @@ export function createComposerRuntimePrefsSlice(input: CreateComposerRuntimePref
     );
   });
 
-  const autoOverrideRuntimeTargetId = computed(() => {
-    return resolveAutoComposerRuntimeOverride(input.operatorPresenceSettings.value);
-  });
-
   const selectedRuntimeTargetId = computed(() => {
-    const override = autoOverrideRuntimeTargetId.value;
-    if (override) {
-      return override;
-    }
     const preferred = composerRuntimePrefs.value.runtime_target?.trim();
     if (preferred) {
       return preferred;
@@ -155,11 +143,8 @@ export function createComposerRuntimePrefsSlice(input: CreateComposerRuntimePref
     const threadId = input.activeIdeThreadId.value;
     writeComposerRuntimePrefs(workspaceId, { runtime_target: runtimeTarget }, threadId);
     input.composerRuntimePrefsRevision.value += 1;
-    // Workspace pin remains the fleet/headless default (last operator pick on this host),
-    // while the dock selection itself is thread-isolated in localStorage.
-    void saveWorkspaceComposerPrefs(workspaceId, { runtime_target: runtimeTarget }).catch(
-      () => undefined,
-    );
+    // Interactive PC selection is thread-local. Fleet/headless runtime policy
+    // is configured independently in Workspace Runtime Policy.
   }
 
   function setSelectedComposerModel(modelId: string): void {
@@ -185,9 +170,6 @@ export function createComposerRuntimePrefsSlice(input: CreateComposerRuntimePref
       writeComposerRuntimePrefs(workspaceId, { claude_cli_model: normalized }, threadId);
     } else {
       writeComposerRuntimePrefs(workspaceId, { cursor_cli_model: normalized }, threadId);
-      void saveWorkspaceComposerPrefs(workspaceId, { cursor_cli_model: normalized }).catch(
-        () => undefined,
-      );
     }
     input.composerRuntimePrefsRevision.value += 1;
   }

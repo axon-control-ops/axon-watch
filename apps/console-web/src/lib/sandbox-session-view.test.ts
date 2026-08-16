@@ -84,9 +84,10 @@ describe('sandbox session view', () => {
     expect(
       composerAccessMenuStatus({ fullAccess: true, sandboxEnabled: true }),
     ).toEqual({
-      executionLine: 'Full Access active — tools after approval',
+      executionLine: 'Full Access active — routine tools autonomous; high-risk effects gated',
       sandboxLine: 'Sandbox on — disposable session copy',
-      workerIsolationLine: 'Company workers still use isolated git checkouts for AUTO shifts',
+      workerIsolationLine:
+        'Full Auto supplies lazy isolated checkouts; manual workspace Sandbox remains enabled afterward',
     });
     expect(
       composerAccessMenuStatus({ fullAccess: true, sandboxEnabled: false }).workerIsolationLine,

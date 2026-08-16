@@ -240,6 +240,7 @@ def dispatch_ide_composer(
     workspace_root: Path | None = None,
     execution_policy: AgentExecutionPolicy | None = None,
     fallback_runtime_families: tuple[str, ...] = (),
+    respect_cached_usage_limit: bool = False,
 ) -> dict[str, object]:
     def _finish(payload: dict[str, object]) -> dict[str, object]:
         return _attach_dispatch_metadata(payload, composer_mode=composer_mode)
@@ -340,7 +341,11 @@ def dispatch_ide_composer(
             and fallback_runtime_families
             and env_has_api_key(subprocess_env, family=family)
         )
-        if not allows_retry and not use_provider_key_after_known_subscription_limit:
+        if (
+            not allows_retry
+            and respect_cached_usage_limit
+            and not use_provider_key_after_known_subscription_limit
+        ):
             label = str(record.get("label") or runtime_id)
             errors.append(f"{label} usage limit is still active")
             continue

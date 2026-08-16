@@ -16,6 +16,7 @@ from app.workspace_agents.lead_task_plan import (  # noqa: E402
     extract_exclusive_paths,
     should_lead_decompose_dispatch,
 )
+from app.workspace_agents.lead_query_intent import detect_specialist_query_intent  # noqa: E402
 
 
 DASHPRO_ROSTER = [
@@ -174,6 +175,18 @@ class LeadTaskPlanTests(unittest.TestCase):
             mode="auto",
         )
         self.assertFalse(should_lead_decompose_dispatch(fan))
+
+    def test_tenant_headcount_routes_from_lead_to_backend(self) -> None:
+        goal = "How many children do we have in the Young Eagles preschool tenant?"
+        plan = build_lead_task_plan(
+            goal=goal,
+            roster=DASHPRO_ROSTER,
+            mode="decompose",
+        )
+
+        self.assertTrue(detect_specialist_query_intent(goal))
+        self.assertTrue(should_lead_decompose_dispatch(plan))
+        self.assertEqual(["backend"], [item.owner_role for item in plan.items])
 
     def test_dashpro_dashboard_fixes_dispatch_to_frontend(self) -> None:
         goal = (

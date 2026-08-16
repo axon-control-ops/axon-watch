@@ -11,6 +11,15 @@ export type ComposerSandboxStatus = {
   session_enabled: boolean;
   env_forced: boolean;
   source: 'off' | 'session' | 'env' | string;
+  manual_enabled: boolean;
+  auto_enabled: boolean;
+  materialized: boolean;
+  dirty: boolean;
+  effective_access: 'full' | 'operator' | string;
+  retained_reason: string;
+  can_disable: boolean;
+  checkout_id: string | null;
+  lifecycle: 'off' | 'auto-ready' | 'active' | 'retained-dirty' | string;
 };
 
 export async function fetchComposerSandboxStatus(
@@ -22,6 +31,18 @@ export async function fetchComposerSandboxStatus(
     {},
     'sandbox session status request failed',
   );
+}
+
+export async function reviewComposerSandbox(workspaceId: string): Promise<ComposerSandboxStatus & { changed_paths: string[] }> {
+  return fetchJson(`/api/workspaces/${encodeURIComponent(workspaceId)}/sandbox/review`, {}, 'review sandbox session failed');
+}
+
+export async function publishComposerSandbox(workspaceId: string): Promise<ComposerSandboxStatus> {
+  return fetchJson(`/api/workspaces/${encodeURIComponent(workspaceId)}/sandbox/publish`, { method: 'POST' }, 'publish sandbox session failed');
+}
+
+export async function discardComposerSandbox(workspaceId: string): Promise<ComposerSandboxStatus> {
+  return fetchJson(`/api/workspaces/${encodeURIComponent(workspaceId)}/sandbox/discard`, { method: 'POST' }, 'discard sandbox session failed');
 }
 
 export async function enableComposerSandbox(

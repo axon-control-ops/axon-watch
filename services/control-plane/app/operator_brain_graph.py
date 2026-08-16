@@ -393,6 +393,43 @@ def build_operator_brain_graph(
 
     append_host_context_nodes(nodes=nodes, edges=edges, core_node_id=_CORE_NODE_ID)
 
+    # Active cross-workspace missions are durable dependency truth, not inferred
+    # visualization state. Project their workspace edges into Mission Control.
+    try:
+        from app.persistence import workspace_mission_store
+
+        for mission in workspace_mission_store.list_missions(limit=50):
+            if mission.get("status") in {"completed", "cancelled"}:
+                continue
+            mission_id = str(mission.get("mission_id") or "")
+            mission_node_id = f"mission_{mission_id}"
+            nodes.append({
+                "node_id": mission_node_id,
+                "kind": "mission",
+                "label": str(mission.get("goal") or mission_id)[:120],
+                "tone": "critical" if mission.get("status") == "blocked" else "attention",
+                "workspace_id": mission.get("source_workspace_id"),
+                "detail": str(mission.get("status") or "planned"),
+            })
+            edges.append({
+                "edge_id": f"coordinates_{mission_id}",
+                "source": _CORE_NODE_ID,
+                "target": mission_node_id,
+                "kind": "coordinates",
+            })
+            for item in mission.get("nodes") or []:
+                workspace_id = str(item.get("workspace_id") or "")
+                workspace_node = f"ws_{workspace_id}"
+                if workspace_node in workspace_node_ids:
+                    edges.append({
+                        "edge_id": f"mission_affects_{mission_id}_{workspace_id}",
+                        "source": mission_node_id,
+                        "target": workspace_node,
+                        "kind": "affects",
+                    })
+    except Exception:
+        pass
+
     return {
         "generated_at": generated_at,
         "watch_connected": watch_connected,

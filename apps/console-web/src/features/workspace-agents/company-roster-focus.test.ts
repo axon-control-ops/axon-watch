@@ -119,16 +119,20 @@ describe('buildPendingDecisionComposerDraft', () => {
 
   it('offers executable recovery controls when a receipt has no authored options', () => {
     const pending = employee({
+      name: 'Cass',
+      role: 'watcher',
+      role_label: 'Watcher',
       pending_decision_id: 'auton-failed-shift',
-      pending_decision_title: 'Lila (frontend) last shift failed',
+      pending_decision_title: 'Dana (lead) last shift failed',
+      pending_decision_subject_role: 'lead',
     });
 
     expect(pendingDecisionCardOptions(pending).map((option) => option.label)).toEqual([
-      'Approve safe retry',
-      'Dismiss alert',
+      'Assign Cass to diagnose',
+      'Dismiss — already recovered',
     ]);
     expect(buildPendingDecisionComposerDraft(pending)).toContain(
-      'Approve safe retry',
+      'Assign Cass to diagnose',
     );
     const [approve, reject] = pendingDecisionCardOptions(pending);
     expect(pendingDecisionDirectResolution(approve?.id)).toBe('approved');

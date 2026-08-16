@@ -3,16 +3,10 @@ import type { ComposerMode } from '../../../composables/useAgentDockComposer';
 import { MODE_OPTIONS } from '../../../composables/useAgentDockComposer';
 import type { ClaudeCatalogRow } from '../../../lib/claude-catalog-view';
 import type { CursorCatalogRow } from '../../../lib/cursor-catalog-view';
-import {
-  mcpToolDetail,
-  type ComposerMcpTool,
-} from '../../../lib/composer-mcp-tools-view';
+import { mcpToolDetail, type ComposerMcpTool } from '../../../lib/composer-mcp-tools-view';
 import { useShellStore } from '../../../stores/shell';
 import AgentDockComposerModeMenu from './AgentDockComposerModeMenu.vue';
-import type {
-  AgentDockComposerAttachmentChip,
-  AgentDockComposerRuntimeTarget,
-} from './agent-dock-composer-toolbar-types';
+import type { AgentDockComposerAttachmentChip, AgentDockComposerRuntimeTarget } from './agent-dock-composer-toolbar-types';
 
 defineProps<{
   showContextMenu: boolean;
@@ -42,6 +36,7 @@ defineProps<{
   executionAccessHint: string;
   sandboxSessionEnabled: boolean;
   sandboxEnvForced: boolean;
+  sandboxAutoEnabled: boolean; sandboxDirty: boolean;
   sandboxHint: string;
   sandboxLabel: string;
   sandboxSessionPending?: boolean;
@@ -98,6 +93,7 @@ const emit = defineEmits<{
   'switch-consultative': [];
   'request-sandbox-session': [];
   'disable-sandbox-session': [];
+  'review-sandbox-session': []; 'publish-sandbox-session': []; 'discard-sandbox-session': [];
   'open-vault': [];
 }>();
 
@@ -529,6 +525,7 @@ function runtimeStatusLine(record: AgentDockComposerRuntimeTarget): string {
       :execution-access-hint="executionAccessHint"
       :sandbox-session-enabled="sandboxSessionEnabled"
       :sandbox-env-forced="sandboxEnvForced"
+      :sandbox-auto-enabled="sandboxAutoEnabled" :sandbox-dirty="sandboxDirty"
       :sandbox-hint="sandboxHint"
       :sandbox-label="sandboxLabel"
       :sandbox-session-pending="sandboxSessionPending"
@@ -538,6 +535,8 @@ function runtimeStatusLine(record: AgentDockComposerRuntimeTarget): string {
       @switch-consultative="emit('switch-consultative')"
       @request-sandbox-session="emit('request-sandbox-session')"
       @disable-sandbox-session="emit('disable-sandbox-session')"
+      @review-sandbox-session="emit('review-sandbox-session')" @publish-sandbox-session="emit('publish-sandbox-session')"
+      @discard-sandbox-session="emit('discard-sandbox-session')"
     />
   </div>
 </template>

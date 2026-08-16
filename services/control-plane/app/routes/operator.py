@@ -148,6 +148,7 @@ def operator_presence_settings_get() -> dict[str, object]:
 @router.put("/api/operator-presence/settings")
 def operator_presence_settings_put(body: OperatorPresenceSettingsRequest) -> dict[str, object]:
     current = operator_presence_settings_store.load_settings()
+    previous_mode = str(current.get("autonomy_mode") or "manual").strip().lower()
     patch = body.model_dump(exclude_none=True)
     if "autonomy_mode" in patch:
         mode = str(patch.get("autonomy_mode") or "manual").strip().lower()
@@ -162,7 +163,13 @@ def operator_presence_settings_put(body: OperatorPresenceSettingsRequest) -> dic
                 {"scheduler_enabled": mode == "full"}
             )
     current.update(patch)
-    return operator_presence_settings_store.save_settings(current)
+    saved = operator_presence_settings_store.save_settings(current)
+    next_mode = str(saved.get("autonomy_mode") or "manual").strip().lower()
+    if previous_mode != next_mode:
+        from app.cli_runtime.composer_sandbox import reconcile_autonomy_transition
+
+        reconcile_autonomy_transition(previous_mode, next_mode)
+    return saved
 
 
 @router.post("/api/kairo/speak")

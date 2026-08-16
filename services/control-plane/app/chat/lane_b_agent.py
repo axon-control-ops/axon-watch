@@ -121,6 +121,7 @@ def generate_lane_b_result(
     execution_policy: AgentExecutionPolicy | None = None,
     allow_git_dispatch: bool = True,
     fallback_runtime_families: tuple[str, ...] = (),
+    respect_cached_usage_limit: bool = False,
 ) -> dict[str, object]:
     trimmed = user_prompt.strip()
     if not trimmed:
@@ -165,6 +166,7 @@ def generate_lane_b_result(
                 workspace_root=workspace_root,
                 execution_policy=execution_policy,
                 fallback_runtime_families=fallback_runtime_families,
+                respect_cached_usage_limit=respect_cached_usage_limit,
             )
         except RuntimeError as exc:
             return {
@@ -208,6 +210,7 @@ def generate_lane_b_result(
             workspace_root=workspace_root,
             execution_policy=execution_policy,
             fallback_runtime_families=fallback_runtime_families,
+            respect_cached_usage_limit=respect_cached_usage_limit,
         )
     except RuntimeError as exc:
         return {

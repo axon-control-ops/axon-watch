@@ -130,6 +130,10 @@ main_tests=(
   tests.test_watcher_receipts
   tests.test_prior_shift_evidence
   tests.test_workspace_worker_prompt_dispatch
+  tests.test_workspace_missions
+  tests.test_composer_sandbox_policy_v2
+  tests.test_direct_reply_acceptance
+  tests.test_lead_text
   tests.test_cli_runtime_agent_sandbox_hook_policy
   tests.test_ci_remediation
   tests.test_safe_improvement

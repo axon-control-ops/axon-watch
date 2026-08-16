@@ -16,9 +16,15 @@ export function pendingDecisionCardOptions(
   if (supplied.length || !employee.pending_decision_id?.trim()) {
     return supplied;
   }
+  const subject = failedShiftSubject(employee);
+  const holder = employee.name.trim() || employee.role_label?.trim() || 'Watcher';
+  const sameOwner = subject?.role === (employee.role ?? '').trim().toLowerCase();
   return [
-    { id: APPROVE_PENDING_RECOVERY_ID, label: 'Approve safe retry' },
-    { id: DISMISS_PENDING_DECISION_ID, label: 'Dismiss alert' },
+    {
+      id: APPROVE_PENDING_RECOVERY_ID,
+      label: sameOwner && subject ? `Retry ${subject.name} now` : `Assign ${holder} to diagnose`,
+    },
+    { id: DISMISS_PENDING_DECISION_ID, label: 'Dismiss — already recovered' },
   ];
 }
 
@@ -54,6 +60,21 @@ export function failedShiftSubjectFromDecisionTitle(
   return { name, role };
 }
 
+/** Prefer structured receipt identity; retain title parsing for older receipts. */
+export function failedShiftSubject(
+  employee: CompanyEmployeeRecord,
+): { name: string; role: string } | null {
+  const fromTitle = failedShiftSubjectFromDecisionTitle(employee.pending_decision_title);
+  const structuredRole = employee.pending_decision_subject_role?.trim().toLowerCase();
+  if (!structuredRole) {
+    return fromTitle;
+  }
+  return {
+    name: fromTitle?.role === structuredRole ? fromTitle.name : structuredRole,
+    role: structuredRole,
+  };
+}
+
 export function findRosterEmployeeByRole(
   employees: readonly CompanyEmployeeRecord[],
   role: string | null | undefined,
@@ -80,7 +101,7 @@ export function buildPendingDecisionComposerDraft(
   employee: CompanyEmployeeRecord,
 ): string {
   const prompt = pendingDecisionPrompt(employee);
-  const subject = failedShiftSubjectFromDecisionTitle(employee.pending_decision_title);
+  const subject = failedShiftSubject(employee);
   const reason = String(employee.pending_decision_reason || '').trim();
   const holder = employee.name.trim() || employee.role_label?.trim() || 'Teammate';
   const options = pendingDecisionCardOptions(employee)
@@ -144,7 +165,7 @@ export function companyPendingDecisionHint(
   if (pending.length === 1) {
     const row = pending[0];
     const holder = row.name.trim() || 'A teammate';
-    const subject = failedShiftSubjectFromDecisionTitle(row.pending_decision_title);
+    const subject = failedShiftSubject(row);
     const holderRole = (row.role ?? '').trim().toLowerCase();
     if (subject && subject.role !== holderRole) {
       return `${holder} needs your decision about ${subject.name} (${subject.role}) — tap to open their dock.`;

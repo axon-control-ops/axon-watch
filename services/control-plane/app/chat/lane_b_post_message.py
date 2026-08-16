@@ -29,7 +29,6 @@ from app.cli_runtime.approval_gate import is_run_linked_composer_mode, is_tool_c
 from app.persistence import chat_store
 from app.plans.service import maybe_attach_plan_artifact
 from app.terminal.session_registry import ensure_agent_session, serialize_session
-from app.workspace_agents.execution_policy import role_execution_policy
 from app.workspace_agents.employee_persona_prompt import build_employee_persona_appendix
 from app.workspace_agents.employee_first_person import (
     employee_name_from_persona_block,
@@ -102,9 +101,9 @@ def post_lane_b_message(
         _remember_lane_b_turn,
         _resolve_chat_thread,
     )
-    from app.cli_runtime.composer_sandbox import resolve_sandbox_workspace_root
+    from app.cli_runtime.composer_sandbox import resolve_sandbox_execution
 
-    sandbox_workspace_root = resolve_sandbox_workspace_root(workspace_id)
+    sandbox_workspace_root, execution_access = resolve_sandbox_execution(workspace_id, composer_mode, execution_access)
 
     try:
         switch_intent = resolve_workspace_switch_intent(content)
@@ -182,9 +181,9 @@ def post_lane_b_message(
     # Role baseline this thread is bound to, independent of the operator's own
     # Full Access toggle — a message landing in a consultative-only role's
     # thread must not inherit the operator's own write access.
-    thread_execution_policy = (
-        role_execution_policy(thread_employee_role) if thread_employee_role else None
-    )
+    from app.cli_runtime.composer_execution_policy import resolve_composer_execution_policy
+
+    thread_execution_policy = resolve_composer_execution_policy(sandbox_workspace_root, thread_employee_role, composer_mode)
     lead_name = employee_name_from_persona_block(employee_persona or "") or "Lead"
     bind_lane_b_attachments = lambda message_id: _bind_message_attachments(
         attachment_ids=attachment_ids,

@@ -27,6 +27,10 @@ def _parse_iso(raw: str | None) -> datetime | None:
 
 
 def _failed_shift_role(receipt: dict[str, Any], workspace_id: str) -> str | None:
+    payload = receipt.get("payload") if isinstance(receipt.get("payload"), dict) else {}
+    structured = str(payload.get("subject_role") or "").strip().lower()
+    if structured:
+        return structured
     workspace = str(workspace_id or "").strip()
     dedupe_key = str(receipt.get("dedupe_key") or "").strip()
     prefix = f"failed_shift:{workspace}:"
@@ -38,6 +42,38 @@ def _failed_shift_role(receipt: dict[str, Any], workspace_id: str) -> str | None
     # cards. There is nothing after the role to partition on.
     role = dedupe_key[len(prefix) :].strip().lower()
     return role or None
+
+
+def _completion_is_newer_than_failure(
+    receipt: dict[str, Any], outcome: dict[str, str]
+) -> bool:
+    """Do not clear a decision unless completion post-dates its source failure."""
+    payload = receipt.get("payload") if isinstance(receipt.get("payload"), dict) else {}
+    subject_run_id = str(payload.get("subject_run_id") or "").strip()
+    completed_run_id = str(outcome.get("run_id") or "").strip()
+    if not subject_run_id:
+        return bool(completed_run_id)
+    if not completed_run_id or completed_run_id == subject_run_id:
+        return False
+    try:
+        from app.persistence import run_store
+
+        failed = run_store.get_run(subject_run_id)
+        completed = run_store.get_run(completed_run_id)
+    except Exception:
+        return False
+    if not isinstance(failed, dict) or not isinstance(completed, dict):
+        return False
+    failed_stamp = str(
+        failed.get("ended_at") or failed.get("updated_at") or failed.get("started_at") or ""
+    )
+    completed_stamp = str(
+        completed.get("ended_at")
+        or completed.get("updated_at")
+        or completed.get("started_at")
+        or ""
+    )
+    return bool(failed_stamp and completed_stamp and completed_stamp > failed_stamp)
 
 
 def reconcile_recovered_failed_shift_decisions(
@@ -54,12 +90,55 @@ def reconcile_recovered_failed_shift_decisions(
             continue
         outcomes.setdefault(role, latest_outcome(workspace_id, role))
         outcome = outcomes[role] or {}
-        # A role's latest run can only ever be reported "completed" once a run
-        # newer than the one that produced this escalation has finished
-        # cleanly (a single run cannot be both failed and completed) — no
-        # run_id comparison is needed or, given the dedupe key above, possible.
-        if str(outcome.get("outcome") or "").strip().lower() == "completed":
+        # A completed latest run only supersedes the alert when it is distinct
+        # from and newer than the exact source failure recorded in the payload.
+        if (
+            str(outcome.get("outcome") or "").strip().lower() == "completed"
+            and _completion_is_newer_than_failure(receipt, outcome)
+        ):
             supersede_pending_decision(str(receipt.get("receipt_id") or ""))
+
+
+def reconcile_workspace_recovered_decisions(
+    workspace_id: str,
+    *,
+    completed_run: dict[str, Any] | None = None,
+) -> None:
+    """Immediately remove failed-shift decisions made obsolete by recovery."""
+    from app.persistence import autonomous_attention_store
+    from app.persistence.autonomous_attention_decisions import supersede_pending_decision
+
+    workspace = str(workspace_id or "").strip()
+    if not workspace:
+        return
+    pending = autonomous_attention_store.list_pending_decisions(
+        limit=500,
+        workspace_id=workspace,
+    )
+    # At the completion event we know causality even when SQLite timestamps
+    # share one-second precision: this distinct run completed after the pending
+    # decision already existed.
+    if isinstance(completed_run, dict):
+        completed_role = str(completed_run.get("employee_role") or "").strip().lower()
+        completed_id = str(completed_run.get("run_id") or "").strip()
+        if completed_role and completed_id:
+            for receipt in pending:
+                if _failed_shift_role(receipt, workspace) != completed_role:
+                    continue
+                payload = (
+                    receipt.get("payload")
+                    if isinstance(receipt.get("payload"), dict)
+                    else {}
+                )
+                source_id = str(payload.get("subject_run_id") or "").strip()
+                if source_id and source_id == completed_id:
+                    continue
+                supersede_pending_decision(str(receipt.get("receipt_id") or ""))
+            pending = autonomous_attention_store.list_pending_decisions(
+                limit=500,
+                workspace_id=workspace,
+            )
+    reconcile_recovered_failed_shift_decisions(workspace, pending)
 
 
 def sweep_stale_attention_decisions(

@@ -3211,7 +3211,6 @@ export const useShellStore = defineStore('shell', () => {
     cursorRuntimeStatus,
     claudeRuntimeStatus,
     codexRuntimeStatus,
-    operatorPresenceSettings,
     composerRuntimePrefsRevision,
     cursorPickerVisibleRevision,
   });
@@ -3361,8 +3360,6 @@ export const useShellStore = defineStore('shell', () => {
     operatorPresenceSettingsError,
     operatorPresenceSettingsSavedAt,
     loadOperatorBriefing: () => loadOperatorBriefing(),
-    agentExecutionAccess,
-    setAgentExecutionAccess,
   });
   const {
     loadInbox,

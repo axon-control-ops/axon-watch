@@ -38,6 +38,8 @@ export type AgentDockComposerToolbarSource = {
   executionAccessHint: MaybeRef<string>;
   sandboxSessionEnabled: MaybeRef<boolean>;
   sandboxEnvForced: MaybeRef<boolean>;
+  sandboxAutoEnabled: MaybeRef<boolean>;
+  sandboxDirty: MaybeRef<boolean>;
   sandboxHint: MaybeRef<string>;
   sandboxLabel: MaybeRef<string>;
   sandboxSessionPending: MaybeRef<boolean>;
@@ -108,6 +110,8 @@ export function useAgentDockComposerToolbarProps(
     executionAccessHint: toValue(composer.executionAccessHint),
     sandboxSessionEnabled: toValue(composer.sandboxSessionEnabled),
     sandboxEnvForced: toValue(composer.sandboxEnvForced),
+    sandboxAutoEnabled: toValue(composer.sandboxAutoEnabled),
+    sandboxDirty: toValue(composer.sandboxDirty),
     sandboxHint: toValue(composer.sandboxHint),
     sandboxLabel: toValue(composer.sandboxLabel),
     sandboxSessionPending: toValue(composer.sandboxSessionPending),

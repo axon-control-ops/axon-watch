@@ -159,13 +159,13 @@ describe('company-roster-failure-view', () => {
         }),
       ),
     ).toMatch(/usage/i);
-
     const codexBlocked = employee({
       status: 'idle',
       last_outcome: 'failed',
       last_outcome_detail: 'Codex usage limit is still active',
     });
-    expect(employeeFailureLine(codexBlocked)).toMatch(/signed-in Codex account is quota-limited/i);
+    expect(employeeFailureLine(codexBlocked)).toMatch(/Codex CLI reported a usage-limit block/i);
+    expect(employeeFailureLine(codexBlocked)).toMatch(/cannot verify the live account quota/i);
     expect(employeeFailureLine(codexBlocked)).not.toMatch(/Cursor usage signal/i);
   });
 

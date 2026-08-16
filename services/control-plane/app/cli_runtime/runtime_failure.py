@@ -33,13 +33,13 @@ def _operator_next_step(reason: str) -> str:
     if is_usage_limit_failure(reason):
         if "codex" in lowered:
             return (
-                "The signed-in Codex account is currently quota-limited. Switch this "
-                "workspace to Claude/Cursor, or enable those families for Auto failover, then retry."
+                "The Codex CLI reported a usage-limit block; Axon cannot inspect the live "
+                "account quota. Retry once, or switch this workspace to Claude/Cursor."
             )
         if "claude" in lowered:
             return (
-                "The signed-in Claude account is currently quota-limited. Switch this "
-                "workspace to Codex/Cursor, or enable those families for Auto failover, then retry."
+                "The Claude CLI reported a usage-limit block; Axon cannot inspect the live "
+                "account quota. Retry once, or switch this workspace to Codex/Cursor."
             )
         return (
             "Check Cursor Usage in Settings → CLI runtime — Auto+Composer may still "

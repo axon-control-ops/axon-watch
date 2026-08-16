@@ -80,6 +80,14 @@ def build_company_roster(
 ) -> dict[str, object]:
     workspace_record = record or get_workspace_record(workspace_id)
     normalized_id = workspace_id.strip()
+    try:
+        from app.workspace_agents.autonomous_attention_recovery import (
+            reconcile_workspace_recovered_decisions,
+        )
+
+        reconcile_workspace_recovered_decisions(normalized_id)
+    except Exception:
+        pass
     if configs is None or defaults is None or companies is None or staffing_template is None:
         configs, defaults, companies, staffing_template = load_workspace_agent_configs()
 
@@ -173,6 +181,9 @@ def build_company_roster(
             row["pending_decision_prompt"] = decision_payload.get("prompt")
             row["pending_decision_reason"] = pending_decision.get("detail")
             row["pending_decision_options"] = decision_options
+            row["pending_decision_owner_role"] = decision_payload.get("owner_role")
+            row["pending_decision_subject_role"] = decision_payload.get("subject_role")
+            row["pending_decision_subject_run_id"] = decision_payload.get("subject_run_id")
         employee_rows.append(row)
 
     try:

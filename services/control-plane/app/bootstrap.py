@@ -51,6 +51,12 @@ def _log_auth_posture() -> None:
 async def control_plane_lifespan(_app: FastAPI):
     # Startup before requests (FastAPI lifespan): reconcile, then start worker tick.
     _log_auth_posture()
+    try:
+        from app.cli_runtime.composer_sandbox import reconcile_persisted_sandboxes
+
+        reconcile_persisted_sandboxes()
+    except Exception:  # noqa: BLE001 — recovery failure must remain visible without blocking boot
+        logger.exception("composer Sandbox startup reconciliation failed")
     reconcile_orphaned_runs_on_startup(boot_id=_BOOT_ID)
     abandoned = reap_abandoned_review_ready_runs()
     if abandoned:
