@@ -444,10 +444,10 @@ def route_teammate_decision(
         current = next((row for row in roster if row.employee_id == cleaned_current), None)
 
     from app.workspace_agents.lead_task_plan import detect_fan_out_intent
-    from app.workspace_agents.named_assign_route import match_named_assign_employee
+    from app.workspace_agents.named_assign_route import count_named_roster_members, match_named_assign_employee
 
-    # Multi-role fan-out is Lead planner territory — never collapse to one specialist.
-    if detect_fan_out_intent(prompt):
+    # Lead territory: naming 2+ teammates is orchestration, not a single assign.
+    if detect_fan_out_intent(prompt) or count_named_roster_members(prompt, roster) >= 2:
         return TeammateRouteDecision(
             should_route=False,
             reason="lead_fan_out",

@@ -34,7 +34,7 @@ _FAN_OUT_RE = re.compile(
     r"\b(?:start|work|working|go)\b"
     r"|\bget\b.{0,24}\b(?:all|every|the)\b.{0,16}"
     r"\b(?:agents?|teammates?|specialists?|team)\b.{0,24}\b(?:work|working|started?)\b"
-    r"|\bmaterialize[_\s-]lead[_\s-]fan[_\s-]out\b"
+    r"|\bmaterialize[_\s-]lead[_\s-]fan[_\s-]out\b|\baxon-assign\b|\bfan(?:ning|ned)?[\s-]?(?:this|it|that|them)?[\s-]?out\b"
     r"|\b(?:assign|dispatch|route|lease|queue)\b.{0,160}\b(?:two|three|\d+)\b"
     r".{0,120}\b(?:frontend|ui|backend|integrations?|watcher)\b.{0,120}"
     r"\b(?:frontend|ui|backend|integrations?|watcher|specialists?)\b",

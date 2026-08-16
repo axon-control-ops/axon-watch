@@ -23,6 +23,31 @@ def _name_tokens(name: str) -> list[str]:
     return tokens
 
 
+def count_named_roster_members(
+    prompt: str,
+    roster: list[TeammateRouteEmployee] | None,
+) -> int:
+    """How many distinct roster teammates a prompt names.
+
+    A Lead fan-out brief names every specialist it dispatches to, which is
+    exactly the shape the single-assign matcher grabs. Two or more names means
+    orchestration, not "give this to Priya".
+    """
+    text = str(prompt or "")
+    if not text.strip():
+        return 0
+    seen: set[str] = set()
+    for row in roster or []:
+        employee_id = str(row.employee_id or "").strip()
+        if not employee_id or not str(row.name or "").strip():
+            continue
+        for token in _name_tokens(row.name):
+            if re.search(rf"\b{re.escape(token)}\b", text, re.I):
+                seen.add(employee_id)
+                break
+    return len(seen)
+
+
 def match_named_assign_employee(
     prompt: str,
     roster: list[TeammateRouteEmployee] | None,
@@ -113,6 +138,7 @@ def detect_named_assign_intent(prompt: str, roster: list[TeammateRouteEmployee] 
 
 
 __all__ = [
+    "count_named_roster_members",
     "detect_named_assign_intent",
     "match_named_assign_employee",
     "rewrite_named_assign_prompt",
