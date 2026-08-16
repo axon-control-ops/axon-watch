@@ -52,6 +52,50 @@ class ApprovalGateTests(unittest.TestCase):
         self.assertIsNotNone(reason)
         self.assertIn("approval", reason.lower())
 
+    def test_full_access_grants_executing_on_any_live_phase(self) -> None:
+        """Regression: Full Access showed in the dock but Cursor still prompted.
+
+        --force is gated on the executing tier; requiring run_phase ==
+        "executing" as well meant a run dispatched while queued/starting/
+        planning never got it, so every command hit Cursor's own approval gate.
+        """
+        for phase in ("executing", "planning", "starting", "queued", ""):
+            with self.subTest(phase=phase):
+                self.assertEqual(
+                    "executing",
+                    resolve_runtime_execution_tier(
+                        composer_mode="agent",
+                        run_phase=phase,
+                        execution_access="full",
+                    ),
+                )
+
+    def test_finished_or_waiting_runs_stay_consultative(self) -> None:
+        for phase in ("completed", "failed", "cancelled", "paused", "awaiting_input"):
+            with self.subTest(phase=phase):
+                self.assertEqual(
+                    "consultative",
+                    resolve_runtime_execution_tier(
+                        composer_mode="agent",
+                        run_phase=phase,
+                        execution_access="full",
+                    ),
+                )
+
+    def test_full_access_is_still_required_for_tools(self) -> None:
+        # Without the operator's Full Access consent nothing executes, and a
+        # non-tool-capable mode never executes regardless of consent.
+        self.assertEqual(
+            "consultative",
+            resolve_runtime_execution_tier(composer_mode="agent", run_phase="executing"),
+        )
+        self.assertEqual(
+            "consultative",
+            resolve_runtime_execution_tier(
+                composer_mode="ask", run_phase="executing", execution_access="full"
+            ),
+        )
+
     _STREAM_OK = (
         '{"type":"assistant","message":{"role":"assistant","content":'
         '[{"type":"text","text":"ok"}]}}\n'

@@ -6,6 +6,8 @@ Consultative tiers (Cursor plan / Codex read-only) stay available without approv
 
 from __future__ import annotations
 
+from app.domain.run_state import TERMINAL_PHASES, WAITING_PHASES
+
 import os
 import re
 from typing import Literal
@@ -88,10 +90,16 @@ def resolve_runtime_execution_tier(
         return "consultative"
     if not agent_tool_execution_enabled(execution_access):
         return "consultative"
+    # Full Access is the operator's explicit decision that this turn may use
+    # tools. Requiring run_phase == "executing" on top of it meant a live run
+    # dispatched while still queued/starting/planning never got Cursor's
+    # --force, so the CLI prompted for approval on every command while the
+    # dock showed Full Access. Only a finished or explicitly waiting run stays
+    # consultative.
     phase = str(run_phase or "").strip().lower()
-    if phase == "executing":
-        return "executing"
-    return "consultative"
+    if phase in TERMINAL_PHASES or phase in WAITING_PHASES:
+        return "consultative"
+    return "executing"
 
 
 def runtime_dispatch_blocked_reason(
