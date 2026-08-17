@@ -190,6 +190,24 @@ class WorkspaceWorkerPromptTests(unittest.TestCase):
         self.assertIn("never ask for pasted tokens in chat", prompt)
         self.assertIn("Do not run `supabase db push` without separate operator deployment approval", prompt)
 
+    def test_dashpro_prompt_teaches_homework_submit_triage(self) -> None:
+        with patch(
+            "app.workspace_agents.worker_prompt.build_team_roster_context",
+            return_value="",
+        ):
+            prompt = build_continuous_worker_prompt(
+                workspace_id="workspace_dashpro",
+                employee=EmployeeConfig(
+                    name="Marco",
+                    role="backend",
+                    owns="DashPro Supabase and assignment data",
+                    schedule="continuous",
+                ),
+            )
+        self.assertIn("parent homework submit triage", prompt)
+        self.assertIn("homework_submissions_content_type_check", prompt)
+        self.assertIn("resolveHomeworkSubmissionTypes", prompt)
+
     def test_prompt_includes_prior_failure_detail_for_retry(self) -> None:
         with patch(
             "app.workspace_agents.run_outcome.latest_role_run_outcome",

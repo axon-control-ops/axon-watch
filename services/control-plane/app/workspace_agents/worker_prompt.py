@@ -22,6 +22,7 @@ from app.workspace_agents.prior_shift_evidence import (
     prior_failure_clause as _prior_failure_clause,
     prior_shift_evidence_clause,
 )
+from app.workspace_agents.dashpro_homework_submit_triage import dashpro_homework_submit_triage_clause
 from app.workspace_agents.supabase_self_heal import dashpro_supabase_self_heal_clause
 from app.workspace_agents.watcher_receipts import (
     should_attach_watcher_receipts,
@@ -458,6 +459,7 @@ def build_continuous_worker_prompt(
             "do not stack Quality Gates + Android + typecheck heaps. "
         )
         memory_clause += dashpro_supabase_self_heal_clause()
+        memory_clause += dashpro_homework_submit_triage_clause()
     prior_failure = "" if task_payload else _prior_failure_clause(workspace_id=workspace_id, role=role)
     task_packet = _current_task_packet(
         workspace_id=workspace_id,
