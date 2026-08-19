@@ -53,3 +53,47 @@ class AgentShellHookCommandPolicyTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class QuotedMetacharacterTests(unittest.TestCase):
+    """Quoted metacharacters are data, not shell syntax."""
+
+    def _decide(self, command: str) -> str:
+        return evaluate_hook_payload(
+            {
+                "hook_event_name": "PreToolUse",
+                "tool_name": "Bash",
+                "tool_input": {"command": command},
+            },
+            approved_wrappers=frozenset({"axon-agent-terminal-job"}),
+            approved_command_prefixes=(("git", "grep"), ("grep",), ("rg",)),
+        )["permission"]
+
+    def test_regex_alternation_in_quotes_is_allowed(self) -> None:
+        # This exact shape was denied and cost agents repeated turns.
+        self.assertEqual(
+            self._decide('git grep -n "insert\\|from(" components/x.tsx'), "allow"
+        )
+        self.assertEqual(self._decide("grep -n 'a|b' file.ts"), "allow")
+
+    def test_real_shell_operators_are_still_denied(self) -> None:
+        for command in (
+            "grep -n a file | wc -l",
+            "grep -n a file; rm -rf x",
+            "grep -n a file && rm x",
+            "grep -n a file > out.txt",
+        ):
+            with self.subTest(command=command):
+                self.assertEqual(self._decide(command), "deny")
+
+    def test_expansion_inside_double_quotes_is_still_denied(self) -> None:
+        # Double quotes do not stop $() or backticks, so these stay dangerous.
+        for command in ('grep -n "$(id)" file', 'grep -n "`id`" file'):
+            with self.subTest(command=command):
+                self.assertEqual(self._decide(command), "deny")
+
+    def test_unbalanced_quoting_fails_closed(self) -> None:
+        self.assertEqual(self._decide("grep -n 'unterminated file"), "deny")
+
+    def test_backslash_escape_outside_quotes_is_denied(self) -> None:
+        self.assertEqual(self._decide("grep -n a file \\| wc -l"), "deny")

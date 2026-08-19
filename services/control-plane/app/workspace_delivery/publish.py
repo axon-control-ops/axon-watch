@@ -288,6 +288,26 @@ def publish_worker_isolation(
     """Commit/push/draft-PR from a disposable worker isolation root."""
     policy = get_workspace_delivery_policy(workspace_id)
     if policy is None or not policy.enabled:
+        # Unconfigured delivery must never be reported as "no change" while the
+        # isolation holds real edits: that combination returned ok=True *and*
+        # cleanup_isolation=True, so the checkout was deleted and finished work
+        # was silently destroyed while the run reported completed. Keep the
+        # isolation whenever there is something in it to lose.
+        pending = list_isolation_changed_paths(isolation_root)
+        if pending:
+            return PublishResult(
+                ok=False,
+                stage="blocked",
+                delivery=None,
+                detail=(
+                    "workspace delivery is not configured for "
+                    f"{workspace_id}, so {len(pending)} changed path(s) cannot be "
+                    "published; the isolation checkout is preserved at "
+                    f"{isolation_root} — configure delivery, or collect the work "
+                    "from that checkout before it is cleaned up"
+                ),
+                cleanup_isolation=False,
+            )
         return PublishResult(
             ok=True,
             stage="no_change",

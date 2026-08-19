@@ -1,4 +1,4 @@
-"""Deterministic, fail-closed shell policy used by per-run Cursor hooks."""
+"""Deterministic, fail-closed shell policy used by per-run agent hooks."""
 
 from __future__ import annotations
 
@@ -94,6 +94,50 @@ _GENERIC_ESCAPE_ARGUMENTS = frozenset(
 )
 
 
+def _has_unquoted_shell_meta(command: str) -> bool:
+    """True when a shell metacharacter is live rather than quoted data.
+
+    Scanning the raw string rejected ``git grep -n "insert\\|from("`` — the
+    pipe is inside quotes and is regex data, not a shell operator. Agents hit
+    this constantly on ordinary searches and burned whole turns retrying.
+
+    Quoting rules are followed exactly, because they decide what is actually
+    dangerous:
+
+    * single quotes make every character literal, so metas inside them are data;
+    * double quotes still allow ``$`` and backtick expansion, so those two stay
+      rejected inside them while ``|``, ``;``, ``>`` and friends are data;
+    * unquoted metas are rejected exactly as before.
+
+    Unbalanced quoting fails closed — the shell would interpret the remainder in
+    a way this scanner cannot predict.
+    """
+    quote: str | None = None
+    index = 0
+    while index < len(command):
+        character = command[index]
+        if quote is None and character == "\\":
+            # An unquoted backslash escapes the next character; it is also the
+            # classic way to smuggle an operator past a naive scan.
+            return True
+        if quote == '"' and character == "\\":
+            index += 2
+            continue
+        if quote is None and character in {"'", '"'}:
+            quote = character
+        elif quote is not None and character == quote:
+            quote = None
+        elif quote == "'":
+            pass  # Literal region: nothing here can reach the shell as syntax.
+        elif quote == '"':
+            if character in {"$", "`"}:
+                return True
+        elif character in _SHELL_META:
+            return True
+        index += 1
+    return quote is not None
+
+
 def _deny(reason: str) -> dict[str, str]:
     return {
         "permission": "deny",
@@ -133,10 +177,14 @@ def _load_policy(
 
 
 def _extract_shell_command(payload: Mapping[str, Any]) -> str:
-    event = str(payload.get("hook_event_name") or "")
-    if event == "beforeShellExecution":
+    raw_event = str(payload.get("hook_event_name") or "").strip()
+    # Cursor uses lower-camel event names while Claude Code uses PascalCase.
+    # Normalize only the known spelling separators/case; unknown events must
+    # still fail closed rather than being treated as shell execution.
+    event = "".join(character for character in raw_event.casefold() if character.isalnum())
+    if event == "beforeshellexecution":
         command = payload.get("command")
-    elif event == "preToolUse":
+    elif event == "pretooluse":
         tool_name = str(
             payload.get("tool_name")
             or payload.get("tool")
@@ -145,7 +193,7 @@ def _extract_shell_command(payload: Mapping[str, Any]) -> str:
         ).lower()
         # Cursor emits shell/terminal; Claude Code emits Bash. Same gate.
         if tool_name and tool_name not in {"shell", "terminal", "bash"}:
-            raise ValueError("unsupported preToolUse tool")
+            raise ValueError("unsupported PreToolUse tool")
         tool_input = payload.get("tool_input", payload.get("input"))
         command = tool_input.get("command") if isinstance(tool_input, Mapping) else None
     else:
@@ -185,7 +233,7 @@ def evaluate_hook_payload(
     except (TypeError, ValueError) as exc:
         return _deny(str(exc))
 
-    if any(character in command for character in _SHELL_META):
+    if _has_unquoted_shell_meta(command):
         return _deny("shell operators, expansion, redirection, and escapes are not allowed")
 
     try:
@@ -223,6 +271,8 @@ def evaluate_hook_payload(
         return _deny("raw network tools are not allowed")
     if executable in _INTERPRETER_ESCAPES:
         return _deny("shell and interpreter escapes are not allowed")
+    if executable == "npx" and "--no-install" not in tokens[1:]:
+        return _deny("npx must include --no-install to prevent implicit package downloads")
     if _git_is_destructive(tokens):
         return _deny("destructive or networked Git operations are not allowed")
     if any(token.lower() in _GENERIC_ESCAPE_ARGUMENTS for token in tokens[1:]):

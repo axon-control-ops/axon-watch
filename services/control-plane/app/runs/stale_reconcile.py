@@ -14,8 +14,12 @@ from app.persistence import run_store
 
 logger = logging.getLogger(__name__)
 
-# Cursor agent turns time out around 240s; keep headroom for finalize + retries.
-DEFAULT_STALE_SECONDS = 720.0
+# Sized for Cursor, whose agent turns time out around 240s. Claude/Codex shifts
+# routinely run longer, and three worker runs were stale-failed at 752-766s while
+# still doing real work — the reaper was killing progress, not hangs. 1200s keeps
+# genuine hang detection well inside the 1800s lead cutoff.
+# Override per host with AXON_WATCH_WORKER_RUN_STALE_SECONDS.
+DEFAULT_STALE_SECONDS = 1200.0
 # Lead shifts coordinate specialists and often run longer than a single CLI turn.
 DEFAULT_LEAD_STALE_SECONDS = 1800.0
 # Canary/production OTA (expo export + eas update) regularly exceeds 30 minutes when

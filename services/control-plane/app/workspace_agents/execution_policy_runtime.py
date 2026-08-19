@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import logging
+
 import hashlib
 import json
 from dataclasses import replace
@@ -15,16 +17,62 @@ from app.workspace_agents.execution_policy import AgentExecutionPolicy, resolve_
 from app.workspace_agents.verifier_checks import load_repo_contract
 
 
+logger = logging.getLogger(__name__)
+
+
 def resolve_worker_execution_policy(
     *,
     employee: EmployeeConfig,
     task_payload: dict[str, Any],
     workspace_root: Path,
+    workspace_id: str | None = None,
 ) -> AgentExecutionPolicy:
-    """Resolve role, employee, contract, and leased-task scope fail closed."""
+    """Resolve role, employee, contract, and leased-task scope fail closed.
+
+    The contract is read from the **bound workspace root** when one is known,
+    falling back to ``workspace_root`` (usually the disposable checkout).
+
+    Bound-first is the safer source, not the looser one:
+
+    * ``create_isolation_root`` guarantees it never writes into the bound
+      project, so the bound copy is the one tree an agent provably cannot
+      author. A checkout, by contrast, is writable within the run's scope.
+    * The contract is operator policy about what agents may do, not run
+      content, so it belongs with the operator rather than with whatever
+      commit a worktree happens to be pinned at.
+    * A checkout only carries *committed* files. An untracked or uncommitted
+      ``project.axon.yaml`` was therefore invisible to every run, which
+      silently emptied the workspace scope and made the whole workspace
+      read-only — with the agent appearing to refuse work.
+
+    Gate 6's verifier contract deliberately still reads from the checkout: its
+    checks describe the snapshot under review, whereas write authority
+    describes present operator intent.
+    """
+    contract_source: Path = Path(workspace_root)
+    if workspace_id:
+        try:
+            from app.terminal.workspace_roots import resolve_workspace_root
+
+            bound_root = resolve_workspace_root(workspace_id)
+            if bound_root.is_dir():
+                contract_source = bound_root
+        except Exception:  # noqa: BLE001 — fall back to the checkout, never fail dispatch
+            contract_source = Path(workspace_root)
     try:
-        contract = load_repo_contract(str(workspace_root))
-    except (OSError, ProjectContractError, ValueError):
+        contract = load_repo_contract(str(contract_source))
+    except (OSError, ProjectContractError, ValueError) as exc:
+        # An invalid contract silently becomes an empty workspace scope, which
+        # intersects every role's write paths down to nothing and drops the run
+        # to read-only "consultative". That looked like an agent refusing to
+        # work rather than a broken project.axon.yaml, so say so out loud.
+        logger.warning(
+            "project contract failed to load for %s (%s: %s); "
+            "workspace scope is empty, so this run will be read-only",
+            contract_source,
+            type(exc).__name__,
+            exc,
+        )
         contract = {}
     task_paths = task_payload.get("allowed_paths")
     # Older task rows (and rows created before task_store began applying role
@@ -59,6 +107,19 @@ def resolve_worker_execution_policy(
             dict.fromkeys((*policy.approved_command_prefixes, *extra))
         )
         policy = replace(policy, approved_command_prefixes=merged)
+    scoped_workspace = str(workspace_id or "").strip()
+    if not scoped_workspace:
+        from app.workspace_service_connections import workspace_id_for_project_root
+
+        scoped_workspace = workspace_id_for_project_root(workspace_root) or ""
+    if scoped_workspace:
+        from app.workspace_service_connections import apply_live_service_policy
+
+        policy = apply_live_service_policy(
+            policy,
+            workspace_id=scoped_workspace,
+            role=employee.role,
+        )
     return policy
 
 

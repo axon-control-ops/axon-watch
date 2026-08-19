@@ -13,6 +13,7 @@ from app.workspace_agents.critical_review_clause import is_review_type_task
 from app.runs.service import (
     RunLifecycleError,
     append_run_execution_receipt,
+    block_run_on_operator_ask,
     complete_run,
     fail_run,
     touch_run_activity,
@@ -35,7 +36,11 @@ from app.workspace_agents.worker_prompt import build_continuous_worker_prompt
 from app.workspace_agents.worker_prompt import parse_out_of_scope_guard
 from app.persistence import task_store
 from app.persistence import worker_scheduler_settings_store
-from app.workspace_agents.ask_autopilot import escalate_unresolved_operator_ask, maybe_resolve_safe_ask
+from app.workspace_agents.ask_autopilot import (
+    escalate_unresolved_operator_ask,
+    maybe_resolve_safe_ask,
+    parse_latest_ask_card,
+)
 from app.persistence.workspace_composer_prefs_store import (
     resolve_worker_runtime_model,
     resolve_worker_runtime_fallback_families,
@@ -64,6 +69,12 @@ from app.workspace_agents.worker_dispatch_support import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+def _ask_prompt_for_receipt(reply_text: str) -> str:
+    """The worker's own question, for the blocked run's current_step."""
+    parsed = parse_latest_ask_card(reply_text)
+    return parsed[0] if parsed else "Awaiting an operator decision"
 
 def worker_dispatch_enabled() -> bool:
     raw = os.environ.get("AXON_WATCH_WORKER_SCHEDULER_DISPATCH", "1").strip().lower()
@@ -157,7 +168,10 @@ def dispatch_continuous_worker_run(
         )
         agent_root = worker_agent_workspace(isolation_root)
         execution_policy = resolve_worker_execution_policy(
-            employee=employee, task_payload=task, workspace_root=agent_root
+            employee=employee,
+            task_payload=task,
+            workspace_root=agent_root,
+            workspace_id=workspace_id,
         )
         record_execution_policy_receipt(run_id, execution_policy)
         append_run_execution_receipt(
@@ -225,7 +239,7 @@ def dispatch_continuous_worker_run(
                 success=True,
                 intent="worker_autonomy",
             )
-        escalate_unresolved_operator_ask(
+        escalated_ask = escalate_unresolved_operator_ask(
             reply_text,
             employee_name=employee.name,
             employee_role=str(employee.role or ""),
@@ -234,7 +248,18 @@ def dispatch_continuous_worker_run(
             run_id=run_id,
         )
         scope_guard_detail = parse_out_of_scope_guard(reply_text)
-        if scope_guard_detail:
+        if escalated_ask:
+            # The worker asked a question only the operator may answer. Recording
+            # the receipt alone left the run executing, so it could carry on past
+            # its own stated blocker and even finalize as complete while the ask
+            # sat unanswered. Hold it in the blocked phase instead; answering the
+            # ask resumes it through the normal approve path.
+            dispatched = False
+            finalized = block_run_on_operator_ask(
+                run_id,
+                prompt=_ask_prompt_for_receipt(reply_text),
+            )
+        elif scope_guard_detail:
             dispatched = False
             finalized = fail_worker_run(
                 run_id,
