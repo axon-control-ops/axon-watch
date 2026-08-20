@@ -108,8 +108,14 @@ def format_fleet_leads_block(
             "workspace_dashpro — do not patch the product app in a client-ops tree.",
             "- Centre ops / letters / graduation / enrolment data → Young Eagles "
             "(workspace_young_eagles_day_care, Imani).",
+            "- Thapelosego supplier bids / RFQ packs / company documents → TPS "
+            "(workspace_tps, Noor).",
             "- Axon console / Mission Control / Fast Gate → Axon-X "
             "(workspace_axon_watch, Mira).",
+            "Cross-workspace coordination: Leads message each other by creating a "
+            "handoff (POST /api/workspaces/{source}/handoffs). That posts to both "
+            "Leads' IDE threads and opens a target-workspace task — prefer this over "
+            "chatting across workspaces without a ticket.",
             "Prefer creating a cross-workspace handoff over doing foreign work in the wrong repo.",
             "EAS Update only ships JS/assets (not native binary changes); native/"
             "SDK/permission work still needs a new build in the DashPro app repo.",
