@@ -70,9 +70,16 @@ def _changed_paths(root: Path | None) -> list[str]:
 
 
 def _workspace_root(workspace_id: str) -> Path | None:
+    """Bound project root, or None when it cannot be resolved.
+
+    Reading sandbox status must never raise. Resolution walks the whole binding
+    registry, so one unrelated workspace whose project_root sits outside the
+    allowlist raised WorkspaceBindingError and took down status for every other
+    workspace. Status degrades to "no bound root" instead.
+    """
     try:
         return resolve_workspace_root(workspace_id)
-    except WorkspaceRootError:
+    except Exception:  # noqa: BLE001 — status is read-only and must not fail closed
         return None
 
 
