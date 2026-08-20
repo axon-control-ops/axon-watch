@@ -254,6 +254,43 @@ class RunStaleReconcileTests(unittest.TestCase):
         task = task_store.get_task(task_id) or {}
         self.assertEqual("open", task.get("status"))
 
+    def test_reap_unlocks_post_isolation_lane_b_stall(self) -> None:
+        from app.persistence import task_store
+        from app.runs.begin_execution import begin_execution
+
+        record = _leased_worker_run(
+            workspace_id="workspace_post_isolation_stall",
+            employee_role="frontend",
+            summary="frontend: Thapelosego supplier quotation",
+        )
+        run_id = str(record["run_id"])
+        task_id = str(record.get("task_id") or "")
+        begin_execution(
+            run_id,
+            actor="workspace_scheduler",
+            receipt_summary="Operator start entered execution",
+        )
+        append_run_execution_receipt(
+            run_id,
+            receipt_type="worker_dispatch_started",
+            receipt_summary="Continuous worker dispatch started for role=frontend",
+            actor="workspace_scheduler",
+        )
+        append_run_execution_receipt(
+            run_id,
+            receipt_type="worker_isolation_created",
+            receipt_summary="worker isolation worktree branch=worker/test",
+            actor="workspace_scheduler",
+        )
+        _age_run(run_id, seconds=120)
+
+        reaped = reap_stale_employee_runs()
+
+        self.assertEqual([run_id], reaped)
+        self.assertEqual("failed", get_run(run_id)["phase"])
+        task = task_store.get_task(task_id) or {}
+        self.assertEqual("open", task.get("status"))
+
     def test_verification_shift_uses_longer_stale_ttl(self) -> None:
         from app.persistence import task_store
         from app.runs.stale_reconcile import DEFAULT_VERIFICATION_STALE_SECONDS, employee_run_stale_seconds_for_record

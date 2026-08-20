@@ -244,11 +244,26 @@ def dispatch_continuous_worker_run(
             success=True,
             intent="worker_isolation",
         )
-        enqueue_verification_terminal_jobs(
-            workspace_id=workspace_id,
-            run_id=run_id,
-            task=task,
-        )
+
+        def _enqueue_verify_jobs() -> None:
+            try:
+                enqueue_verification_terminal_jobs(
+                    workspace_id=workspace_id,
+                    run_id=run_id,
+                    task=task,
+                )
+            except Exception:  # noqa: BLE001 — never block Lane B on verify enqueue
+                logger.exception(
+                    "continuous worker verification enqueue failed for %s role=%s",
+                    run_id,
+                    employee.role,
+                )
+
+        threading.Thread(
+            target=_enqueue_verify_jobs,
+            daemon=True,
+            name=f"verify-enqueue-{run_id}",
+        ).start()
         prompt = build_continuous_worker_prompt(
             workspace_id=workspace_id,
             employee=employee,

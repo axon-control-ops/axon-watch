@@ -254,8 +254,14 @@ def dispatch_ide_composer(
         return _attach_dispatch_metadata(payload, composer_mode=composer_mode)
 
     subprocess_env = runtime_subprocess_env()
-    # Only autonomous dispatch opts into provider-key fallback.
-    snapshot = runtime_status_snapshot(force_refresh=bool(subprocess_env.get("CURSOR_API_KEY")))
+    # Only interactive dispatch blocks on live CLI auth probes. Continuous workers
+    # set ``respect_cached_usage_limit`` and must not hang after isolation when a
+    # ``cursor agent status`` probe stalls.
+    snapshot = runtime_status_snapshot(
+        force_refresh=bool(subprocess_env.get("CURSOR_API_KEY"))
+        and not respect_cached_usage_limit,
+        allow_stale=respect_cached_usage_limit,
+    )
     resolved_root = workspace_root if workspace_root is not None else _resolve_workspace_root(workspace_id)
     if resolved_root is None:
         return _finish({

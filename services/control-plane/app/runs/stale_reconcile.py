@@ -64,6 +64,18 @@ _GHOST_DISPATCH_PROGRESS_RECEIPT_TYPES = frozenset(
         "runtime_dispatch",
     }
 )
+# Receipts that mean Lane B or verify-enqueue progressed after isolation was recorded.
+_POST_ISOLATION_LANE_B_RECEIPT_TYPES = frozenset(
+    {
+        "agent_sandbox_started",
+        "agent_sandbox_skipped",
+        "runtime_dispatch",
+        "worker_progress",
+        "verification_terminal_enqueued",
+        "verification_terminal_unrunnable",
+        "verification_terminal_enqueue_failed",
+    }
+)
 
 
 def undispatched_worker_seconds() -> float:
@@ -101,6 +113,52 @@ def _run_has_any_receipt_type(record: dict[str, Any], receipt_types: frozenset[s
 
 def run_has_dispatch_progress(record: dict[str, Any]) -> bool:
     return _run_has_any_receipt_type(record, _GHOST_DISPATCH_PROGRESS_RECEIPT_TYPES)
+
+
+def run_has_post_isolation_lane_b_stall(
+    record: dict[str, Any],
+    *,
+    now: datetime | None = None,
+) -> bool:
+    """True when isolation was recorded but Lane B / verify enqueue never started."""
+    phase = str(record.get("phase") or "").strip()
+    if phase not in {"executing", "starting", "planning"}:
+        return False
+    if not str(record.get("task_id") or "").strip():
+        return False
+    if not _run_has_receipt_type(record, "worker_isolation_created"):
+        return False
+    if _run_has_any_receipt_type(record, _POST_ISOLATION_LANE_B_RECEIPT_TYPES):
+        return False
+    age = _isolation_created_age_seconds(record, now=now or datetime.now(timezone.utc))
+    if age is None:
+        return False
+    return age >= ghost_dispatch_seconds()
+
+
+def _isolation_created_age_seconds(
+    record: dict[str, Any],
+    *,
+    now: datetime,
+) -> float | None:
+    history_ref = str(record.get("history_ref") or "").strip()
+    if not history_ref:
+        return None
+    for item in run_store.list_history(history_ref):
+        receipt = item.get("receipt")
+        if not isinstance(receipt, dict):
+            continue
+        if str(receipt.get("type") or "").strip() != "worker_isolation_created":
+            continue
+        stamp = _parse_iso(item.get("timestamp"))
+        if stamp is None:
+            stamp = _parse_iso(record.get("updated_at"))
+        if stamp is None:
+            return None
+        if stamp.tzinfo is None:
+            stamp = stamp.replace(tzinfo=timezone.utc)
+        return max(0.0, (now - stamp).total_seconds())
+    return None
 
 
 def run_has_ghost_dispatch(record: dict[str, Any], *, now: datetime | None = None) -> bool:
@@ -150,6 +208,41 @@ def recover_ghost_dispatch_run(
     task_store.reopen_orphaned_leased_tasks(
         terminal_run_ids=[cleaned],
         terminal_outcome="ghost worker dispatch auto-unlocked; retry Run verification",
+        refund_attempts=True,
+    )
+    return True
+
+
+def recover_post_isolation_lane_b_stall_run(
+    run_id: str,
+    *,
+    actor: str = "workspace_scheduler",
+    receipt_summary: str | None = None,
+) -> bool:
+    """Fail/reopen a worker run stuck after isolation without Lane B progress."""
+    from app.persistence import task_store
+    from app.runs.service import RunLifecycleError, RunNotFoundError, fail_run
+    from app.workspace_agents.worker_dispatch_support import release_worker_dispatch
+
+    cleaned = str(run_id or "").strip()
+    if not cleaned:
+        return False
+    record = run_store.get_run(cleaned)
+    if record is None or not run_has_post_isolation_lane_b_stall(record):
+        return False
+    release_worker_dispatch(cleaned)
+    summary = receipt_summary or (
+        "Continuous worker dispatch stalled after worker_isolation_created without "
+        f"Lane B or verify progress (>{int(ghost_dispatch_seconds())}s); task reopened"
+    )
+    try:
+        fail_run(cleaned, receipt_summary=summary, actor=actor)
+    except (RunLifecycleError, RunNotFoundError):
+        logger.exception("post-isolation lane B stall recover failed for %s", cleaned)
+        return False
+    task_store.reopen_orphaned_leased_tasks(
+        terminal_run_ids=[cleaned],
+        terminal_outcome="worker dispatch stalled after isolation; retry Run verification",
         refund_attempts=True,
     )
     return True
@@ -534,6 +627,28 @@ def reap_stale_employee_runs(
                 )
             continue
 
+        if (
+            phase in {"executing", "starting", "planning"}
+            and run_has_post_isolation_lane_b_stall(record, now=moment)
+        ):
+            isolation_age = _isolation_created_age_seconds(record, now=moment) or age
+            if recover_post_isolation_lane_b_stall_run(
+                run_id,
+                receipt_summary=(
+                    "Continuous worker dispatch stalled after worker_isolation_created "
+                    f"without Lane B progress ({int(isolation_age)}s > "
+                    f"{int(ghost_dispatch_seconds())}s)"
+                ),
+            ):
+                reaped.append(run_id)
+                logger.warning(
+                    "reaped post-isolation lane B stall for %s role=%s idle_s=%.0f",
+                    run_id,
+                    role,
+                    isolation_age,
+                )
+            continue
+
         if age < cutoff:
             continue
 
@@ -638,8 +753,10 @@ __all__ = [
     "host_long_running_ship_active",
     "host_verification_test_active",
     "recover_ghost_dispatch_run",
+    "recover_post_isolation_lane_b_stall_run",
     "reap_stale_employee_runs",
     "run_has_dispatch_progress",
     "run_has_ghost_dispatch",
+    "run_has_post_isolation_lane_b_stall",
     "run_looks_like_ota_ship",
 ]

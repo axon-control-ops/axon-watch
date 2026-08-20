@@ -544,6 +544,38 @@ class DispatchRecursionRecoveryTests(unittest.TestCase):
             mock_non_cursor.call_args_list[1].kwargs["subprocess_env"]["OPENAI_API_KEY"],
         )
 
+    def test_continuous_worker_uses_stale_runtime_snapshot_when_api_key_set(self) -> None:
+        snapshot = _snapshot_cursor_and_codex_ready()
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            with (
+                patch(
+                    "app.cli_runtime.router.runtime_subprocess_env",
+                    return_value={"CURSOR_API_KEY": "vault-key", "PATH": "/usr/bin"},
+                ),
+                patch(
+                    "app.cli_runtime.router.runtime_status_snapshot",
+                    return_value=snapshot,
+                ) as mock_snapshot,
+                patch("app.cli_runtime.router._resolve_workspace_root", return_value=root),
+                patch("app.cli_runtime.router.ensure_workspace_research_mcp", return_value=True),
+                patch(
+                    "app.cli_runtime.router.run_cursor_local_with_recursion_retry",
+                    return_value=CursorAgentReply(content="ok"),
+                ),
+            ):
+                dispatch_ide_composer(
+                    workspace_id="workspace_tps",
+                    composer_mode="agent",
+                    user_prompt="Continue the bounded task.",
+                    context_block="ctx",
+                    respect_cached_usage_limit=True,
+                )
+        mock_snapshot.assert_called_once_with(
+            force_refresh=False,
+            allow_stale=True,
+        )
+
 
 if __name__ == "__main__":
     unittest.main()
