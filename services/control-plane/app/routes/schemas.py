@@ -98,6 +98,15 @@ class EnqueueAgentTerminalJobRequest(BaseModel):
     message_id: str | None = None
     # Per-job deadline override; omitted means the command-class default.
     timeout_seconds: float | None = None
+    # "workspace" (bound project root) or "sandbox" (the composer checkout).
+    target: str | None = None
+
+
+class StartSandboxPreviewRequest(BaseModel):
+    """Optional overrides when the preview heuristic cannot infer a project."""
+
+    command: str | None = None
+    port: int | None = None
 
 
 class RenameTerminalSessionRequest(BaseModel):

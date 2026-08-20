@@ -10,6 +10,7 @@ from fastapi import APIRouter, HTTPException, Query
 
 from app.routes.schemas import EnqueueAgentTerminalJobRequest
 from app.terminal.agent_jobs import (
+    TARGET_WORKSPACE,
     cancel_agent_terminal_job,
     enqueue_agent_terminal_job,
     get_agent_terminal_job,
@@ -51,6 +52,7 @@ def workspace_terminal_agent_jobs_enqueue(
             message_id=body.message_id,
             source_workspace_id=body.source_workspace_id,
             timeout_seconds=body.timeout_seconds,
+            target=body.target or TARGET_WORKSPACE,
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc

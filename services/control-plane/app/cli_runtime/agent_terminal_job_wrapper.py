@@ -18,7 +18,8 @@ from urllib.request import Request, urlopen
 
 def _usage() -> int:
     print(
-        "usage: axon-agent-terminal-job [--workspace ID] [--no-stream] [--run-id ID] -- <command...>\n"
+        "usage: axon-agent-terminal-job [--workspace ID] [--no-stream] [--run-id ID]\n"
+        "                               [--target workspace|sandbox] -- <command...>\n"
         "       axon-agent-terminal-job --status JOB_ID --workspace ID",
         file=sys.stderr,
     )
@@ -59,6 +60,7 @@ def main(argv: list[str] | None = None) -> int:
     run_id = os.environ.get("AXON_WATCH_RUN_ID", "").strip()
     stream_to_chat = True
     status_job_id = ""
+    target = ""
     command: list[str] = []
     while arguments:
         item = arguments.pop(0)
@@ -68,6 +70,8 @@ def main(argv: list[str] | None = None) -> int:
             run_id = arguments.pop(0).strip()
         elif item == "--status" and arguments:
             status_job_id = arguments.pop(0).strip()
+        elif item == "--target" and arguments:
+            target = arguments.pop(0).strip().lower()
         elif item == "--no-stream":
             stream_to_chat = False
         elif item in {"-h", "--help"}:
@@ -95,6 +99,8 @@ def main(argv: list[str] | None = None) -> int:
             payload["run_id"] = run_id
         if source_workspace_id:
             payload["source_workspace_id"] = source_workspace_id
+        if target:
+            payload["target"] = target
         response = _request(endpoint, payload=payload)
     except RuntimeError as exc:
         print(str(exc), file=sys.stderr)
@@ -106,6 +112,8 @@ def main(argv: list[str] | None = None) -> int:
     print(f"job_id={job_id}")
     print(f"status={response.get('status') or '?'}")
     print(f"session_id={response.get('session_id') or '?'}")
+    print(f"target={response.get('target') or 'workspace'}")
+    print(f"cwd={response.get('cwd') or '?'}")
     print(f"stream_to_chat={str(bool(response.get('stream_to_chat'))).lower()}")
     receipt = str(response.get("receipt") or "").strip()
     if receipt:

@@ -11,6 +11,7 @@ job to a terminal state and enforces its deadline.
 from __future__ import annotations
 
 from copy import deepcopy
+from pathlib import Path
 from typing import Any
 from uuid import uuid4
 
@@ -33,12 +34,42 @@ from app.terminal.agent_job_watcher import (
     start_job_watcher,
     wrap_with_exit_sentinel,
 )
-from app.terminal.session_registry import ensure_agent_session, serialize_session
+from app.terminal.session_registry import (
+    ensure_agent_session,
+    ensure_sandbox_session,
+    serialize_session,
+)
 from app.terminal.session_runtime import ensure_runtime
 from app.terminal.ship_command_guards import assert_ship_command_allowed
 from app.terminal.workspace_roots import WorkspaceRootError, resolve_workspace_root
 
 _MAX_COMMAND_CHARS = 32_768
+
+TARGET_WORKSPACE = "workspace"
+TARGET_SANDBOX = "sandbox"
+_TARGETS = frozenset({TARGET_WORKSPACE, TARGET_SANDBOX})
+
+
+def _resolve_job_root(workspace_id: str, target: str) -> Path:
+    """Resolve the cwd for a job. Sandbox targets never fall back to the root.
+
+    A silent fallback would run a preview against the bound project root while
+    the operator believes they are looking at sandbox-only changes, which is
+    exactly the confusion this target is meant to remove.
+    """
+    if target == TARGET_SANDBOX:
+        from app.cli_runtime.composer_sandbox import resolve_sandbox_workspace_root
+
+        root = resolve_sandbox_workspace_root(workspace_id)
+        if root is None:
+            raise ValueError(
+                "sandbox target requires an enabled, materialized sandbox for this workspace"
+            )
+        return root
+    try:
+        return resolve_workspace_root(workspace_id)
+    except WorkspaceRootError as exc:
+        raise ValueError(str(exc)) from exc
 
 
 def _agent_command_bytes(value: object) -> bytes | None:
@@ -96,11 +127,17 @@ def enqueue_agent_terminal_job(
     message_id: str | None = None,
     source_workspace_id: str | None = None,
     timeout_seconds: float | int | None = None,
+    target: str = TARGET_WORKSPACE,
+    service: bool = False,
 ) -> dict[str, Any]:
     """Ensure agent PTY runtime, write the command, return a chat-friendly receipt."""
     clean_workspace = str(workspace_id or "").strip()
     if not clean_workspace:
         raise ValueError("workspace_id is required")
+
+    clean_target = str(target or TARGET_WORKSPACE).strip().lower() or TARGET_WORKSPACE
+    if clean_target not in _TARGETS:
+        raise ValueError(f"unsupported job target: {target!r}")
 
     payload = _agent_command_bytes(command)
     if payload is None:
@@ -125,12 +162,13 @@ def enqueue_agent_terminal_job(
     )
 
     clean_run = str(run_id or "").strip() or f"job-{uuid4().hex[:12]}"
-    try:
-        workspace_root = resolve_workspace_root(clean_workspace)
-    except WorkspaceRootError as exc:
-        raise ValueError(str(exc)) from exc
+    workspace_root = _resolve_job_root(clean_workspace, clean_target)
 
-    session = ensure_agent_session(workspace_id=clean_workspace, run_id=clean_run)
+    session = (
+        ensure_sandbox_session(workspace_id=clean_workspace, run_id=clean_run)
+        if clean_target == TARGET_SANDBOX
+        else ensure_agent_session(workspace_id=clean_workspace, run_id=clean_run)
+    )
     runtime = ensure_runtime(
         workspace_id=clean_workspace,
         workspace_root=str(workspace_root),
@@ -148,13 +186,17 @@ def enqueue_agent_terminal_job(
         else None
     )
 
-    deadline_seconds = resolve_timeout_seconds(timeout_seconds, command=command_text)
+    deadline_seconds = resolve_timeout_seconds(
+        timeout_seconds, command=command_text, service=service
+    )
     record: dict[str, Any] = {
         "job_id": job_id,
         "workspace_id": clean_workspace,
         "session_id": session.session_id,
-        "run_id": session.run_id,
+        "run_id": clean_run,
         "command": command_text,
+        "target": clean_target,
+        "cwd": str(workspace_root),
         "status": "running",
         "created_at": utc_now(),
         "timeout_seconds": int(deadline_seconds),
@@ -179,8 +221,11 @@ def enqueue_agent_terminal_job(
 
     receipt = (
         f"Running in Axon terminal (`{session.session_id}`): `{command_text}`.\n"
+        f"Working directory: `{workspace_root}`.\n"
         "Open the vaxon tab for live logs — this is Axon-owned, not Cursor shell detach."
     )
+    if clean_target == TARGET_SANDBOX:
+        receipt += " This job runs against the Sandbox checkout, not the bound project root."
     if stream_target is not None:
         receipt += " Live output is also streaming into the active chat `:::terminal` card."
 
@@ -223,6 +268,8 @@ def cancel_agent_terminal_job(job_id: str) -> dict[str, Any] | None:
 
 
 __all__ = [
+    "TARGET_SANDBOX",
+    "TARGET_WORKSPACE",
     "cancel_agent_terminal_job",
     "enqueue_agent_terminal_job",
     "get_agent_terminal_job",

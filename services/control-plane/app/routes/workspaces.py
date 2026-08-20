@@ -31,6 +31,7 @@ from app.terminal.session_registry import (
     list_sessions,
     rename_session,
     serialize_session,
+    serialize_session_with_context,
 )
 from app.terminal.session_runtime import terminate_runtime
 from app.workspace_catalog import WorkspaceNotFoundError, get_workspace_record, list_workspace_records
@@ -287,7 +288,7 @@ def workspace_terminal_sessions(workspace_id: str) -> dict[str, object]:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 
     ensure_operator_session(workspace_id)
-    items = [serialize_session(record) for record in list_sessions(workspace_id)]
+    items = [serialize_session_with_context(record) for record in list_sessions(workspace_id)]
     return {"workspace_id": workspace_id, "items": items, "count": len(items)}
 
 
@@ -340,7 +341,7 @@ def workspace_terminal_sessions_delete(workspace_id: str, session_id: str) -> di
     if not deleted and session_id != "terminal-operator":
         raise HTTPException(status_code=404, detail="terminal session not found")
     ensure_operator_session(workspace_id)
-    items = [serialize_session(record) for record in list_sessions(workspace_id)]
+    items = [serialize_session_with_context(record) for record in list_sessions(workspace_id)]
     return {"workspace_id": workspace_id, "deleted": deleted, "items": items, "count": len(items)}
 
 

@@ -36,6 +36,11 @@ DEFAULT_JOB_TIMEOUT_SECONDS = 600.0
 # reason this helper exists — they must not inherit the short worker deadline.
 SHIP_JOB_TIMEOUT_SECONDS = 3600.0
 MAX_JOB_TIMEOUT_SECONDS = 3600.0
+# Service jobs (a sandbox preview dev server) are categorically different from
+# batch jobs: never finishing is success, not a hang, so the batch cap would
+# reap a healthy preview out from under the operator. Still bounded, so a
+# forgotten preview cannot hold a port forever.
+SERVICE_JOB_TIMEOUT_SECONDS = 8 * 3600.0
 
 
 def default_timeout_for_command(command: str) -> float:
@@ -58,9 +63,16 @@ def wrap_with_exit_sentinel(command: str, job_id: str) -> str:
     return f"bash -c {quoted}; printf '\\n__AXON_JOB_EXIT:{job_id}:%s__\\n' \"$?\""
 
 
-def resolve_timeout_seconds(value: float | int | None, *, command: str = "") -> float:
-    """Explicit override wins; otherwise the deadline follows the command class."""
-    fallback = default_timeout_for_command(command)
+def resolve_timeout_seconds(
+    value: float | int | None, *, command: str = "", service: bool = False
+) -> float:
+    """Explicit override wins; otherwise the deadline follows the command class.
+
+    ``service`` raises the ceiling to ``SERVICE_JOB_TIMEOUT_SECONDS`` for jobs
+    whose whole purpose is to keep running (a preview dev server).
+    """
+    ceiling = SERVICE_JOB_TIMEOUT_SECONDS if service else MAX_JOB_TIMEOUT_SECONDS
+    fallback = SERVICE_JOB_TIMEOUT_SECONDS if service else default_timeout_for_command(command)
     if value is None:
         return fallback
     try:
@@ -69,7 +81,7 @@ def resolve_timeout_seconds(value: float | int | None, *, command: str = "") -> 
         return fallback
     if seconds <= 0:
         return fallback
-    return min(seconds, MAX_JOB_TIMEOUT_SECONDS)
+    return min(seconds, ceiling)
 
 
 def _flush_fence_to_chat(
@@ -268,6 +280,7 @@ def start_job_watcher(
 __all__ = [
     "DEFAULT_JOB_TIMEOUT_SECONDS",
     "MAX_JOB_TIMEOUT_SECONDS",
+    "SERVICE_JOB_TIMEOUT_SECONDS",
     "exit_sentinel_re",
     "resolve_timeout_seconds",
     "start_job_watcher",
