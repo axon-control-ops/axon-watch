@@ -254,6 +254,71 @@ class RunStaleReconcileTests(unittest.TestCase):
         task = task_store.get_task(task_id) or {}
         self.assertEqual("open", task.get("status"))
 
+    def test_verification_shift_uses_longer_stale_ttl(self) -> None:
+        from app.persistence import task_store
+        from app.runs.stale_reconcile import DEFAULT_VERIFICATION_STALE_SECONDS, employee_run_stale_seconds_for_record
+
+        opened = task_store.create_task(
+            workspace_id="workspace_verify_ttl",
+            goal="Verification after Priya (frontend): npm test",
+            owner_role="frontend",
+        )
+        task_id = str(opened["task_id"])
+        task_store.lease_task(task_id, lease_holder="test")
+        record = create_run(
+            workspace_id="workspace_verify_ttl",
+            mode="agent",
+            summary="frontend: verification ttl",
+            employee_role="frontend",
+            task_id=task_id,
+        )
+        self.assertEqual(
+            DEFAULT_VERIFICATION_STALE_SECONDS,
+            employee_run_stale_seconds_for_record(record),
+        )
+
+    def test_stale_executing_fail_reopens_leased_task_with_refund(self) -> None:
+        from app.persistence import task_store
+        from app.runs.begin_execution import begin_execution
+
+        opened = task_store.create_task(
+            workspace_id="workspace_stale_reopen",
+            goal="frontend: ordinary shift",
+            owner_role="frontend",
+        )
+        task_id = str(opened["task_id"])
+        task_store.lease_task(task_id, lease_holder="test")
+        record = create_run(
+            workspace_id="workspace_stale_reopen",
+            mode="agent",
+            summary="frontend: stale reopen",
+            employee_role="frontend",
+            task_id=task_id,
+        )
+        run_id = str(record["run_id"])
+        begin_execution(run_id, actor="test", receipt_summary="entered execution")
+        append_run_execution_receipt(
+            run_id,
+            receipt_type="worker_dispatch_started",
+            receipt_summary="dispatch started",
+            actor="workspace_scheduler",
+        )
+        append_run_execution_receipt(
+            run_id,
+            receipt_type="worker_isolation_created",
+            receipt_summary="isolation ready",
+            actor="workspace_scheduler",
+        )
+        _age_run(run_id, seconds=1300)
+
+        reaped = reap_stale_employee_runs(stale_seconds=600)
+
+        self.assertIn(run_id, reaped)
+        self.assertEqual("failed", get_run(run_id)["phase"])
+        task = task_store.get_task(task_id) or {}
+        self.assertEqual("open", task.get("status"))
+        self.assertLess(int(task.get("attempts_used") or 0), int(task.get("attempt_budget") or 0))
+
     def test_touch_run_activity_does_not_block_stale_reaper(self) -> None:
         record = create_run(
             workspace_id="workspace_axon_watch",

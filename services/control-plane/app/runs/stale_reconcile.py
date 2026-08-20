@@ -25,6 +25,8 @@ DEFAULT_LEAD_STALE_SECONDS = 1800.0
 # Canary/production OTA (expo export + eas update) regularly exceeds 30 minutes when
 # Dana blocks on Cursor shellToolCall — do not stale-fail Mid-export.
 DEFAULT_OTA_LEAD_STALE_SECONDS = 5400.0
+# Full-suite npm/jest verification shifts routinely exceed the default 1200s worker TTL.
+DEFAULT_VERIFICATION_STALE_SECONDS = 3600.0
 _STALE_SUMMARY = "Continuous worker run exceeded stale timeout"
 _PAUSED_ABANDON_SUMMARY = "Paused continuous worker run abandoned after stale timeout"
 _OTA_RUN_TEXT_RE = re.compile(
@@ -34,6 +36,7 @@ _HOST_SHIP_CMDLINE_RE = re.compile(
     r"(?i)(?:npm\s+run\s+ota(?::[\w-]*)?|ota:(?:canary|production)|"
     r"eas(?:-wrapper)?\s+update|expo\s+export)"
 )
+_HOST_VERIFY_CMDLINE_RE = re.compile(r"(?i)(?:\bjest\b|npm\s+test\b|\bvitest\b)")
 
 # Phases that mean a role is still doing (or waiting on) in-flight work.
 BUSY_EMPLOYEE_PHASES = frozenset(
@@ -152,6 +155,44 @@ def recover_ghost_dispatch_run(
     return True
 
 
+def host_verification_test_active() -> bool:
+    """True when a local jest/npm-test process is still running."""
+    proc = Path("/proc")
+    if not proc.is_dir():
+        return False
+    try:
+        entries = list(proc.iterdir())
+    except OSError:
+        return False
+    for entry in entries:
+        name = entry.name
+        if not name.isdigit():
+            continue
+        try:
+            raw = (entry / "cmdline").read_bytes()
+        except OSError:
+            continue
+        if not raw:
+            continue
+        cmdline = raw.replace(b"\x00", b" ").decode("utf-8", errors="ignore")
+        if _HOST_VERIFY_CMDLINE_RE.search(cmdline):
+            return True
+    return False
+
+
+def _record_is_verification_shift(record: dict[str, Any] | None) -> bool:
+    if not isinstance(record, dict):
+        return False
+    task_id = str(record.get("task_id") or "").strip()
+    if not task_id:
+        return False
+    from app.persistence import task_store
+    from app.workspace_agents.verification_execution import is_verification_task
+
+    task = task_store.get_task(task_id)
+    return is_verification_task(task)
+
+
 def _run_has_receipt_type(record: dict[str, Any], receipt_type: str) -> bool:
     history_ref = str(record.get("history_ref") or "").strip()
     if not history_ref:
@@ -202,9 +243,17 @@ def run_looks_like_ota_ship(record: dict[str, Any] | None) -> bool:
 
 
 def employee_run_stale_seconds_for_record(record: dict[str, Any] | None) -> float:
-    """TTL for a concrete run — OTA Lead ships get a longer default than board work."""
+    """TTL for a concrete run — OTA Lead ships and verification get longer defaults."""
     role = str((record or {}).get("employee_role") or "").strip().lower()
     base = employee_run_stale_seconds_for_role(role)
+    if _record_is_verification_shift(record):
+        raw = os.environ.get("AXON_WATCH_VERIFICATION_RUN_STALE_SECONDS", "").strip()
+        if raw:
+            try:
+                return max(base, float(raw))
+            except ValueError:
+                pass
+        return max(base, DEFAULT_VERIFICATION_STALE_SECONDS)
     if role != "lead" or not run_looks_like_ota_ship(record):
         return base
     raw = os.environ.get("AXON_WATCH_OTA_LEAD_RUN_STALE_SECONDS", "").strip()
@@ -504,6 +553,20 @@ def reap_stale_employee_runs(
             )
             continue
 
+        if (
+            phase == "executing"
+            and _record_is_verification_shift(record)
+            and host_verification_test_active()
+        ):
+            logger.info(
+                "skipping stale reap for verification run %s — host test process still active "
+                "(idle_s=%.0f cutoff_s=%.0f)",
+                run_id,
+                age,
+                cutoff,
+            )
+            continue
+
         if phase == "paused":
             if not _cancel_paused_employee_run(run_id, age=age, cutoff=cutoff):
                 continue
@@ -545,6 +608,14 @@ def reap_stale_employee_runs(
         except (RunLifecycleError, RunNotFoundError):
             logger.exception("stale employee-run reap skipped for %s", run_id)
             continue
+        if str(record.get("task_id") or "").strip():
+            from app.persistence import task_store
+
+            task_store.reopen_orphaned_leased_tasks(
+                terminal_run_ids=[run_id],
+                terminal_outcome="stale worker run; task reopened for retry",
+                refund_attempts=True,
+            )
         reaped.append(run_id)
         logger.warning(
             "reaped stale employee run %s role=%s idle_s=%.0f",
@@ -565,6 +636,7 @@ __all__ = [
     "employee_run_stale_seconds_for_role",
     "ghost_dispatch_seconds",
     "host_long_running_ship_active",
+    "host_verification_test_active",
     "recover_ghost_dispatch_run",
     "reap_stale_employee_runs",
     "run_has_dispatch_progress",
