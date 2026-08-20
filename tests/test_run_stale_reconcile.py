@@ -223,6 +223,37 @@ class RunStaleReconcileTests(unittest.TestCase):
         task = task_store.get_task(task_id) or {}
         self.assertEqual("open", task.get("status"))
 
+    def test_reap_unlocks_ghost_dispatch_after_worker_dispatch_started(self) -> None:
+        from app.persistence import task_store
+        from app.runs.begin_execution import begin_execution
+
+        record = _leased_worker_run(
+            workspace_id="workspace_ghost_dispatch",
+            employee_role="frontend",
+            summary="Verification after Priya (frontend): npm test",
+        )
+        run_id = str(record["run_id"])
+        task_id = str(record.get("task_id") or "")
+        begin_execution(
+            run_id,
+            actor="workspace_scheduler",
+            receipt_summary="Operator start entered execution",
+        )
+        append_run_execution_receipt(
+            run_id,
+            receipt_type="worker_dispatch_started",
+            receipt_summary="Continuous worker dispatch started for role=frontend",
+            actor="workspace_scheduler",
+        )
+        _age_run(run_id, seconds=120)
+
+        reaped = reap_stale_employee_runs()
+
+        self.assertEqual([run_id], reaped)
+        self.assertEqual("failed", get_run(run_id)["phase"])
+        task = task_store.get_task(task_id) or {}
+        self.assertEqual("open", task.get("status"))
+
     def test_touch_run_activity_does_not_block_stale_reaper(self) -> None:
         record = create_run(
             workspace_id="workspace_axon_watch",

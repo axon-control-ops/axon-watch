@@ -44,6 +44,23 @@ _EARLY_BUSY_PHASES = frozenset({"queued", "starting", "planning"})
 _STALE_IDLE_SKIP_RECEIPT_TYPES = frozenset({"worker_heartbeat"})
 # Executing runs without worker_dispatch_started are operator-visible zombies.
 DEFAULT_UNDISPATCHED_WORKER_SECONDS = 90.0
+# Executing runs that recorded worker_dispatch_started but never reached isolation
+# or any other progress receipt — dispatch thread died or hung after claiming.
+DEFAULT_GHOST_DISPATCH_SECONDS = 90.0
+_GHOST_DISPATCH_PROGRESS_RECEIPT_TYPES = frozenset(
+    {
+        "worker_isolation_created",
+        "worker_heartbeat",
+        "worker_progress",
+        "worker_delivery",
+        "verification_terminal_enqueued",
+        "verification_terminal_unrunnable",
+        "worker_delivery_verification_receipt",
+        "auto_ask_resolution",
+        "worker_ask_block",
+        "runtime_dispatch",
+    }
+)
 
 
 def undispatched_worker_seconds() -> float:
@@ -54,6 +71,85 @@ def undispatched_worker_seconds() -> float:
         return max(30.0, float(raw))
     except ValueError:
         return DEFAULT_UNDISPATCHED_WORKER_SECONDS
+
+
+def ghost_dispatch_seconds() -> float:
+    raw = os.environ.get("AXON_WATCH_GHOST_DISPATCH_SECONDS", "").strip()
+    if not raw:
+        return DEFAULT_GHOST_DISPATCH_SECONDS
+    try:
+        return max(30.0, float(raw))
+    except ValueError:
+        return DEFAULT_GHOST_DISPATCH_SECONDS
+
+
+def _run_has_any_receipt_type(record: dict[str, Any], receipt_types: frozenset[str]) -> bool:
+    history_ref = str(record.get("history_ref") or "").strip()
+    if not history_ref:
+        return False
+    for item in run_store.list_history(history_ref):
+        receipt = item.get("receipt")
+        if not isinstance(receipt, dict):
+            continue
+        if str(receipt.get("type") or "").strip() in receipt_types:
+            return True
+    return False
+
+
+def run_has_dispatch_progress(record: dict[str, Any]) -> bool:
+    return _run_has_any_receipt_type(record, _GHOST_DISPATCH_PROGRESS_RECEIPT_TYPES)
+
+
+def run_has_ghost_dispatch(record: dict[str, Any], *, now: datetime | None = None) -> bool:
+    """True when dispatch claimed a run but never produced isolation/progress."""
+    phase = str(record.get("phase") or "").strip()
+    if phase not in {"executing", "starting", "planning"}:
+        return False
+    if not str(record.get("task_id") or "").strip():
+        return False
+    if not _run_has_receipt_type(record, "worker_dispatch_started"):
+        return False
+    if _run_has_any_receipt_type(record, _GHOST_DISPATCH_PROGRESS_RECEIPT_TYPES):
+        return False
+    age = _run_idle_age_seconds(record, now=now or datetime.now(timezone.utc))
+    if age is None:
+        return False
+    return age >= ghost_dispatch_seconds()
+
+
+def recover_ghost_dispatch_run(
+    run_id: str,
+    *,
+    actor: str = "workspace_scheduler",
+    receipt_summary: str | None = None,
+) -> bool:
+    """Release the in-memory dispatch claim, fail the run, and reopen its leased task."""
+    from app.persistence import task_store
+    from app.runs.service import RunLifecycleError, RunNotFoundError, fail_run
+    from app.workspace_agents.worker_dispatch_support import release_worker_dispatch
+
+    cleaned = str(run_id or "").strip()
+    if not cleaned:
+        return False
+    record = run_store.get_run(cleaned)
+    if record is None or not run_has_ghost_dispatch(record):
+        return False
+    release_worker_dispatch(cleaned)
+    summary = receipt_summary or (
+        "Continuous worker dispatch never reached isolation/progress after "
+        f"worker_dispatch_started (>{int(ghost_dispatch_seconds())}s); task reopened"
+    )
+    try:
+        fail_run(cleaned, receipt_summary=summary, actor=actor)
+    except (RunLifecycleError, RunNotFoundError):
+        logger.exception("ghost dispatch recover failed for %s", cleaned)
+        return False
+    task_store.reopen_orphaned_leased_tasks(
+        terminal_run_ids=[cleaned],
+        terminal_outcome="ghost worker dispatch auto-unlocked; retry Run verification",
+        refund_attempts=True,
+    )
+    return True
 
 
 def _run_has_receipt_type(record: dict[str, Any], receipt_type: str) -> bool:
@@ -367,6 +463,28 @@ def reap_stale_employee_runs(
             )
             continue
 
+        ghost_cutoff = ghost_dispatch_seconds()
+        if (
+            phase in {"executing", "starting", "planning"}
+            and run_has_ghost_dispatch(record, now=moment)
+            and age >= ghost_cutoff
+        ):
+            if recover_ghost_dispatch_run(
+                run_id,
+                receipt_summary=(
+                    "Ghost worker dispatch auto-unlocked: dispatch started but never "
+                    f"reached isolation/progress ({int(age)}s > {int(ghost_cutoff)}s)"
+                ),
+            ):
+                reaped.append(run_id)
+                logger.warning(
+                    "reaped ghost-dispatch employee run %s role=%s idle_s=%.0f",
+                    run_id,
+                    role,
+                    age,
+                )
+            continue
+
         if age < cutoff:
             continue
 
@@ -445,7 +563,11 @@ __all__ = [
     "employee_run_stale_seconds",
     "employee_run_stale_seconds_for_record",
     "employee_run_stale_seconds_for_role",
+    "ghost_dispatch_seconds",
     "host_long_running_ship_active",
+    "recover_ghost_dispatch_run",
     "reap_stale_employee_runs",
+    "run_has_dispatch_progress",
+    "run_has_ghost_dispatch",
     "run_looks_like_ota_ship",
 ]

@@ -24,6 +24,7 @@ from app.workspace_agents.lead_fan_out import (
 logger = logging.getLogger(__name__)
 
 DISPATCH_RECEIPT_WAIT_SECONDS = 25.0
+DISPATCH_PROGRESS_WAIT_SECONDS = 120.0
 DISPATCH_RECEIPT_POLL_INTERVAL = 0.25
 
 
@@ -110,6 +111,49 @@ def _wait_for_worker_dispatch_started(
     return _run_has_receipt_type(run_id, "worker_dispatch_started")
 
 
+def _wait_for_worker_dispatch_progress(
+    run_id: str,
+    *,
+    timeout: float = DISPATCH_RECEIPT_WAIT_SECONDS,
+) -> bool:
+    """Block until dispatch reaches isolation/progress, or timeout."""
+    from app.runs.stale_reconcile import run_has_dispatch_progress
+
+    deadline = time.monotonic() + max(1.0, float(timeout))
+    while time.monotonic() < deadline:
+        refreshed = _safe_get_run(run_id) or {}
+        if run_has_dispatch_progress(refreshed):
+            return True
+        phase = str(refreshed.get("phase") or "").strip().lower()
+        if phase in {"failed", "cancelled", "completed", "review_ready"}:
+            return phase != "failed"
+        time.sleep(DISPATCH_RECEIPT_POLL_INTERVAL)
+    return False
+
+
+def _recover_ghost_dispatch_operator_start(run_id: str) -> bool:
+    from app.runs.stale_reconcile import recover_ghost_dispatch_run
+
+    return recover_ghost_dispatch_run(
+        run_id,
+        actor="operator",
+        receipt_summary=(
+            "Ghost worker dispatch auto-unlocked during operator start; "
+            "task reopened for retry"
+        ),
+    )
+
+
+def _maybe_auto_unlock_ghost_dispatch(run_id: str) -> bool:
+    """Fail/reopen a zombie executing run so operator retry can proceed."""
+    from app.runs.stale_reconcile import run_has_ghost_dispatch
+
+    record = _safe_get_run(run_id)
+    if record is None or not run_has_ghost_dispatch(record):
+        return False
+    return _recover_ghost_dispatch_operator_start(run_id)
+
+
 def _recover_undispatched_operator_start(run_id: str) -> None:
     """Terminate an undispatched run and reopen its leased task for retry."""
     from app.runs.service import RunLifecycleError, RunNotFoundError, fail_run, stop_run
@@ -139,6 +183,16 @@ def _recover_undispatched_operator_start(run_id: str) -> None:
     )
 
 
+def _recover_stuck_operator_dispatch(run_id: str) -> None:
+    """Reopen a handoff whose dispatch thread never reached real progress."""
+    if _maybe_auto_unlock_ghost_dispatch(run_id):
+        return
+    if _run_has_receipt_type(run_id, "worker_dispatch_started"):
+        _recover_ghost_dispatch_operator_start(run_id)
+        return
+    _recover_undispatched_operator_start(run_id)
+
+
 def _finalize_operator_dispatch(run_id: str, advanced: dict[str, Any]) -> dict[str, Any]:
     """Ensure worker dispatch actually started before returning success to the UI."""
     phase = str((advanced or {}).get("phase") or "").strip().lower()
@@ -148,11 +202,20 @@ def _finalize_operator_dispatch(run_id: str, advanced: dict[str, Any]) -> dict[s
     if busy_phase not in {"executing", "starting", "planning"}:
         return advanced if advanced else (refreshed or {})
     if _wait_for_worker_dispatch_started(run_id):
-        refreshed = _safe_get_run(run_id)
-        live_phase = str((refreshed or {}).get("phase") or "").strip().lower()
-        if live_phase in {"executing", "starting", "planning"}:
-            return refreshed or advanced
-        return advanced
+        if _wait_for_worker_dispatch_progress(
+            run_id,
+            timeout=DISPATCH_PROGRESS_WAIT_SECONDS,
+        ):
+            refreshed = _safe_get_run(run_id)
+            live_phase = str((refreshed or {}).get("phase") or "").strip().lower()
+            if live_phase in {"executing", "starting", "planning"}:
+                return refreshed or advanced
+            return advanced
+        _recover_stuck_operator_dispatch(run_id)
+        raise OperatorStartTaskError(
+            "handoff dispatch started but never reached isolation/progress; "
+            "ghost dispatch auto-unlocked — use Run verification again"
+        )
     _recover_undispatched_operator_start(run_id)
     raise OperatorStartTaskError(
         "handoff dispatch did not start within timeout; task reopened — "
@@ -330,20 +393,25 @@ def operator_start_task(task_id: str) -> dict[str, Any]:
         run = _safe_get_run(run_id)
         phase = str((run or {}).get("phase") or "").strip().lower()
         if phase and phase not in {"queued", "starting"}:
-            raise OperatorStartTaskError(
-                f"task is already in progress (phase={phase or 'unknown'})"
-            )
-        if not run_id:
-            raise OperatorStartTaskError(
-                "leased handoff is missing its queued run; cancel or repair the task"
-            )
-        advanced = _dispatch_target_run(run_id)
-        thread_id = _existing_employee_ide_thread(workspace_id, owner_role)
-        return {
-            "task": task_store.get_task(cleaned) or task,
-            "run": advanced,
-            "thread_id": thread_id,
-        }
+            if _maybe_auto_unlock_ghost_dispatch(run_id):
+                task = task_store.get_task(cleaned) or task
+                status = str(task.get("status") or "").strip().lower()
+            else:
+                raise OperatorStartTaskError(
+                    f"task is already in progress (phase={phase or 'unknown'})"
+                )
+        if status == "leased":
+            if not run_id:
+                raise OperatorStartTaskError(
+                    "leased handoff is missing its queued run; cancel or repair the task"
+                )
+            advanced = _dispatch_target_run(run_id)
+            thread_id = _existing_employee_ide_thread(workspace_id, owner_role)
+            return {
+                "task": task_store.get_task(cleaned) or task,
+                "run": advanced,
+                "thread_id": thread_id,
+            }
 
     if status != "open":
         raise OperatorStartTaskError(
@@ -385,10 +453,14 @@ def operator_start_task(task_id: str) -> dict[str, Any]:
         )
     busy_run = _active_role_run(workspace_id, owner_role)
     if busy_run is not None:
-        raise OperatorStartTaskError(
-            f'teammate for role "{owner_role}" already has active run '
-            f'{str(busy_run.get("run_id") or "unknown")}'
-        )
+        busy_id = str(busy_run.get("run_id") or "").strip()
+        if busy_id and _maybe_auto_unlock_ghost_dispatch(busy_id):
+            busy_run = _active_role_run(workspace_id, owner_role)
+        if busy_run is not None:
+            raise OperatorStartTaskError(
+                f'teammate for role "{owner_role}" already has active run '
+                f'{str(busy_run.get("run_id") or "unknown")}'
+            )
 
     holder = f"operator-start-{workspace_id}-{owner_role}"
     try:
