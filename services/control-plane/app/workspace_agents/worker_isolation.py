@@ -23,6 +23,9 @@ def create_worker_isolation(
     baseline_ref: str | None = None,
 ) -> Path:
     """Create a disposable checkout for one continuous-worker run."""
+    from app.workspace_agents.workspace_runtime_bootstrap import ensure_workspace_runtime_ready
+
+    ensure_workspace_runtime_ready(workspace_id)
     bound = resolve_workspace_root(workspace_id)
     checkout = create_isolation_root(
         proposal_id=run_id,

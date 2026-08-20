@@ -52,6 +52,16 @@ VALIDATION_PREFIXES: tuple[tuple[str, ...], ...] = (
     ("npx", "--no-install", "vitest"),
 )
 
+# Read-only PDF inspection and repo-local Python document scripts (scripts/*.py).
+# python3 is normally blocked as an interpreter escape; the shell hook allows it
+# only when the second token is under scripts/ and this prefix is approved.
+DOCUMENT_PREFIXES: tuple[tuple[str, ...], ...] = (
+    ("pdftotext",),
+    ("pdftoppm",),
+    ("python3", "scripts/"),
+    (".venv/bin/python3", "scripts/"),
+)
+
 COMMON_AUDITED_WRAPPERS: tuple[str, ...] = (
     "axon-agent-terminal-job",
     "workspace-live-verify",
@@ -67,6 +77,7 @@ __all__ = [
     "COMMON_AUDITED_WRAPPERS",
     "LEAD_DISPATCH_WRAPPERS",
     "COMMON_READ_PREFIXES",
+    "DOCUMENT_PREFIXES",
     "GH_READ_PREFIXES",
     "VALIDATION_PREFIXES",
 ]

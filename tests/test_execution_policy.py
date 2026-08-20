@@ -373,6 +373,15 @@ class SelfValidationPolicyTests(unittest.TestCase):
             with self.subTest(command=command):
                 self.assertEqual("deny", self._permission("backend", command))
 
+    def test_document_roles_can_run_repo_python_scripts(self) -> None:
+        for role in ("frontend", "lead", "backend"):
+            with self.subTest(role=role):
+                self.assertEqual(
+                    "allow",
+                    self._permission(role, "python3 scripts/fill-rfq26052-pdf.py"),
+                )
+                self.assertEqual("allow", self._permission(role, "pdftotext docs/rfq/form.pdf -"))
+
 
 class LeadDispatchWrapperTests(unittest.TestCase):
     """A Lead without a dispatch wrapper can only write a handoff document."""

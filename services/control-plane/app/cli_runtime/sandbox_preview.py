@@ -143,6 +143,110 @@ def ensure_preview_dependencies(checkout: Path, bound_root: Path) -> str:
     return f"linked {linked} packages into {target}"
 
 
+# Git worktrees omit untracked deliverables (PDFs, filled forms, generated output).
+# Borrow live copies from the bound project root so agents can read/edit documents
+# the operator created locally without committing first.
+_DOCUMENT_BORROW_ROOTS: tuple[str, ...] = (
+    "docs",
+    "output",
+    "assets",
+    "data",
+    "website/documents",
+    "website",
+)
+
+
+def _should_copy_borrowed_file(source: Path, target: Path) -> bool:
+    if not source.is_file():
+        return False
+    if not target.exists():
+        return True
+    try:
+        return source.stat().st_mtime > target.stat().st_mtime
+    except OSError:
+        return False
+
+
+def ensure_document_assets_borrowed(checkout: Path, bound_root: Path) -> list[str]:
+    """Copy untracked or newer document trees from bound root into an isolation checkout."""
+    copied: list[str] = []
+    if not bound_root.is_dir():
+        return copied
+
+    for relative in _DOCUMENT_BORROW_ROOTS:
+        source_root = bound_root / relative
+        if not source_root.is_dir():
+            continue
+        for source in source_root.rglob("*"):
+            if not source.is_file():
+                continue
+            name = source.name
+            if name.startswith(".env"):
+                continue
+            try:
+                rel = source.relative_to(bound_root)
+            except ValueError:
+                continue
+            target = checkout / rel
+            if not _should_copy_borrowed_file(source, target):
+                continue
+            try:
+                target.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(source, target, follow_symlinks=True)
+                copied.append(rel.as_posix())
+            except OSError:
+                continue
+    return copied
+
+
+def ensure_checkout_python_venv(checkout: Path, bound_root: Path) -> str | None:
+    """Create a local .venv in the checkout when requirements.txt needs PyMuPDF etc.
+
+    Worktrees omit gitignored ``.venv``; agents run ``.venv/bin/python3 scripts/…``.
+    Provisioning runs on the host during isolation materialization (outside bwrap).
+    """
+    req = checkout / "requirements.txt"
+    if not req.is_file():
+        bound_req = bound_root / "requirements.txt"
+        if bound_req.is_file():
+            try:
+                shutil.copy2(bound_req, req, follow_symlinks=True)
+            except OSError:
+                return None
+        else:
+            return None
+    python_bin = checkout / ".venv" / "bin" / "python3"
+    if python_bin.is_file():
+        return "checkout python venv already present"
+    try:
+        subprocess.run(
+            ["python3", "-m", "venv", str(checkout / ".venv")],
+            cwd=checkout,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+    except (OSError, subprocess.CalledProcessError) as exc:
+        return f"python venv create failed: {exc}"
+    pip = checkout / ".venv" / "bin" / "pip"
+    if not pip.is_file():
+        return "python venv missing pip"
+    try:
+        completed = subprocess.run(
+            [str(pip), "install", "-r", str(req)],
+            cwd=checkout,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+    except OSError as exc:
+        return f"python venv pip install failed: {exc}"
+    if completed.returncode != 0:
+        detail = (completed.stderr or completed.stdout or "pip install failed")[:200]
+        return f"python venv pip install failed: {detail}"
+    return f"installed python venv from {req.name}"
+
+
 def ensure_preview_env_files(checkout: Path, bound_root: Path) -> list[str]:
     """Copy the bound root's local env files into the checkout.
 
@@ -238,6 +342,20 @@ def ensure_sandbox_checkout_runnable(checkout: Path, bound_root: Path) -> dict[s
             notes.append(f"repaired env symlinks: {', '.join(repaired_env)}")
     except OSError as exc:
         errors.append(f"could not link env files: {exc}")
+    try:
+        borrowed_docs = ensure_document_assets_borrowed(checkout, bound_root)
+        if borrowed_docs:
+            sample = ", ".join(borrowed_docs[:5])
+            suffix = f" (+{len(borrowed_docs) - 5} more)" if len(borrowed_docs) > 5 else ""
+            notes.append(f"borrowed document assets: {sample}{suffix}")
+    except OSError as exc:
+        errors.append(f"could not borrow document assets: {exc}")
+    try:
+        venv_note = ensure_checkout_python_venv(checkout, bound_root)
+        if venv_note:
+            notes.append(venv_note)
+    except OSError as exc:
+        errors.append(f"could not prepare python venv: {exc}")
     return {"ok": not errors, "notes": notes, "errors": errors}
 
 
@@ -588,6 +706,8 @@ __all__ = [
     "stop_preview_port",
     "ensure_preview_dependencies",
     "ensure_preview_env_files",
+    "ensure_checkout_python_venv",
+    "ensure_document_assets_borrowed",
     "ensure_isolation_checkout_runnable",
     "ensure_sandbox_checkout_runnable",
     "remove_preview_bootstrap_links",

@@ -50,6 +50,25 @@ class AgentShellHookCommandPolicyTests(unittest.TestCase):
         )
         self.assertEqual("deny", response["permission"])
 
+    def test_python3_repo_scripts_allowed_with_scripts_prefix(self) -> None:
+        response = evaluate_hook_payload(
+            {
+                "hook_event_name": "beforeShellExecution",
+                "command": "python3 scripts/fill-rfq26052-pdf.py",
+            },
+            approved_wrappers=frozenset(),
+            approved_command_prefixes=(("python3", "scripts/"), ("pdftotext",)),
+        )
+        self.assertEqual("allow", response["permission"])
+
+    def test_python3_outside_scripts_stays_denied(self) -> None:
+        response = evaluate_hook_payload(
+            {"hook_event_name": "beforeShellExecution", "command": "python3 -c print(1)"},
+            approved_wrappers=frozenset(),
+            approved_command_prefixes=(("python3", "scripts/"),),
+        )
+        self.assertEqual("deny", response["permission"])
+
 
 if __name__ == "__main__":
     unittest.main()

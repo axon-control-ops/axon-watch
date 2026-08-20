@@ -6,14 +6,14 @@ repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 source "${repo_root}/scripts/dev/lib/common.sh"
 
 missing=()
-for cmd in bwrap rg git node npm; do
+for cmd in bwrap rg git node npm python3 awk; do
   if ! command -v "${cmd}" >/dev/null 2>&1; then
     missing+=("${cmd}")
   fi
 done
 
 if ((${#missing[@]} == 0)); then
-  echo "Agent sandbox host prerequisites already present: bwrap rg git node npm"
+  echo "Agent sandbox host prerequisites already present: bwrap rg git node npm python3 awk"
   exit 0
 fi
 
@@ -31,12 +31,20 @@ for cmd in "${missing[@]}"; do
     git) packages+=(git) ;;
     node) packages+=(nodejs) ;;
     npm) packages+=(npm) ;;
+    python3) packages+=(python3) ;;
+    awk) packages+=(gawk) ;;
   esac
 done
+
+# PDF tooling is optional for document workspaces but install when apt is available.
+optional_packages=(poppler-utils)
 
 echo "Installing sandbox host packages: ${packages[*]}"
 sudo apt-get update
 sudo DEBIAN_FRONTEND=noninteractive apt-get install -y "${packages[@]}"
+if ((${#optional_packages[@]})); then
+  sudo DEBIAN_FRONTEND=noninteractive apt-get install -y "${optional_packages[@]}" || true
+fi
 
 echo "Installing Axon bin wrappers (axon-agent-terminal-job, axon-assign, …)"
 "${repo_root}/scripts/ops/install-bin-wrappers.sh"

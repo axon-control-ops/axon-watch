@@ -217,7 +217,38 @@ def _git_is_destructive(tokens: Sequence[str]) -> bool:
 
 
 def _matches_prefix(tokens: Sequence[str], prefix: Sequence[str]) -> bool:
-    return len(tokens) >= len(prefix) and tuple(tokens[: len(prefix)]) == tuple(prefix)
+    if len(tokens) < len(prefix):
+        if _script_prefix_match(tokens, prefix):
+            return True
+        return False
+    if tuple(tokens[: len(prefix)]) == tuple(prefix):
+        return True
+    return _script_prefix_match(tokens, prefix)
+
+
+def _script_prefix_match(tokens: Sequence[str], prefix: Sequence[str]) -> bool:
+    """Allow python3 scripts/foo.py and .venv/bin/python3 scripts/foo.py."""
+    if len(tokens) < 2 or len(prefix) != 2:
+        return False
+    exe = os.path.basename(tokens[0]).lower()
+    prefix_exe = os.path.basename(prefix[0]).lower()
+    if exe != prefix_exe or prefix[1] != "scripts/":
+        return False
+    if prefix[0] == "python3" and tokens[0] != "python3":
+        return False
+    if prefix[0] == ".venv/bin/python3" and tokens[0] != ".venv/bin/python3":
+        return False
+    return str(tokens[1]).startswith("scripts/")
+
+
+def _interpreter_prefix_approved(
+    executable: str,
+    tokens: Sequence[str],
+    approved_command_prefixes: tuple[tuple[str, ...], ...],
+) -> bool:
+    if executable not in _INTERPRETER_ESCAPES:
+        return False
+    return any(_matches_prefix(tokens, prefix) for prefix in approved_command_prefixes)
 
 
 def evaluate_hook_payload(
@@ -269,7 +300,9 @@ def evaluate_hook_payload(
         return _deny(f"privilege escalation is not allowed — never use sudo/su to work around filesystem restrictions.{hint}")
     if executable in _RAW_NETWORK_TOOLS and not narrowly_approved:
         return _deny("raw network tools are not allowed")
-    if executable in _INTERPRETER_ESCAPES:
+    if executable in _INTERPRETER_ESCAPES and not _interpreter_prefix_approved(
+        executable, tokens, approved_command_prefixes
+    ):
         return _deny("shell and interpreter escapes are not allowed")
     if executable == "npx" and "--no-install" not in tokens[1:]:
         return _deny("npx must include --no-install to prevent implicit package downloads")

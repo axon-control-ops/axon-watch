@@ -3,9 +3,12 @@
 from __future__ import annotations
 
 import json
+import logging
 import os
 from dataclasses import dataclass
 from pathlib import Path
+
+logger = logging.getLogger(__name__)
 
 
 class WorkspaceBindingError(ValueError):
@@ -193,8 +196,19 @@ def upsert_workspace_project_binding(
     tmp_path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     tmp_path.replace(path)
 
-    return WorkspaceProjectBinding(
+    binding = WorkspaceProjectBinding(
         workspace_id=normalized_id,
         project_root=resolved_root,
         display_name=label,
     )
+    try:
+        from app.workspace_agents.workspace_runtime_bootstrap import provision_workspace_runtime
+
+        provision_workspace_runtime(
+            normalized_id,
+            project_root=resolved_root,
+            display_name=label,
+        )
+    except Exception as exc:  # noqa: BLE001 — binding must succeed even if bootstrap fails
+        logger.warning("workspace runtime bootstrap deferred for %s: %s", normalized_id, exc)
+    return binding

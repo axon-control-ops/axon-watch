@@ -184,6 +184,16 @@ class SandboxCheckoutIsolationGapTests(unittest.TestCase):
         self.assertEqual(ensure_preview_env_files(self.checkout, self.bound), [])
         self.assertEqual((self.checkout / ".env").read_text(encoding="utf-8"), "FROM=checkout\n")
 
+    def test_untracked_document_assets_are_borrowed_from_bound_root(self) -> None:
+        (self.bound / "docs" / "rfq").mkdir(parents=True)
+        (self.bound / "docs" / "rfq" / "filled.pdf").write_bytes(b"%PDF-1.4")
+        (self.checkout / "docs" / "rfq").mkdir(parents=True)
+        (self.checkout / "docs" / "rfq" / "tracked.txt").write_text("old\n", encoding="utf-8")
+        result = ensure_sandbox_checkout_runnable(self.checkout, self.bound)
+        self.assertTrue(result["ok"])
+        self.assertTrue((self.checkout / "docs" / "rfq" / "filled.pdf").is_file())
+        self.assertIn("borrowed document assets", " ".join(result["notes"]))
+
 
 class PreviewBootstrapMustNotPolluteChangesTests(unittest.TestCase):
     """Bootstrap symlinks must never reach Review or Publish.
