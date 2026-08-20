@@ -14,7 +14,6 @@ COMMON_READ_PREFIXES: tuple[tuple[str, ...], ...] = (
     ("git", "status"),
     ("git", "diff"),
     ("git", "log"),
-    ("git", "grep"),
     ("rg",),
     # `rg` alone left plain `grep` denied, so every agent that reached for the
     # more common tool lost a turn to a policy error. It is read-only, and the
@@ -40,22 +39,18 @@ GH_READ_PREFIXES: tuple[tuple[str, ...], ...] = (
 # sandbox denies every command that could produce it. `npm run <arbitrary>`
 # stays gated so deploy/ship scripts cannot ride in on a generic approval.
 VALIDATION_PREFIXES: tuple[tuple[str, ...], ...] = (
-    ("npm", "ci"),
     ("npm", "test"),
     ("npm", "run", "test"),
     ("npm", "run", "lint"),
     ("npm", "run", "typecheck"),
-    ("npx", "--no-install", "jest"),
-    ("npx", "--no-install", "tsc"),
-    ("npx", "--no-install", "tsx"),
-    ("npx", "--no-install", "eslint"),
-    ("npx", "--no-install", "vitest"),
+    ("npx", "jest"),
+    ("npx", "tsc"),
+    ("npx", "tsx"),
+    ("npx", "eslint"),
+    ("npx", "vitest"),
 )
 
-COMMON_AUDITED_WRAPPERS: tuple[str, ...] = (
-    "axon-agent-terminal-job",
-    "workspace-live-verify",
-)
+COMMON_AUDITED_WRAPPERS: tuple[str, ...] = ("axon-agent-terminal-job",)
 
 # Lead-only: fan a goal out into role-scoped tasks and dispatch teammates.
 # A Lead without this can only describe a handoff in a document — nobody is
