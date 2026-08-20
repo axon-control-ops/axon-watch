@@ -547,10 +547,7 @@ from app.runs.queries import (
     list_runs,
     to_runtime_summary_active_run,
 )
-from app.runs.restart_reconcile import (
-    reconcile_employee_runs_missing_tasks,
-    reconcile_orphaned_runs_on_startup,
-)
+from app.runs.restart_reconcile import reconcile_orphaned_runs_on_startup
 from app.runs.employee_retention import (
     DEFAULT_KEEP_PER_ROLE,
     drain_terminal_employee_runs,
