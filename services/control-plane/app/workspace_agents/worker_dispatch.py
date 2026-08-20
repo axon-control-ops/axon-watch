@@ -278,6 +278,15 @@ def dispatch_continuous_worker_run(
         runtime_family = (runtime_target or "cursor_local").split("_", 1)[0]
         runtime_model = resolve_worker_runtime_model(workspace_id, runtime_family)
         fallback_runtime_families = resolve_worker_runtime_fallback_families(workspace_id)
+        append_run_execution_receipt(
+            run_id,
+            receipt_type="lane_b_invoke_started",
+            receipt_summary=(
+                f"Invoking Lane B for role={employee.role} task={task_id} "
+                f"runtime={runtime_target or 'cursor_local'}"
+            ),
+            actor="workspace_scheduler",
+        )
         lane_b_result = generate_lane_b_result(
             context=context,
             user_prompt=prompt,
