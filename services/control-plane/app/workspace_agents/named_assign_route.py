@@ -92,9 +92,23 @@ def match_named_assign_employee(
 
 def rewrite_named_assign_prompt(prompt: str, employee_name: str) -> str:
     """Strip assign framing so the specialist gets an actionable ask."""
+    body = named_assign_action_body(prompt, employee_name)
+    if body is None:
+        body = (
+            "Lead did not include a concrete task body in this handoff. "
+            "Ask Lead/operator for the specific goal, expected files, and acceptance criteria."
+        )
+    return (
+        "You own this assignment from Lead. Complete it and report back when done.\n\n"
+        f"Operator ask: {body}"
+    )
+
+
+def named_assign_action_body(prompt: str, employee_name: str) -> str | None:
+    """Return the concrete work body, or None for pronoun-only handoffs."""
     text = str(prompt or "").strip()
     if not text:
-        return text
+        return None
     name = " ".join(str(employee_name or "").strip().split())
     first = name.split()[0] if name else ""
     tokens = []
@@ -122,15 +136,16 @@ def rewrite_named_assign_prompt(prompt: str, employee_name: str) -> str:
     cleaned = re.sub(r"\breport\s+back\b", " ", cleaned, flags=re.I)
     cleaned = re.sub(r"\bthe\s+task\b", " ", cleaned, flags=re.I)
     cleaned = re.sub(r"\s{2,}", " ", cleaned).strip(" \t\r\n,.;:!?-")
-    body = (
-        cleaned
-        if len(cleaned) >= 8
-        else "Complete the assigned task from the Lead handoff and report back when done."
-    )
-    return (
-        "You own this assignment from Lead. Complete it and report back when done.\n\n"
-        f"Operator ask: {body}"
-    )
+    if len(cleaned) < 8:
+        return None
+    if re.fullmatch(r"(?:it|this|that|task|job|work|handoff|assignment)", cleaned, re.I):
+        return None
+    return cleaned
+
+
+def is_vague_named_assign(prompt: str, employee_name: str) -> bool:
+    """True when a named assignment references "the task" without the task body."""
+    return named_assign_action_body(prompt, employee_name) is None
 
 
 def detect_named_assign_intent(prompt: str, roster: list[TeammateRouteEmployee] | None) -> bool:
@@ -141,5 +156,7 @@ __all__ = [
     "count_named_roster_members",
     "detect_named_assign_intent",
     "match_named_assign_employee",
+    "named_assign_action_body",
+    "is_vague_named_assign",
     "rewrite_named_assign_prompt",
 ]

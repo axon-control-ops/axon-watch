@@ -126,7 +126,7 @@ def sticky_lead_follow_up_goal(
 
 def sticky_lead_follow_up_acceptance(*, plan: dict[str, Any]) -> str:
     plan_id = str(plan.get("plan_id") or "").strip()
-    plan_goal = truncate_text(str(plan.get("goal") or ""), max_len=200) or "the Lead plan"
+    plan_goal = " ".join(str(plan.get("goal") or "").split()).strip() or "the Lead plan"
     return (
         f"Sole truth: advance plan {plan_id} — {plan_goal}. "
         "Specialist digs and CI findings are inputs, not the ask. "

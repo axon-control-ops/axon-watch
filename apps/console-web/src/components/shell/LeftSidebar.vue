@@ -32,6 +32,7 @@ import { isActiveRun } from '../../stores/shell-run-selection';
 import {
   clampSidebarWidth,
   MIN_SIDEBAR_WIDTH,
+  DEFAULT_SIDEBAR_WIDTH,
   readStoredSidebarWidth,
   SIDEBAR_WIDTH_KEY,
 } from '../../lib/sidebar-width-split';
@@ -46,7 +47,7 @@ const { spokenText } = useSpokenUtteranceText();
 const workspaceFilter = ref('');
 const showAddWorkspaceForm = ref(false);
 const sidebarRef = ref<HTMLElement | null>(null);
-const expandedSidebarWidth = ref(readStoredSidebarWidth() ?? 280);
+const expandedSidebarWidth = ref(readStoredSidebarWidth() ?? DEFAULT_SIDEBAR_WIDTH);
 const resizing = ref(false);
 const {
   panelSize: voiceCardHeight,

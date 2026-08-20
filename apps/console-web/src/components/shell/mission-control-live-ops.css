@@ -50,6 +50,116 @@
   box-shadow: 0 0 0.45rem rgba(255, 70, 90, 0.25);
 }
 
+.mc-live-ops--center {
+  gap: 0.45rem;
+  padding: 0.35rem 0.45rem 0.55rem;
+}
+
+.mc-live-ops--thread-focus {
+  gap: 0.45rem;
+  padding: 0.25rem 0.35rem 0.45rem;
+}
+
+.mc-live-ops--thread-focus .mc-live-ops__scroll--center {
+  flex: 1 1 auto;
+}
+
+.mc-live-ops--thread-focus .mc-transmission--thread-focus {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid rgba(70, 210, 255, 0.18);
+  border-radius: 0.55rem;
+  background: rgba(1, 10, 18, 0.72);
+}
+
+.mc-live-ops--thread-focus .mc-transmission__thread,
+.mc-live-ops--thread-focus .mc-transmission__empty {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.mc-live-ops__conversation-bar {
+  flex: 0 0 auto;
+  margin-top: 0;
+}
+
+.mc-live-ops__vaxon-composer {
+  flex: 0 0 auto;
+  margin-top: 0;
+}
+
+.mc-live-ops--center .mc-live-ops__machine-ceo--center {
+  margin: 0;
+  padding: 0.45rem 0.62rem;
+}
+
+.mc-live-ops__hero {
+  display: flex;
+  flex-direction: column;
+  gap: 0.42rem;
+  flex: 0 0 auto;
+}
+
+.mc-live-ops__hero--center {
+  gap: 0.55rem;
+}
+
+.mc-live-ops--center .mc-live-ops__orb-stage {
+  flex: 0 1 auto;
+  min-height: 15rem;
+  max-height: min(48vh, 28rem);
+  margin: 0;
+}
+
+.mc-live-ops__orb-stage--center {
+  border-color: rgba(96, 240, 255, 0.38);
+  box-shadow:
+    inset 0 -3.5rem 3rem rgba(0, 40, 70, 0.35),
+    0 0 1.8rem rgba(0, 160, 220, 0.16);
+}
+
+.mc-live-ops__modes--center {
+  justify-content: center;
+  padding: 0.1rem 0;
+}
+
+.mc-live-ops__scroll--center {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  overflow: hidden;
+}
+
+.mc-live-ops__scroll--center .mc-transmission {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.mc-live-ops__scroll--center .mc-transmission__thread,
+.mc-live-ops__scroll--center .mc-transmission__empty {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+}
+
+.mc-live-ops__stream--center {
+  flex: 0 1 38%;
+  min-height: 4.5rem;
+  max-height: 12rem;
+  overflow: auto;
+  margin: 0;
+  padding: 0.35rem 0.45rem;
+  border: 1px solid rgba(70, 210, 255, 0.14);
+  border-radius: 0.42rem;
+  background: rgba(0, 12, 20, 0.62);
+}
+
 .mc-live-ops__orb-stage {
   position: relative;
   display: flex;
@@ -66,7 +176,7 @@
     radial-gradient(circle at 50% 82%, rgba(0, 70, 120, 0.48), transparent 58%),
     radial-gradient(circle at 50% 50%, rgba(0, 40, 70, 0.35), transparent 70%),
     rgba(1, 8, 16, 0.96);
-  overflow: hidden;
+  overflow: visible;
   box-shadow:
     inset 0 -3.5rem 3rem rgba(0, 40, 70, 0.35),
     0 0 1.2rem rgba(0, 140, 200, 0.12);
@@ -74,14 +184,15 @@
 
 .mc-live-ops__orb-visual {
   position: relative;
-  display: grid;
-  place-items: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   flex: 1 1 auto;
   min-height: 0;
   width: 100%;
   height: 100%;
   padding: 0.55rem 0.4rem 3.1rem;
-  overflow: hidden;
+  overflow: visible;
 }
 
 .mc-live-ops__orb-stage::before {

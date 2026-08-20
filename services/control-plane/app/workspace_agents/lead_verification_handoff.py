@@ -123,6 +123,9 @@ def enqueue_specialist_verification_task(
         "APPLY=true writes. Minimal in-scope fixes only if a test proves a defect. "
         "End with Confidence: N/10."
     )
+    if commands:
+        command_hint_acceptance = "; ".join(f"`{command}`" for command in commands[:3])
+        acceptance = f"{command_hint_acceptance}. {acceptance}"
     if blockers.strip():
         acceptance = f"{acceptance} Blockers from prior shift: {truncate_text(blockers, max_len=180)}"
 

@@ -72,7 +72,7 @@ class AgentExecutionPolicyOverride:
 _ROLE_DEFAULTS: dict[str, AgentExecutionPolicy] = {
     "lead": AgentExecutionPolicy(
         read_paths=(".",),
-        write_paths=("docs/planning", "docs/ops", "plans"),
+        write_paths=("node_modules", "docs/planning", "docs/ops", "plans"),
         forbidden_path_globs=(),
         approved_wrapper_names=(*_COMMON_AUDITED_WRAPPERS, *_LEAD_DISPATCH_WRAPPERS, "run_contract_unit_tests.sh"),
         approved_command_prefixes=(*_COMMON_READ_PREFIXES, *_VALIDATION_PREFIXES, *_GH_READ_PREFIXES),
@@ -97,9 +97,12 @@ _ROLE_DEFAULTS: dict[str, AgentExecutionPolicy] = {
     "frontend": AgentExecutionPolicy(
         read_paths=(".",),
         write_paths=(
+            "node_modules",
             "apps",
             "app",
             "src",
+            "website",
+            "assets",
             "components",
             "features",
             "screens",
@@ -120,7 +123,7 @@ _ROLE_DEFAULTS: dict[str, AgentExecutionPolicy] = {
     ),
     "backend": AgentExecutionPolicy(
         read_paths=(".",),
-        write_paths=("services", "server", "api", "lib", "supabase", "packages", "tests"),
+        write_paths=("node_modules", "services", "server", "api", "lib", "supabase", "packages", "tests"),
         forbidden_path_globs=(),
         approved_wrapper_names=(*_COMMON_AUDITED_WRAPPERS, "run_contract_unit_tests.sh"),
         approved_command_prefixes=(*_COMMON_READ_PREFIXES, *_VALIDATION_PREFIXES),
@@ -132,7 +135,7 @@ _ROLE_DEFAULTS: dict[str, AgentExecutionPolicy] = {
     ),
     "integrations": AgentExecutionPolicy(
         read_paths=(".",),
-        write_paths=(".github", "config", "scripts"),
+        write_paths=("node_modules", ".github", "config", "scripts"),
         forbidden_path_globs=(),
         approved_wrapper_names=(*_COMMON_AUDITED_WRAPPERS, "axonhealth", "watch-fast-gate.sh"),
         approved_command_prefixes=(*_COMMON_READ_PREFIXES, *_VALIDATION_PREFIXES, *_GH_READ_PREFIXES),

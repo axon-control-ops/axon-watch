@@ -16,6 +16,7 @@ from app.workspace_agents.completion_gate import (  # noqa: E402
     CompletionGateResult,
     evaluate_post_publish_completion_gate,
     evaluate_pre_publish_completion_gate,
+    record_completion_gate_receipt,
 )
 
 
@@ -168,6 +169,56 @@ class WorkerCompletionGateTests(unittest.TestCase):
 
         self.assertTrue(result.passed, result)
         self.assertEqual("non-implementation task", result.reason)
+
+    def test_report_task_receipt_names_edit_receipt_paths(self) -> None:
+        opened = task_store.create_task(
+            workspace_id="workspace_dashpro",
+            owner_role="lead",
+            goal="Document AXON isolation and access acceptance probe findings.",
+            acceptance_criteria="Create an ops note if useful and report evidence.",
+            allowed_paths=["node_modules", "docs/planning", "docs/ops", "plans"],
+        )
+        task = task_store.lease_task(
+            opened["task_id"],
+            lease_holder="employee-workspace_dashpro-lead",
+        )
+        run_id = create_run(
+            workspace_id="workspace_dashpro",
+            mode="agent",
+            summary="Lead ops note",
+            employee_role="lead",
+            task_id=str(task["task_id"]),
+            require_leased_task=True,
+        )["run_id"]
+        self._pass_acceptance(str(run_id))
+
+        with tempfile.TemporaryDirectory() as tempdir:
+            result = evaluate_pre_publish_completion_gate(
+                run_id=str(run_id),
+                task=task,
+                isolation_root=Path(tempdir),
+                reply_text=(
+                    "Created the operator note.\n"
+                    ":::edit docs/ops/AXON_FULL_ACCESS_PROBE.md +25 -0\n"
+                    ":::\n"
+                    "Confidence: 9/10"
+                ),
+                changed_paths=[],
+            )
+
+        self.assertTrue(result.passed, result)
+        self.assertEqual(["docs/ops/AXON_FULL_ACCESS_PROBE.md"], result.changed_paths)
+        record_completion_gate_receipt(str(run_id), result)
+        run = run_store.get_run(str(run_id))
+        history = run_store.list_history(str((run or {}).get("history_ref") or ""))
+        receipt = next(
+            item.get("receipt") for item in history
+            if (item.get("receipt") or {}).get("type") == "completion_gate"
+        )
+        self.assertIn(
+            "changed_files=docs/ops/AXON_FULL_ACCESS_PROBE.md",
+            str(receipt.get("summary") or ""),
+        )
 
     def test_verification_refusal_without_command_receipts_cannot_pass(self) -> None:
         opened = task_store.create_task(
@@ -393,6 +444,14 @@ class ReviewShapedTaskClassificationTests(unittest.TestCase):
 
     def test_audit_goal_is_report_first(self) -> None:
         self.assertFalse(self._requested("Audit the CI workflows and report findings"))
+
+    def test_dashboard_status_report_does_not_match_add_substring(self) -> None:
+        self.assertFalse(
+            self._requested(
+                "Produce a clear status report on the teacher dashboard and "
+                "parent/child dashboard flow work completed to date."
+            )
+        )
 
     def test_review_that_names_a_build_still_demands_a_diff(self) -> None:
         self.assertTrue(

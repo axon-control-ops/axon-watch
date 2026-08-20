@@ -68,6 +68,22 @@ describe('fetchJson timeout', () => {
       /chat message submit failed: cross-origin mutation blocked/,
     );
   });
+
+  it('includes HttpOnly session credentials by default', async () => {
+    const fetchMock = vi.fn(async () => ({
+      ok: true,
+      status: 200,
+      json: async () => ({ ok: true }),
+    }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await fetchJson('/api/auth/session');
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/api/auth/session',
+      expect.objectContaining({ credentials: 'include' }),
+    );
+  });
 });
 
 describe('fetchWithTimeout', () => {

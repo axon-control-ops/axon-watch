@@ -47,6 +47,9 @@
     --topbar-height: 3.125rem;
     --statusbar-height: 2.125rem;
     --shell-gutter: 0.42rem;
+  }
+
+  .console-shell--mockup:not(.console-shell--mobile) {
     min-width: 720px;
     overflow-x: auto;
   }

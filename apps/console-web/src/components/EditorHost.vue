@@ -2,6 +2,9 @@
 import { onBeforeUnmount, onMounted, ref, watch } from 'vue';
 
 import { createMonacoEditor } from '../lib/create-monaco-editor';
+import {
+  EDITOR_SURFACE_LAYOUT_EVENT,
+} from '../lib/editor-surface-layout';
 import type { EditorDocumentLanguage } from '../lib/workspace-documents';
 import type { EditorSelectionSnapshot } from '../lib/create-monaco-editor';
 
@@ -38,6 +41,7 @@ let editorController: Awaited<ReturnType<typeof createMonacoEditor>> | null = nu
 let suppressChangeEmit = false;
 let mountedDocumentKey = '';
 let resizeObserver: ResizeObserver | null = null;
+let editorSurfaceLayoutListener: (() => void) | null = null;
 
 function scheduleEditorLayout(): void {
   if (!editorController) {
@@ -129,6 +133,10 @@ onMounted(async () => {
       resizeObserver.observe(containerRef.value);
     }
     scheduleEditorLayout();
+    editorSurfaceLayoutListener = () => {
+      scheduleEditorLayout();
+    };
+    window.addEventListener(EDITOR_SURFACE_LAYOUT_EVENT, editorSurfaceLayoutListener);
   } catch {
     loadState.value = 'error';
   }
@@ -158,6 +166,10 @@ watch(
 );
 
 onBeforeUnmount(() => {
+  if (editorSurfaceLayoutListener) {
+    window.removeEventListener(EDITOR_SURFACE_LAYOUT_EVENT, editorSurfaceLayoutListener);
+    editorSurfaceLayoutListener = null;
+  }
   resizeObserver?.disconnect();
   resizeObserver = null;
   editorController?.dispose();

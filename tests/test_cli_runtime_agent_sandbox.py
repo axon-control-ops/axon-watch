@@ -417,6 +417,100 @@ class AgentSandboxTests(unittest.TestCase):
         self.assertIn("SECRET_DENIED", result.stdout)
         self.assertNotIn("TOP_SECRET", result.stdout)
 
+    @unittest.skipUnless(Path("/usr/bin/bwrap").is_file(), "Bubblewrap is unavailable")
+    def test_linked_worktree_supports_read_only_git_status(self) -> None:
+        repository = self.temp_root / "repository"
+        linked = self.temp_root / "linked"
+        repository.mkdir()
+        subprocess.run(["git", "init", "-q", str(repository)], check=True)
+        subprocess.run(["git", "-C", str(repository), "config", "user.name", "Axon Test"], check=True)
+        subprocess.run(["git", "-C", str(repository), "config", "user.email", "axon@example.invalid"], check=True)
+        tracked = repository / "tracked.txt"
+        tracked.write_text("base\n", encoding="utf-8")
+        subprocess.run(["git", "-C", str(repository), "add", "tracked.txt"], check=True)
+        subprocess.run(["git", "-C", str(repository), "commit", "-qm", "base"], check=True)
+        subprocess.run(["git", "-C", str(repository), "worktree", "add", "-q", "-b", "probe", str(linked)], check=True)
+        (linked / ".axon-si").mkdir()
+        tracked_linked = linked / "tracked.txt"
+        tracked_linked.write_text("changed\n", encoding="utf-8")
+
+        policy = self._policy(writable_roots=(".",), cursor_readonly_paths=())
+        launch = wrap_command_in_agent_sandbox(
+            ["/usr/bin/git", "status", "--short"],
+            policy=policy,
+            workspace_root=linked,
+            run_id="run-linked-git-status",
+            policy_root=self.policy_root,
+            bwrap_path="/usr/bin/bwrap",
+            user_home=self.home,
+        )
+        result = subprocess.run(
+            launch.command,
+            capture_output=True,
+            text=True,
+            timeout=15,
+            check=False,
+        )
+        self.assertEqual(0, result.returncode, result.stderr)
+        self.assertIn("tracked.txt", result.stdout)
+        command = list(launch.command)
+        common_git_dir = (repository / ".git").resolve()
+        self.assertIn(str(common_git_dir), command)
+        self.assertIn("/run/axon-agent-git/common", command)
+        self.assertNotIn(str(common_git_dir / "worktrees" / "linked"), command)
+        mount_destinations = [
+            command[index + 2]
+            for index, value in enumerate(command[:-2])
+            if value in {"--ro-bind", "--bind"}
+        ]
+        self.assertNotIn(str(repository), mount_destinations)
+        self.assertNotIn(str(common_git_dir), mount_destinations)
+        self.assertIn(str(launch.hook_material.git_config), command)
+
+    @unittest.skipUnless(Path("/usr/bin/bwrap").is_file(), "Bubblewrap is unavailable")
+    def test_borrowed_node_modules_packages_are_readable_inside_bwrap(self) -> None:
+        bound = self.temp_root / "bound"
+        bound.mkdir()
+        package = bound / "node_modules" / "pkg"
+        package.mkdir(parents=True)
+        (package / "marker.txt").write_text("borrowed\n", encoding="utf-8")
+
+        modules = self.workspace / "node_modules"
+        modules.mkdir()
+        (modules / "pkg").symlink_to(package, target_is_directory=True)
+
+        policy = self._policy(cursor_readonly_paths=())
+        launch = wrap_command_in_agent_sandbox(
+            [
+                "/usr/bin/python3",
+                "-c",
+                "from pathlib import Path; print(Path('node_modules/pkg/marker.txt').read_text().strip())",
+            ],
+            policy=policy,
+            workspace_root=self.workspace,
+            run_id="run-borrowed-node-modules",
+            policy_root=self.policy_root,
+            bwrap_path="/usr/bin/bwrap",
+            user_home=self.home,
+        )
+        command = list(launch.command)
+        bind_targets = {
+            command[index + 1]
+            for index, value in enumerate(command[:-1])
+            if value == "--ro-bind"
+        }
+        self.assertIn(str((bound / "node_modules").resolve()), bind_targets)
+
+        result = subprocess.run(
+            launch.command,
+            capture_output=True,
+            text=True,
+            timeout=15,
+            check=False,
+        )
+        self.assertEqual(0, result.returncode, result.stderr)
+        self.assertEqual("borrowed", result.stdout.strip())
+
 
 class AgentShellHookTests(unittest.TestCase):
     def setUp(self) -> None:
@@ -489,6 +583,14 @@ class AgentShellHookTests(unittest.TestCase):
                     approved_command_prefixes=self.prefixes,
                 )
                 self.assertEqual("deny", response["permission"])
+
+    def test_pre_tool_use_accepts_runtime_specific_event_casing(self) -> None:
+        for event in ("preToolUse", "PreToolUse"):
+            with self.subTest(event=event):
+                self.assertEqual(
+                    "allow",
+                    self._evaluate("git status --short", event=event)["permission"],
+                )
 
     def test_hook_policy_io_and_json_errors_fail_closed(self) -> None:
         missing = Path("/definitely/missing/agent-policy.json")

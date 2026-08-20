@@ -110,6 +110,17 @@ def workspaces_show(workspace_id: str) -> dict[str, Any]:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 
 
+@router.get("/api/workspaces/{workspace_id}/service-connection")
+def workspace_service_connection(workspace_id: str) -> dict[str, Any]:
+    try:
+        get_workspace_record(workspace_id)
+    except WorkspaceNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    from app.workspace_service_connections import workspace_service_connection_posture
+
+    return workspace_service_connection_posture(workspace_id)
+
+
 @router.get("/api/workspaces/{workspace_id}/composer-prefs")
 def workspace_composer_prefs_get(workspace_id: str) -> dict[str, Any]:
     try:

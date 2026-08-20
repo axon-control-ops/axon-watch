@@ -271,6 +271,8 @@ def evaluate_hook_payload(
         return _deny("raw network tools are not allowed")
     if executable in _INTERPRETER_ESCAPES:
         return _deny("shell and interpreter escapes are not allowed")
+    if executable == "npx" and "--no-install" not in tokens[1:]:
+        return _deny("npx must include --no-install to prevent implicit package downloads")
     if _git_is_destructive(tokens):
         return _deny("destructive or networked Git operations are not allowed")
     if any(token.lower() in _GENERIC_ESCAPE_ARGUMENTS for token in tokens[1:]):

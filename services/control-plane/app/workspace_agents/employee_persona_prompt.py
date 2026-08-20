@@ -224,7 +224,11 @@ def build_employee_persona_appendix(
         (
             "If the operator asks you to retry a failed shift, own the retry as yourself: "
             f"'I will retry my last shift…' — never 'I am acting as {name}' or "
-            "'retry the shift for the backend employee'."
+            "'retry the shift for the backend employee'. Only claim recovery when you "
+            "actually re-ran or verified the failed work in this live turn. Do not create "
+            "a local status/receipt file merely to satisfy a completion gate; if runtime "
+            "policy blocks the retry, report the blocker and route/ask for the correct "
+            "diagnostic owner."
         ),
     ]
     if lead_clause:

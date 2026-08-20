@@ -18,10 +18,12 @@ const props = withDefaults(
     text: string;
     createdAt?: string | null;
     showResend?: boolean;
+    attachmentCount?: number;
   }>(),
   {
     createdAt: null,
     showResend: true,
+    attachmentCount: 0,
   },
 );
 
@@ -34,7 +36,9 @@ const expanded = ref(false);
 const draft = ref(props.text);
 const saving = ref(false);
 
-const canExpand = computed(() => stickyPromptCanExpand(props.text));
+const canExpand = computed(
+  () => stickyPromptCanExpand(props.text) || props.attachmentCount > 0,
+);
 const displayText = computed(() =>
   expanded.value ? props.text : stickyPromptPreviewText(props.text),
 );
@@ -215,6 +219,12 @@ onUnmounted(() => {
         >
           {{ formatThreadTimestamp(createdAt) }}
         </time>
+        <span
+          v-if="!expanded && attachmentCount > 0"
+          class="agent-dock-sticky-prompt__attachment-hint"
+        >
+          · {{ attachmentCount }} {{ attachmentCount === 1 ? 'file' : 'files' }}
+        </span>
       </div>
       <OperatorMessageActions
         class="agent-dock-sticky-prompt__actions"
@@ -228,8 +238,6 @@ onUnmounted(() => {
         @resend="() => void resendOperatorMessage(text)"
       />
     </div>
-
-    <slot name="attachments" />
 
     <textarea
       v-if="editing"
@@ -259,6 +267,10 @@ onUnmounted(() => {
     >
       {{ expanded ? 'Show less' : 'Show more' }}
     </button>
+
+    <div v-if="expanded && !editing" class="agent-dock-sticky-prompt__attachments">
+      <slot name="attachments" />
+    </div>
 
     <div
       v-if="editing"

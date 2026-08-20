@@ -183,7 +183,12 @@ def post_lane_b_message(
     # thread must not inherit the operator's own write access.
     from app.cli_runtime.composer_execution_policy import resolve_composer_execution_policy
 
-    thread_execution_policy = resolve_composer_execution_policy(sandbox_workspace_root, thread_employee_role, composer_mode)
+    thread_execution_policy = resolve_composer_execution_policy(
+        sandbox_workspace_root,
+        thread_employee_role,
+        composer_mode,
+        execution_access,
+    )
     lead_name = employee_name_from_persona_block(employee_persona or "") or "Lead"
     bind_lane_b_attachments = lambda message_id: _bind_message_attachments(
         attachment_ids=attachment_ids,

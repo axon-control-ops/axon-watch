@@ -76,6 +76,18 @@ describe('composer-teammate-route', () => {
     expect(decision.reason).toBe('lead_fan_out');
   });
 
+  it('does not switch teammates for pronoun-only named assigns', () => {
+    const dana = dashproRoster[0];
+    const decision = shouldSoftRouteToTeammate(
+      'Route the task to Priya',
+      dana,
+      dashproRoster,
+    );
+    expect(decision.shouldRoute).toBe(false);
+    expect(decision.reason).toBe('vague_named_assign');
+    expect(decision.employee?.name).toBe('Priya');
+  });
+
   it('does not spend a model call on a zero-signal prompt', () => {
     const decision = shouldSoftRouteToTeammate(
       'check canary',

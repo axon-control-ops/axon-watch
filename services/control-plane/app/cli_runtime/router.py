@@ -225,6 +225,14 @@ def _cursor_reply_content(reply: CursorAgentReply, approval_notice: str | None) 
     return content
 
 
+def _cursor_named_model_requires_auto(detail: str) -> bool:
+    lowered = str(detail or "").lower()
+    return (
+        "named models unavailable" in lowered
+        and "free plans can only use auto" in lowered
+    )
+
+
 def dispatch_ide_composer(
     *,
     workspace_id: str,
@@ -382,26 +390,58 @@ def dispatch_ide_composer(
             env=dispatch_env,
             workspace_id=workspace_id,
             run_id=run_id,
+            workspace_root=workspace_root,
         )
         try:
             if target_type == "cloud":
                 raise RuntimeError(_cloud_runtime_message(record))
             if family == "cursor":
-                cursor_reply = run_cursor_local_with_recursion_retry(
-                    runtime_id=runtime_id,
-                    workspace_id=workspace_id,
-                    binary=binary,
-                    prompt=prompt,
-                    workspace_root=workspace_root,
-                    composer_mode=composer_mode,
-                    execution_tier=execution_tier,
-                    model=model,
-                    subprocess_env=dispatch_env,
-                    run_id=run_id,
-                    on_chunk=on_chunk,
-                    trust_policy=cursor_trust_policy,
-                    sandbox_policy=sandbox_policy,
-                )
+                try:
+                    cursor_reply = run_cursor_local_with_recursion_retry(
+                        runtime_id=runtime_id,
+                        workspace_id=workspace_id,
+                        binary=binary,
+                        prompt=prompt,
+                        workspace_root=workspace_root,
+                        composer_mode=composer_mode,
+                        execution_tier=execution_tier,
+                        model=model,
+                        subprocess_env=dispatch_env,
+                        run_id=run_id,
+                        on_chunk=on_chunk,
+                        trust_policy=cursor_trust_policy,
+                        sandbox_policy=sandbox_policy,
+                    )
+                except RuntimeError as cursor_exc:
+                    # Cursor free plans may be logged in and otherwise ready
+                    # while rejecting an explicit model pin. Treat that as an
+                    # Auto-model retry, not as a provider failure that burns
+                    # Codex/Claude fallback capacity or strands the worker.
+                    if model and _cursor_named_model_requires_auto(str(cursor_exc)):
+                        logger.info(
+                            "cursor_named_model_unavailable_retry_auto "
+                            "runtime_id=%s workspace_id=%s model=%s",
+                            runtime_id,
+                            workspace_id,
+                            model,
+                        )
+                        cursor_reply = run_cursor_local_with_recursion_retry(
+                            runtime_id=runtime_id,
+                            workspace_id=workspace_id,
+                            binary=binary,
+                            prompt=prompt,
+                            workspace_root=workspace_root,
+                            composer_mode=composer_mode,
+                            execution_tier=execution_tier,
+                            model="",
+                            subprocess_env=dispatch_env,
+                            run_id=run_id,
+                            on_chunk=on_chunk,
+                            trust_policy=cursor_trust_policy,
+                            sandbox_policy=sandbox_policy,
+                        )
+                    else:
+                        raise
                 content = _cursor_reply_content(cursor_reply, approval_notice)
                 return _finish({
                     "content": content,

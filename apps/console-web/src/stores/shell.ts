@@ -898,8 +898,8 @@ export const useShellStore = defineStore('shell', () => {
 
   async function restoreWorkspaceIdeView(workspaceId: string): Promise<void> {
     await loadIdeThreads(workspaceId);
-    const threadId =
-      getWorkspaceSurfaceThreadId(workspaceId, 'ide') ?? bootstrapIdeActiveThreadId(workspaceId);
+    bootstrapIdeActiveThreadId(workspaceId);
+    const threadId = getWorkspaceSurfaceThreadId(workspaceId, 'ide');
     if (threadId) {
       setWorkspaceSurfaceThreadId(workspaceId, 'ide', threadId);
     }
@@ -1178,12 +1178,17 @@ export const useShellStore = defineStore('shell', () => {
   const ideChatHydratePromises = new Map<string, Promise<void>>();
 
   function bootstrapIdeActiveThreadId(workspaceId: string): string | null {
+    const threads = ideThreadsByWorkspaceId.value[workspaceId] ?? [];
+    const knownIds = new Set(threads.map((thread) => thread.thread_id));
+    let selectedThreadId = getWorkspaceSurfaceThreadId(workspaceId, 'ide');
+    if (selectedThreadId && !knownIds.has(selectedThreadId)) {
+      clearWorkspaceSurfaceThreadId(workspaceId, 'ide');
+      selectedThreadId = null;
+    }
     const resolved = resolveBootstrapIdeThreadId({
-      selectedThreadId: getWorkspaceSurfaceThreadId(workspaceId, 'ide'),
+      selectedThreadId,
       openTabIds: openIdeThreadIdsByWorkspaceId.value[workspaceId] ?? [],
-      threadListIds: (ideThreadsByWorkspaceId.value[workspaceId] ?? []).map(
-        (thread) => thread.thread_id,
-      ),
+      threads,
     });
     if (resolved && resolved !== getWorkspaceSurfaceThreadId(workspaceId, 'ide')) {
       setWorkspaceSurfaceThreadId(workspaceId, 'ide', resolved);
@@ -1303,6 +1308,27 @@ export const useShellStore = defineStore('shell', () => {
     ideChatHydratePromises.set(cleaned, promise);
     return promise;
   }
+
+  let runtimeLaneWasReady = false;
+  watch(
+    () => Boolean(runtimeSummary.value?.watch.connected),
+    async (connected) => {
+      const wasReady = runtimeLaneWasReady;
+      runtimeLaneWasReady = connected;
+      if (!connected || wasReady) {
+        return;
+      }
+      const workspaceId = currentWorkspace.value?.workspace_id;
+      if (!workspaceId || layoutMode.value !== 'ide') {
+        return;
+      }
+      if (threadMessages.value.length > 0) {
+        return;
+      }
+      commandMutationError.value = null;
+      await hydrateWorkspaceIdeChat(workspaceId);
+    },
+  );
 
   async function createIdeThread(): Promise<string | null> {
     const workspaceId = currentWorkspace.value?.workspace_id;

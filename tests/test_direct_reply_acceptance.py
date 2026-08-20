@@ -31,6 +31,20 @@ class DirectReplyAcceptanceTests(unittest.TestCase):
         self.assertFalse(result.passed)
         self.assertIn("no human-facing conclusion", result.summary)
 
+    def test_accepts_orphan_tool_read_markers_when_final_report_exists(self) -> None:
+        reply = (
+            ":::terminal npm test\n"
+            "sh: 1: jest: not found\n"
+            ":::\n"
+            ":::tool Read node_modules/.bin/jest\n"
+            ":::tool Read node_modules\n"
+            "I tried to run the test suite and hit a hard environment blocker.\n\n"
+            "Bottom line: this disposable checkout has no installed dependencies."
+        )
+        result = evaluate_direct_reply_acceptance(reply)
+        self.assertTrue(result.passed)
+        self.assertIn("hard environment blocker", narrative_outside_receipts(reply))
+
     def test_accepts_receipts_followed_by_final_answer(self) -> None:
         reply = (
             ':::terminal query\ncount=42\n:::\n'

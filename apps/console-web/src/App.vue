@@ -1,7 +1,10 @@
 <script setup lang="ts">
-import { computed, onUnmounted, ref, watch } from 'vue';
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 
+import { OPERATOR_AUTH_REQUIRED_EVENT } from './api/client';
+import { fetchOperatorSession, type OperatorSessionStatus } from './api/operator-auth-api';
 import BootWakeOverlay from './components/BootWakeOverlay.vue';
+import OperatorLoginGate from './components/auth/OperatorLoginGate.vue';
 import CenterWorkbench from './components/shell/CenterWorkbench.vue';
 import LeftSidebar from './components/shell/LeftSidebar.vue';
 import RightDock from './components/shell/RightDock.vue';
@@ -34,12 +37,24 @@ useVoiceDeckOnBoot();
 useVoiceCockpitPresence();
 useKairoAppVoice();
 let liveEventsSession: ReturnType<typeof startLiveEventsSession> | null = null;
+const operatorAuthState = ref<'checking' | 'authenticated' | 'required' | 'error'>('checking');
+const operatorAuthError = ref<string | null>(null);
+const operatorSessionHint = ref<OperatorSessionStatus | null>(null);
+let bootstrapStarted = false;
 const { appSurface } = useAppSurface();
 const isVaultSurface = computed(() => appSurface.value === 'vault');
 const isDataSurface = computed(() => appSurface.value === 'data');
 const isSkillsSurface = computed(() => appSurface.value === 'skills');
 const isMobileSurface = computed(() => appSurface.value === 'mobile');
 const isSettingsSurface = computed(() => appSurface.value === 'settings');
+const mobileSurfaceGridStyle = {
+  gridTemplateAreas: "'mobile'",
+  gridTemplateColumns: 'minmax(0, 1fr)',
+  gridTemplateRows: 'minmax(0, 1fr)',
+  minWidth: '0',
+  width: '100%',
+  height: '100vh',
+};
 const isFoundationSurface = computed(
   () =>
     isVaultSurface.value ||
@@ -65,6 +80,44 @@ function completeBoot(): void {
   bootComplete.value = true;
 }
 
+function markOperatorAuthenticated(): void {
+  operatorAuthState.value = 'authenticated';
+  operatorAuthError.value = null;
+  if (!bootstrapStarted) {
+    bootstrapStarted = true;
+    void shell.loadBootstrapData();
+  }
+}
+
+async function checkOperatorSession(): Promise<void> {
+  operatorAuthState.value = 'checking';
+  operatorAuthError.value = null;
+  try {
+    const status = await fetchOperatorSession();
+    operatorSessionHint.value = status;
+    if (status.authenticated) {
+      markOperatorAuthenticated();
+      return;
+    }
+    operatorAuthState.value = 'required';
+  } catch (error) {
+    operatorAuthState.value = 'error';
+    operatorAuthError.value =
+      error instanceof Error ? error.message : 'Operator session check failed.';
+  }
+}
+
+function requireOperatorAuthentication(): void {
+  operatorAuthState.value = 'required';
+  liveEventsSession?.disconnect();
+  liveEventsSession = null;
+}
+
+onMounted(() => {
+  window.addEventListener(OPERATOR_AUTH_REQUIRED_EVENT, requireOperatorAuthentication);
+  void checkOperatorSession();
+});
+
 watch(
   appSurface,
   (surface, previous) => {
@@ -83,10 +136,12 @@ watch(
 );
 
 watch(
-  bootComplete,
-  (complete) => {
-    if (!complete || showScanPreview.value) {
+  () => [bootComplete.value, operatorAuthState.value] as const,
+  ([complete, authState]) => {
+    if (!complete || authState !== 'authenticated' || showScanPreview.value) {
       shell.unbindViewportCompactListener();
+      liveEventsSession?.disconnect();
+      liveEventsSession = null;
       return;
     }
 
@@ -131,6 +186,7 @@ watch(
 );
 
 onUnmounted(() => {
+  window.removeEventListener(OPERATOR_AUTH_REQUIRED_EVENT, requireOperatorAuthentication);
   shell.unbindViewportCompactListener();
   liveEventsSession?.disconnect();
   liveEventsSession = null;
@@ -138,49 +194,62 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <ScanHierarchyPreview v-if="showScanPreview" />
+  <OperatorLoginGate
+    v-if="operatorAuthState !== 'authenticated'"
+    :checking="operatorAuthState === 'checking'"
+    :connection-error="operatorAuthError"
+    :loopback-bypass="operatorSessionHint?.loopback_bypass === true"
+    :cookie-max-age-seconds="operatorSessionHint?.cookie_max_age_seconds ?? null"
+    @authenticated="markOperatorAuthenticated"
+    @retry="checkOperatorSession"
+  />
 
   <template v-else>
-    <BootWakeOverlay v-if="!bootComplete" @complete="completeBoot" />
+    <ScanHierarchyPreview v-if="showScanPreview" />
 
-    <div
-      v-show="bootComplete"
-      class="console-shell console-shell--mockup"
-      :class="{
-        'dev-seams': shell.showDevSeams,
-        'console-shell--mobile-compact': shell.mobileCompactLayout,
-        'console-shell--ide': shell.layoutMode === 'ide',
-        'console-shell--operator': shell.layoutMode === 'operator',
-        'console-shell--brain-galaxy':
-          shell.layoutMode === 'operator' && shell.operatorBrainGalaxyActive,
-        'console-shell--mission-control':
-          shell.layoutMode === 'operator' && !shell.operatorBrainGalaxyActive,
-        'console-shell--glass3d': !isFoundationSurface,
-        'console-shell--vault': isVaultSurface,
-        'console-shell--data': isDataSurface,
-        'console-shell--skills': isSkillsSurface,
-        'console-shell--mobile': isMobileSurface,
-        'console-shell--settings': isSettingsSurface,
-      }"
-      :data-layout-mode="shell.layoutMode"
-      data-hud="holographic"
-    >
-      <HudHoloAtmosphere v-if="!isFoundationSurface" />
-      <TopBar />
-      <template v-if="!isFoundationSurface">
-        <MobileVoiceCockpitStrip />
-        <LeftSidebar />
-        <CenterWorkbench />
-        <RightDock />
-      </template>
-      <VaultSurface v-if="isVaultSurface" />
-      <DataSurface v-if="isDataSurface" />
-      <SkillsSurface v-if="isSkillsSurface" />
-      <OperatorMobileShell v-if="isMobileSurface" />
-      <OperatorSettingsSurface v-if="isSettingsSurface" />
-      <StatusBar />
-    </div>
-    <VoiceOrbHost v-if="bootComplete && !isFoundationSurface" />
-    <ReportTheaterOverlay v-if="bootComplete && !isFoundationSurface" />
+    <template v-else>
+      <BootWakeOverlay v-if="!bootComplete" @complete="completeBoot" />
+
+      <div
+        v-show="bootComplete"
+        class="console-shell console-shell--mockup"
+        :class="{
+          'dev-seams': shell.showDevSeams,
+          'console-shell--mobile-compact': shell.mobileCompactLayout,
+          'console-shell--ide': shell.layoutMode === 'ide',
+          'console-shell--operator': shell.layoutMode === 'operator',
+          'console-shell--brain-galaxy':
+            shell.layoutMode === 'operator' && shell.operatorBrainGalaxyActive,
+          'console-shell--mission-control':
+            shell.layoutMode === 'operator' && !shell.operatorBrainGalaxyActive,
+          'console-shell--glass3d': !isFoundationSurface,
+          'console-shell--vault': isVaultSurface,
+          'console-shell--data': isDataSurface,
+          'console-shell--skills': isSkillsSurface,
+          'console-shell--mobile': isMobileSurface,
+          'console-shell--settings': isSettingsSurface,
+        }"
+        :style="isMobileSurface ? mobileSurfaceGridStyle : undefined"
+        :data-layout-mode="shell.layoutMode"
+        data-hud="holographic"
+      >
+        <HudHoloAtmosphere v-if="!isFoundationSurface" />
+        <TopBar />
+        <template v-if="!isFoundationSurface">
+          <MobileVoiceCockpitStrip />
+          <LeftSidebar />
+          <CenterWorkbench />
+          <RightDock />
+        </template>
+        <VaultSurface v-if="isVaultSurface" />
+        <DataSurface v-if="isDataSurface" />
+        <SkillsSurface v-if="isSkillsSurface" />
+        <OperatorMobileShell v-if="isMobileSurface" />
+        <OperatorSettingsSurface v-if="isSettingsSurface" />
+        <StatusBar />
+      </div>
+      <VoiceOrbHost v-if="bootComplete && !isFoundationSurface" />
+      <ReportTheaterOverlay v-if="bootComplete && !isFoundationSurface" />
+    </template>
   </template>
 </template>

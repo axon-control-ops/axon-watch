@@ -66,6 +66,12 @@ export interface TerminalSessionRecord {
   title: string;
   run_id: string | null;
   created_at: string;
+  /** Directory this PTY is really rooted at — isolated lanes differ from the bound root. */
+  cwd?: string;
+  /** Branch at `cwd`; for an isolated lane this is the worker branch, not the bound one. */
+  branch?: string;
+  /** True when the lane runs inside the disposable Sandbox checkout. */
+  isolated?: boolean;
 }
 
 function encodeWorkspaceFilePath(filePath: string): string {

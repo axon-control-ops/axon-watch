@@ -9,7 +9,7 @@ When a parent sees **Submit to Teacher** fail on `homework-detail` / physical wo
 | `row-level security policy` + `homework_submissions` | RLS | **Marco** (backend) | Parent INSERT/UPDATE policies; `get_my_children_ids()`; K12 tenant via `COALESCE(preschool_id, organization_id)`; migrations `20260817194500`, `20260817201500` |
 | `homework_submissions_content_type_check` | CHECK constraint | **Priya** (frontend) + **Marco** if enum gap | Map payload to allowed `content_type`: `text`, `audio`, `image`, `video`, `pdf`, `link`, `mixed`, `file`. Legacy JS sent `'file'` before DB allowed it — migration `20260817213000`. Use `lib/homework/resolveHomeworkSubmissionTypes.ts` |
 | `homework_submissions_submission_type_check` | CHECK constraint | **Priya** | Allowed: `text`, `photo`, `video`, `audio`, `file`, `drawing` — **not** `mixed` |
-| FK / `submitted_by` | Client + schema | **Priya** | FK → `public.users(id)`; resolve via `users.auth_user_id`, not `profiles.id` |
+| `homework_submissions_submitted_by_fkey` / FK / `submitted_by` | Client RPC + schema | **Priya** + **Marco** | FK → `public.users(id)`. **Never** send `auth.uid()` or `profiles.id`. Use RPC `get_my_homework_submitter_user_id()` (`lib/homework/resolveHomeworkSubmittedBy.ts`, migration `20260817220000`). If unresolved, send `submitted_by: null` — not a wrong UUID. Parent clients **cannot** `SELECT public.users`. |
 | `Network request failed` (Android gallery) | Client read path | **Priya** | `readUploadBodyFromUri` — not a DB issue |
 
 **Not the same column:** `content_type` and `submission_type` have **different** allowed value lists. Do not copy one to the other.
@@ -28,7 +28,7 @@ cd /run/media/vaxon/axon-data/projectx/product/dashpro
 node_modules/.bin/supabase migration list --linked
 ```
 
-Confirm applied (local = remote): `20260817194500`, `20260817201500`, `20260817213000`.
+Confirm applied (local = remote): `20260817194500`, `20260817201500`, `20260817213000`, `20260817220000`.
 
 **Note:** These were applied to the linked Supabase project by the operator via `supabase db push` during incident response — not by Marco in sandbox. Agents write migration files; operator (or approved Integrations step) pushes.
 

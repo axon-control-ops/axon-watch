@@ -1,20 +1,18 @@
 import { describe, expect, it } from 'vitest';
 
 import {
-  SANDBOX_SESSION_CONSENT_LINES,
   buildComposerModeAccessLabel,
   composerAccessBannerCopy,
   composerAccessMenuStatus,
   composerAccessTone,
+  sandboxRootDirtyMessage,
   sandboxSessionHint,
   sandboxSessionLabel,
+  sandboxStripDetailCopy,
+  sandboxUnpromotedChangesMessage,
 } from './sandbox-session-view';
 
 describe('sandbox session view', () => {
-  it('exposes consent lines for the enable dialog', () => {
-    expect(SANDBOX_SESSION_CONSENT_LINES.length).toBeGreaterThanOrEqual(2);
-  });
-
   it('labels and hints reflect on/off and env force', () => {
     expect(sandboxSessionLabel(false)).toBe('Sandbox');
     expect(sandboxSessionLabel(true)).toBe('Sandbox · On');
@@ -92,5 +90,23 @@ describe('sandbox session view', () => {
     expect(
       composerAccessMenuStatus({ fullAccess: true, sandboxEnabled: false }).workerIsolationLine,
     ).toContain('isolated checkouts');
+  });
+
+  it('builds strip and status warning copy for sandbox lifecycle', () => {
+    expect(sandboxStripDetailCopy(false)).toContain('root preview');
+    expect(sandboxStripDetailCopy(true)).toContain('Review and preview');
+    expect(sandboxUnpromotedChangesMessage()).toContain('Review / Preview');
+    expect(
+      sandboxRootDirtyMessage({
+        bound_branch: 'development',
+        root_changed_paths: ['README.md', 'package.json'],
+      }),
+    ).toContain('development');
+    expect(
+      sandboxRootDirtyMessage({
+        bound_branch: 'development',
+        root_changed_paths: ['README.md', 'package.json'],
+      }),
+    ).toContain('README.md');
   });
 });

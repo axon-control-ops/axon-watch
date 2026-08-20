@@ -138,6 +138,46 @@ systemctl --user enable \
   console-web.service \
   console-web-rebuild.path
 
+# Linger is what keeps user units running after logout and across reboot. It
+# needs privilege, so verify it explicitly instead of printing an instruction
+# and hoping: this host has reported Linger=no while appearing "installed".
+ensure_linger() {
+  local state
+  state="$(loginctl show-user "${USER}" -p Linger --value 2>/dev/null || echo "")"
+  if [[ "${state}" == "yes" ]]; then
+    echo "Linger: enabled"
+    return 0
+  fi
+  echo "Linger: NOT enabled — user units will die at logout and not start at boot."
+  if loginctl enable-linger "${USER}" 2>/dev/null; then
+    state="$(loginctl show-user "${USER}" -p Linger --value 2>/dev/null || echo "")"
+  elif sudo -n loginctl enable-linger "${USER}" 2>/dev/null; then
+    state="$(loginctl show-user "${USER}" -p Linger --value 2>/dev/null || echo "")"
+  fi
+  if [[ "${state}" == "yes" ]]; then
+    echo "Linger: enabled"
+    return 0
+  fi
+  echo "ERROR: could not enable linger. Run this as a privileged step, then re-run:" >&2
+  echo "  sudo loginctl enable-linger ${USER}" >&2
+  return 1
+}
+
+linger_ok=1
+ensure_linger || linger_ok=0
+
+# The tunnel binary must live on the system disk, not in this checkout: the
+# external SSD holding the repo has failed before and takes the tunnel with it.
+if [[ -x "${HOME}/.local/lib/axon/cloudflared/current/cloudflared" ]]; then
+  echo "cloudflared: managed install present"
+else
+  echo "cloudflared: NOT installed — run ./scripts/ops/install-cloudflared.sh" >&2
+fi
+
+if [[ "${linger_ok}" -ne 1 ]]; then
+  echo "WARN: install completed but always-on is NOT guaranteed until linger is enabled." >&2
+fi
+
 port_busy() {
   local port="$1"
   ss -ltn "sport = :${port}" 2>/dev/null | rg -q ":${port}"
@@ -195,6 +235,5 @@ curl -sS --max-time 10 -X POST \
   | python3 -m json.tool 2>/dev/null || \
   echo "WARN: managed tunnel start failed; check /api/tunnel/status." >&2
 
-echo "User linger should stay yes so services survive logout: loginctl enable-linger \$USER"
 echo "Operator surface: http://127.0.0.1:4173  (legacy axon-local / :7734 runtime retired; source retained)"
 echo "Hard CF ingress cutover (optional): CF_API_TOKEN=... ./scripts/ops/set-tunnel-ingress-4173.sh"

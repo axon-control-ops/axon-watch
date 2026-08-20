@@ -1,0 +1,16 @@
+{
+  "schema_version": 1,
+  "version": "2026.8.2",
+  "download_base_url": "https://github.com/cloudflare/cloudflared/releases/download",
+  "install_root": "${HOME}/.local/lib/axon/cloudflared",
+  "artifacts": {
+    "linux/x86_64": {
+      "asset": "cloudflared-linux-amd64",
+      "sha256": "fcfb02b575a52ca1af2e3267af4e1517bcdeb30ac48c834c69abaed3c0576ad2"
+    },
+    "linux/aarch64": {
+      "asset": "cloudflared-linux-arm64",
+      "sha256": "7747d94570fb390cf47dcb4f9555c193c6355cda9793f0d878d9049e5d6a7790"
+    }
+  }
+}

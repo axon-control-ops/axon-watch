@@ -25,7 +25,7 @@ describe('resolveConversationNavigationIntent', () => {
   it('switches to grid view', () => {
     expect(resolveConversationNavigationIntent('grid view', WORKSPACES)).toEqual({
       kind: 'switch_center_view',
-      centerView: 'grid',
+      centerView: 'mission',
       reply: 'Switching to fleet grid view.',
     });
   });
@@ -58,7 +58,7 @@ describe('resolveConversationNavigationIntent', () => {
   it('switches to fleet grid on explicit fleet grid phrasing', () => {
     expect(resolveConversationNavigationIntent('show fleet grid', WORKSPACES)).toEqual({
       kind: 'switch_center_view',
-      centerView: 'grid',
+      centerView: 'mission',
       reply: 'Switching to fleet grid view.',
     });
   });

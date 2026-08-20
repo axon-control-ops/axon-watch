@@ -75,11 +75,11 @@ class InterpreterWritesAreActuallyDeniedTests(unittest.TestCase):
 
     def test_headless_form_reaches_the_full_frontend_toolchain(self) -> None:
         for command in (
-            "npx jest tests/components/x.test.tsx",
+            "npx --no-install jest tests/components/x.test.tsx",
             "npm test -- tests/components/x.test.tsx",
-            "npx tsc --noEmit",
-            "axon-agent-terminal-job --workspace w -- npx jest tests/components/x.test.tsx",
-            "axon-agent-terminal-job --workspace w -- npx tsc --noEmit",
+            "npx --no-install tsc --noEmit",
+            "axon-agent-terminal-job --workspace w -- npx --no-install jest tests/components/x.test.tsx",
+            "axon-agent-terminal-job --workspace w -- npx --no-install tsc --noEmit",
         ):
             with self.subTest(command=command):
                 self.assertEqual("allow", self._permission("frontend", command))

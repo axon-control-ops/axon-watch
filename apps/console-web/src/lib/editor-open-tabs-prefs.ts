@@ -1,7 +1,39 @@
 import {
+  isBinaryFilePath,
+  isImageFilePath,
+  isPdfFilePath,
+} from './workspace-file-language';
+import {
   isSafeWorkspaceFilePath,
   normalizeWorkspaceFilePath,
 } from './workspace-file-session';
+
+function isInlinePreviewOnlyPath(path: string): boolean {
+  return isPdfFilePath(path) || isImageFilePath(path);
+}
+
+/** Prefer a readable editor tab over PDF/image previews on workspace entry. */
+export function pickPreferredActiveEditorPath(openedPaths: readonly string[]): string | null {
+  const opened = uniquePaths(openedPaths);
+  if (opened.length === 0) {
+    return null;
+  }
+
+  const readme = opened.find((path) => path === 'README.md' || path.endsWith('/README.md'));
+  if (readme) {
+    return readme;
+  }
+
+  const markdown = opened.find(
+    (path) => path.endsWith('.md') && !isInlinePreviewOnlyPath(path),
+  );
+  if (markdown) {
+    return markdown;
+  }
+
+  const editable = opened.find((path) => !isBinaryFilePath(path));
+  return editable ?? opened[0] ?? null;
+}
 
 export const OPEN_EDITOR_FILE_TABS_KEY = 'axon-x-open-editor-file-tabs-v1';
 export const ACTIVE_EDITOR_DOCUMENT_IDS_KEY = 'axon-x-active-editor-document-v1';
@@ -158,13 +190,21 @@ export function resolveRestoredActiveEditorDocumentId(input: {
     return null;
   }
 
+  const preferredPath = pickPreferredActiveEditorPath(opened);
+  if (!preferredPath) {
+    return null;
+  }
+
   const stored = String(input.storedDocumentId ?? '').trim();
   if (stored.startsWith('file:')) {
     const path = stored.slice('file:'.length);
     if (opened.includes(path)) {
+      if (isInlinePreviewOnlyPath(path)) {
+        return `file:${preferredPath}`;
+      }
       return stored;
     }
   }
 
-  return `file:${opened[0]}`;
+  return `file:${preferredPath}`;
 }

@@ -45,14 +45,30 @@ def operator_composer_sandbox_policy(workspace_root: Path) -> AgentExecutionPoli
 
 
 def resolve_composer_execution_policy(
-    workspace_root: Path | None, employee_role: str, composer_mode: str
+    workspace_root: Path | None,
+    employee_role: str,
+    composer_mode: str,
+    execution_access: str | None = None,
 ) -> AgentExecutionPolicy | None:
-    from app.cli_runtime.approval_gate import is_tool_capable_composer_mode
+    from app.cli_runtime.approval_gate import (
+        full_access_requested,
+        is_tool_capable_composer_mode,
+    )
 
     if not is_tool_capable_composer_mode(composer_mode):
         return None
     if employee_role:
-        return role_execution_policy(employee_role)
+        role_policy = role_execution_policy(employee_role)
+        # Operator Full Access inside a disposable composer checkout should match
+        # the generic-thread sandbox: write anywhere in the copy, promote on receipt.
+        # Consultative roles (watcher) stay read-only regardless of the toggle.
+        if (
+            workspace_root is not None
+            and full_access_requested(execution_access)
+            and role_policy.execution_access == "full"
+        ):
+            return operator_composer_sandbox_policy(workspace_root)
+        return role_policy
     return operator_composer_sandbox_policy(workspace_root) if workspace_root is not None else None
 
 

@@ -175,8 +175,23 @@ export function systemMessagePreview(content: string): string {
   return `${trimmed.slice(0, 117).trim()}…`;
 }
 
-const STICKY_PROMPT_PREVIEW_LINES = 3;
-const STICKY_PROMPT_PREVIEW_CHARS = 220;
+const STICKY_PROMPT_PREVIEW_LINES = 1;
+const STICKY_PROMPT_PREVIEW_CHARS = 120;
+
+function stickyPromptMeaningfulLines(text: string): string[] {
+  return text
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0);
+}
+
+/** Skip markdown headings in the collapsed preview so "# Instructions" does not eat the line budget. */
+function stickyPromptPreviewLines(text: string): string[] {
+  const meaningfulLines = stickyPromptMeaningfulLines(text);
+  const substantive = meaningfulLines.filter((line) => !/^#{1,6}\s+\S/.test(line));
+  const source = substantive.length > 0 ? substantive : meaningfulLines;
+  return source.slice(0, STICKY_PROMPT_PREVIEW_LINES);
+}
 
 /**
  * The operator's own message renders as raw pre-wrapped text (no markdown),
@@ -190,19 +205,17 @@ export function stickyPromptCanExpand(text: string): boolean {
   if (!normalized) {
     return false;
   }
-  const meaningfulLines = normalized.split(/\r?\n/).filter((line) => line.trim().length > 0);
+  const meaningfulLines = stickyPromptMeaningfulLines(normalized);
+  const substantive = meaningfulLines.filter((line) => !/^#{1,6}\s+\S/.test(line));
+  const previewSource = substantive.length > 0 ? substantive : meaningfulLines;
   return (
     normalized.length > STICKY_PROMPT_PREVIEW_CHARS ||
-    meaningfulLines.length > STICKY_PROMPT_PREVIEW_LINES
+    previewSource.length > STICKY_PROMPT_PREVIEW_LINES
   );
 }
 
 export function stickyPromptPreviewText(text: string): string {
-  const meaningfulLines = text
-    .split(/\r?\n/)
-    .map((line) => line.trim())
-    .filter((line) => line.length > 0);
-  const preview = meaningfulLines.slice(0, STICKY_PROMPT_PREVIEW_LINES).join('\n');
+  const preview = stickyPromptPreviewLines(text).join('\n');
   return preview.length > STICKY_PROMPT_PREVIEW_CHARS
     ? `${preview.slice(0, STICKY_PROMPT_PREVIEW_CHARS).trim()}…`
     : preview;

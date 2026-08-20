@@ -35,8 +35,8 @@ WRITE_CONTRACT_CLAUSE = (
     "whole command is denied and the wrapper looks missing when it is simply "
     "mis-invoked. On a headless shift, route shell work through "
     "`axon-agent-terminal-job --workspace <id> -- <command>`, where the inner "
-    "command must itself be approved (for example `npx jest <path>`, "
-    "`npm test -- <path>`, `npx tsc --noEmit`). A denial means wrong form or wrong "
+    "command must itself be approved (for example `npx --no-install jest <path>`, "
+    "`npm test -- <path>`, `npx --no-install tsc --noEmit`). A denial means wrong form or wrong "
     "role for your policy — never that the tool does not exist. Quote the exact "
     "denial text rather than concluding the tool is unavailable. "
 )

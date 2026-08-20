@@ -111,20 +111,27 @@ def _wait_for_worker_dispatch_started(
 
 
 def _recover_undispatched_operator_start(run_id: str) -> None:
-    """Fail a zombie run and reopen its leased task so Run verification can retry."""
-    from app.runs.service import RunLifecycleError, RunNotFoundError, fail_run
+    """Terminate an undispatched run and reopen its leased task for retry."""
+    from app.runs.service import RunLifecycleError, RunNotFoundError, fail_run, stop_run
 
     try:
-        fail_run(
-            run_id,
-            receipt_summary=(
-                "Operator start did not receive worker_dispatch_started within "
-                f"{int(DISPATCH_RECEIPT_WAIT_SECONDS)}s; task reopened for retry"
-            ),
-            actor="operator",
-        )
+        record = _safe_get_run(run_id) or {}
+        phase = str(record.get("phase") or "").strip().lower()
+        if phase in {"queued", "starting", "planning", "waiting_external"}:
+            paused = stop_run(run_id)
+            if str(paused.get("phase") or "").strip().lower() == "paused":
+                stop_run(run_id)
+        else:
+            fail_run(
+                run_id,
+                receipt_summary=(
+                    "Operator start did not receive worker_dispatch_started within "
+                    f"{int(DISPATCH_RECEIPT_WAIT_SECONDS)}s; task reopened for retry"
+                ),
+                actor="operator",
+            )
     except (RunLifecycleError, RunNotFoundError):
-        logger.exception("could not fail undispatched operator start run %s", run_id)
+        logger.exception("could not terminate undispatched operator start run %s", run_id)
     task_store.reopen_orphaned_leased_tasks(
         terminal_run_ids=[run_id],
         terminal_outcome="operator start dispatch timeout; retry Run verification",

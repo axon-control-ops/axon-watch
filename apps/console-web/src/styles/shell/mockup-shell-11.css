@@ -246,17 +246,22 @@
   grid-column: centerWorkbench;
 }
 
-/* Mission Control grid: left rail is redundant with Fleet Health.
-   Keep LIVE OPERATIONS / RightDock; expand the center workbench. */
+/* Mission Control tabs: center workbench + resizable LIVE OPS glance rail. */
 .console-shell--mockup.console-shell--operator.console-shell--mission-control {
   grid-template-columns:
-    0
+    minmax(14rem, var(--shell-left-sidebar-width, 340px))
     minmax(0, 1fr)
-    var(--shell-agent-dock-width, min(26rem, 32vw));
+    var(--shell-agent-dock-width, 360px);
+}
+
+.console-shell--mockup.console-shell--operator.console-shell--mission-control .region-right-dock {
+  display: flex;
+  min-width: 0;
 }
 
 .console-shell--mockup.console-shell--operator.console-shell--mission-control .region-left-sidebar {
-  display: none;
+  display: flex;
+  min-width: 0;
 }
 
 .console-shell--mockup.console-shell--operator.console-shell--mission-control .region-center-workbench {

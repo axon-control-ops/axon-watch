@@ -130,6 +130,7 @@ def assert_agent_terminal_job_allowed(
         employee=_employee_for_role(source, role),
         task_payload=task,
         workspace_root=root,
+        workspace_id=source,
     )
     decision = evaluate_hook_payload(
         {"hook_event_name": "beforeShellExecution", "command": command},

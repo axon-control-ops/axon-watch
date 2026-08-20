@@ -3,12 +3,47 @@
 from __future__ import annotations
 
 import logging
+import re
 from typing import Any
 
 from app.persistence import task_store
 from app.workspace_agents.lead_text import truncate_text
 
 logger = logging.getLogger(__name__)
+
+
+_DISPOSABLE_MISSING_ARTIFACT_RE = re.compile(
+    r"\b(?:no such file|not found|missing|wasn'?t found|does not exist)\b",
+    re.I,
+)
+
+
+def should_suppress_disposable_artifact_follow_up(
+    *,
+    lead_next: str,
+    blockers: str,
+    specialist_goal: str,
+) -> bool:
+    """Suppress loops caused by stale artifacts missing only in a disposable checkout.
+
+    A disposable worker checkout is not authoritative proof that an old probe or
+    temporary artifact should be recreated in the real project. If a specialist
+    explicitly reports that the file is absent in an isolated/sandbox checkout,
+    Lead should not create another sticky follow-up that keeps the fleet chasing
+    yesterday's probe.
+    """
+    blob = " ".join(
+        str(part or "")
+        for part in (lead_next, blockers, specialist_goal)
+        if str(part or "").strip()
+    ).lower()
+    if not blob:
+        return False
+    if not _DISPOSABLE_MISSING_ARTIFACT_RE.search(blob):
+        return False
+    if not any(marker in blob for marker in ("disposable", "isolated worker", "isolation checkout", "sandbox")):
+        return False
+    return any(marker in blob for marker in ("probe", "temporary artifact", "acceptance artifact"))
 
 
 def should_suppress_redig_follow_up(
@@ -68,6 +103,17 @@ def enqueue_lead_follow_up_task(
     ):
         logger.info(
             "lead follow-up suppressed (re-dig overlap) workspace=%s run=%s",
+            workspace,
+            run_id,
+        )
+        return None
+    if should_suppress_disposable_artifact_follow_up(
+        lead_next=lead_next,
+        blockers=blockers,
+        specialist_goal=specialist_goal,
+    ):
+        logger.info(
+            "lead follow-up suppressed (stale disposable artifact) workspace=%s run=%s",
             workspace,
             run_id,
         )
@@ -174,5 +220,6 @@ def enqueue_lead_follow_up_task(
 
 __all__ = [
     "enqueue_lead_follow_up_task",
+    "should_suppress_disposable_artifact_follow_up",
     "should_suppress_redig_follow_up",
 ]

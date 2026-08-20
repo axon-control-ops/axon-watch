@@ -61,7 +61,8 @@ _ROLE_FOCUS: dict[str, str] = {
 }
 
 _IMPLEMENT_RE = re.compile(
-    r"\b(?:fix(?:es|ed|ing)?|wire|implement|build|repair|ship|patch|update|add|remove|migrate)\b",
+    r"\b(?:fix(?:es|ed|ing)?|wire|implement|build|repair|ship|patch|update|add|remove|migrate|improve|polish|revise|clarify)\b"
+    r"|make\s+(?:it|this|that|the\s+(?:screen|flow|page|dashboard|copy|ux|ui))\s+make\s+sense",
     re.I,
 )
 

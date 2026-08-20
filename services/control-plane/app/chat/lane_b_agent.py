@@ -47,16 +47,40 @@ def _read_file_preview(workspace_id: str, path: str, *, max_chars: int = 1200) -
         return ""
 
 
-def build_lane_b_context_block(context: LaneBContext) -> str:
+def build_lane_b_context_block(
+    context: LaneBContext,
+    *,
+    workspace_root: Path | None = None,
+) -> str:
     lines = [
         f"Workspace: {context.workspace_id}",
         f"Composer mode: {context.composer_mode}",
     ]
-    try:
-        root = resolve_workspace_root(context.workspace_id)
+    if workspace_root is not None:
+        root = workspace_root.resolve()
         lines.append(f"Project root: {root}")
-    except WorkspaceRootError as exc:
-        lines.append(f"Project root unavailable: {exc}")
+        lines.append(
+            "This is the active disposable checkout. Use it as the working directory; "
+            "do not switch to a remembered or bound host-project path."
+        )
+        jest_bin = root / "node_modules" / ".bin" / "jest"
+        if jest_bin.is_file() or jest_bin.is_symlink():
+            lines.append(
+                "Sandbox toolchain: node_modules is linked into this checkout — "
+                "run tests with `npx --no-install jest <paths>` or `npm test -- <paths>` "
+                "before claiming jest is missing."
+            )
+        elif (root / "node_modules").is_dir():
+            lines.append(
+                "Sandbox toolchain: node_modules exists but jest bin was not found — "
+                "try `npm test -- <paths>` or report the exact shell error."
+            )
+    else:
+        try:
+            root = resolve_workspace_root(context.workspace_id)
+            lines.append(f"Project root: {root}")
+        except WorkspaceRootError as exc:
+            lines.append(f"Project root unavailable: {exc}")
 
     if context.active_file_path:
         preview = _read_file_preview(context.workspace_id, context.active_file_path)
@@ -133,7 +157,7 @@ def generate_lane_b_result(
             "reason": "empty prompt",
         }
 
-    context_block = build_lane_b_context_block(context)
+    context_block = build_lane_b_context_block(context, workspace_root=workspace_root)
     # Continuous-worker prompts carry commit safety language as policy, not as
     # operator intent. Only interactive turns may route through direct Git.
     git_result = (

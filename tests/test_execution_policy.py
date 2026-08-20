@@ -25,9 +25,13 @@ from app.workspace_agents.execution_policy import (  # noqa: E402
 from app.workspace_agents.execution_policy_runtime import (  # noqa: E402
     resolve_worker_execution_policy,
 )
+from app.workspace_agents.execution_policy_prefixes import COMMON_READ_PREFIXES  # noqa: E402
 
 
 class RoleExecutionPolicyTests(unittest.TestCase):
+    def test_git_grep_is_approved_read_prefix(self) -> None:
+        self.assertIn(("git", "grep"), COMMON_READ_PREFIXES)
+
     def test_role_defaults_are_immutable_and_conservative(self) -> None:
         lead = role_execution_policy("lead")
         watcher = role_execution_policy("watcher")
@@ -323,12 +327,30 @@ class SelfValidationPolicyTests(unittest.TestCase):
 
     def test_implementation_roles_can_run_their_own_validation(self) -> None:
         for role in ("backend", "frontend", "integrations", "lead"):
-            for command in ("npm test -- tests/x.test.ts", "npm run lint", "npx jest tests/x"):
+            for command in (
+                "npm ci",
+                "npm test -- tests/x.test.ts",
+                "npm run lint",
+                "npx --no-install jest tests/x",
+            ):
                 with self.subTest(role=role, command=command):
                     self.assertEqual("allow", self._permission(role, command))
 
+    def test_validation_roles_can_materialize_local_dependencies(self) -> None:
+        from app.workspace_agents.execution_policy import role_execution_policy
+
+        for role in ("backend", "frontend", "integrations", "lead"):
+            with self.subTest(role=role):
+                self.assertIn("node_modules", role_execution_policy(role).write_paths)
+
     def test_mutating_package_commands_stay_gated(self) -> None:
-        for command in ("npm install lodash", "npm run deploy", "npm publish", "npx create-app"):
+        for command in (
+            "npm install lodash",
+            "npm run deploy",
+            "npm publish",
+            "npx create-app",
+            "npx jest tests/x",
+        ):
             with self.subTest(command=command):
                 self.assertEqual("deny", self._permission("backend", command))
 

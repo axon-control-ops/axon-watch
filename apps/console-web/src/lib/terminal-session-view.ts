@@ -5,7 +5,15 @@ export interface TerminalSessionRecord {
   title: string;
   run_id: string | null;
   created_at: string;
+  /** Directory the PTY is really rooted at (isolated lanes differ from the bound root). */
+  cwd?: string;
+  /** Branch checked out at `cwd` — not necessarily the bound workspace branch. */
+  branch?: string;
+  /** True when this lane runs in the disposable Sandbox checkout. */
+  isolated?: boolean;
 }
+
+export const SANDBOX_TERMINAL_SESSION_ID = 'terminal-sandbox';
 
 export const DEFAULT_OPERATOR_TERMINAL_SESSION_ID = 'terminal-operator';
 export const DEFAULT_VAXON_TERMINAL_TITLE = 'vaxon';
@@ -38,6 +46,28 @@ export function terminalSessionTabLabel(session: TerminalSessionRecord): string 
     return `${title.toLowerCase()} · local`;
   }
   return title;
+}
+
+/**
+ * Branch badge for a terminal tab.
+ *
+ * Only isolated lanes get one. Showing the bound branch on every tab is what
+ * made the dock misleading in the first place: an operator reading
+ * `development` on a tab whose PTY sits in a `worker/...` worktree concludes
+ * the agent is working on the bound branch.
+ */
+export function terminalSessionBranchBadge(session: TerminalSessionRecord): string {
+  if (!session.isolated) return '';
+  return session.branch?.trim() || 'isolated';
+}
+
+/** Full cwd + branch, for the tab's hover title. */
+export function terminalSessionRootTitle(session: TerminalSessionRecord): string {
+  const cwd = session.cwd?.trim() || '';
+  const branch = session.branch?.trim() || '';
+  if (!cwd && !branch) return '';
+  const where = session.isolated ? 'Sandbox checkout' : 'Bound workspace';
+  return [`${where}: ${cwd || 'unknown'}`, branch ? `branch ${branch}` : ''].filter(Boolean).join(' · ');
 }
 
 export function sortTerminalSessionsOperatorFirst(

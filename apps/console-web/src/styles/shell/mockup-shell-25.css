@@ -273,6 +273,30 @@
   background: #111;
 }
 
+.editor-pdf-preview__fallback {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  justify-content: center;
+  gap: 0.65rem;
+  min-height: 12rem;
+  padding: 1.25rem 1.5rem;
+}
+
+.editor-pdf-preview__open-link {
+  align-self: flex-start;
+  color: rgba(0, 242, 255, 0.92);
+  font-family: var(--font-ui);
+  font-size: 0.76rem;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.editor-pdf-preview__open-link:hover,
+.editor-pdf-preview__open-link:focus-visible {
+  text-decoration: underline;
+}
+
 .editor-binary-preview {
   display: flex;
   flex-direction: column;

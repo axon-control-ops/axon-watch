@@ -4,7 +4,6 @@ import { createPinia } from 'pinia';
 import App from './App.vue';
 import { installKairoAudioUnlockListeners } from './lib/kairo-audio-unlock';
 import { detectDesktopCapabilities } from './lib/desktop-capability';
-import { useShellStore } from './stores/shell';
 import './styles/app.css';
 
 const desktopCaps = detectDesktopCapabilities();
@@ -34,8 +33,5 @@ window.addEventListener('unhandledrejection', (event) => {
 });
 
 app.use(pinia);
-
-const shell = useShellStore(pinia);
-void shell.loadBootstrapData();
 
 app.mount('#app');

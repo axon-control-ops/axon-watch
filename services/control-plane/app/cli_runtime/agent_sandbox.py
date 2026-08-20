@@ -11,13 +11,18 @@ import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Sequence
-from app.cli_runtime.agent_sandbox_paths import append_hidden_mounts, hidden_workspace_paths
+from app.cli_runtime.agent_sandbox_paths import (
+    append_hidden_mounts,
+    append_outside_symlink_binds,
+    hidden_workspace_paths,
+)
 from app.cli_runtime.codex_profile_mount import append_codex_auth_mount, resolve_codex_auth_path
 from app.cli_runtime.agent_sandbox_hook_docs import _claude_settings_document, _hooks_document
 from app.cli_runtime.user_bin_path import existing_user_local_bin, sandbox_path_with_user_bins
 
 _SANDBOX_HOME = Path("/run/axon-agent-home")
 _SANDBOX_POLICY_ROOT = Path("/run/axon-agent-policy")
+_SANDBOX_GIT_ROOT = Path("/run/axon-agent-git")
 _HOOK_TIMEOUT_SECONDS = 5
 # Cursor CLI atomically renames these under $HOME on startup. Bind-mounting the
 # host copies read-only (or sharing one mount across concurrent agents) surfaces
@@ -47,6 +52,8 @@ class AgentSandboxPolicy:
     # auth file is mounted only at the sandbox's private CODEX_HOME.
     codex_auth_path: str = ""
     forbidden_path_globs: tuple[str, ...] = ()
+    # Whitelisted service-bridge keys materialized with --setenv (never logged).
+    injected_env: tuple[tuple[str, str], ...] = ()
 
 
 @dataclass(frozen=True)
@@ -56,6 +63,8 @@ class CursorHookMaterial:
     hooks_json: Path
     policy_json: Path
     hook_script: Path
+    git_config: Path
+    git_marker: Path | None
     workspace_scratch: Path
     workspace_codex_scratch: Path
     sandbox_home: Path
@@ -286,6 +295,9 @@ def materialize_cursor_hook_policy(
     hooks_path = cursor_dir / "hooks.json"
     policy_path = target / "policy.json"
     hook_path = target / "hook.py"
+    git_config_path = target / "gitconfig"
+    linked_git_metadata = _linked_worktree_git_metadata(workspace)
+    git_marker_path = target / "git-worktree"
     wrapper_dir = target / "bin"
     scratch_root = target / "scratch"
     workspace_scratch = scratch_root / ".agents"
@@ -308,6 +320,14 @@ def materialize_cursor_hook_policy(
     _write_immutable(claude_settings_path, _canonical_json(_claude_settings_document()))
     _write_immutable(policy_path, policy_bytes)
     _write_immutable(hook_path, hook_source, executable=True)
+    _write_immutable(git_config_path, b"")
+    if linked_git_metadata is not None:
+        _common_git_dir, worktree_relative = linked_git_metadata
+        sandbox_git_dir = _SANDBOX_GIT_ROOT / "common" / worktree_relative
+        _write_immutable(
+            git_marker_path,
+            f"gitdir: {sandbox_git_dir}\n".encode("utf-8"),
+        )
     for wrapper in policy.approved_wrappers:
         source = _builtin_wrapper_source(wrapper)
         if source is not None:
@@ -327,6 +347,8 @@ def materialize_cursor_hook_policy(
         hooks_json=hooks_path,
         policy_json=policy_path,
         hook_script=hook_path,
+        git_config=git_config_path,
+        git_marker=git_marker_path if linked_git_metadata is not None else None,
         workspace_scratch=workspace_scratch,
         workspace_codex_scratch=workspace_codex_scratch,
         sandbox_home=generated_home,
@@ -426,6 +448,48 @@ def _append_dirs(arguments: list[str], paths: Sequence[Path]) -> None:
                 seen.add(value)
 
 
+def _linked_worktree_git_metadata(workspace: Path) -> tuple[Path, Path] | None:
+    """Return trusted external metadata for a disposable linked worktree.
+
+    Composer and worker isolation roots are created with ``git worktree``.
+    Their ``.git`` marker points back to the source repository, which is not
+    otherwise visible inside Bubblewrap. Expose that metadata read-only so
+    approved introspection such as ``git status`` works without allowing the
+    runtime to mutate refs, config, hooks, or another worktree.
+    """
+    marker = workspace / ".git"
+    if not marker.is_file() or marker.is_symlink():
+        return None
+    try:
+        marker_text = marker.read_text(encoding="utf-8")
+    except (OSError, UnicodeError):
+        return None
+    first_line = marker_text.splitlines()[0].strip() if marker_text else ""
+    if not first_line.startswith("gitdir:"):
+        return None
+    raw_git_dir = first_line.removeprefix("gitdir:").strip()
+    if not raw_git_dir:
+        return None
+    candidate = Path(raw_git_dir)
+    if not candidate.is_absolute():
+        candidate = marker.parent / candidate
+    try:
+        worktree_git_dir = candidate.resolve(strict=True)
+        common_marker = worktree_git_dir / "commondir"
+        raw_common = common_marker.read_text(encoding="utf-8").strip()
+        common_git_dir = (worktree_git_dir / raw_common).resolve(strict=True)
+    except (OSError, UnicodeError):
+        return None
+    if (
+        common_git_dir.name != ".git"
+        or not common_git_dir.is_dir()
+        or not _is_relative_to(worktree_git_dir, common_git_dir / "worktrees")
+        or _is_relative_to(common_git_dir, workspace)
+    ):
+        return None
+    return common_git_dir, worktree_git_dir.relative_to(common_git_dir)
+
+
 def build_bwrap_command(
     command: Sequence[str],
     *,
@@ -463,11 +527,15 @@ def build_bwrap_command(
     material_root = hook_material.root.resolve(strict=True)
     if _is_relative_to(material_root, workspace):
         raise SandboxConfigurationError("Sandbox hook material must remain outside the workspace.")
-    for material_path in (
+    material_paths = [
         hook_material.hooks_json,
         hook_material.policy_json,
         hook_material.hook_script,
-    ):
+        hook_material.git_config,
+    ]
+    if hook_material.git_marker is not None:
+        material_paths.append(hook_material.git_marker)
+    for material_path in material_paths:
         resolved_material_path = material_path.resolve(strict=True)
         if not _is_relative_to(resolved_material_path, material_root):
             raise SandboxConfigurationError("Sandbox hook material contains an escaped path.")
@@ -483,6 +551,10 @@ def build_bwrap_command(
         dict.fromkeys(_resolve_workspace_path(workspace, path) for path in policy.writable_roots)
     )
     hidden_paths = hidden_workspace_paths(workspace, policy.forbidden_path_globs)
+    linked_git_metadata = _linked_worktree_git_metadata(workspace)
+    common_git_dir = linked_git_metadata[0] if linked_git_metadata is not None else None
+    if common_git_dir is not None and hook_material.git_marker is not None:
+        hidden_paths = tuple(path for path in hidden_paths if path != workspace / ".git")
     cursor_paths = tuple(
         dict.fromkeys(
             _resolve_cursor_path(path, user_home=home, workspace=workspace)
@@ -540,6 +612,8 @@ def build_bwrap_command(
         _SANDBOX_HOME / ".claude" / "settings.json",
         _SANDBOX_HOME / ".codex" / "auth.json",
     ]
+    if common_git_dir is not None and hook_material.git_marker is not None:
+        destination_paths.append(_SANDBOX_GIT_ROOT / "common")
     if user_local_bin is not None:
         destination_paths.append(user_local_bin)
     destination_paths.extend(cursor_paths)
@@ -549,8 +623,24 @@ def build_bwrap_command(
     _append_dirs(arguments, destination_paths)
 
     arguments.extend(["--ro-bind", str(workspace), str(workspace)])
+    append_outside_symlink_binds(arguments, workspace)
     for writable_root in writable_roots:
         arguments.extend(["--bind", str(writable_root), str(writable_root)])
+    if common_git_dir is not None and hook_material.git_marker is not None:
+        # Keep both the pointer and all shared repository metadata immutable.
+        # Mask repository config as well: status/diff need metadata, not remote
+        # URLs or credentials that may have been embedded in local config.
+        sandbox_common_git_dir = _SANDBOX_GIT_ROOT / "common"
+        arguments.extend(["--ro-bind", str(common_git_dir), str(sandbox_common_git_dir)])
+        arguments.extend(["--ro-bind", str(hook_material.git_marker), str(workspace / ".git")])
+        for config_name in ("config", "config.worktree"):
+            config_path = common_git_dir / config_name
+            if config_path.is_file():
+                arguments.extend([
+                    "--ro-bind",
+                    str(hook_material.git_config),
+                    str(sandbox_common_git_dir / config_name),
+                ])
     arguments.extend(["--bind", str(workspace_scratch), str(workspace / ".agents")])
     arguments.extend(["--bind", str(workspace_codex_scratch), str(workspace / ".codex")])
     append_hidden_mounts(arguments, hidden_paths)
@@ -579,6 +669,12 @@ def build_bwrap_command(
     if user_local_bin is not None:
         arguments.extend(["--ro-bind", str(user_local_bin), str(user_local_bin)])
 
+    for key, value in policy.injected_env:
+        clean_key = str(key).strip()
+        clean_value = str(value)
+        if not clean_key or "\x00" in clean_key or "\x00" in clean_value:
+            continue
+        arguments.extend(["--setenv", clean_key, clean_value])
     arguments.extend(
         [
             "--setenv",
@@ -586,7 +682,7 @@ def build_bwrap_command(
             str(_SANDBOX_HOME),
             "--setenv",
             "PATH",
-            sandbox_path_with_user_bins(user_local_bin),
+            sandbox_path_with_user_bins(user_local_bin, workspace=workspace),
             "--setenv",
             "TMPDIR",
             "/tmp",

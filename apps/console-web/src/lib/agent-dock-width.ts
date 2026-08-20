@@ -31,6 +31,13 @@ export function defaultAgentDockWidth(viewportWidth: number): number {
   return clampAgentDockWidth(target, viewportWidth);
 }
 
+export const DEFAULT_OPERATOR_LIVE_OPS_GLANCE_WIDTH = 360;
+
+export function defaultOperatorLiveOpsGlanceWidth(viewportWidth: number): number {
+  const target = Math.max(DEFAULT_OPERATOR_LIVE_OPS_GLANCE_WIDTH, Math.round(viewportWidth * 0.22));
+  return clampAgentDockWidth(target, viewportWidth);
+}
+
 /** Nudge dock width; positive delta widens the right dock. */
 export function nudgeAgentDockWidth(
   width: number,

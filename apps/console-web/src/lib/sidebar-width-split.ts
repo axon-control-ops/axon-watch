@@ -1,7 +1,7 @@
 export const SIDEBAR_WIDTH_KEY = 'axon-x-left-sidebar-width-v1';
-export const DEFAULT_SIDEBAR_WIDTH = 280;
-export const MIN_SIDEBAR_WIDTH = 220;
-export const MAX_SIDEBAR_WIDTH = 420;
+export const DEFAULT_SIDEBAR_WIDTH = 340;
+export const MIN_SIDEBAR_WIDTH = 240;
+export const MAX_SIDEBAR_WIDTH = 480;
 
 export function clampSidebarWidth(width: number, viewportWidth: number): number {
   if (!Number.isFinite(width) || viewportWidth <= 0) {

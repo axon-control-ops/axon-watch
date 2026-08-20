@@ -29,8 +29,16 @@ def runtime_path_with_user_bins(current_path: str, *, home: Path | None = None) 
     return os.pathsep.join(parts)
 
 
-def sandbox_path_with_user_bins(user_local_bin: Path | None = None) -> str:
+def sandbox_path_with_user_bins(
+    user_local_bin: Path | None = None,
+    *,
+    workspace: Path | None = None,
+) -> str:
     parts = ["/run/axon-agent-policy/bin"]
+    if workspace is not None:
+        local_bins = workspace / "node_modules" / ".bin"
+        if local_bins.is_dir():
+            parts.append(str(local_bins))
     if user_local_bin is not None:
         parts.append(str(user_local_bin))
     parts.extend(SYSTEM_BIN_PATHS)

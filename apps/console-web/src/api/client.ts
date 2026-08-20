@@ -23,6 +23,22 @@ export const CHAT_MESSAGE_FETCH_TIMEOUT_MS = 60_000;
 
 /** Attachment uploads carry a file body, not just JSON — allow more time than a plain call. */
 export const ATTACHMENT_UPLOAD_TIMEOUT_MS = 60_000;
+export const OPERATOR_AUTH_REQUIRED_EVENT = 'axon-operator-auth-required';
+
+function notifyOperatorAuthRequired(path: string, status: number): void {
+  if (
+    status !== 401 ||
+    path === '/api/auth/session' ||
+    typeof window === 'undefined'
+  ) {
+    return;
+  }
+  window.dispatchEvent(
+    new CustomEvent(OPERATOR_AUTH_REQUIRED_EVENT, {
+      detail: { path, status },
+    }),
+  );
+}
 
 export class ApiRequestError extends Error {
   readonly status: number;
@@ -42,6 +58,23 @@ export function isApiNotFoundError(error: unknown): boolean {
 
 export function isApiConflictError(error: unknown): boolean {
   return error instanceof ApiRequestError && error.status === 409;
+}
+
+/** Transient control-plane / proxy failures — keep thread selection and retry later. */
+export function isApiTransientError(error: unknown): boolean {
+  if (error instanceof ApiRequestError) {
+    return error.status === 503 || error.status === 502 || error.status === 504;
+  }
+  if (error instanceof DOMException && error.name === 'TimeoutError') {
+    return true;
+  }
+  if (error instanceof TypeError) {
+    return true;
+  }
+  if (error instanceof Error) {
+    return /fetch failed|network|ECONNREFUSED|timed out/i.test(error.message);
+  }
+  return false;
 }
 
 export function controlPlaneBaseUrl(): string {
@@ -96,8 +129,13 @@ export async function fetchJson<T>(
 ): Promise<T> {
   const { signal, clear } = mergeAbortSignals(timeoutMs, init.signal);
   try {
-    const response = await fetch(apiUrl(path), { ...init, signal });
+    const response = await fetch(apiUrl(path), {
+      credentials: 'include',
+      ...init,
+      signal,
+    });
     if (!response.ok) {
+      notifyOperatorAuthRequired(path, response.status);
       const fallback = errorLabel ?? `request failed with status ${response.status}`;
       let detail = '';
       try {
@@ -154,7 +192,13 @@ export async function fetchWithTimeout(
 ): Promise<Response> {
   const { signal, clear } = mergeAbortSignals(timeoutMs, init.signal);
   try {
-    return await fetch(apiUrl(path), { ...init, signal });
+    const response = await fetch(apiUrl(path), {
+      credentials: 'include',
+      ...init,
+      signal,
+    });
+    notifyOperatorAuthRequired(path, response.status);
+    return response;
   } catch (error) {
     if (error instanceof DOMException && error.name === 'TimeoutError') {
       throw new Error(`request timed out after ${timeoutMs}ms`);
@@ -179,8 +223,13 @@ export async function fetchBlob(
 ): Promise<Blob> {
   const { signal, clear } = mergeAbortSignals(timeoutMs, init.signal);
   try {
-    const response = await fetch(apiUrl(path), { ...init, signal });
+    const response = await fetch(apiUrl(path), {
+      credentials: 'include',
+      ...init,
+      signal,
+    });
     if (!response.ok) {
+      notifyOperatorAuthRequired(path, response.status);
       throw new Error(errorLabel ?? `request failed with status ${response.status}`);
     }
     return response.blob();

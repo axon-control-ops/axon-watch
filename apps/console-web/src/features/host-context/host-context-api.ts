@@ -1,4 +1,5 @@
 import { detectDesktopCapabilities, type DesktopCapabilityFlags } from '../../lib/desktop-capability';
+import { fetchJson } from '../../api/client';
 import type {
   HostActionReceipt,
   HostArtifactRecord,
@@ -7,18 +8,14 @@ import type {
 } from '../../contracts/canonical';
 
 async function jsonFetch<T>(path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(path, {
+  return fetchJson<T>(path, {
     ...init,
     headers: {
       Accept: 'application/json',
       'Content-Type': 'application/json',
       ...(init?.headers ?? {}),
     },
-  });
-  if (!response.ok) {
-    throw new Error(`${path} failed: ${response.status}`);
-  }
-  return (await response.json()) as T;
+  }, `${path} failed`);
 }
 
 export function readLocalCapabilities(): DesktopCapabilityFlags {

@@ -15,10 +15,15 @@ import {
 type UseRightDockResizeOptions = {
   dockRef: Ref<HTMLElement | null>;
   collapsed?: Ref<boolean>;
+  resolveDefaultWidth?: (viewportWidth: number) => number;
 };
 
 export function useRightDockResize(options: UseRightDockResizeOptions) {
-  const dockWidth = ref(readStoredAgentDockWidth() ?? defaultAgentDockWidth(window.innerWidth));
+  const resolveDefault =
+    options.resolveDefaultWidth ?? defaultAgentDockWidth;
+  const dockWidth = ref(
+    readStoredAgentDockWidth() ?? resolveDefault(window.innerWidth),
+  );
   const resizing = ref(false);
   const viewportWidth = ref(window.innerWidth);
 
@@ -80,7 +85,7 @@ export function useRightDockResize(options: UseRightDockResizeOptions) {
   }
 
   function resetDockWidth(): void {
-    applyDockWidth(defaultAgentDockWidth(window.innerWidth));
+    applyDockWidth(resolveDefault(window.innerWidth));
     persistAgentDockWidth(dockWidth.value);
   }
 

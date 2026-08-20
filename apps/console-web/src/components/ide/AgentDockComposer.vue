@@ -5,6 +5,7 @@ import { useAgentDockComposerToolbarProps } from '../../composables/agent-dock/u
 import AgentDockComposerAccessBanner from './agent-dock/AgentDockComposerAccessBanner.vue';
 import AgentDockComposerChrome from './agent-dock/AgentDockComposerChrome.vue';
 import AgentDockComposerInput from './agent-dock/AgentDockComposerInput.vue';
+import AgentDockSandboxActionStrip from './agent-dock/AgentDockSandboxActionStrip.vue';
 import AgentDockComposerToolbar from './agent-dock/AgentDockComposerToolbar.vue';
 import AgentDockKairoComposerFooter from './agent-dock/AgentDockKairoComposerFooter.vue';
 const composer = useAgentDockComposer();
@@ -64,6 +65,21 @@ const toolbarProps = useAgentDockComposerToolbarProps(composer);
         <AgentDockComposerAccessBanner
           v-if="composer.composerAccessBanner.value"
           :banner="composer.composerAccessBanner.value"
+        />
+        <AgentDockSandboxActionStrip
+          :show="composer.sandboxSessionEnabled.value"
+          :dirty="composer.sandboxDirty.value"
+          :pending="composer.sandboxSessionPending.value"
+          :message="composer.sandboxSessionError.value"
+          :preview-url="composer.sandboxPreviewUrl.value"
+          :collapsed="composer.sandboxStripCollapsed.value"
+          @review="composer.reviewSandboxSessionChanges"
+          @start-preview="composer.startSandboxPreview"
+          @stop-preview="composer.stopSandboxPreview"
+          @restart-preview="composer.restartSandboxPreview"
+          @toggle-collapsed="composer.toggleSandboxStripCollapsed"
+          @publish="composer.publishSandboxSessionChanges"
+          @discard="composer.discardSandboxSessionChanges"
         />
         <AgentDockComposerInput
           :set-input-ref="composer.setInputRef"

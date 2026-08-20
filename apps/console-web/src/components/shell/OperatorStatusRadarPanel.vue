@@ -20,13 +20,18 @@ import {
 import { shouldHideLiveExecutionFeed, isAutoCompleteRunSummary } from '../../lib/operator-run-strip-view';
 import { leftSidebarAttentionBadgeCount } from '../../lib/left-sidebar-mode';
 import { kairoPresenceModuleParts } from '../../lib/mockup-shell-view';
-import PersonaTitle from '../PersonaTitle.vue';
 import { resolveKairoPresenceState } from '../../lib/kairo-presence';
 import {
   formatRunDisplayName,
   formatRunIdentityLabel,
 } from '../../lib/run-display';
-import { runContinueActionLabel } from '../../lib/run-lifecycle-ui';
+import {
+  runContinueActionLabel,
+  shouldOfferRunStop,
+} from '../../lib/run-lifecycle-ui';
+import {
+  kairoConversationPhase,
+} from '../../features/kairo-conversation/kairo-conversation-state';
 import { useShellStore } from '../../stores/shell';
 import {
   operatorTerminalDockActionLabel,
@@ -41,7 +46,10 @@ import OperatorIncidentFeedPanel from './OperatorIncidentFeedPanel.vue';
 import OperatorRunStripPanel from './OperatorRunStripPanel.vue';
 import OperatorStatusRadarPanelHeader from './OperatorStatusRadarPanelHeader.vue';
 import OperatorTaskBoardPanel from './OperatorTaskBoardPanel.vue';
+import MissionControlLiveOpsPanel from './MissionControlLiveOpsPanel.vue';
 import AttentionStackPanel from './AttentionStackPanel.vue';
+import LeadReviewOverlay from './LeadReviewOverlay.vue';
+import { closeLeadReviewOverlay } from '../../features/lead-review/lead-review-overlay-state';
 
 const props = defineProps<{
   terminalVisible: boolean;
@@ -157,6 +165,17 @@ const attentionBadgeCount = computed(() =>
     inboxLoadState: shell.inboxLoadState,
   }),
 );
+
+const dispatchQueuedCount = computed(() => {
+  let waiting = 0;
+  for (const task of shell.workspaceTasksForCurrentWorkspace) {
+    const status = String(task.status ?? '').trim().toLowerCase();
+    if (!status || status === 'queued' || status === 'waiting') {
+      waiting += 1;
+    }
+  }
+  return waiting;
+});
 const kairoParts = computed(() => {
   const highSignals =
     shell.operatorBriefing?.top_signals.filter((signal) => signal.severity === 'high').length ??
@@ -175,10 +194,8 @@ const kairoParts = computed(() => {
   return kairoPresenceModuleParts(state);
 });
 
-const showStopAction = computed(
-  () =>
-    Boolean(shell.primaryActiveRun?.can_stop) ||
-    shell.primaryActiveRun?.phase === 'executing',
+const showStopAction = computed(() =>
+  shouldOfferRunStop(shell.primaryActiveRun?.can_stop),
 );
 
 const onlyAutoCompleteReviewBacklog = computed(
@@ -272,6 +289,21 @@ onMounted(() => {
   }, 80);
 });
 
+watch(
+  () => kairoConversationPhase.value,
+  (phase) => {
+    if (shell.layoutMode !== 'operator') {
+      return;
+    }
+    if (centerView.value === 'graph' || centerView.value === 'vaxon') {
+      return;
+    }
+    if (phase !== 'idle') {
+      setCenterView('vaxon');
+    }
+  },
+);
+
 const terminalRunPhase = computed(() => shell.primaryActiveRun?.phase ?? null);
 
 const terminalDockAlive = computed(
@@ -335,6 +367,14 @@ function handleOperatorQuickGuideAction(actionId: OperatorQuickGuideActionId): v
     shell.setLayoutMode('ide');
   }
 }
+
+async function onLeadReviewComplete(planId: string): Promise<void> {
+  const closed = await shell.closeCurrentLeadPlanEngagement(planId, 'completed');
+  if (closed) {
+    closeLeadReviewOverlay();
+    await shell.loadOperatorBriefing({ background: true, light: true });
+  }
+}
 </script>
 
 <template>
@@ -348,6 +388,7 @@ function handleOperatorQuickGuideAction(actionId: OperatorQuickGuideActionId): v
         'operator-status-radar-panel--terminal-collapsed': !props.terminalVisible,
         'operator-status-radar-panel--emphasized': shell.missionControlEmphasized,
         'operator-status-radar-panel--galaxy-only': brainHeroMode,
+        'operator-status-radar-panel--tabbed': !brainHeroMode,
       },
     ]"
     aria-label="Operator mission control"
@@ -356,7 +397,7 @@ function handleOperatorQuickGuideAction(actionId: OperatorQuickGuideActionId): v
       <OperatorBrainGraphPanel
         :terminal-visible="props.terminalVisible"
         @toggle-terminal="toggleTerminal"
-        @switch-grid="setCenterView('grid')"
+        @switch-grid="setCenterView('mission')"
       />
     </template>
 
@@ -376,333 +417,330 @@ function handleOperatorQuickGuideAction(actionId: OperatorQuickGuideActionId): v
         :terminal-panel-aria-label="terminalPanelAriaLabel"
         :kairo-title="kairoParts.title"
         :kairo-subtitle="kairoParts.subtitle"
-        :show-kairo-presence="centerView !== 'grid'"
+        :attention-badge-count="attentionBadgeCount"
+        :dispatch-queued-count="dispatchQueuedCount"
         @set-center-view="setCenterView"
         @toggle-terminal="toggleTerminal"
       />
 
-      <OperatorFleetHealthGrid />
-
-      <section
-        id="mission-control-attention"
-        class="operator-status-radar-panel__attention"
-        aria-label="Attention for current workspace"
+      <div
+        class="operator-status-radar-panel__tab-body"
+        :class="`operator-status-radar-panel__tab-body--${centerView}`"
+        :data-tab="centerView"
       >
-        <header class="operator-status-radar-panel__attention-head">
-          <p class="operator-status-radar-panel__attention-eyebrow">Attention</p>
-          <p class="operator-status-radar-panel__attention-scope">
-            {{
-              shell.currentWorkspace?.display_name?.trim() ||
-              shell.currentWorkspace?.workspace_id ||
-              'Current workspace'
-            }}
-            <template v-if="shell.workspaceAttentionSignalCount > 0">
-              · {{ shell.workspaceAttentionSignalCount }} open
-            </template>
-          </p>
-        </header>
-        <AttentionStackPanel variant="sidebar" sections="attention-only" />
-      </section>
+        <template v-if="centerView === 'mission'">
+          <OperatorFleetHealthGrid />
 
-      <OperatorTaskBoardPanel />
+          <OperatorIncidentFeedPanel />
 
-      <OperatorIncidentFeedPanel />
-
-      <OperatorRunStripPanel />
-
-      <section
-        v-if="showStandaloneQuickGuide && quickGuide"
-        class="operator-status-radar-panel__guide operator-status-radar-panel__guide--standalone"
-        :class="{
-          'operator-status-radar-panel__guide--terminal-hidden': !props.terminalVisible,
-          'operator-status-radar-panel__guide--attention': quickGuide.tone === 'attention',
-        }"
-        aria-label="What to do next"
-      >
-        <div class="operator-status-radar-panel__guide-head">
-          <p class="operator-status-radar-panel__guide-title">{{ quickGuide.title }}</p>
-          <div
-            v-if="quickGuide.actions.length"
-            class="operator-status-radar-panel__guide-actions"
-            role="group"
-            aria-label="Quick actions"
+          <section
+            v-if="showStandaloneQuickGuide && quickGuide"
+            class="operator-status-radar-panel__guide operator-status-radar-panel__guide--standalone"
+            :class="{
+              'operator-status-radar-panel__guide--terminal-hidden': !props.terminalVisible,
+              'operator-status-radar-panel__guide--attention': quickGuide.tone === 'attention',
+            }"
+            aria-label="What to do next"
           >
-            <button
-              v-for="action in quickGuide.actions"
-              :key="action.id"
-              type="button"
-              class="operator-status-radar-panel__guide-action"
-              @click="handleOperatorQuickGuideAction(action.id)"
-            >
-              {{ action.label }}
-            </button>
-          </div>
-        </div>
-        <ol class="operator-status-radar-panel__guide-steps">
-          <li v-for="(step, index) in quickGuide.steps" :key="index">{{ step }}</li>
-        </ol>
-      </section>
-
-      <section
-        v-if="showMissionStage"
-        class="operator-status-radar-panel__stage"
-      >
-        <div class="operator-status-radar-panel__stage-top">
-          <div class="operator-status-radar-panel__stage-identity">
-            <span class="operator-status-radar-panel__phase-tag">{{ executionStage.phase }}</span>
-            <span v-if="executionStage.hasActiveRun" class="operator-status-radar-panel__run-id">
-              {{ executionStage.displayName }}
-              <span class="operator-status-radar-panel__run-short-id">#{{ executionStage.shortId }}</span>
-            </span>
-          </div>
-          <span v-if="executionStage.hasActiveRun" class="operator-status-radar-panel__elapsed">
-            {{ executionStage.elapsed }}
-          </span>
-        </div>
-
-        <div
-          v-if="executionStage.hasActiveRun"
-          class="operator-status-radar-panel__progress"
-          role="progressbar"
-          :aria-valuenow="executionStage.phaseProgress"
-          aria-valuemin="0"
-          aria-valuemax="100"
-          :aria-label="`${executionStage.phase} progress`"
-        >
-          <span
-            class="operator-status-radar-panel__progress-fill"
-            :style="{ width: `${executionStage.phaseProgress}%` }"
-          />
-        </div>
-
-        <p class="operator-status-radar-panel__stage-step">{{ executionStage.currentStep }}</p>
-        <p
-          v-if="executionStage.hasActiveRun"
-          class="operator-status-radar-panel__stage-summary"
-        >
-          Task: {{ executionStage.summary }}
-          <span v-if="executionStage.commandDetail"> · Command: {{ executionStage.commandDetail }}</span>
-        </p>
-
-        <p class="operator-status-radar-panel__stage-notice">{{ executionStage.notice }}</p>
-        <p class="operator-status-radar-panel__stage-decide">{{ executionStage.decide }}</p>
-
-        <section
-          v-if="quickGuide"
-          class="operator-status-radar-panel__guide"
-          :class="{
-            'operator-status-radar-panel__guide--terminal-hidden': !props.terminalVisible,
-            'operator-status-radar-panel__guide--attention': quickGuide.tone === 'attention',
-          }"
-          aria-label="What to do next"
-        >
-          <div class="operator-status-radar-panel__guide-head">
-            <p class="operator-status-radar-panel__guide-title">{{ quickGuide.title }}</p>
-            <div
-              v-if="quickGuide.actions.length"
-              class="operator-status-radar-panel__guide-actions"
-              role="group"
-              aria-label="Quick actions"
-            >
-              <button
-                v-for="action in quickGuide.actions"
-                :key="action.id"
-                type="button"
-                class="operator-status-radar-panel__guide-action"
-                @click="handleOperatorQuickGuideAction(action.id)"
+            <div class="operator-status-radar-panel__guide-head">
+              <p class="operator-status-radar-panel__guide-title">{{ quickGuide.title }}</p>
+              <div
+                v-if="quickGuide.actions.length"
+                class="operator-status-radar-panel__guide-actions"
+                role="group"
+                aria-label="Quick actions"
               >
-                {{ action.label }}
+                <button
+                  v-for="action in quickGuide.actions"
+                  :key="action.id"
+                  type="button"
+                  class="operator-status-radar-panel__guide-action"
+                  @click="handleOperatorQuickGuideAction(action.id)"
+                >
+                  {{ action.label }}
+                </button>
+              </div>
+            </div>
+            <ol class="operator-status-radar-panel__guide-steps">
+              <li v-for="(step, index) in quickGuide.steps" :key="index">{{ step }}</li>
+            </ol>
+          </section>
+
+          <ConnectorsRailPanel />
+
+          <footer class="operator-status-radar-panel__rail" aria-label="Runtime status">
+            <component
+              :is="item.action ? 'button' : 'div'"
+              v-for="item in statusRail"
+              :key="item.label"
+              class="operator-status-radar-panel__rail-item"
+              :class="[
+                `operator-status-radar-panel__rail-item--${item.tone}`,
+                { 'operator-status-radar-panel__rail-item--action': item.action },
+              ]"
+              :type="item.action ? 'button' : undefined"
+              :title="item.action === 'focus-connectors' ? 'Open Mission Control connectors' : undefined"
+              :aria-label="
+                item.action === 'focus-connectors'
+                  ? `${item.label} ${item.value}. Open Mission Control connectors.`
+                  : undefined
+              "
+              @click="item.action ? handleStatusRailAction(item.action) : undefined"
+            >
+              <span>{{ item.label }}</span>
+              <strong>{{ item.value }}</strong>
+            </component>
+          </footer>
+        </template>
+
+        <template v-else-if="centerView === 'attention'">
+          <section
+            id="mission-control-attention"
+            class="operator-status-radar-panel__attention operator-status-radar-panel__attention--tab"
+            aria-label="Attention for current workspace"
+          >
+            <header class="operator-status-radar-panel__attention-head">
+              <p class="operator-status-radar-panel__attention-eyebrow">Attention</p>
+              <p class="operator-status-radar-panel__attention-scope">
+                {{
+                  shell.currentWorkspace?.display_name?.trim() ||
+                  shell.currentWorkspace?.workspace_id ||
+                  'Current workspace'
+                }}
+                <template v-if="shell.workspaceAttentionSignalCount > 0">
+                  · {{ shell.workspaceAttentionSignalCount }} open
+                </template>
+              </p>
+            </header>
+            <AttentionStackPanel variant="sidebar" sections="attention-only" />
+          </section>
+
+          <OperatorRunStripPanel />
+
+          <section
+            v-if="showMissionStage"
+            class="operator-status-radar-panel__stage"
+          >
+            <div class="operator-status-radar-panel__stage-top">
+              <div class="operator-status-radar-panel__stage-identity">
+                <span class="operator-status-radar-panel__phase-tag">{{ executionStage.phase }}</span>
+                <span v-if="executionStage.hasActiveRun" class="operator-status-radar-panel__run-id">
+                  {{ executionStage.displayName }}
+                  <span class="operator-status-radar-panel__run-short-id">#{{ executionStage.shortId }}</span>
+                </span>
+              </div>
+              <span v-if="executionStage.hasActiveRun" class="operator-status-radar-panel__elapsed">
+                {{ executionStage.elapsed }}
+              </span>
+            </div>
+
+            <div
+              v-if="executionStage.hasActiveRun"
+              class="operator-status-radar-panel__progress"
+              role="progressbar"
+              :aria-valuenow="executionStage.phaseProgress"
+              aria-valuemin="0"
+              aria-valuemax="100"
+              :aria-label="`${executionStage.phase} progress`"
+            >
+              <span
+                class="operator-status-radar-panel__progress-fill"
+                :style="{ width: `${executionStage.phaseProgress}%` }"
+              />
+            </div>
+
+            <p class="operator-status-radar-panel__stage-step">{{ executionStage.currentStep }}</p>
+            <p
+              v-if="executionStage.hasActiveRun"
+              class="operator-status-radar-panel__stage-summary"
+            >
+              Task: {{ executionStage.summary }}
+              <span v-if="executionStage.commandDetail"> · Command: {{ executionStage.commandDetail }}</span>
+            </p>
+
+            <p class="operator-status-radar-panel__stage-notice">{{ executionStage.notice }}</p>
+            <p class="operator-status-radar-panel__stage-decide">{{ executionStage.decide }}</p>
+
+            <section
+              v-if="quickGuide"
+              class="operator-status-radar-panel__guide"
+              :class="{
+                'operator-status-radar-panel__guide--terminal-hidden': !props.terminalVisible,
+                'operator-status-radar-panel__guide--attention': quickGuide.tone === 'attention',
+              }"
+              aria-label="What to do next"
+            >
+              <div class="operator-status-radar-panel__guide-head">
+                <p class="operator-status-radar-panel__guide-title">{{ quickGuide.title }}</p>
+                <div
+                  v-if="quickGuide.actions.length"
+                  class="operator-status-radar-panel__guide-actions"
+                  role="group"
+                  aria-label="Quick actions"
+                >
+                  <button
+                    v-for="action in quickGuide.actions"
+                    :key="action.id"
+                    type="button"
+                    class="operator-status-radar-panel__guide-action"
+                    @click="handleOperatorQuickGuideAction(action.id)"
+                  >
+                    {{ action.label }}
+                  </button>
+                </div>
+              </div>
+              <ol class="operator-status-radar-panel__guide-steps">
+                <li v-for="(step, index) in quickGuide.steps" :key="index">{{ step }}</li>
+              </ol>
+            </section>
+
+            <p v-if="!executionStage.hasActiveRun" class="operator-status-radar-panel__stage-advise">
+              {{ executionStage.advise }}
+            </p>
+          </section>
+
+          <section
+            v-if="showLiveFeed"
+            class="operator-status-radar-panel__feed"
+            aria-label="Live execution feed"
+          >
+            <header class="operator-status-radar-panel__section-header">
+              <span>Live execution</span>
+              <span>{{ shell.primaryActiveRun ? formatRunIdentityLabel(shell.primaryActiveRun) : shell.threadStateLabel }}</span>
+            </header>
+            <ol class="operator-status-radar-panel__feed-list">
+              <li
+                v-for="item in liveFeed"
+                :key="item.id"
+                class="operator-status-radar-panel__feed-item"
+                :class="`operator-status-radar-panel__feed-item--${item.tone}`"
+              >
+                <span class="operator-status-radar-panel__feed-marker" aria-hidden="true" />
+                <div class="operator-status-radar-panel__feed-copy">
+                  <p>{{ item.label }}</p>
+                  <span v-if="item.meta">{{ item.meta }}</span>
+                </div>
+              </li>
+            </ol>
+          </section>
+
+          <section
+            class="operator-status-radar-panel__feed"
+            aria-label="Agent summary"
+          >
+            <header class="operator-status-radar-panel__section-header">
+              <span>Agent summary</span>
+              <span>{{ shell.primaryActiveRun ? formatRunIdentityLabel(shell.primaryActiveRun) : 'Latest run state' }}</span>
+            </header>
+            <ol class="operator-status-radar-panel__feed-list">
+              <li
+                v-for="item in agentSummary"
+                :key="item.id"
+                class="operator-status-radar-panel__feed-item operator-status-radar-panel__feed-item--info"
+              >
+                <span class="operator-status-radar-panel__feed-marker" aria-hidden="true" />
+                <div class="operator-status-radar-panel__feed-copy">
+                  <p>{{ item.label }}</p>
+                  <span v-if="item.meta">{{ item.meta }}</span>
+                </div>
+              </li>
+            </ol>
+          </section>
+
+          <section v-if="showRunActions || shell.runMutationError" class="operator-status-radar-panel__controls">
+            <div v-if="showRunActions" class="operator-status-radar-panel__run-actions run-actions">
+              <p
+                v-if="shell.primaryActiveRun"
+                class="operator-status-radar-panel__run-target"
+                :title="shell.primaryActiveRun.summary || shell.primaryActiveRun.run_id"
+              >
+                Active run · {{ formatRunIdentityLabel(shell.primaryActiveRun) }}
+                <span>· {{ shell.primaryActiveRun.phase }}</span>
+              </p>
+              <button
+                v-if="showStopAction"
+                type="button"
+                class="run-actions__button run-actions__button--primary"
+                :disabled="!shell.canStopPrimaryRun"
+                :title="
+                  shell.primaryActiveRun
+                    ? `Stop ${formatRunIdentityLabel(shell.primaryActiveRun)}`
+                    : 'Stop active run'
+                "
+                @click="shell.stopPrimaryRun()"
+              >
+                {{
+                  shell.runMutationState === 'stopping'
+                    ? 'STOPPING…'
+                    : shell.primaryActiveRun
+                      ? `STOP · ${formatRunDisplayName(shell.primaryActiveRun)}`
+                      : 'STOP RUN'
+                }}
               </button>
+              <button
+                v-if="shell.canResumePrimaryRun"
+                type="button"
+                class="run-actions__button run-actions__button--warning"
+                :disabled="!shell.canResumePrimaryRun || shell.runMutationPending"
+                :title="
+                  shell.primaryActiveRun
+                    ? `${continueActionLabel} ${formatRunIdentityLabel(shell.primaryActiveRun)}`
+                    : continueActionLabel
+                "
+                @click="shell.resumePrimaryRun()"
+              >
+                {{
+                  shell.primaryActiveRun
+                    ? `${continueActionLabel.replace(/ RUN$/i, '')} · ${formatRunDisplayName(shell.primaryActiveRun)}`
+                    : continueActionLabel
+                }}
+              </button>
+              <button
+                v-if="shell.canCompletePrimaryRun"
+                type="button"
+                class="run-actions__button run-actions__button--primary"
+                :disabled="shell.runMutationPending"
+                @click="shell.completePrimaryRun()"
+              >
+                {{ shell.runMutationState === 'completing' ? 'COMPLETING…' : 'COMPLETE RUN' }}
+              </button>
+              <template v-if="shell.pendingApprovalsCount > 0">
+                <button
+                  type="button"
+                  class="run-actions__button run-actions__button--primary"
+                  :disabled="!shell.canApprovePrimaryRun"
+                  @click="shell.approvePrimaryRun()"
+                >
+                  {{ shell.runMutationState === 'approving' ? 'APPROVING…' : 'APPROVE RUN' }}
+                </button>
+                <button
+                  type="button"
+                  class="run-actions__button run-actions__button--danger"
+                  :disabled="!shell.canRejectPrimaryRun"
+                  @click="shell.rejectPrimaryRun()"
+                >
+                  {{ shell.runMutationState === 'rejecting' ? 'REJECTING…' : 'REJECT RUN' }}
+                </button>
+              </template>
             </div>
-          </div>
-          <ol class="operator-status-radar-panel__guide-steps">
-            <li v-for="(step, index) in quickGuide.steps" :key="index">{{ step }}</li>
-          </ol>
-        </section>
 
-        <p v-if="!executionStage.hasActiveRun" class="operator-status-radar-panel__stage-advise">
-          {{ executionStage.advise }}
-        </p>
-      </section>
+            <p v-if="shell.runMutationError" class="operator-status-radar-panel__error" role="alert">
+              {{ shell.runMutationError }}
+            </p>
+          </section>
+        </template>
 
-      <section
-        v-if="showLiveFeed"
-        class="operator-status-radar-panel__feed"
-        aria-label="Live execution feed"
-      >
-        <header class="operator-status-radar-panel__section-header">
-          <span>Live execution</span>
-          <span>{{ shell.primaryActiveRun ? formatRunIdentityLabel(shell.primaryActiveRun) : shell.threadStateLabel }}</span>
-        </header>
-        <ol class="operator-status-radar-panel__feed-list">
-          <li
-            v-for="item in liveFeed"
-            :key="item.id"
-            class="operator-status-radar-panel__feed-item"
-            :class="`operator-status-radar-panel__feed-item--${item.tone}`"
-          >
-            <span class="operator-status-radar-panel__feed-marker" aria-hidden="true" />
-            <div class="operator-status-radar-panel__feed-copy">
-              <p>{{ item.label }}</p>
-              <span v-if="item.meta">{{ item.meta }}</span>
-            </div>
-          </li>
-        </ol>
-      </section>
+        <template v-else-if="centerView === 'dispatch'">
+          <OperatorTaskBoardPanel />
+        </template>
 
-      <section
-        class="operator-status-radar-panel__feed"
-        aria-label="Agent summary"
-      >
-        <header class="operator-status-radar-panel__section-header">
-          <span>Agent summary</span>
-          <span>{{ shell.primaryActiveRun ? formatRunIdentityLabel(shell.primaryActiveRun) : 'Latest run state' }}</span>
-        </header>
-        <ol class="operator-status-radar-panel__feed-list">
-          <li
-            v-for="item in agentSummary"
-            :key="item.id"
-            class="operator-status-radar-panel__feed-item operator-status-radar-panel__feed-item--info"
-          >
-            <span class="operator-status-radar-panel__feed-marker" aria-hidden="true" />
-            <div class="operator-status-radar-panel__feed-copy">
-              <p>{{ item.label }}</p>
-              <span v-if="item.meta">{{ item.meta }}</span>
-            </div>
-          </li>
-        </ol>
-      </section>
-
-      <section v-if="showRunActions || shell.runMutationError" class="operator-status-radar-panel__controls">
-        <div v-if="showRunActions" class="operator-status-radar-panel__run-actions run-actions">
-          <p
-            v-if="shell.primaryActiveRun"
-            class="operator-status-radar-panel__run-target"
-            :title="shell.primaryActiveRun.summary || shell.primaryActiveRun.run_id"
-          >
-            Active run · {{ formatRunIdentityLabel(shell.primaryActiveRun) }}
-            <span>· {{ shell.primaryActiveRun.phase }}</span>
-          </p>
-          <button
-            v-if="showStopAction"
-            type="button"
-            class="run-actions__button run-actions__button--primary"
-            :disabled="!shell.canStopPrimaryRun && shell.primaryActiveRun?.phase !== 'executing'"
-            :title="
-              shell.primaryActiveRun
-                ? `Stop ${formatRunIdentityLabel(shell.primaryActiveRun)}`
-                : 'Stop active run'
-            "
-            @click="shell.stopPrimaryRun()"
-          >
-            {{
-              shell.runMutationState === 'stopping'
-                ? 'STOPPING…'
-                : shell.primaryActiveRun
-                  ? `STOP · ${formatRunDisplayName(shell.primaryActiveRun)}`
-                  : 'STOP RUN'
-            }}
-          </button>
-          <button
-            v-if="shell.canResumePrimaryRun"
-            type="button"
-            class="run-actions__button run-actions__button--warning"
-            :disabled="!shell.canResumePrimaryRun || shell.runMutationPending"
-            :title="
-              shell.primaryActiveRun
-                ? `${continueActionLabel} ${formatRunIdentityLabel(shell.primaryActiveRun)}`
-                : continueActionLabel
-            "
-            @click="shell.resumePrimaryRun()"
-          >
-            {{
-              shell.primaryActiveRun
-                ? `${continueActionLabel.replace(/ RUN$/i, '')} · ${formatRunDisplayName(shell.primaryActiveRun)}`
-                : continueActionLabel
-            }}
-          </button>
-          <button
-            v-if="shell.canCompletePrimaryRun"
-            type="button"
-            class="run-actions__button run-actions__button--primary"
-            :disabled="shell.runMutationPending"
-            @click="shell.completePrimaryRun()"
-          >
-            {{ shell.runMutationState === 'completing' ? 'COMPLETING…' : 'COMPLETE RUN' }}
-          </button>
-          <template v-if="shell.pendingApprovalsCount > 0">
-            <button
-              type="button"
-              class="run-actions__button run-actions__button--primary"
-              :disabled="!shell.canApprovePrimaryRun"
-              @click="shell.approvePrimaryRun()"
-            >
-              {{ shell.runMutationState === 'approving' ? 'APPROVING…' : 'APPROVE RUN' }}
-            </button>
-            <button
-              type="button"
-              class="run-actions__button run-actions__button--danger"
-              :disabled="!shell.canRejectPrimaryRun"
-              @click="shell.rejectPrimaryRun()"
-            >
-              {{ shell.runMutationState === 'rejecting' ? 'REJECTING…' : 'REJECT RUN' }}
-            </button>
-          </template>
-        </div>
-
-        <p v-if="shell.runMutationError" class="operator-status-radar-panel__error" role="alert">
-          {{ shell.runMutationError }}
-        </p>
-      </section>
-
-      <ConnectorsRailPanel />
-
-      <div class="operator-status-radar-panel__utility-actions">
-        <button
-          type="button"
-          class="operator-status-radar-panel__action"
-          @click="shell.focusAttentionSidebar()"
-        >
-          Open Attention
-          <span v-if="attentionBadgeCount > 0" class="operator-status-radar-panel__badge">
-            {{ attentionBadgeCount }}
-          </span>
-        </button>
-        <button
-          type="button"
-          class="operator-status-radar-panel__action operator-status-radar-panel__action--kairo"
-          @click="shell.focusKairoBriefing()"
-        >
-          Open <PersonaTitle suffix="Briefing" mark-size="xs" />
-        </button>
+        <template v-else-if="centerView === 'vaxon'">
+          <MissionControlLiveOpsPanel layout="center" />
+        </template>
       </div>
 
-      <footer class="operator-status-radar-panel__rail" aria-label="Runtime status">
-        <component
-          :is="item.action ? 'button' : 'div'"
-          v-for="item in statusRail"
-          :key="item.label"
-          class="operator-status-radar-panel__rail-item"
-          :class="[
-            `operator-status-radar-panel__rail-item--${item.tone}`,
-            { 'operator-status-radar-panel__rail-item--action': item.action },
-          ]"
-          :type="item.action ? 'button' : undefined"
-          :title="item.action === 'focus-connectors' ? 'Open Mission Control connectors' : undefined"
-          :aria-label="
-            item.action === 'focus-connectors'
-              ? `${item.label} ${item.value}. Open Mission Control connectors.`
-              : undefined
-          "
-          @click="item.action ? handleStatusRailAction(item.action) : undefined"
-        >
-          <span>{{ item.label }}</span>
-          <strong>{{ item.value }}</strong>
-        </component>
-      </footer>
-
       <button
-        v-if="!props.terminalVisible"
+        v-if="!props.terminalVisible && centerView !== 'vaxon'"
         type="button"
         class="operator-status-radar-panel__terminal-dock"
         :class="{
@@ -730,5 +768,7 @@ function handleOperatorQuickGuideAction(actionId: OperatorQuickGuideActionId): v
         </span>
       </button>
     </template>
+
+    <LeadReviewOverlay @mark-complete="void onLeadReviewComplete($event)" />
   </section>
 </template>

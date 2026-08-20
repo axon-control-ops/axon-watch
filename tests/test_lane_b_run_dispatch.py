@@ -40,6 +40,17 @@ class LaneBRunDispatchTests(unittest.TestCase):
         )
         self.assertEqual("executing", record["phase"])
 
+    def test_direct_employee_turn_does_not_lease_an_unrelated_fleet_task(self) -> None:
+        record = resolve_lane_b_agent_run(
+            workspace_id="workspace_alpha",
+            content="Create a bounded isolation probe",
+            linked_run_id=None,
+            execution_access="full",
+            employee_role="frontend",
+        )
+        self.assertEqual("frontend", record["employee_role"])
+        self.assertFalse(str(record.get("task_id") or ""))
+
     def test_plan_run_is_linked_and_becomes_review_ready(self) -> None:
         created = resolve_lane_b_agent_run(
             workspace_id="workspace_alpha",

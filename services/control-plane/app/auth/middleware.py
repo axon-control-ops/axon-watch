@@ -23,6 +23,8 @@ from app.auth.settings import (
 _MUTATING = frozenset({"POST", "PUT", "PATCH", "DELETE"})
 _EXEMPT_PREFIXES = (
     "/api/health",
+    # Browser login/logout must remain reachable before a session exists.
+    "/api/auth/session",
     "/api/desktop/bootstrap",
     "/api/desktop/bootstrap-code",
     "/api/desktop/status",

@@ -13,7 +13,9 @@ from app.chat.lane_b_lead_named_assign_fast_path import (  # noqa: E402
     maybe_post_lead_named_assign_message,
 )
 from app.workspace_agents.named_assign_route import (  # noqa: E402
+    is_vague_named_assign,
     match_named_assign_employee,
+    named_assign_action_body,
     rewrite_named_assign_prompt,
 )
 from app.workspace_agents.teammate_route import TeammateRouteEmployee  # noqa: E402
@@ -77,7 +79,13 @@ class NamedAssignRouteTests(unittest.TestCase):
         self.assertNotIn("assign Cole", rewritten.lower())
         self.assertIn("Lesego login table", rewritten)
 
-    def test_lead_fast_path_acks_without_lane_b(self) -> None:
+    def test_vague_named_assign_has_no_concrete_body(self) -> None:
+        self.assertIsNone(named_assign_action_body("Route the task to Lila", "Lila"))
+        self.assertTrue(is_vague_named_assign("Route the task to Lila", "Lila"))
+        rewritten = rewrite_named_assign_prompt("Route the task to Lila", "Lila")
+        self.assertIn("did not include a concrete task body", rewritten)
+
+    def test_lead_fast_path_materializes_concrete_named_assign(self) -> None:
         roster = _roster()
         saved: list[dict] = []
 
@@ -88,10 +96,17 @@ class NamedAssignRouteTests(unittest.TestCase):
         with patch(
             "app.chat.lane_b_lead_named_assign_fast_path.build_company_roster",
             return_value={"employees": [row.__dict__ for row in roster]},
+        ), patch(
+            "app.chat.lane_b_lead_named_assign_fast_path._create_named_handoff_task",
+            return_value={
+                "task": {"task_id": "task-concrete"},
+                "run": {"run_id": "run-concrete", "phase": "executing"},
+                "started": True,
+            },
         ):
             response = maybe_post_lead_named_assign_message(
                 workspace_id="workspace_test",
-                content="Ok assign Cole the task and have him report back",
+                content="Ok assign Cole the Lesego login table and have him report back",
                 thread_id="thread_lead",
                 employee_role="lead",
                 lead_name="Imani",
@@ -104,12 +119,60 @@ class NamedAssignRouteTests(unittest.TestCase):
 
         self.assertIsNotNone(response)
         assert response is not None
-        self.assertEqual("", response["run_id"])
+        self.assertTrue(response["dispatched"])
+        self.assertEqual("run-concrete", response["run_id"])
+        self.assertEqual("task-concrete", response["named_assign"]["task_id"])
         self.assertFalse(response["streaming"])
         self.assertEqual("Cole", response["named_assign"]["employee_name"])
         agent = next(row for row in saved if row["role"] == "agent")
-        self.assertIn("assigning Cole", agent["content"])
-        self.assertIn("will not do that specialist work", agent["content"])
+        self.assertIn("routed a concrete Lead handoff to Cole", agent["content"])
+        self.assertIn("Lesego login table", agent["content"])
+
+    def test_lead_fast_path_uses_prior_operator_ask_for_vague_named_assign(self) -> None:
+        roster = _roster()
+        saved: list[dict] = []
+
+        def save_message(payload: dict) -> dict:
+            saved.append(payload)
+            return payload
+
+        with patch(
+            "app.chat.lane_b_lead_named_assign_fast_path.build_company_roster",
+            return_value={"employees": [row.__dict__ for row in roster]},
+        ), patch(
+            "app.persistence.chat_store.list_thread_messages",
+            return_value=[
+                {
+                    "role": "operator",
+                    "content": "Fix the parent dashboard submission screen copy and teacher review flow",
+                },
+                {"role": "operator", "content": "Route the task to Lila"},
+            ],
+        ), patch(
+            "app.chat.lane_b_lead_named_assign_fast_path._create_named_handoff_task",
+            return_value={
+                "task": {"task_id": "task-prior"},
+                "run": {"run_id": "run-prior", "phase": "executing"},
+                "started": True,
+            },
+        ) as create_task:
+            response = maybe_post_lead_named_assign_message(
+                workspace_id="workspace_test",
+                content="Route the task to Lila",
+                thread_id="thread_lead",
+                employee_role="lead",
+                lead_name="Imani",
+                composer_mode="agent",
+                created_at="2026-07-29T12:00:00Z",
+                save_message=save_message,
+                new_message_id=lambda prefix: f"{prefix}_1",
+                bind_attachments=lambda _message_id: [],
+            )
+
+        self.assertIsNotNone(response)
+        assert response is not None
+        self.assertEqual("task-prior", response["named_assign"]["task_id"])
+        self.assertIn("parent dashboard submission screen", create_task.call_args.kwargs["body"])
 
     def test_lead_fast_path_skips_when_assigning_lead(self) -> None:
         roster = _roster()

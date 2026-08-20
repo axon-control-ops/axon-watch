@@ -5,7 +5,11 @@ import type {
   VaultStatusSnapshot,
 } from '../lib/vault-surface-view';
 
-import { apiUrl, DEFAULT_FETCH_TIMEOUT_MS, fetchBlob } from './client';
+import {
+  DEFAULT_FETCH_TIMEOUT_MS,
+  fetchBlob,
+  fetchWithTimeout,
+} from './client';
 
 export interface VaultImportResult {
   imported_keys: string[];
@@ -52,7 +56,11 @@ async function vaultRequest<T>(
     }
   }
   try {
-    const response = await fetch(apiUrl(path), { ...init, signal: controller.signal });
+    const response = await fetchWithTimeout(
+      path,
+      { ...init, signal: controller.signal },
+      timeoutMs,
+    );
     if (!response.ok) {
       let detail = `request failed with status ${response.status}`;
       try {

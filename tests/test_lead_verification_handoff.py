@@ -91,7 +91,13 @@ class LeadVerificationHandoffTests(unittest.TestCase):
     def test_extracts_verify_commands(self) -> None:
         commands = extract_verification_commands(MARCO_REPLY)
         self.assertIn("npm test -- tests/unit/services/staffVisibility.test.ts", commands)
-        self.assertIn("npx tsx services/ops/verify-lesego-dimakatso-staff.ts", commands)
+        self.assertIn("npx --no-install tsx services/ops/verify-lesego-dimakatso-staff.ts", commands)
+
+    def test_normalizes_npx_verification_commands_to_no_install(self) -> None:
+        commands = extract_verification_commands(
+            "Retry `npx jest tests/unit/safe.test.ts` after the fix."
+        )
+        self.assertEqual(["npx --no-install jest tests/unit/safe.test.ts"], commands)
 
     def test_rejects_malformed_retry_commands(self) -> None:
         commands = extract_verification_commands(

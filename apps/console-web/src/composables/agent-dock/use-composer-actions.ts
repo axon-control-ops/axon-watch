@@ -23,6 +23,7 @@ import {
 } from '../../lib/apply-employee-specialty-route';
 import { shouldSoftSwitchAgentToPlan } from '../../lib/composer-plan-auto-switch';
 import {
+  isVagueNamedAssignPrompt,
   matchNamedAssignEmployee,
   rewriteNamedAssignPrompt,
 } from '../../lib/named-assign-route';
@@ -252,7 +253,9 @@ export function useComposerActions(options: UseComposerActionsOptions) {
       roster,
       useModelTiebreak: false,
     });
-    const routed = await maybeApplySpecialtyRoute(routeDecision);
+    const vagueNamedAssign =
+      Boolean(namedAssign) && isVagueNamedAssignPrompt(submitDraft, namedAssign?.employee.name ?? '');
+    const routed = vagueNamedAssign ? false : await maybeApplySpecialtyRoute(routeDecision);
     const shouldRewriteNamedAssign =
       Boolean(namedAssign) &&
       (routed ||
@@ -349,7 +352,9 @@ export function useComposerActions(options: UseComposerActionsOptions) {
       roster,
       useModelTiebreak: false,
     });
-    const routed = await maybeApplySpecialtyRoute(routeDecision);
+    const vagueNamedAssign =
+      Boolean(namedAssign) && isVagueNamedAssignPrompt(pending, namedAssign?.employee.name ?? '');
+    const routed = vagueNamedAssign ? false : await maybeApplySpecialtyRoute(routeDecision);
     const shouldRewriteNamedAssign =
       Boolean(namedAssign) &&
       (routed ||

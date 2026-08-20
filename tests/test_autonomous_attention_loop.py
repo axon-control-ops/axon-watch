@@ -173,12 +173,18 @@ class AutonomousAttentionLoopTests(unittest.TestCase):
         )
         self.assertEqual(open_tasks, [])
         receipt = result["escalated"][0]
-        approved = resolve_autonomy_decision(
-            receipt["receipt_id"],
-            resolution="approved",
-        )
+        with patch(
+            "app.workspace_agents.autonomous_attention._try_start_approved_attention_task",
+            return_value={"status": "queued", "task_id": "task-demo"},
+        ) as autostart:
+            approved = resolve_autonomy_decision(
+                receipt["receipt_id"],
+                resolution="approved",
+            )
         self.assertEqual(approved["status"], "resolved")
         self.assertEqual(approved["resolution"], "approved")
+        self.assertEqual(approved["autostart"]["status"], "queued")
+        autostart.assert_called_once()
         task = task_store.get_task(str(approved["task_id"]))
         assert task is not None
         self.assertEqual(task["risk"], "approved")
@@ -191,6 +197,44 @@ class AutonomousAttentionLoopTests(unittest.TestCase):
         self.assertIsNotNone(claimed)
         assert claimed is not None
         self.assertEqual(claimed["task_id"], task["task_id"])
+
+    def test_approved_critical_item_autostarts_operator_task(self) -> None:
+        result = enqueue_attend_actions(
+            workspace_id="workspace_axon_watch",
+            findings=[
+                LeadCheckinFinding(
+                    kind="critical_signal",
+                    workspace_id="workspace_axon_watch",
+                    owner_role="watcher",
+                    title="Lead recovery review",
+                    detail="Dana failed and needs Cass to diagnose",
+                    dedupe_key="failed_shift:workspace_axon_watch:lead",
+                    escalate_only=True,
+                )
+            ],
+        )
+        receipt = result["escalated"][0]
+
+        with patch(
+            "app.workspace_agents.autonomous_attention._try_start_approved_attention_task",
+            return_value={
+                "status": "started",
+                "task_id": "task-started",
+                "run_id": "run-started",
+            },
+        ) as autostart:
+            approved = resolve_autonomy_decision(
+                receipt["receipt_id"],
+                resolution="approved",
+            )
+
+        self.assertEqual(approved["status"], "resolved")
+        self.assertEqual(approved["resolution"], "approved")
+        self.assertEqual(approved["autostart"]["status"], "started")
+        self.assertEqual(approved["autostart"]["run_id"], "run-started")
+        autostart.assert_called_once()
+        started_task = autostart.call_args.args[0]
+        self.assertEqual(str(started_task.get("task_id") or ""), approved["task_id"])
 
     def test_dedupe_skips_second_pass(self) -> None:
         finding = LeadCheckinFinding(

@@ -527,3 +527,19 @@
   color: #edf4fb;
 }
 
+
+/* Agent thread tabs: glow carries state, the border marks the active tab.
+   Previously every busy/failed tab drew its own outline, so a row of tabs read
+   as several "selected" chips and the real selection was hard to find. State
+   still reads at a glance — it just uses glow and fill instead of an outline. */
+.agent-dock-thread-tabbar__tab.hud-active-chip:not(.hud-active-chip--active):not(
+    .agent-dock-thread-tabbar__tab--active
+  ) {
+  border-color: transparent !important;
+}
+
+.agent-dock-thread-tabbar__tab.hud-active-chip.agent-dock-thread-tabbar__tab--active,
+.agent-dock-thread-tabbar__tab.hud-active-chip.hud-active-chip--active {
+  border-style: solid !important;
+  border-width: 1px !important;
+}

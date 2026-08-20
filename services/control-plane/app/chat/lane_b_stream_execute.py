@@ -353,10 +353,15 @@ def execute_lane_b_stream(job: LaneBStreamJob) -> None:
         speaker_name = employee_name_from_persona_block(job.memory_appendix)
         agent_content = rewrite_employee_third_person_to_first(agent_content, speaker_name)
         execution_tier = str(lane_b_result.get("execution_tier") or "consultative")
-        try:
-            workspace_root = resolve_workspace_root(job.workspace_id)
-        except WorkspaceRootError:
-            workspace_root = None
+        # Verify edit receipts against the same checkout the runtime used.
+        # Falling back to the bound project root made valid sandbox edits look
+        # missing and, worse, could validate an unrelated live-tree path.
+        workspace_root = job.workspace_root
+        if workspace_root is None:
+            try:
+                workspace_root = resolve_workspace_root(job.workspace_id)
+            except WorkspaceRootError:
+                workspace_root = None
         run_started_epoch = None
         if job.dispatch_run_id:
             try:

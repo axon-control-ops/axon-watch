@@ -11,9 +11,10 @@ _STRUCTURED_BLOCK_RE = re.compile(
     re.IGNORECASE,
 )
 _STRUCTURED_START_RE = re.compile(
-    r":::(?:terminal|edit|research|image|thinking|tool)\b",
+    r":::(terminal|edit|research|image|thinking|tool)\b",
     re.IGNORECASE,
 )
+_ORPHAN_TOOL_MARKER_RE = re.compile(r"^:::tool\b[^\n]*(?:\n|$)", re.IGNORECASE | re.MULTILINE)
 _MARKDOWN_NOISE_RE = re.compile(r"[`#>*_\-\s]+")
 
 
@@ -27,6 +28,7 @@ def narrative_outside_receipts(reply_text: str | None) -> str:
     """Return human-facing prose after removing machine receipt blocks."""
     raw = str(reply_text or "")
     without_closed = _STRUCTURED_BLOCK_RE.sub("\n", raw)
+    without_closed = _ORPHAN_TOOL_MARKER_RE.sub("\n", without_closed)
     # An unclosed final receipt means the runtime stopped while still emitting
     # tool output. Ignore that tail rather than mistaking it for a final answer.
     unmatched = _STRUCTURED_START_RE.search(without_closed)
@@ -41,10 +43,16 @@ def evaluate_direct_reply_acceptance(reply_text: str | None) -> DirectReplyAccep
     starts = len(_STRUCTURED_START_RE.findall(raw))
     closed = len(_STRUCTURED_BLOCK_RE.findall(raw))
     if starts > closed:
-        return DirectReplyAcceptance(
-            False,
-            "Direct reply incomplete: runtime output ended inside an unclosed receipt block",
-        )
+        without_closed = _STRUCTURED_BLOCK_RE.sub("\n", raw)
+        unmatched_kinds = [
+            match.group(1).lower()
+            for match in _STRUCTURED_START_RE.finditer(_ORPHAN_TOOL_MARKER_RE.sub("\n", without_closed))
+        ]
+        if any(kind != "tool" for kind in unmatched_kinds):
+            return DirectReplyAcceptance(
+                False,
+                "Direct reply incomplete: runtime output ended inside an unclosed receipt block",
+            )
 
     narrative = narrative_outside_receipts(raw)
     substantive = _MARKDOWN_NOISE_RE.sub("", narrative)

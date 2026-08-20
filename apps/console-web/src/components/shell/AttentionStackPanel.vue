@@ -13,7 +13,10 @@ import {
   formatRunShortId,
 } from '../../lib/run-display';
 import { runPhaseProgress, runPhaseTag } from '../../lib/mockup-shell-view';
-import { runContinueActionLabel } from '../../lib/run-lifecycle-ui';
+import {
+  runContinueActionLabel,
+  shouldOfferRunStop,
+} from '../../lib/run-lifecycle-ui';
 import {
   deliveryStateLabel,
   deliveryStateTooltip,
@@ -76,10 +79,7 @@ const reviewReadyRunCount = computed(
     ).length,
 );
 
-const showStopAction = computed(
-  () =>
-    Boolean(activeRun.value?.can_stop) || activeRun.value?.phase === 'executing',
-);
+const showStopAction = computed(() => shouldOfferRunStop(activeRun.value?.can_stop));
 
 const showReviewActions = computed(
   () =>
@@ -276,7 +276,7 @@ function approvalExplanation(): OperatorAlertExplanation {
             v-if="showStopAction"
             type="button"
             class="run-actions__button run-actions__button--ghost"
-            :disabled="!shell.canStopPrimaryRun && activeRun?.phase !== 'executing'"
+            :disabled="!shell.canStopPrimaryRun"
             @click="shell.stopPrimaryRun()"
           >
             {{ shell.runMutationState === 'stopping' ? 'STOPPING…' : 'STOP' }}

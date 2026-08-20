@@ -105,6 +105,10 @@ def tunnel_stop(config: dict[str, object] | None = None) -> dict[str, object]:
         stop_managed_process(config)
     except OSError as exc:
         raise TunnelControlError(str(exc) or "tunnel stop failed") from exc
+    # Imported lazily: tunnel_supervisor imports this module at load time.
+    from app.tunnel.tunnel_supervisor import note_operator_stop
+
+    note_operator_stop()
     snapshot = tunnel_status(config)
     snapshot["msg"] = "Tunnel stopped"
     return snapshot

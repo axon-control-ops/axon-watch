@@ -258,6 +258,15 @@ export async function fetchWorkspaceChatThreads(
   );
 }
 
+export async function deleteChatThread(threadId: string): Promise<{ thread_id: string; deleted: boolean }> {
+  const encodedThreadId = encodeURIComponent(threadId);
+  return fetchJson<{ thread_id: string; deleted: boolean }>(
+    `/api/chat/threads/${encodedThreadId}`,
+    { method: 'DELETE' },
+    'chat thread delete failed',
+  );
+}
+
 export async function createWorkspaceChatThread(
   workspaceId: string,
   options: {

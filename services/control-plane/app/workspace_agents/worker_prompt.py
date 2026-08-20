@@ -153,6 +153,9 @@ def _role_tools_clause(role: str) -> str:
             shared
             + "Frontend focus: UI/files edits with targeted checks; avoid heavy servers "
             "unless the leased goal requires them. "
+            "In a disposable sandbox checkout, node_modules is borrowed from the bound "
+            "project — use `npx --no-install jest <test-path>` or `npm test -- <path>` "
+            "for receipts; do not claim jest is missing without running one of those. "
         )
     if cleaned == "lead":
         return (

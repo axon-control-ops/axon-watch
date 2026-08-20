@@ -18,6 +18,7 @@ from app.runs.service import (
     prune_terminal_employee_runs,
     reap_abandoned_review_ready_runs,
     reap_stale_employee_runs,
+    reconcile_employee_runs_missing_tasks,
 )
 from app.runs.stale_reconcile import BUSY_EMPLOYEE_PHASES
 from app.workspace_agents.config_loader import EmployeeConfig, load_workspace_agent_configs
@@ -339,6 +340,14 @@ def run_observation_tick() -> dict[str, Any]:
     result["reaped_count"] = len(reaped)
     if reaped:
         logger.info("continuous worker tick reaped %s stale run(s)", len(reaped))
+
+    missing_task_runs = reconcile_employee_runs_missing_tasks()
+    result["missing_task_reconciled_count"] = len(missing_task_runs)
+    if missing_task_runs:
+        logger.info(
+            "continuous worker tick cancelled %s active employee run(s) with missing tasks",
+            len(missing_task_runs),
+        )
 
     abandoned = reap_abandoned_review_ready_runs()
     result["abandoned_count"] = len(abandoned)

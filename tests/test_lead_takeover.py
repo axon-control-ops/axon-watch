@@ -256,6 +256,74 @@ class LeadTakeoverTests(unittest.TestCase):
         self.assertIn("Your action", content)
         self.assertNotIn("Ask me what to do next", content)
 
+    def test_sticky_follow_up_acceptance_keeps_full_plan_goal(self) -> None:
+        from app.persistence import task_store
+        from app.workspace_agents import lead_plan_store
+        from app.workspace_agents.lead_takeover import post_lead_takeover_report
+
+        long_goal = (
+            "AXON isolation and access acceptance probe. Work only in the current "
+            "disposable checkout and create docs/ops/AXON_FULL_ACCESS_PROBE.md "
+            "containing exactly: DashPro sandbox full-access receipts, git metadata "
+            "context receipts, and no-network verification notes for operator review."
+        )
+        plan = lead_plan_store.persist_plan(
+            workspace_id="workspace_dashpro",
+            plan={"goal": long_goal, "mode": "fan_out"},
+            plan_key_to_task_id={},
+        )
+        with (
+            patch("app.live_events.broadcast_material_change"),
+            patch("app.live_events.broadcast_spoken_line", return_value=1),
+        ):
+            takeover = post_lead_takeover_report(
+                workspace_id="workspace_dashpro",
+                run_id="run_cass_full_goal_1",
+                employee_role="watcher",
+                employee_name="Cass",
+                phase="completed",
+                goal="Check sandbox probe",
+                reply_text="Lead next: Lead: complete the operator note.\nConfidence: 8/10",
+                plan_id=str(plan["plan_id"]),
+            )
+
+        follow = task_store.get_task(str(takeover.get("follow_up_task_id")))
+        assert follow is not None
+        acceptance = str(follow.get("acceptance_criteria") or "")
+        self.assertIn("docs/ops/AXON_FULL_ACCESS_PROBE.md", acceptance)
+        self.assertIn("no-network verification notes", acceptance)
+        self.assertNotIn("…", acceptance)
+
+    def test_suppresses_stale_disposable_probe_follow_up(self) -> None:
+        from app.workspace_agents.lead_takeover import post_lead_takeover_report
+
+        with (
+            patch("app.live_events.broadcast_material_change"),
+            patch("app.live_events.broadcast_spoken_line", return_value=1),
+        ):
+            takeover = post_lead_takeover_report(
+                workspace_id="workspace_dashpro",
+                run_id="run_cass_stale_probe_1",
+                employee_role="watcher",
+                employee_name="Cass",
+                phase="completed",
+                goal=(
+                    "AXON isolation and access acceptance probe using a disposable "
+                    "sandbox checkout."
+                ),
+                reply_text=(
+                    "Receipts: git status was clean.\n"
+                    "Blockers / Lead next: Lead: the probe file was not found in "
+                    "this isolated worker checkout; tests/AXON_FULL_ACCESS_PROBE.test.ts "
+                    "returned No such file or directory. This is a disposable sandbox "
+                    "artifact, not workspace-wide proof.\n"
+                    "Confidence: 9/10"
+                ),
+            )
+
+        self.assertEqual("posted", takeover.get("status"))
+        self.assertIsNone(takeover.get("follow_up_task_id"))
+
     def test_controlling_plan_ignores_completed_plan_id(self) -> None:
         from app.workspace_agents import lead_plan_store
         from app.workspace_agents.lead_plan_control import controlling_lead_plan

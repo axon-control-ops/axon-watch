@@ -22,6 +22,7 @@ class DashproHomeworkSubmitTriageTests(unittest.TestCase):
         self.assertIn("homework_submissions_content_type_check", clause)
         self.assertIn("homework_submissions_submission_type_check", clause)
         self.assertIn("resolveHomeworkSubmissionTypes", clause)
+        self.assertIn("get_my_homework_submitter_user_id", clause)
         self.assertIn("do not run supabase db push", clause.lower())
 
 

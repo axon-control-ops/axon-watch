@@ -297,6 +297,55 @@ class DispatchRecursionRecoveryTests(unittest.TestCase):
         self.assertNotIn("API key was rejected", reason)
         mock_non_cursor.assert_not_called()
 
+    def test_cursor_named_model_limit_retries_auto_before_fallback(self) -> None:
+        calls: list[str] = []
+
+        def fake_cursor(**kwargs):  # noqa: ANN003
+            model = str(kwargs.get("model") or "")
+            calls.append(model)
+            if model:
+                raise RuntimeError(
+                    "ActionRequiredError: Named models unavailable. "
+                    "Free plans can only use Auto. Switch to Auto or upgrade plans to continue."
+                )
+            return CursorAgentReply(content="Recovered with Cursor Auto.")
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            with (
+                patch(
+                    "app.cli_runtime.router.runtime_status_snapshot",
+                    return_value=_snapshot_cursor_and_codex_ready(),
+                ),
+                patch(
+                    "app.cli_runtime.router._resolve_workspace_root",
+                    return_value=root,
+                ),
+                patch(
+                    "app.cli_runtime.router.ensure_workspace_research_mcp",
+                    return_value=True,
+                ),
+                patch(
+                    "app.cli_runtime.router.run_cursor_local_with_recursion_retry",
+                    side_effect=fake_cursor,
+                ),
+                patch("app.cli_runtime.router.run_non_cursor_local") as mock_non_cursor,
+            ):
+                result = dispatch_ide_composer(
+                    workspace_id="workspace_dashpro",
+                    composer_mode="agent",
+                    user_prompt="Continue the bounded task.",
+                    context_block="ctx",
+                    runtime_target="cursor_local",
+                    runtime_model="sonnet",
+                    fallback_runtime_families=("codex",),
+        )
+
+        self.assertTrue(result.get("dispatched"))
+        self.assertTrue(str(result.get("content") or "").startswith("Recovered with Cursor Auto."))
+        self.assertEqual(["sonnet", ""], calls)
+        mock_non_cursor.assert_not_called()
+
     def test_autonomous_worker_uses_only_approved_fallback_family(self) -> None:
         snapshot = _snapshot_cursor_and_codex_ready()
         snapshot["codex_usage"] = {"limit_reached": True}

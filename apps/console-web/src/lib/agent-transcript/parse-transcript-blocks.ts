@@ -118,7 +118,7 @@ export function parseAgentTranscriptBlocksUncached(
 
   function flushText(): void {
     let raw = textBuffer.join('\n').replace(/^\n+|\n+$/g, '');
-    if (raw.length > 8_000 && /\[[0-9;?]*[A-Za-z]/.test(raw)) {
+    if (/\[[0-9;?]*[A-Za-z]/.test(raw)) {
       raw = stripOrphanAnsiFragments(raw);
     }
     const text = dedupeProseText(raw);

@@ -10,7 +10,11 @@ CONTROL_PLANE_ROOT = Path(__file__).resolve().parents[1] / "services" / "control
 sys.path.insert(0, str(CONTROL_PLANE_ROOT))
 
 from app.cli_runtime.codex_agent import _build_codex_exec_command, _extract_codex_text, run_codex_local  # noqa: E402
-from app.cli_runtime.claude_agent import _extract_claude_text, run_claude_local  # noqa: E402
+from app.cli_runtime.claude_agent import (  # noqa: E402
+    _extract_claude_text,
+    build_claude_agent_command,
+    run_claude_local,
+)
 from app.cli_runtime.cursor_agent import CursorAgentReply, _cursor_mode_flag, run_cursor_local  # noqa: E402
 
 
@@ -240,7 +244,7 @@ class CliRuntimeAgentTests(unittest.TestCase):
         self.assertIn("plan", command)
 
     @patch("app.cli_runtime.claude_agent.communicate_registered_process")
-    def test_claude_executing_uses_accept_edits(self, mock_communicate) -> None:
+    def test_claude_executing_without_outer_sandbox_uses_accept_edits(self, mock_communicate) -> None:
         mock_communicate.return_value = (_stream_json_stdout("DONE"), "", 0)
         run_claude_local(
             binary="/usr/bin/claude",
@@ -251,7 +255,30 @@ class CliRuntimeAgentTests(unittest.TestCase):
         )
         command = mock_communicate.call_args.kwargs["command"]
         self.assertIn("acceptEdits", command)
+        self.assertNotIn("bypassPermissions", command)
         self.assertEqual("/tmp/ws", mock_communicate.call_args.kwargs.get("cwd"))
+
+    def test_claude_full_access_bypasses_inner_gate_only_inside_outer_sandbox(self) -> None:
+        command = build_claude_agent_command(
+            binary="/usr/bin/claude",
+            prompt="run the tests",
+            composer_mode="agent",
+            execution_tier="executing",
+            outer_sandboxed=True,
+        )
+        self.assertIn("bypassPermissions", command)
+        self.assertNotIn("acceptEdits", command)
+
+    def test_claude_ask_stays_plan_even_inside_outer_sandbox(self) -> None:
+        command = build_claude_agent_command(
+            binary="/usr/bin/claude",
+            prompt="explain this",
+            composer_mode="ask",
+            execution_tier="consultative",
+            outer_sandboxed=True,
+        )
+        self.assertIn("plan", command)
+        self.assertNotIn("bypassPermissions", command)
 
     def test_claude_preserves_tool_activity_as_terminal_and_edit_blocks(self) -> None:
         stream = "\n".join([

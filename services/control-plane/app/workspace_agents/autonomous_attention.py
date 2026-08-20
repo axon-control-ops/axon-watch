@@ -269,6 +269,34 @@ def _reject_duplicate_pending(*, primary_id: str, soft_key: str) -> int:
     return cleared
 
 
+def _try_start_approved_attention_task(task: dict[str, Any] | None) -> dict[str, Any]:
+    """Best-effort immediate start after an operator approves a gated task.
+
+    Full Auto can rely on the scheduler, but Manual/Semi keeps the scheduler
+    paused. In those modes the approve button must feel decisive: create the
+    bounded task and try the same operator-start path as the Task Board button.
+    """
+    task_id = str((task or {}).get("task_id") or "").strip()
+    if not task_id:
+        return {"status": "skipped", "reason": "missing_task_id"}
+    try:
+        from app.workspace_agents.operator_start_task import operator_start_task
+
+        started = operator_start_task(task_id)
+        return {
+            "status": "started",
+            "run_id": str((started.get("run") or {}).get("run_id") or ""),
+            "task_id": task_id,
+        }
+    except Exception as exc:  # noqa: BLE001 — approval should remain resolved.
+        logger.warning("approved attention task autostart failed task=%s: %s", task_id, exc)
+        return {
+            "status": "queued",
+            "task_id": task_id,
+            "reason": str(exc),
+        }
+
+
 def resolve_autonomy_decision(
     receipt_id: str,
     *,
@@ -338,7 +366,10 @@ def resolve_autonomy_decision(
             resolution="approved",
             task_id=str(task.get("task_id") or "") or None,
         )
+        resolved["autostart"] = _try_start_approved_attention_task(task)
         cleared = _reject_duplicate_pending(primary_id=receipt_id, soft_key=soft_key)
+        if cleared:
+            resolved["duplicates_cleared"] = cleared
         return resolved
     except Exception:
         if task is not None:

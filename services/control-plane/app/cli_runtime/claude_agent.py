@@ -17,12 +17,22 @@ from app.cli_runtime.subprocess_runner import (
 )
 
 
-def _claude_permission_mode(composer_mode: str, execution_tier: str) -> str:
-    """Map Axon composer modes onto Claude Code permission modes."""
+def _claude_permission_mode(
+    composer_mode: str,
+    execution_tier: str,
+    *,
+    outer_sandboxed: bool = False,
+) -> str:
+    """Map Axon access onto Claude without weakening an unsandboxed launch."""
     if composer_mode in {"ask", "plan"}:
         return "plan"
     if execution_tier == "executing":
-        return "acceptEdits"
+        # Axon's outer Bubblewrap boundary owns filesystem scope and its
+        # immutable PreToolUse hook owns the command allowlist. Claude's
+        # acceptEdits mode adds a second interactive Bash gate inside that
+        # disposable checkout, making effective Full Access misleading.
+        # Bypass only when that outer containment is actually present.
+        return "bypassPermissions" if outer_sandboxed else "acceptEdits"
     return "plan"
 
 
@@ -37,6 +47,7 @@ def build_claude_agent_command(
     execution_tier: str = "consultative",
     model: str = "",
     reasoning_effort: str = "",
+    outer_sandboxed: bool = False,
 ) -> list[str]:
     """Build the Claude Code argv for headless Lane B dispatch."""
     command = [
@@ -48,7 +59,11 @@ def build_claude_agent_command(
         "--include-partial-messages",
         "--no-session-persistence",
         "--permission-mode",
-        _claude_permission_mode(composer_mode, execution_tier),
+        _claude_permission_mode(
+            composer_mode,
+            execution_tier,
+            outer_sandboxed=outer_sandboxed,
+        ),
     ]
     if model:
         command.extend(["--model", model])
@@ -255,6 +270,7 @@ def run_claude_local(
         execution_tier=execution_tier,
         model=model,
         reasoning_effort=reasoning_effort,
+        outer_sandboxed=sandbox_policy is not None,
     )
     run_cwd = str(workspace_root.resolve()) if workspace_root else None
 

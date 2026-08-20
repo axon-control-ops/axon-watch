@@ -103,7 +103,46 @@ class ComposerSandboxPolicyV2Tests(unittest.TestCase):
             self.assertIsNone(resolve_composer_execution_policy(root, "", "ask"))
             policy = resolve_composer_execution_policy(root, "", "agent")
             self.assertEqual(policy and policy.write_paths, (".",))
+            lead_scoped = resolve_composer_execution_policy(root, "lead", "agent", "consultative")
+            self.assertNotEqual(lead_scoped and lead_scoped.write_paths, (".",))
+            lead_full = resolve_composer_execution_policy(root, "lead", "agent", "full")
+            self.assertEqual(lead_full and lead_full.write_paths, (".",))
+            watcher_full = resolve_composer_execution_policy(root, "watcher", "agent", "full")
+            self.assertEqual(watcher_full and watcher_full.write_paths, ())
             composer_sandbox.discard_sandbox("ws-access")
+
+    def test_review_exposes_checkout_preview_and_root_dirty_state(self) -> None:
+        with self._patch_root(), patch.object(composer_sandbox, "_auto_enabled", return_value=False):
+            composer_sandbox.enable_sandbox("ws-review")
+            root = composer_sandbox.resolve_sandbox_workspace_root("ws-review")
+            assert root is not None
+            (root / "README.md").write_text("sandbox change\n", encoding="utf-8")
+            (self.project / "root-only.txt").write_text("root change\n", encoding="utf-8")
+
+            review = composer_sandbox.review_sandbox("ws-review")
+
+            self.assertTrue(review["dirty"])
+            self.assertIn("README.md", review["changed_paths"])
+            self.assertTrue(review["root_dirty"])
+            self.assertIn("root-only.txt", review["root_changed_paths"])
+            self.assertEqual(str(root), review["checkout_root"])
+            self.assertEqual(str(self.project.resolve()), review["bound_project_root"])
+            self.assertTrue(review["preview"]["available"])
+            self.assertIn(str(root), review["preview"]["example"])
+            composer_sandbox.discard_sandbox("ws-review")
+
+    def test_publish_refuses_when_bound_root_is_dirty(self) -> None:
+        with self._patch_root(), patch.object(composer_sandbox, "_auto_enabled", return_value=False):
+            composer_sandbox.enable_sandbox("ws-publish")
+            root = composer_sandbox.resolve_sandbox_workspace_root("ws-publish")
+            assert root is not None
+            (root / "README.md").write_text("sandbox change\n", encoding="utf-8")
+            (self.project / "root-only.txt").write_text("root change\n", encoding="utf-8")
+
+            with self.assertRaises(composer_sandbox.DirtySandboxError):
+                composer_sandbox.publish_sandbox("ws-publish")
+
+            composer_sandbox.discard_sandbox("ws-publish")
 
 
 if __name__ == "__main__":

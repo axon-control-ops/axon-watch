@@ -85,6 +85,7 @@ function flatIndexFor(message: OperatorThreadEntry): number {
               <AgentDockStickyPrompt
                 :text="turn.prompt.content"
                 :created-at="turn.prompt.created_at"
+                :attachment-count="messageAttachments(turn.prompt).length"
                 show-resend
               >
                 <template #attachments>
@@ -203,6 +204,7 @@ function flatIndexFor(message: OperatorThreadEntry): number {
               <AgentDockStickyPrompt
                 :text="item.message.content"
                 :created-at="item.message.created_at"
+                :attachment-count="messageAttachments(item.message).length"
                 show-resend
               >
                 <template #attachments>

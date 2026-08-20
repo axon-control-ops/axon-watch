@@ -22,11 +22,11 @@ from app.signals.inbox_assembly import include_summary_degraded_signal
 from app.signals.store import get_inbox_snapshot
 from app.tunnel.tunnel_control import (
     TunnelControlError,
-    attempt_tunnel_autostart,
     tunnel_start,
     tunnel_status,
     tunnel_stop,
 )
+from app.tunnel.tunnel_supervisor import start_tunnel_supervisor
 from app.vault.api import (
     VaultExportBody,
     VaultMonitorImportBody,
@@ -101,9 +101,10 @@ class SentryAttendBody(BaseModel):
 
 
 def vault_startup_auto_unlock() -> None:
-    # Vault first so named-tunnel tokens from unlock are available to autostart.
+    # Vault first so named-tunnel tokens from unlock are available to the supervisor.
     attempt_auto_unlock()
-    attempt_tunnel_autostart()
+    # Supervisor, not a one-shot start: cloudflared that dies later must come back.
+    start_tunnel_supervisor()
     # Warm connector/monitor caches off the request path so post-revive inbox
     # polls do not all stampede a cold Sentry/IMAP probe and 503 at the CP.
     def _warm_probe_caches() -> None:

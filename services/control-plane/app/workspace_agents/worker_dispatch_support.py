@@ -29,6 +29,8 @@ logger = logging.getLogger(__name__)
 
 _active_run_ids: set[str] = set()
 _active_run_ids_lock = threading.Lock()
+# Runs whose cwd is the durable composer Sandbox — must not be torn down as worker isolation.
+_sandbox_borrowed_run_ids: set[str] = set()
 
 
 def claim_worker_dispatch(run_id: str) -> bool:
@@ -86,6 +88,13 @@ def finalize_failed_worker_task(
 
 
 def cleanup_dispatch_isolation(run_id: str, isolation_root: Path) -> None:
+    cleaned_run = str(run_id or "").strip()
+    with _active_run_ids_lock:
+        borrowed = cleaned_run in _sandbox_borrowed_run_ids
+        if borrowed:
+            _sandbox_borrowed_run_ids.discard(cleaned_run)
+    if borrowed:
+        return
     cleanup = cleanup_worker_isolation(isolation_root)
     try:
         append_run_execution_receipt(
@@ -103,9 +112,34 @@ def cleanup_dispatch_isolation(run_id: str, isolation_root: Path) -> None:
         logger.exception("worker isolation cleanup receipt failed for %s", run_id)
 
 
+def _composer_sandbox_checkout(workspace_id: str) -> Path | None:
+    """Return the durable Sandbox checkout when enabled and materialized."""
+    try:
+        from app.cli_runtime.composer_sandbox import (
+            resolve_sandbox_workspace_root,
+            sandbox_status,
+        )
+
+        status = sandbox_status(workspace_id)
+        if not status.get("enabled") or not status.get("materialized"):
+            return None
+        return resolve_sandbox_workspace_root(workspace_id)
+    except Exception:  # noqa: BLE001 — verification dispatch must fall back to isolation
+        logger.exception("composer Sandbox checkout resolve failed for %s", workspace_id)
+        return None
+
+
 def create_dispatch_isolation(
     *, workspace_id: str, run_id: str, task: dict[str, Any]
 ) -> Path:
+    cleaned_run = str(run_id or "").strip()
+    if is_verification_task(task):
+        sandbox_root = _composer_sandbox_checkout(workspace_id)
+        if sandbox_root is not None:
+            with _active_run_ids_lock:
+                _sandbox_borrowed_run_ids.add(cleaned_run)
+            return sandbox_root
+
     baseline_commit = None
     baseline_ref = None
     if is_verification_task(task):
@@ -123,6 +157,9 @@ def create_dispatch_isolation(
 
 def _verification_command_root(workspace_id: str) -> Path | None:
     """Root the verify commands actually run against (the agent PTY cwd)."""
+    sandbox_root = _composer_sandbox_checkout(workspace_id)
+    if sandbox_root is not None:
+        return sandbox_root
     from app.terminal.workspace_roots import resolve_workspace_root
 
     try:
@@ -142,9 +179,18 @@ def enqueue_verification_terminal_jobs(
         logger.info("verification shift %s has no extracted verify commands", run_id)
         return
 
-    from app.terminal.agent_jobs import enqueue_agent_terminal_job
+    from app.terminal.agent_jobs import TARGET_SANDBOX, TARGET_WORKSPACE, enqueue_agent_terminal_job
 
     workspace_root = _verification_command_root(workspace_id)
+    job_target = TARGET_WORKSPACE
+    try:
+        from app.cli_runtime.composer_sandbox import sandbox_status
+
+        status = sandbox_status(workspace_id)
+        if status.get("enabled") and status.get("materialized"):
+            job_target = TARGET_SANDBOX
+    except Exception:  # noqa: BLE001 — fall back to bound root
+        pass
     for command in commands[:3]:
         runnable, note = resolve_verification_command(command, workspace_root)
         if runnable is None:
@@ -167,6 +213,7 @@ def enqueue_verification_terminal_jobs(
                 run_id=run_id,
                 stream_to_chat=True,
                 source_workspace_id=workspace_id,
+                target=job_target,
             )
             append_run_execution_receipt(
                 run_id,

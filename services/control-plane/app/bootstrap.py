@@ -12,6 +12,7 @@ from app.runs.service import (
     drain_terminal_employee_runs,
     reap_abandoned_review_ready_runs,
     reap_stale_employee_runs,
+    reconcile_employee_runs_missing_tasks,
     reconcile_orphaned_runs_on_startup,
 )
 from app.workspace_agents.scheduler import (
@@ -69,6 +70,12 @@ async def control_plane_lifespan(_app: FastAPI):
         logger.info(
             "startup stale employee-run reap cleared %s run(s)",
             len(reaped),
+        )
+    missing_task_runs = reconcile_employee_runs_missing_tasks()
+    if missing_task_runs:
+        logger.info(
+            "startup missing-task employee-run reconcile cleared %s run(s)",
+            len(missing_task_runs),
         )
     pruned = drain_terminal_employee_runs()
     if pruned:

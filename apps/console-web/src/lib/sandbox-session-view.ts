@@ -6,6 +6,24 @@ export const SANDBOX_SESSION_CONSENT_LINES = [
 
 export type ComposerAccessTone = 'full' | 'sandbox' | 'sandbox-full';
 
+export function sandboxUnpromotedChangesMessage(): string {
+  return 'Sandbox has unpromoted changes — use Review / Preview before publish.';
+}
+
+export function sandboxRootDirtyMessage(input: {
+  bound_branch?: string;
+  root_changed_paths?: string[];
+}): string {
+  const rootPaths = (input.root_changed_paths ?? []).slice(0, 4).join(', ');
+  return `Root worktree is dirty on ${input.bound_branch || 'current branch'} (${rootPaths}). Clean root before publishing Sandbox changes.`;
+}
+
+export function sandboxStripDetailCopy(dirty: boolean): string {
+  return dirty
+    ? 'Review and preview this disposable checkout before publishing.'
+    : 'Sandbox is active; root preview stays separate.';
+}
+
 export function sandboxSessionHint(enabled: boolean, envForced: boolean): string {
   if (envForced) {
     return 'Sandbox is forced on by server config for this process';

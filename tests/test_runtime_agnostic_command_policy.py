@@ -25,13 +25,13 @@ from app.cli_runtime.agent_shell_hook import (  # noqa: E402
     to_claude_hook_response,
 )
 
-PREFIXES = (("npm", "test"), ("npx", "jest"), ("gh", "run", "list"))
+PREFIXES = (("npm", "ci"), ("npm", "test"), ("npx", "--no-install", "jest"), ("gh", "run", "list"))
 
 
-def _decide(command: str, *, tool_name: str) -> dict:
+def _decide(command: str, *, tool_name: str, event_name: str = "preToolUse") -> dict:
     return evaluate_hook_payload(
         {
-            "hook_event_name": "preToolUse",
+            "hook_event_name": event_name,
             "tool_name": tool_name,
             "tool_input": {"command": command},
         },
@@ -41,10 +41,20 @@ def _decide(command: str, *, tool_name: str) -> dict:
 
 
 class RuntimeParityTests(unittest.TestCase):
+    def test_claude_canonical_pre_tool_use_event_is_accepted(self) -> None:
+        decision = _decide(
+            "npm test -- tests/x.test.tsx",
+            tool_name="Bash",
+            event_name="PreToolUse",
+        )
+        self.assertEqual("allow", decision["permission"])
+
     def test_claude_bash_tool_reaches_the_same_policy_as_cursor_shell(self) -> None:
         for command, expected in (
+            ("npm ci", "allow"),
             ("npm test -- tests/x.test.tsx", "allow"),
-            ("npx jest tests/x.test.tsx", "allow"),
+            ("npx --no-install jest tests/x.test.tsx", "allow"),
+            ("npx jest tests/x.test.tsx", "deny"),
             ("axon-agent-terminal-job --workspace w -- npx jest tests/x", "allow"),
             ("curl https://example.invalid", "deny"),
             ("sudo rm -rf /", "deny"),

@@ -26,6 +26,9 @@ export interface TerminalSessionDescriptor {
   role: 'operator' | 'agent' | string;
   runId: string | null;
   state: 'ready';
+  cwd?: string;
+  branch?: string;
+  isolated?: boolean;
 }
 
 export const DEFAULT_TERMINAL_SESSIONS: TerminalSessionDescriptor[] = [
@@ -53,6 +56,9 @@ function mapTerminalSessionRecord(record: TerminalSessionRecord): TerminalSessio
     role: record.role,
     runId: record.run_id,
     state: 'ready',
+    cwd: record.cwd,
+    branch: record.branch,
+    isolated: record.isolated,
   };
 }
 

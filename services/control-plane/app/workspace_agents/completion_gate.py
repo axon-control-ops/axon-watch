@@ -15,6 +15,7 @@ from app.workspace_agents.lead_verification_handoff import (
     verification_terminal_jobs_for_run,
 )
 from app.workspace_agents.ops_delivery import no_change_delivery_is_successful_ops_task
+from app.chat.reply_verification import extract_edit_paths
 
 
 _IMPLEMENTATION_ROLES = frozenset({"frontend", "backend", "integrations"})
@@ -78,6 +79,10 @@ _STOP_WORDS = frozenset(
 )
 
 
+def _has_intent_word(text: str, words: Iterable[str]) -> bool:
+    return any(re.search(rf"\b{re.escape(word)}\b", text) for word in words)
+
+
 @dataclass(frozen=True)
 class CompletionGateResult:
     passed: bool
@@ -112,7 +117,10 @@ def implementation_requested(task: dict[str, Any] | None) -> bool:
     assigned_blob = " ".join(
         str(task.get(key) or "") for key in ("goal", "acceptance_criteria")
     ).lower()
-    explicitly_requests_implementation = any(word in assigned_blob for word in _IMPLEMENTATION_WORDS)
+    explicitly_requests_implementation = _has_intent_word(
+        assigned_blob,
+        _IMPLEMENTATION_WORDS,
+    )
     if no_change_delivery_is_successful_ops_task(task):
         return False
     # "Critically review X, suggest fixes, apply them" leads with review: the
@@ -122,8 +130,9 @@ def implementation_requested(task: dict[str, Any] | None) -> bool:
     if _leads_with_review_intent(task) and not _demands_unconditional_change(assigned_blob):
         return False
     if role in _IMPLEMENTATION_ROLES:
-        return explicitly_requests_implementation or not any(
-            word in assigned_blob for word in _REPORT_ONLY_WORDS
+        return explicitly_requests_implementation or not _has_intent_word(
+            assigned_blob,
+            _REPORT_ONLY_WORDS,
         )
     return explicitly_requests_implementation
 
@@ -207,6 +216,47 @@ def _worker_reported_changed_files(reply_text: str, paths: Iterable[str]) -> boo
     return bool(re.search(r"\b[\w.-]+\.(tsx?|jsx?|vue|css|py|sql|md)\b", reply))
 
 
+def _receipt_reported_changed_paths(reply_text: str) -> list[str]:
+    """Changed paths explicitly backed by edit receipt blocks in the reply.
+
+    Some report/ops tasks legitimately do not publish a product diff, but still
+    create operator-facing notes inside the disposable checkout. Their completion
+    receipt should not say ``changed_files=none`` when the reply contains a
+    concrete ``:::edit path`` receipt.
+    """
+    cleaned: list[str] = []
+    seen: set[str] = set()
+    for raw in extract_edit_paths(reply_text or ""):
+        path = str(raw or "").strip().lstrip("./")
+        if not path or path in seen:
+            continue
+        seen.add(path)
+        cleaned.append(path)
+    return strip_control_plane_owned_paths(cleaned)
+
+
+def _merge_receipt_paths_for_reporting(
+    *,
+    task: dict[str, Any] | None,
+    paths: list[str],
+    reply_text: str,
+) -> list[str]:
+    if implementation_requested(task):
+        return paths
+    receipt_paths = _receipt_reported_changed_paths(reply_text)
+    if not receipt_paths:
+        return paths
+    merged: list[str] = []
+    seen: set[str] = set()
+    for item in [*paths, *receipt_paths]:
+        cleaned = str(item or "").strip()
+        if not cleaned or cleaned in seen:
+            continue
+        seen.add(cleaned)
+        merged.append(cleaned)
+    return merged
+
+
 def _validation_status(run_id: str, task: dict[str, Any]) -> tuple[bool, str]:
     run = run_store.get_run(run_id)
     if not isinstance(run, dict):
@@ -276,6 +326,11 @@ def evaluate_pre_publish_completion_gate(
         from app.workspace_delivery.publish import list_isolation_changed_paths
 
         paths = strip_control_plane_owned_paths(list_isolation_changed_paths(isolation_root))
+    paths = _merge_receipt_paths_for_reporting(
+        task=task,
+        paths=paths,
+        reply_text=reply_text,
+    )
 
     if not implementation_requested(task):
         if not isinstance(task, dict) or not str(task.get("goal") or "").strip():

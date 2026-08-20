@@ -102,4 +102,10 @@ describe('terminal-scrollback', () => {
     expect(cleaned).not.toMatch(/\u001b\[/);
     expect(cleaned).not.toMatch(/\[1A|\[999D|\[32m/);
   });
+
+  it('drops orphan [K-only lines when ESC bytes were lost in storage', () => {
+    const noisy = ['[K', '[K', '[K', 'PASS tests/unit/foo.test.ts', '[K'].join('\n');
+    const cleaned = sanitizeTerminalDisplayOutput(noisy, 'npm test');
+    expect(cleaned).toBe('PASS tests/unit/foo.test.ts');
+  });
 });

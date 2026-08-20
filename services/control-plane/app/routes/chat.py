@@ -129,6 +129,14 @@ def chat_threads_show(thread_id: str) -> dict[str, object]:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 
 
+@router.delete("/api/chat/threads/{thread_id}")
+def chat_threads_delete(thread_id: str) -> dict[str, object]:
+    try:
+        return chat_store.delete_thread(thread_id)
+    except chat_store.ChatThreadNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
 @router.get("/api/chat/threads/{thread_id}/history")
 def chat_threads_history(thread_id: str, limit: int | None = None) -> dict[str, object]:
     try:

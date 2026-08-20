@@ -14,7 +14,7 @@ from app.persistence import task_store
 logger = logging.getLogger(__name__)
 
 _VERIFICATION_COMMAND_RE = re.compile(
-    r"`((?:npm test[^\n`]*|npx tsx[^\n`]*|npx jest[^\n`]*))`",
+    r"`((?:npm test[^\n`]*|npm run[^\n`]*|npx (?:--no-install )?tsx[^\n`]*|npx (?:--no-install )?jest[^\n`]*))`",
     re.IGNORECASE,
 )
 _TEST_FILE_BACKTICK_RE = re.compile(
@@ -22,7 +22,7 @@ _TEST_FILE_BACKTICK_RE = re.compile(
     re.IGNORECASE,
 )
 _GOAL_INLINE_COMMAND_RE = re.compile(
-    r"(?<![/`])(npm test(?:\s+--\s+[^\n;`\[]+)?|npx tsx[^\n;`\[]+|npx jest[^\n;`\[]+)",
+    r"(?<![/`])(npm test(?:\s+--\s+[^\n;`\[]+)?|npx (?:--no-install )?tsx[^\n;`\[]+|npx (?:--no-install )?jest[^\n;`\[]+)",
     re.IGNORECASE,
 )
 _SOURCE_RUN_RE = re.compile(r"\[from run (run_[a-f0-9]+)\]", re.IGNORECASE)
@@ -32,8 +32,9 @@ _MALFORMED_VERIFY_COMMAND_RE = re.compile(
 )
 _VERIFICATION_SHELL_PREFIXES: tuple[tuple[str, ...], ...] = (
     ("npm", "test"),
-    ("npx", "jest"),
-    ("npx", "tsx"),
+    ("npm", "run"),
+    ("npx", "--no-install", "jest"),
+    ("npx", "--no-install", "tsx"),
 )
 _UNSAFE_SHELL_CHARACTERS = frozenset(";&|><$()\\\r\n\x00")
 # A job the watcher interrupted is a failure with a known cause, not an
@@ -54,7 +55,19 @@ def _verification_command_is_valid(command: str) -> bool:
         return False
     if len(argv) < 2:
         return False
-    return tuple(part.lower() for part in argv[:2]) in _VERIFICATION_SHELL_PREFIXES
+    lowered = tuple(part.lower() for part in argv)
+    return any(lowered[: len(prefix)] == prefix for prefix in _VERIFICATION_SHELL_PREFIXES)
+
+
+def _normalize_verification_command(command: str) -> str:
+    cleaned = " ".join(str(command or "").split()).strip().rstrip(".")
+    try:
+        argv = shlex.split(cleaned)
+    except ValueError:
+        return cleaned
+    if len(argv) >= 2 and argv[0].lower() == "npx" and argv[1].lower() in {"jest", "tsx"}:
+        return " ".join(("npx", "--no-install", *argv[1:]))
+    return cleaned
 
 
 def extract_verification_commands(reply_text: str | None) -> list[str]:
@@ -63,10 +76,20 @@ def extract_verification_commands(reply_text: str | None) -> list[str]:
     commands: list[str] = []
     seen: set[str] = set()
     for match in _VERIFICATION_COMMAND_RE.finditer(body):
-        command = " ".join(match.group(1).split()).strip()
-        if _verification_command_is_valid(command) and command not in seen:
-            seen.add(command)
-            commands.append(command)
+        parts = [part.strip() for part in re.split(r"\s&&\s", match.group(1)) if part.strip()]
+        if not parts:
+            continue
+        valid_parts: list[str] = []
+        for part in parts:
+            command = _normalize_verification_command(part)
+            if not _verification_command_is_valid(command):
+                valid_parts = []
+                break
+            valid_parts.append(command)
+        for command in valid_parts:
+            if command not in seen:
+                seen.add(command)
+                commands.append(command)
     for match in _TEST_FILE_BACKTICK_RE.finditer(body):
         test_path = " ".join(match.group(1).split()).strip()
         command = f"npm test -- {test_path}"
@@ -74,7 +97,7 @@ def extract_verification_commands(reply_text: str | None) -> list[str]:
             seen.add(command)
             commands.append(command)
     for match in _GOAL_INLINE_COMMAND_RE.finditer(body):
-        command = " ".join(match.group(1).split()).strip().rstrip(".")
+        command = _normalize_verification_command(match.group(1))
         if _verification_command_is_valid(command) and command not in seen:
             seen.add(command)
             commands.append(command)
@@ -141,6 +164,22 @@ def is_verification_task(task: dict[str, Any] | None) -> bool:
     return str(task.get("goal") or "").strip().lower().startswith("verification after")
 
 
+def _split_compound_verification_commands(commands: list[str]) -> list[str]:
+    """Split ``cmd1 && cmd2`` goal backticks into individually enqueueable jobs."""
+    expanded: list[str] = []
+    seen: set[str] = set()
+    for command in commands:
+        for part in re.split(r"\s&&\s", str(command or "")):
+            normalized = _normalize_verification_command(part.strip())
+            if not normalized or normalized in seen:
+                continue
+            if not _verification_command_is_valid(normalized):
+                continue
+            seen.add(normalized)
+            expanded.append(normalized)
+    return expanded
+
+
 def verification_commands_for_task(task: dict[str, Any] | None) -> list[str]:
     if not isinstance(task, dict):
         return []
@@ -149,7 +188,7 @@ def verification_commands_for_task(task: dict[str, Any] | None) -> list[str]:
         for key in ("goal", "acceptance_criteria")
         if str(task.get(key) or "").strip()
     )
-    return extract_verification_commands(blob)
+    return _split_compound_verification_commands(extract_verification_commands(blob))
 
 
 def verification_approved_command_prefixes() -> tuple[tuple[str, ...], ...]:
@@ -365,9 +404,11 @@ def verification_worker_prompt_clause(*, workspace_id: str, task: dict[str, Any]
         else f"`axon-agent-terminal-job --workspace {workspace} -- <verify-command>`"
     )
     return (
-        " VERIFICATION SHIFT: run the scoped verify commands first via "
+        " VERIFICATION SHIFT: run the scoped verify commands first — in a sandbox "
+        "disposable checkout you may run approved `npm test` / `npx --no-install jest` "
+        "directly in Shell when node_modules is present; otherwise use "
         f"{wrapped}. Attach stdout/stderr receipts before static review. "
-        "Do not claim tests passed without terminal job output."
+        "Do not claim tests passed without command output."
     )
 
 

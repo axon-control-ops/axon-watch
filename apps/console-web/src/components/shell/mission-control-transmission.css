@@ -276,10 +276,61 @@
   padding: 0.7rem 0.7rem 0.55rem;
 }
 
+.mc-transmission__empty--thread-focus {
+  justify-content: flex-start;
+  gap: 0.55rem;
+  padding: 0.85rem 0.85rem 0.65rem;
+}
+
+.mc-transmission__empty-title {
+  margin: 0;
+  color: rgba(140, 235, 255, 0.82);
+  font: 600 0.54rem var(--font-mono, ui-monospace, monospace);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.mc-transmission__empty-hints {
+  margin: 0.15rem 0 0;
+  padding: 0.55rem 0.65rem;
+  list-style: none;
+  display: grid;
+  gap: 0.35rem;
+  width: 100%;
+  max-width: 28rem;
+  border: 1px dashed rgba(70, 200, 255, 0.2);
+  border-radius: 0.42rem;
+  background: rgba(0, 18, 28, 0.45);
+  color: rgba(130, 178, 198, 0.82);
+  font: 0.58rem / 1.45 var(--font-mono, ui-monospace, monospace);
+}
+
+.mc-transmission__empty-hints strong {
+  color: rgba(168, 232, 252, 0.95);
+  font-weight: 600;
+}
+
 .mc-transmission__empty-body {
   margin: 0;
   color: rgba(140, 190, 215, 0.68);
   font: italic 0.7rem/1.45 var(--font-display, ui-sans-serif, system-ui);
+}
+
+.mc-transmission__empty--thread-focus .mc-transmission__empty-body {
+  font-style: normal;
+  color: rgba(168, 215, 235, 0.82);
+  font-size: 0.72rem;
+  max-width: 32rem;
+}
+
+.mc-transmission__fleet-note {
+  margin: 0;
+  padding: 0.38rem 0.55rem;
+  border-left: 2px solid rgba(255, 180, 90, 0.55);
+  color: rgba(255, 210, 150, 0.88);
+  font: 0.54rem / 1.4 var(--font-mono, ui-monospace, monospace);
+  letter-spacing: 0.04em;
+  max-width: 32rem;
 }
 
 .mc-transmission__thinking-inline {
