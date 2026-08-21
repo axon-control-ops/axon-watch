@@ -569,4 +569,5 @@ from app.runs.stale_reconcile import (
     employee_run_stale_seconds,
     employee_run_stale_seconds_for_role,
     reap_stale_employee_runs,
+    reap_stale_interactive_runs,
 )
