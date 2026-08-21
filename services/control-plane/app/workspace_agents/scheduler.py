@@ -479,6 +479,22 @@ def run_continuous_worker_tick(
     except Exception:  # noqa: BLE001 — never block scheduler on handoff retry
         logger.exception("handoff autostart retry failed")
 
+    try:
+        from app.workspace_handoff_routing import notify_completed_handoffs
+
+        # A cross-workspace handoff previously stopped at one ack when routed;
+        # the source Lead never learned whether the target workspace actually
+        # finished the delegated work. Close that loop on the same tick that
+        # already retries stuck autostarts.
+        handoffs_closed = notify_completed_handoffs()
+        if handoffs_closed:
+            logger.info(
+                "continuous worker tick closed %s completed handoff(s)",
+                len(handoffs_closed),
+            )
+    except Exception:  # noqa: BLE001 — never block scheduler on handoff completion notice
+        logger.exception("handoff completion notice failed")
+
     if not scheduler_enabled():
         return []
 
