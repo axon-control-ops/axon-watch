@@ -1,6 +1,8 @@
 """Every control-plane module must import cleanly on its own, in any order.
 
-Regression guard for two real incidents in one session:
+Regression guard for two real incidents in one session, both the same root
+shape: a caller imports a name a module does not actually define, and it goes
+unnoticed because nothing in the test suite ever imports the caller.
 
 1. scheduler.py imported reap_stale_interactive_runs from app.runs.service,
    which only re-exports an explicit named list from stale_reconcile -- the
@@ -8,19 +10,26 @@ Regression guard for two real incidents in one session:
    control-plane service on every boot (33+ restarts) because nothing in the
    test suite ever imported app.workspace_agents.scheduler or app.main.
 
-2. capability_routing.py imported select_verification_commands from
-   verification_execution.py at module load time, but verification_execution's
-   own import chain circles back to capability_routing (through
-   app.persistence). Importing capability_routing *first* in a fresh process
-   crashed; importing verification_execution first happened to mask it, which
-   is exactly why this kind of bug survives individual-module smoke tests and
-   only shows up depending on unrelated import order elsewhere in the app.
+2. capability_routing.py (22bfded) imported select_verification_commands from
+   verification_execution.py -- a function that was never defined anywhere in
+   that file, at the commit that added the import or since. This looked like
+   an order-dependent circular import at first (an incomplete first fix moved
+   the import to be lazy, which changed a load-time crash into a call-time
+   crash and made 2 of 4 tests in test_capability_routing.py fail
+   deterministically when that file ran in isolation, while passing when
+   grouped with tests that happened to import verification_execution first
+   and warm the -- still missing -- name into existence). The real fix added
+   the missing function; once it existed, the lazy import was reverted back
+   to a normal one, and the tests pass in isolation, grouped, and either
+   import order, deterministically.
 
 A single test that imports app.main (already covered by
-test_control_plane_data.py) only proves *one* import order works. This test
-recursively imports every app.* submodule directly and independently, so an
-order-dependent circular import cannot hide behind whatever order app.main
-happens to trigger.
+test_control_plane_data.py) only proves *one* import order works, and neither
+incident here needed a circular dependency to hide -- an unconditional,
+permanently-missing name is enough on its own if nothing ever imports the
+caller. This test recursively imports every app.* submodule directly and
+independently, so a missing name cannot hide behind whichever import order
+app.main happens to trigger first.
 """
 
 from __future__ import annotations
@@ -61,12 +70,15 @@ class ControlPlaneImportGraphTests(unittest.TestCase):
 
 class ModuleImportedFirstInAFreshProcessTests(unittest.TestCase):
     """The single-process walk above has a real blind spot: once any earlier
-    module has pulled in a dependency, every later import of it in that same
-    process looks fine even if the two modules have a genuine circular
-    import -- which is exactly how both incidents above survived a
-    same-process recursive walk (proven: reverting either fix and re-running
-    that walk still passes, because pkgutil's alphabetical order happens to
-    import something that masks it before reaching the broken module).
+    module has pulled a dependency fully into sys.modules, a later import of
+    it in that same process succeeds regardless of whether the name it needs
+    was ever actually defined, because Python caches the completed module and
+    never re-executes it. That is exactly how incident 2 above survived a
+    same-process recursive walk: reverting the fix and re-running that walk
+    still passed, because pkgutil's alphabetical order happened to import
+    verification_execution (successfully, since nothing about *loading* it
+    ever failed -- the function was simply never in it) before reaching
+    capability_routing.
 
     Each module here is imported as the *sole* first import in a clean
     subprocess -- no accumulated import state from anything else -- which is

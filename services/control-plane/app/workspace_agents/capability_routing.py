@@ -15,6 +15,10 @@ from uuid import uuid4
 from app.persistence import chat_store, run_store, task_store
 from app.workspace_agents.assignment_messages import assignment_card, assignment_card_title
 from app.workspace_agents.lead_text import truncate_text
+from app.workspace_agents.verification_execution import (
+    extract_verification_commands,
+    select_verification_commands,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -128,19 +132,6 @@ def _extract_goal_and_commands(
     goal_hint: str,
     command: str,
 ) -> tuple[str, list[str]]:
-    # Lazy: verification_execution's own import chain circles back to this
-    # module (through app.persistence), so importing it at module load time
-    # crashed with "cannot import name 'select_verification_commands'" for
-    # any caller that reaches capability_routing before verification_execution
-    # has finished loading -- e.g. importing this module first in a fresh
-    # process. Reproduced directly: `import
-    # app.workspace_agents.capability_routing` as the first import in the
-    # process fails; importing verification_execution first masks it.
-    from app.workspace_agents.verification_execution import (
-        extract_verification_commands,
-        select_verification_commands,
-    )
-
     commands = select_verification_commands(
         extract_verification_commands(reply_text or "") or [],
         limit=3,

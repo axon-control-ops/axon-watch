@@ -70,6 +70,29 @@ def _normalize_verification_command(command: str) -> str:
     return cleaned
 
 
+def select_verification_commands(commands: list[str], *, limit: int = 3) -> list[str]:
+    """Normalize, validate, dedupe, and cap an arbitrary list of candidates.
+
+    capability_routing.py has called this since 22bfded to filter a mix of
+    freshly-extracted and single ad-hoc commands down to a safe, bounded set
+    before attaching them to a routed task -- but the function was never
+    added here, so every call crashed with an unconditional ImportError. It
+    is the same normalize/validate pipeline extract_verification_commands
+    already applies to fenced-block matches, generalized to any input list.
+    """
+    selected: list[str] = []
+    seen: set[str] = set()
+    for raw in commands or []:
+        if len(selected) >= max(0, limit):
+            break
+        command = _normalize_verification_command(raw)
+        if not _verification_command_is_valid(command) or command in seen:
+            continue
+        seen.add(command)
+        selected.append(command)
+    return selected
+
+
 def extract_verification_commands(reply_text: str | None) -> list[str]:
     """Pull supported test commands from fenced, path-only, or inline text."""
     body = str(reply_text or "")
