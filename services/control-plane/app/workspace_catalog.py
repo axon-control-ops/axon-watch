@@ -9,7 +9,7 @@ from app.operator_workspace_scope import filter_operator_workspace_records
 from app.workspace_project_bindings import (
     WorkspaceProjectBinding,
     get_workspace_project_binding,
-    load_workspace_project_bindings,
+    list_valid_workspace_project_bindings,
 )
 
 
@@ -71,7 +71,9 @@ def list_workspace_records(
     inbox_fetcher: WatchInboxFetcher | None = None,
     operator_surface: bool = False,
 ) -> list[dict[str, str | bool]]:
-    bindings = load_workspace_project_bindings()
+    # Best-effort: a misconfigured, unrelated workspace binding must not take
+    # the entire /api/workspaces listing down for every other workspace.
+    bindings = list_valid_workspace_project_bindings()
     workspace_ids = {
         str(record.get("workspace_id", "")).strip()
         for record in list_runs()

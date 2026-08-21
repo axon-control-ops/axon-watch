@@ -160,6 +160,46 @@ def _read_bindings_entries(bindings_file: Path | None = None) -> tuple[Path, dic
     return path, entries
 
 
+def list_valid_workspace_project_bindings(
+    bindings_file: Path | None = None,
+) -> dict[str, WorkspaceProjectBinding]:
+    """Every binding that resolves cleanly; a bad one is skipped, not fatal.
+
+    load_workspace_project_bindings deliberately fails closed for the whole
+    map on an allowlist violation -- the right contract for a caller that must
+    trust every binding it gets back. list_workspace_records (the catalog
+    listing behind /api/workspaces) is not that caller: it is a best-effort
+    "what workspaces exist" scan, and one misconfigured, unrelated workspace
+    must not take the whole catalog down for every other one. Still logs
+    loudly, since a workspace silently missing from a listing is real
+    misconfiguration worth noticing, just not worth a 500.
+    """
+    path, entries = _read_bindings_entries(bindings_file)
+    bindings: dict[str, WorkspaceProjectBinding] = {}
+    for workspace_id, entry in entries.items():
+        normalized_id = str(workspace_id).strip()
+        if not normalized_id or not isinstance(entry, dict):
+            continue
+        try:
+            project_root = _resolve_project_root(
+                str(entry.get("project_root", "")), bindings_file=path
+            )
+        except WorkspaceBindingError as exc:
+            logger.warning(
+                "skipping invalid binding for %s in a best-effort listing: %s",
+                normalized_id,
+                exc,
+            )
+            continue
+        display_name = str(entry.get("display_name", "")).strip() or None
+        bindings[normalized_id] = WorkspaceProjectBinding(
+            workspace_id=normalized_id,
+            project_root=project_root,
+            display_name=display_name,
+        )
+    return bindings
+
+
 def get_workspace_project_binding(workspace_id: str) -> WorkspaceProjectBinding | None:
     """Resolve exactly one workspace's binding, ignoring every other entry.
 

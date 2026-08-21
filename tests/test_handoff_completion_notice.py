@@ -57,7 +57,7 @@ class HandoffCompletionNoticeTests(unittest.TestCase):
 
     def test_completed_handoff_notifies_the_source_lead(self) -> None:
         handoff_id, _task_id = self._routed_handoff(
-            source="workspace_tps", target="workspace_dashpro", task_status="completed"
+            source="workspace_smoke", target="workspace_alpha", task_status="completed"
         )
         closed = notify_completed_handoffs()
         self.assertEqual(1, len(closed))
@@ -69,7 +69,7 @@ class HandoffCompletionNoticeTests(unittest.TestCase):
 
     def test_failed_handoff_notifies_with_the_failure_outcome(self) -> None:
         handoff_id, _task_id = self._routed_handoff(
-            source="workspace_tps", target="workspace_dashpro", task_status="failed"
+            source="workspace_smoke", target="workspace_alpha", task_status="failed"
         )
         closed = notify_completed_handoffs()
         self.assertEqual(1, len(closed))
@@ -81,13 +81,13 @@ class HandoffCompletionNoticeTests(unittest.TestCase):
     def test_still_open_target_task_is_not_notified_yet(self) -> None:
         # An 'open' or 'leased' task means the work is still in flight -- the
         # whole point is to wait for a real terminal outcome before speaking.
-        self._routed_handoff(source="workspace_tps", target="workspace_dashpro", task_status="open")
+        self._routed_handoff(source="workspace_smoke", target="workspace_alpha", task_status="open")
         closed = notify_completed_handoffs()
         self.assertEqual([], closed)
 
     def test_a_handoff_is_never_notified_twice(self) -> None:
         self._routed_handoff(
-            source="workspace_tps", target="workspace_dashpro", task_status="completed"
+            source="workspace_smoke", target="workspace_alpha", task_status="completed"
         )
         first = notify_completed_handoffs()
         second = notify_completed_handoffs()
@@ -98,16 +98,16 @@ class HandoffCompletionNoticeTests(unittest.TestCase):
         from app.workspace_agents import build_company_roster
 
         self._routed_handoff(
-            source="workspace_tps", target="workspace_dashpro", task_status="completed"
+            source="workspace_smoke", target="workspace_alpha", task_status="completed"
         )
         notify_completed_handoffs()
 
-        roster = build_company_roster("workspace_tps")
+        roster = build_company_roster("workspace_smoke")
         lead = next(
             row for row in roster.get("employees") or [] if str(row.get("role")).lower() == "lead"
         )
         thread = chat_store.find_thread_for_employee(
-            "workspace_tps", employee_id=str(lead["employee_id"]), thread_kind="ide"
+            "workspace_smoke", employee_id=str(lead["employee_id"]), thread_kind="ide"
         )
         self.assertIsNotNone(thread)
         assert thread is not None
