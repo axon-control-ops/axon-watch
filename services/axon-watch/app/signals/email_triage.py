@@ -50,6 +50,21 @@ _PROMO_PRIORITY_CAP = 40
 _AUTOMATED_SENDER_PATTERNS = (
     re.compile(r"noreply|no-reply|do-not-reply|donotreply|billing-noreply", re.I),
 )
+# Any address shaped like this cannot receive a reply -- it either bounces or
+# is discarded server-side. This used to be consulted only inside the two
+# narrow billing/dev-notification checks below, so a no-reply sender whose
+# body did not also look like a billing or CI notice (a GitHub "action
+# required: 2FA" account notice, for instance) fell through to ordinary
+# action detection and got a full drafted reply addressed to it.
+_NO_REPLY_SENDER_PATTERNS = _AUTOMATED_SENDER_PATTERNS + (
+    re.compile(r"\bmailer-daemon\b", re.I),
+    re.compile(r"\bpostmaster@", re.I),
+)
+
+
+def is_no_reply_sender(sender: str) -> bool:
+    """True when a reply cannot reach a person at this address at all."""
+    return any(pattern.search(str(sender or "")) for pattern in _NO_REPLY_SENDER_PATTERNS)
 _BILLING_NOTICE_PATTERNS = (
     re.compile(
         r"\b(invoice\s+\S+\s+is\s+ready|your\s+\w*\s*invoice|your\s+statement\s+is\s+ready|"
@@ -115,7 +130,13 @@ def analyze_email_message(
     automated_dev_notification = _is_automated_dev_notification(
         subject=subject, sender=sender, snippet=snippet
     )
-    low_attention = promotional or automated_billing or automated_dev_notification
+    # Catches every other shape of no-reply mail the two narrow checks above
+    # miss -- account/security notices, password resets, order confirmations --
+    # anything from an address a reply cannot reach.
+    no_reply_sender = is_no_reply_sender(sender) and not (
+        automated_billing or automated_dev_notification
+    )
+    low_attention = promotional or automated_billing or automated_dev_notification or no_reply_sender
     risk_patterns = _HARD_RISK_PATTERNS if low_attention else (_HARD_RISK_PATTERNS + _SOFT_RISK_PATTERNS)
 
     actions = [
@@ -160,7 +181,7 @@ def analyze_email_message(
         priority = min(priority, _LOW_ATTENTION_PRIORITY_CAP)
         risks = []
         commitments = []
-    elif automated_billing or automated_dev_notification:
+    elif automated_billing or automated_dev_notification or no_reply_sender:
         # Vendor noreply invoices use "review" boilerplate — not a human follow-up.
         priority = min(priority, _LOW_ATTENTION_PRIORITY_CAP)
         risks = []
@@ -183,6 +204,11 @@ def analyze_email_message(
         recommended_action = "monitor_email"
         recommended_detail = (
             "Automated billing or invoice notice — check your vendor portal; no reply expected."
+        )
+    elif no_reply_sender:
+        recommended_action = "monitor_email"
+        recommended_detail = (
+            "Sender does not accept replies (no-reply address) — no draft is suggested."
         )
     elif automated_dev_notification:
         recommended_action = "monitor_engineering_signal"
@@ -220,6 +246,7 @@ def analyze_email_message(
         "promotional": promotional,
         "automated_billing": automated_billing,
         "automated_dev_notification": automated_dev_notification,
+        "no_reply_sender": no_reply_sender,
         "action_requests": actions[:5],
         "risks": risks[:5],
         "commitments": commitments[:5],

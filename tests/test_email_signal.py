@@ -316,5 +316,104 @@ class EmailTriageTests(unittest.TestCase):
         self.assertEqual("workspace_dashpro", items[0]["workspace_id"])
 
 
+class NoReplySenderTests(unittest.TestCase):
+    """Regression guard: a no-reply address must never get a drafted reply.
+
+    A GitHub "[ACTION REQUIRED] ... will soon require 2FA" account notice from
+    noreply@github.com was drafted a full reply addressed to GitHub as if it
+    were a person -- the sender-shape check existed but was only ever
+    consulted inside the narrow billing/dev-notification helpers, not as a
+    general rule.
+    """
+
+    def setUp(self) -> None:
+        _watch_app, self._saved_modules = load_watch_app()
+        from app.signals import email_signal as email_signal_module  # noqa: WPS433
+        from app.signals.email_triage import analyze_email_message, is_no_reply_sender  # noqa: WPS433
+
+        self.email_signal = email_signal_module
+        self.analyze_email_message = analyze_email_message
+        self.is_no_reply_sender = is_no_reply_sender
+
+    def tearDown(self) -> None:
+        restore_app_modules(self._saved_modules)
+
+    def test_github_account_notice_is_recognised_as_no_reply(self) -> None:
+        # The exact failing case: an action-required security notice with none
+        # of the billing or CI/deploy body markers, from a plain noreply sender.
+        analysis = self.analyze_email_message(
+            {
+                "subject": "[ACTION REQUIRED] Your GitHub account, axon-control-ops, will soon require 2FA",
+                "from": "GitHub <noreply@github.com>",
+                "text": (
+                    "We're reaching out to let you know that, as announced last "
+                    "year, we have officially begun requiring users who "
+                    "contribute code to enable two-factor authentication."
+                ),
+                "message_id": "<gh-2fa@github.com>",
+            }
+        )
+        self.assertTrue(analysis["no_reply_sender"])
+        self.assertEqual(analysis["recommended_action"], "monitor_email")
+        self.assertIn("no-reply", analysis["recommended_detail"].lower())
+
+    def test_no_reply_signal_carries_no_reply_draft(self) -> None:
+        analysis = self.analyze_email_message(
+            {
+                "subject": "[ACTION REQUIRED] Your GitHub account, axon-control-ops, will soon require 2FA",
+                "from": "GitHub <noreply@github.com>",
+                "text": "Please enable two-factor authentication on your account.",
+                "message_id": "<gh-2fa-2@example.com>",
+            }
+        )
+        # Below the signal priority threshold entirely -- the same treatment
+        # already given to promotional/billing automated mail in this file.
+        item = self.email_signal.email_inbox_item(analysis, workspace_id="workspace_axon_watch")
+        self.assertIsNone(item)
+
+    def test_ordinary_sender_with_action_language_still_gets_a_draft(self) -> None:
+        # The fix must not suppress replies generally -- only for addresses
+        # that cannot receive one.
+        analysis = self.analyze_email_message(
+            {
+                "subject": "Please confirm the deploy window",
+                "from": "Ops Lead <ops@example.com>",
+                "text": "Could you confirm the deploy window for tomorrow?",
+                "message_id": "<ops-1@example.com>",
+            }
+        )
+        self.assertFalse(analysis["no_reply_sender"])
+        self.assertEqual(analysis["recommended_action"], "capture_follow_up")
+        item = self.email_signal.email_inbox_item(analysis, workspace_id="workspace_axon_watch")
+        self.assertIsNotNone(item)
+        self.assertTrue(item["meta"]["suggested_reply_body"])
+
+    def test_is_no_reply_sender_matches_common_shapes(self) -> None:
+        for sender in (
+            "GitHub <noreply@github.com>",
+            "Billing <no-reply@stripe.com>",
+            "Mailer Daemon <mailer-daemon@example.com>",
+            "Postmaster <postmaster@example.com>",
+        ):
+            with self.subTest(sender=sender):
+                self.assertTrue(self.is_no_reply_sender(sender))
+        self.assertFalse(self.is_no_reply_sender("Ops Lead <ops@example.com>"))
+
+    def test_no_reply_billing_notice_is_not_double_classified(self) -> None:
+        # A no-reply billing notice must still take the billing branch, not the
+        # generic no-reply one -- both suppress the reply, but the detail text
+        # should stay specific to what the email actually is.
+        analysis = self.analyze_email_message(
+            {
+                "subject": "Your invoice is ready",
+                "from": "Billing <billing-noreply@vendor.com>",
+                "text": "Your invoice is ready. Amount due: $42.00. Disregard this email if already paid.",
+                "message_id": "<inv-1@example.com>",
+            }
+        )
+        self.assertTrue(analysis["automated_billing"])
+        self.assertIn("billing", analysis["recommended_detail"].lower())
+
+
 if __name__ == "__main__":
     unittest.main()
