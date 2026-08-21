@@ -372,8 +372,17 @@ def resolve_effective_policy(
         forbidden, _normalize_strings(workspace_forbidden_path_globs or ())
     )
 
-    if not write_paths and _normalize_name(role) == "frontend":
-        write_paths = _ops_frontend_write_paths_for_workspace(workspace_allowed_paths)
+    if _normalize_name(role) == "frontend":
+        # Additive, not a fallback: a broadened frontend baseline (docs/output/
+        # scripts, for cross-workspace document access) now legitimately
+        # intersects some ops-dashboard contracts even before command-centre is
+        # considered, so write_paths is no longer reliably empty here. Gating
+        # on emptiness silently dropped command-centre access for any contract
+        # where the rest of the baseline already matched something -- union it
+        # in instead so the two write-scope sources never compete.
+        ops_paths = _ops_frontend_write_paths_for_workspace(workspace_allowed_paths)
+        if ops_paths:
+            write_paths = _ordered_union(write_paths, ops_paths)
 
     if not write_paths:
         execution_access = "consultative"

@@ -107,18 +107,33 @@ def resolve_worker_execution_policy(
             dict.fromkeys((*policy.approved_command_prefixes, *extra))
         )
         policy = replace(policy, approved_command_prefixes=merged)
-    scoped_workspace = str(workspace_id or "").strip()
-    if not scoped_workspace:
-        from app.workspace_service_connections import workspace_id_for_project_root
+    # Live-service policy is a widening enhancement on top of the baseline
+    # policy above, resolved by walking every operator-maintained workspace
+    # binding. That loader deliberately raises WorkspaceBindingError for a
+    # binding outside the project-root allowlist (a real security config
+    # error), which is the right contract for callers that need to trust the
+    # binding -- but here it means one unrelated misconfigured workspace
+    # (audio-transcribe, in the case that broke this) crashed policy
+    # resolution for every other employee run in the fleet. Widening must
+    # never be able to take down the baseline it is widening.
+    try:
+        scoped_workspace = str(workspace_id or "").strip()
+        if not scoped_workspace:
+            from app.workspace_service_connections import workspace_id_for_project_root
 
-        scoped_workspace = workspace_id_for_project_root(workspace_root) or ""
-    if scoped_workspace:
-        from app.workspace_service_connections import apply_live_service_policy
+            scoped_workspace = workspace_id_for_project_root(workspace_root) or ""
+        if scoped_workspace:
+            from app.workspace_service_connections import apply_live_service_policy
 
-        policy = apply_live_service_policy(
-            policy,
-            workspace_id=scoped_workspace,
-            role=employee.role,
+            policy = apply_live_service_policy(
+                policy,
+                workspace_id=scoped_workspace,
+                role=employee.role,
+            )
+    except Exception:  # noqa: BLE001 — an enhancement must degrade, never crash the baseline
+        logger.exception(
+            "live-service policy widening failed for workspace_root=%s; using baseline policy",
+            workspace_root,
         )
     return policy
 
