@@ -11,6 +11,7 @@ from typing import Any
 
 from app.safe_improvement.isolated_executor import read_baseline_metadata
 from app.workspace_agents.diff_policy import (
+    PRIVATE_COMPANY_PATH_GLOBS,
     evaluate_changed_paths,
     resolve_effective_allowed_paths,
     scan_text_for_secrets,
@@ -82,19 +83,53 @@ def _stage_isolation_paths(isolation_root: Path, paths: list[str]) -> subprocess
 
 
 def _derive_commit_message(paths: list[str], turn_subject: str | None) -> str:
-    text = " ".join(str(turn_subject or "").split()).strip()
-    if text and len(text) <= 72 and not text.endswith("?") and text[:1].isupper():
-        return text
-    if text and 8 <= len(text) <= 90 and not text.endswith("?"):
-        cut = text[:71].rsplit(" ", 1)[0].rstrip(" ,.-")
-        return f"{cut}…" if len(text) > 72 and cut else text[:72]
+    text = " ".join(str(turn_subject or "").split()).strip().rstrip(". ")
+    lowered = text.lower()
+    path_blob = " ".join(paths).lower()
+    kind = "feat"
+    if any(token in lowered for token in ("fix", "repair", "resolve", "correct", "prevent")):
+        kind = "fix"
+    elif all(path.startswith(("docs/", "README", "CHANGELOG")) for path in paths):
+        kind = "docs"
+    elif all(path.startswith(("tests/", "test_")) for path in paths):
+        kind = "test"
+    elif any(path.startswith((".github/", "config/", "infra/")) for path in paths):
+        kind = "chore"
+
+    scope = ""
+    if any(path.startswith("website/") for path in paths):
+        scope = "website"
+    elif "services/control-plane/" in path_blob:
+        scope = "control-plane"
+    elif "services/axon-watch/" in path_blob:
+        scope = "watch"
+    elif "apps/console-web/" in path_blob:
+        scope = "console"
+    elif any(path.startswith(".github/") for path in paths):
+        scope = "ci"
+
+    if text and 8 <= len(text) <= 110 and not text.endswith("?"):
+        # Avoid `fix(website): Fix …` while retaining the meaningful task text.
+        detail = re.sub(
+            r"^(?:fix|repair|resolve|correct|prevent|add|create|update|document|test)\s+(?:the\s+)?",
+            "",
+            text,
+            flags=re.IGNORECASE,
+        ).strip()
+        if detail:
+            prefix = f"{kind}({scope})" if scope else kind
+            available = 72 - len(prefix) - 2
+            if len(detail) > available:
+                detail = detail[:available].rsplit(" ", 1)[0].rstrip(" ,.-") or detail[:available]
+            return f"{prefix}: {detail[:available]}"
     if not paths:
-        return "Worker delivery via Axon-X"
+        return "chore: worker delivery via Axon-X"
     basenames = [path.rsplit("/", 1)[-1] for path in paths[:2]]
     focus = ", ".join(basenames)
     if len(paths) > 2:
         focus = f"{focus} (+{len(paths) - 2} more)"
-    subject = f"Update {focus}"
+    prefix = f"{kind}({scope})" if scope else kind
+    subject = f"{prefix}: update {focus}"
     return subject[:72]
 
 
@@ -201,6 +236,23 @@ def _scan_secrets(isolation_root: Path, paths: list[str]) -> str | None:
         if hits:
             return f"secret pattern in {path}"
     return None
+
+
+def _scan_private_company_material(paths: list[str]) -> str | None:
+    """Block business documents from every worker commit/push/PR."""
+    findings = evaluate_changed_paths(
+        paths,
+        allowed_paths=[],
+        forbidden_path_globs=PRIVATE_COMPANY_PATH_GLOBS,
+        max_paths=120,
+    )
+    if not findings:
+        return None
+    first = findings[0]
+    return (
+        f"private_company_material: {first.path} must stay local/private and "
+        "cannot be staged, pushed, or included in a draft PR"
+    )
 
 
 def _ensure_not_protected(policy: WorkspaceDeliveryPolicy, branch: str) -> str | None:
@@ -392,6 +444,29 @@ def publish_worker_isolation(
         summary=f"{len(paths)} changed path(s) ready for delivery",
         refs=delivery_refs_from_record(delivery),
     )
+
+    private_material_hit = _scan_private_company_material(paths)
+    if private_material_hit:
+        delivery_store.update_delivery(
+            str(delivery["delivery_id"]),
+            stage="blocked",
+            blocker=private_material_hit,
+            refs={"blocker": private_material_hit},
+        )
+        emit_delivery_receipt(
+            run_id,
+            stage="blocked",
+            summary=private_material_hit,
+            success=False,
+            refs={"blocker": private_material_hit, "worker_branch": worker_branch},
+        )
+        return PublishResult(
+            ok=False,
+            stage="blocked",
+            delivery=delivery_store.get_delivery(str(delivery["delivery_id"])),
+            detail=private_material_hit,
+            cleanup_isolation=False,
+        )
 
     scope_hit = _scan_publish_scope(isolation_root, paths, task_id=task_id)
     if scope_hit:

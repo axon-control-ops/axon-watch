@@ -42,6 +42,22 @@ class WorkspaceDeliveryPublishTests(unittest.TestCase):
             calls[0],
         )
 
+    def test_private_company_material_is_never_publishable(self) -> None:
+        detail = publish._scan_private_company_material(
+            ["website/index.html", "docs/rfq/customer-submission.pdf"]
+        )
+
+        self.assertIn("private_company_material", str(detail))
+        self.assertIn("docs/rfq/customer-submission.pdf", str(detail))
+
+    def test_smart_commit_message_names_type_scope_and_outcome(self) -> None:
+        message = publish._derive_commit_message(
+            ["website/index.html", "website/css/site.css"],
+            "Fix gallery navigation on mobile",
+        )
+
+        self.assertEqual(message, "fix(website): gallery navigation on mobile")
+
     def _git(self, root: Path, *args: str) -> None:
         result = subprocess.run(
             ["git", *args], cwd=root, capture_output=True, text=True, check=False

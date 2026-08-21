@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from app.workspace_agents.agent_write_contract import WRITE_CONTRACT_CLAUSE
 from app.workspace_agents.agent_voice_style import AGENT_VOICE_STYLE_CLAUSE
 from app.workspace_agents.catalog import ROLE_CATALOG, _DEFAULT_OWNS, _DEFAULT_ROLE_NAMES
 from app.workspace_agents.config_loader import _role_label
@@ -177,6 +178,7 @@ def build_employee_persona_appendix(
         AGENT_STANDING_ACCURACY_CLAUSE,
         AGENT_VOICE_STYLE_CLAUSE,
         WORKER_ISOLATION_CLAUSE,
+        WRITE_CONTRACT_CLAUSE,
         f"Role label: {role_label}.",
         (
             f"Stay inside this role boundary. Speak and act as {name} in first person — "

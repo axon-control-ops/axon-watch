@@ -84,6 +84,8 @@ class EmployeePersonaPromptTests(unittest.TestCase):
         self.assertIn("not as VAXON", appendix)
         self.assertIn("say which role should own it", appendix)
         self.assertIn("frontend, backend, integrations, watcher, or lead", appendix)
+        self.assertIn("company documents, customer records", appendix)
+        self.assertIn("Commit messages: make them explain", appendix)
         self.assertIn("Company team roster (authoritative", appendix)
 
     def test_lead_appendix_includes_authoritative_team_and_no_search_clause(self) -> None:

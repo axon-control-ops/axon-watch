@@ -39,6 +39,17 @@ WRITE_CONTRACT_CLAUSE = (
     "`npm test -- <path>`, `npx --no-install tsc --noEmit`). A denial means wrong form or wrong "
     "role for your policy — never that the tool does not exist. Quote the exact "
     "denial text rather than concluding the tool is unavailable. "
+    "Publication: company documents, customer records, RFQ/requisition packs, "
+    "internal profiles, generated exports, evidence bundles, and office files "
+    "(`.pdf`, `.docx`, `.xlsx`, `.zip`, etc.) stay local/private. Never stage, "
+    "commit, push, attach to a PR, or place those materials in a public web root. "
+    "Commit only reviewed source, tests, public assets, and deployment configuration. "
+    "The delivery gate enforces this and will block the whole delivery if one "
+    "private-company path is present. "
+    "Commit messages: make them explain the change and surface, in the form "
+    "`fix(scope): outcome`, `feat(scope): capability`, `docs: purpose`, or "
+    "`chore(scope): maintenance`. Never use `update files`, `changes`, or a "
+    "run id as the entire message. "
 )
 
 
