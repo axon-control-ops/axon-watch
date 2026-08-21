@@ -32,7 +32,7 @@ from app.workspace_agents.status import (
     employee_status,
 )
 from app.workspace_catalog import WorkspaceNotFoundError, get_workspace_record, list_workspace_records
-from app.workspace_project_bindings import load_workspace_project_bindings
+from app.workspace_project_bindings import list_valid_workspace_project_bindings
 
 __all__ = [
     "CompanyConfig",
@@ -326,7 +326,7 @@ def list_workspace_agent_records(
 ) -> list[dict[str, object]]:
     configs, defaults, companies, staffing_template = load_workspace_agent_configs()
     workspace_records = list_workspace_records(operator_surface=operator_surface)
-    bindings = load_workspace_project_bindings()
+    bindings = list_valid_workspace_project_bindings()
 
     agents: list[dict[str, object]] = []
     seen: set[str] = set()

@@ -18,7 +18,7 @@ from typing import Any
 from app.cli_runtime.vault_keys import runtime_vault_env
 from app.workspace_project_bindings import (
     get_workspace_project_binding,
-    load_workspace_project_bindings,
+    list_valid_workspace_project_bindings,
 )
 
 
@@ -125,7 +125,7 @@ def get_workspace_service_connection(workspace_id: str) -> WorkspaceServiceConne
 
 def workspace_id_for_project_root(project_root: Path | str) -> str | None:
     candidate = Path(project_root).expanduser().resolve()
-    for workspace_id, binding in load_workspace_project_bindings().items():
+    for workspace_id, binding in list_valid_workspace_project_bindings().items():
         if binding.project_root.resolve() == candidate:
             return workspace_id
     return None

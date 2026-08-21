@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import re
 
-from app.workspace_project_bindings import load_workspace_project_bindings
+from app.workspace_project_bindings import list_valid_workspace_project_bindings
 
 _FRONTMATTER_RE = re.compile(r"^---\s*\n(.*?)\n---\s*\n?", re.DOTALL)
 _NAME_RE = re.compile(r"^name:\s*[\"']?([^\"'\n]+)[\"']?\s*$", re.MULTILINE)
@@ -24,7 +24,7 @@ def _parse_skill_frontmatter(text: str) -> tuple[str | None, str | None]:
 
 
 def list_workspace_skills() -> list[dict[str, str]]:
-    bindings = load_workspace_project_bindings()
+    bindings = list_valid_workspace_project_bindings()
     skills: list[dict[str, str]] = []
     seen: set[tuple[str, str]] = set()
 
@@ -67,5 +67,5 @@ def build_skills_snapshot() -> dict[str, object]:
     return {
         "items": items,
         "count": len(items),
-        "workspaces_scanned": len(load_workspace_project_bindings()),
+        "workspaces_scanned": len(list_valid_workspace_project_bindings()),
     }
