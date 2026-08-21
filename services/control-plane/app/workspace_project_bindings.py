@@ -7,6 +7,7 @@ import logging
 import os
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -136,11 +137,56 @@ def load_workspace_project_bindings(
     return bindings
 
 
+def _read_bindings_entries(bindings_file: Path | None = None) -> tuple[Path, dict[str, Any]]:
+    """Parse the raw bindings JSON without resolving any single entry.
+
+    Split out of load_workspace_project_bindings so a single-workspace lookup
+    (get_workspace_project_binding) never has to materialize every other
+    workspace's binding just to reach its own -- which is what made an
+    unrelated misconfigured workspace (one whose project_root moved outside
+    the allowlist) break get_workspace_record, and therefore effectively every
+    feature that resolves a workspace, for every *other* workspace too.
+    """
+    path = bindings_file or default_bindings_file()
+    if not path.is_file():
+        return path, {}
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise WorkspaceBindingError(f"unable to read bindings file: {path}") from exc
+    entries = payload.get("bindings")
+    if not isinstance(entries, dict):
+        raise WorkspaceBindingError("bindings file must contain a bindings object")
+    return path, entries
+
+
 def get_workspace_project_binding(workspace_id: str) -> WorkspaceProjectBinding | None:
+    """Resolve exactly one workspace's binding, ignoring every other entry.
+
+    Still fails closed (raises) if *this* workspace's own project_root sits
+    outside the allowlist -- the security contract load_workspace_project_bindings
+    enforces is preserved for the entry actually being asked about. It simply
+    never touches, validates, or can be broken by any other workspace's entry.
+    """
     normalized_id = workspace_id.strip()
     if not normalized_id:
         return None
-    return load_workspace_project_bindings().get(normalized_id)
+    path, entries = _read_bindings_entries()
+    entry = entries.get(normalized_id)
+    if not isinstance(entry, dict):
+        return None
+    try:
+        project_root = _resolve_project_root(str(entry.get("project_root", "")), bindings_file=path)
+    except WorkspaceBindingError as exc:
+        if "does not exist:" in str(exc):
+            return None
+        raise
+    display_name = str(entry.get("display_name", "")).strip() or None
+    return WorkspaceProjectBinding(
+        workspace_id=normalized_id,
+        project_root=project_root,
+        display_name=display_name,
+    )
 
 
 def _normalize_workspace_id(workspace_id: str) -> str:
