@@ -27,6 +27,7 @@ const toolbarProps = useAgentDockComposerToolbarProps(composer);
     :command-mutation-pending="composer.shell.commandMutationState === 'submitting'"
     :agent-stream-active="composer.shell.agentStreamActive"
     :show-approval-banner="composer.showApprovalBanner.value"
+    :approval-current-step="composer.shell.ideAgentLinkedRun?.current_step"
     :can-approve-ide-agent-run="composer.shell.canApproveIdeAgentRun"
     :run-mutation-pending="composer.shell.runMutationPending"
     :plan-soft-switch-notice="composer.planSoftSwitchNotice.value"
