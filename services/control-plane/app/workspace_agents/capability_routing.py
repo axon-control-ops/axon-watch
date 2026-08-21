@@ -12,13 +12,9 @@ import re
 from typing import Any
 from uuid import uuid4
 
-from app.persistence import chat_store, task_store
+from app.persistence import chat_store, run_store, task_store
 from app.workspace_agents.assignment_messages import assignment_card, assignment_card_title
 from app.workspace_agents.lead_text import truncate_text
-from app.workspace_agents.verification_execution import (
-    extract_verification_commands,
-    select_verification_commands,
-)
 
 logger = logging.getLogger(__name__)
 
@@ -132,6 +128,19 @@ def _extract_goal_and_commands(
     goal_hint: str,
     command: str,
 ) -> tuple[str, list[str]]:
+    # Lazy: verification_execution's own import chain circles back to this
+    # module (through app.persistence), so importing it at module load time
+    # crashed with "cannot import name 'select_verification_commands'" for
+    # any caller that reaches capability_routing before verification_execution
+    # has finished loading -- e.g. importing this module first in a fresh
+    # process. Reproduced directly: `import
+    # app.workspace_agents.capability_routing` as the first import in the
+    # process fails; importing verification_execution first masks it.
+    from app.workspace_agents.verification_execution import (
+        extract_verification_commands,
+        select_verification_commands,
+    )
+
     commands = select_verification_commands(
         extract_verification_commands(reply_text or "") or [],
         limit=3,
@@ -273,6 +282,17 @@ def try_route_capability_handoff(
     workspace = str(workspace_id or "").strip()
     cleaned_run = str(source_run_id or "").strip()
     if not workspace or not cleaned_run:
+        return None
+    source_run = run_store.get_run(cleaned_run)
+    source_summary = str((source_run or {}).get("summary") or "").lower()
+    # A routed follow-up must not route the same terminal denial into another
+    # routed follow-up. That chain creates unbounded tasks and failure alerts.
+    if "scoped terminal follow-up" in source_summary:
+        logger.warning(
+            "capability route cycle suppressed for run=%s workspace=%s",
+            cleaned_run,
+            workspace,
+        )
         return None
 
     blob = " ".join(
