@@ -117,6 +117,14 @@ def run_has_dispatch_progress(record: dict[str, Any]) -> bool:
     return _run_has_any_receipt_type(record, _GHOST_DISPATCH_PROGRESS_RECEIPT_TYPES)
 
 
+def post_isolation_stall_seconds(record: dict[str, Any]) -> float:
+    """Lead / Cursor cold starts can exceed 90s before the first stream token."""
+    role = str(record.get("employee_role") or "").strip().lower()
+    if role == "lead":
+        return 240.0
+    return ghost_dispatch_seconds()
+
+
 def run_has_post_isolation_lane_b_stall(
     record: dict[str, Any],
     *,
@@ -135,7 +143,7 @@ def run_has_post_isolation_lane_b_stall(
     age = _isolation_created_age_seconds(record, now=now or datetime.now(timezone.utc))
     if age is None:
         return False
-    return age >= ghost_dispatch_seconds()
+    return age >= post_isolation_stall_seconds(record)
 
 
 def _isolation_created_age_seconds(
@@ -535,6 +543,90 @@ def _cancel_stale_early_busy_employee_run(
         cancel_step="Stale continuous worker run cancelled after idle timeout",
         receipt_summary=receipt_summary,
     )
+
+
+# Interactive (untagged) runs are correctly exempt from the employee reaper --
+# an operator composer turn can legitimately run long. But that exemption's
+# other half was missing: nothing ever revisited them if genuinely abandoned
+# (browser closed mid-turn, composer tab left open), and the only code that
+# could resolve them ran once, at process boot. A run could sit `executing`
+# indefinitely until someone restarted the control plane. Default matches the
+# lead cutoff: long enough for real work, not so long a dead run looks live
+# for the rest of the day.
+DEFAULT_INTERACTIVE_RUN_STALE_SECONDS = 1800.0
+
+
+def interactive_run_stale_seconds() -> float:
+    raw = os.environ.get("AXON_WATCH_INTERACTIVE_RUN_STALE_SECONDS", "").strip()
+    if not raw:
+        return DEFAULT_INTERACTIVE_RUN_STALE_SECONDS
+    try:
+        return max(60.0, float(raw))
+    except ValueError:
+        return DEFAULT_INTERACTIVE_RUN_STALE_SECONDS
+
+
+def reap_stale_interactive_runs(
+    *, now: datetime | None = None, stale_seconds: float | None = None
+) -> list[str]:
+    """Resolve abandoned non-employee runs on the normal tick, not just at boot.
+
+    Mirrors ``interrupt_run_on_restart``'s phase handling exactly -- executing
+    fails, a waiting phase cancels -- but is gated by idle age instead of a
+    process restart, so an operator does not have to restart the service to
+    unstick a composer thread nobody is coming back to.
+    """
+    from app.runs.service import (
+        RunLifecycleError,
+        RunNotFoundError,
+        _transition_record,
+        fail_run,
+    )
+
+    moment = now or datetime.now(timezone.utc)
+    if moment.tzinfo is None:
+        moment = moment.replace(tzinfo=timezone.utc)
+    cutoff = max(60.0, float(stale_seconds)) if stale_seconds is not None else interactive_run_stale_seconds()
+
+    reaped: list[str] = []
+    for record in run_store.list_runs():
+        if str(record.get("employee_role") or "").strip():
+            continue
+        phase = str(record.get("phase") or "").strip()
+        if is_terminal_phase(phase) or phase == "review_ready":
+            continue
+        age = _run_idle_age_seconds(record, now=moment)
+        if age is None or age < cutoff:
+            continue
+        run_id = str(record.get("run_id") or "").strip()
+        if not run_id:
+            continue
+        try:
+            if phase == "executing":
+                fail_run(
+                    run_id,
+                    receipt_summary=(
+                        f"Interactive run abandoned: idle {int(age)}s with no activity"
+                    ),
+                    actor="workspace_scheduler",
+                )
+                reaped.append(run_id)
+            elif phase in {"awaiting_approval", "awaiting_input", "waiting_external", "paused"}:
+                _transition_record(
+                    record,
+                    to_phase="cancelled",
+                    current_step=f"Run cancelled: idle {int(age)}s waiting for input nobody gave",
+                    actor="workspace_scheduler",
+                    receipt_type="interactive_run_abandoned",
+                    receipt_summary=(
+                        f"Interactive run abandoned in {phase}: idle {int(age)}s"
+                    ),
+                )
+                reaped.append(run_id)
+        except (RunLifecycleError, RunNotFoundError):
+            logger.exception("interactive run reap failed for %s", run_id)
+            continue
+    return reaped
 
 
 def reap_stale_employee_runs(
