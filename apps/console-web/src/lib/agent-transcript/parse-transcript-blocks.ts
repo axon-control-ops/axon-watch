@@ -4,6 +4,7 @@ import {
   tryParseLegacyLeadFanOutText,
 } from '../lead-fan-out-card';
 import { parseLeadStandupReport } from '../lead-standup-card';
+import { parseLeadCheckinReport } from '../lead-checkin-card';
 import { sanitizeResearchCardTitle, sanitizeResearchSnippet } from '../research-snippet';import { inferResearchBlockKind, type ResearchBlockKind } from '../research-provider';
 import {
   sanitizeTerminalDisplayOutput,
@@ -84,6 +85,21 @@ function upgradeClarifyingTextSegments(
         bodyMarkdown: standup.bodyMarkdown,
         confidence: standup.confidence,
         verificationNotice: standup.verificationNotice,
+      });
+      continue;
+    }
+    const checkin = parseLeadCheckinReport(segment.text);
+    if (checkin) {
+      next.push({
+        kind: 'lead-checkin',
+        title: checkin.title,
+        summary: checkin.summary,
+        findingCount: checkin.findingCount,
+        assignmentCount: checkin.assignmentCount,
+        findings: checkin.findings,
+        nextSteps: checkin.nextSteps,
+        prompt: checkin.prompt,
+        options: checkin.options,
       });
       continue;
     }

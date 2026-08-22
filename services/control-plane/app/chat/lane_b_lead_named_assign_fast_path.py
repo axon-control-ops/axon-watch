@@ -13,35 +13,6 @@ from app.workspace_agents.named_assign_route import (
 from app.workspace_agents.teammate_route import normalize_teammate_role, roster_employees_from_company
 
 
-def _prior_operator_task_body(
-    *,
-    thread_id: str,
-    current_content: str,
-    specialist_name: str,
-    roster: list[Any],
-) -> str | None:
-    from app.persistence import chat_store
-
-    current = " ".join(str(current_content or "").split()).strip().lower()
-    try:
-        history = chat_store.list_thread_messages(thread_id)
-    except Exception:
-        return None
-    for message in reversed(history or []):
-        if str(message.get("role") or "").strip().lower() != "operator":
-            continue
-        content = " ".join(str(message.get("content") or "").split()).strip()
-        if not content or content.lower() == current:
-            continue
-        # Skip older "route it to X" lines; they are not the actual work body.
-        matched = match_named_assign_employee(content, roster)
-        if matched is not None and named_assign_action_body(content, matched.name) is None:
-            continue
-        if len(content) >= 12:
-            return content
-    return None
-
-
 def _create_named_handoff_task(
     *,
     workspace_id: str,
@@ -108,13 +79,6 @@ def maybe_post_lead_named_assign_message(
         return None
 
     action_body = named_assign_action_body(content, named.name)
-    if action_body is None:
-        action_body = _prior_operator_task_body(
-            thread_id=thread_id,
-            current_content=content,
-            specialist_name=named.name,
-            roster=roster,
-        )
 
     operator_message = save_message(
         {

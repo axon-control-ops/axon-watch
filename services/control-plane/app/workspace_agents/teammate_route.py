@@ -168,7 +168,10 @@ def should_soft_route_to_teammate(
     if is_build_plan_implement_prompt(text):
         return TeammateRouteDecision(should_route=False, reason="build_plan_implement")
 
-    from app.workspace_agents.named_assign_route import match_named_assign_employee
+    from app.workspace_agents.named_assign_route import (
+        is_vague_named_assign,
+        match_named_assign_employee,
+    )
 
     named = match_named_assign_employee(text, employees)
     if named is not None:
@@ -179,6 +182,18 @@ def should_soft_route_to_teammate(
                 reason="already_owning",
                 employee=named,
                 routing_receipt="named_assign;already_owning",
+            )
+        if is_vague_named_assign(text, named.name):
+            return TeammateRouteDecision(
+                should_route=False,
+                reason="vague_named_assign",
+                employee=named,
+                from_employee_id=current_id or None,
+                from_name=(current_employee.name.strip() if current_employee else "") or None,
+                routing_receipt=(
+                    f"named_assign;vague;to={named.employee_id};"
+                    "action=request_concrete_scope"
+                ),
             )
         from_name = (
             (current_employee.name.strip() if current_employee else "")

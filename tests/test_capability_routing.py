@@ -105,11 +105,81 @@ class CapabilityRoutingTests(unittest.TestCase):
         self.assertIsNotNone(result)
         assert result is not None
         self.assertEqual("document_scope", result["capability"])
+        self.assertEqual("frontend", result["target_role"])
         task = task_store.get_task(str(result["task_id"]))
         self.assertIsNotNone(task)
         assert task is not None
         self.assertIn("docs", task.get("allowed_paths") or [])
         self.assertIn("scripts", task.get("allowed_paths") or [])
+
+    def test_lead_terminal_followup_routes_to_integrations_not_back_to_lead(self) -> None:
+        task_store.reset_store()
+        with patch(
+            "app.workspace_agents.build_company_roster",
+            return_value={
+                "employees": [
+                    {"employee_id": "tess", "name": "Tess", "role": "integrations"},
+                    {"employee_id": "noor", "name": "Noor", "role": "lead"},
+                ]
+            },
+        ), patch(
+            "app.workspace_handoff_routing.try_autostart_handoff_task",
+            return_value=None,
+        ), patch(
+            "app.persistence.chat_store.find_thread_for_employee",
+            return_value=None,
+        ), patch(
+            "app.runs.service.append_run_execution_receipt",
+            return_value={},
+        ):
+            result = try_route_capability_handoff(
+                workspace_id="workspace_tps",
+                source_run_id="run_leadblocked123",
+                source_role="lead",
+                source_name="Noor",
+                reply_text="Sandbox policy denied the command. Use an approved wrapper.",
+                goal_hint="Run the scoped repository policy check",
+            )
+        self.assertIsNotNone(result)
+        assert result is not None
+        self.assertEqual("integrations", result["target_role"])
+
+    @patch("app.workspace_agents.capability_routing.run_store.get_run")
+    def test_scoped_specialist_terminal_denial_does_not_create_duplicate_task(self, get_run) -> None:
+        task_store.reset_store()
+        get_run.return_value = {
+            "run_id": "run_scoped_frontend",
+            "task_id": "task_frontend",
+            "summary": "frontend: repair navigation",
+        }
+        result = try_route_capability_handoff(
+            workspace_id="workspace_dashpro",
+            source_run_id="run_scoped_frontend",
+            source_role="frontend",
+            source_name="Priya",
+            reply_text="Sandbox policy denied the command. Use an approved wrapper.",
+            goal_hint="edit the scoped navigation file",
+        )
+        self.assertIsNone(result)
+        self.assertEqual([], task_store.list_tasks(workspace_id="workspace_dashpro"))
+
+    @patch("app.workspace_agents.capability_routing.run_store.get_run")
+    def test_does_not_route_a_routed_followup_again(self, get_run) -> None:
+        task_store.reset_store()
+        get_run.return_value = {
+            "run_id": "run_followup",
+            "summary": "lead: Scoped terminal follow-up (lead): python3 -c print(1)",
+        }
+        result = try_route_capability_handoff(
+            workspace_id="workspace_tps",
+            source_run_id="run_followup",
+            source_role="lead",
+            source_name="Noor",
+            reply_text="Sandbox policy denied the command. Use an approved wrapper.",
+            goal_hint="python3 -c print(1)",
+        )
+        self.assertIsNone(result)
+        self.assertEqual([], task_store.list_tasks(workspace_id="workspace_tps"))
 
 
 if __name__ == "__main__":

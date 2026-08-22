@@ -14,6 +14,7 @@ from app.workspace_agents.verification_execution import (
     extract_verification_commands,
     is_verification_task,
     resolve_verification_baseline,
+    select_verification_commands,
     source_run_from_verification_goal,
     verification_approved_command_prefixes,
     verification_commands_for_task,
@@ -73,7 +74,7 @@ def _verification_goal(
     name = (employee_name or employee_role or "specialist").strip()
     role = (employee_role or "specialist").strip()
     command_hint = (
-        "; ".join(f"`{command}`" for command in commands[:3])
+        "; ".join(f"`{command}`" for command in select_verification_commands(commands, limit=3))
         if commands
         else "`npm test` and read-only verify script"
     )
@@ -110,7 +111,10 @@ def enqueue_specialist_verification_task(
             if cleaned_run in goal and goal.lower().startswith("verification after"):
                 return row
 
-    commands = extract_verification_commands(reply_text)
+    commands = select_verification_commands(
+        extract_verification_commands(reply_text),
+        limit=3,
+    )
     goal_text = _verification_goal(
         employee_name=employee_name,
         employee_role=role,

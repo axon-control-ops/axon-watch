@@ -2,6 +2,7 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch, type Ref } 
 
 import {
   AGENT_DOCK_COLLAPSED_WIDTH_PX,
+  AGENT_DOCK_WIDTH_KEY,
   applyAgentDockResizeKeyAction,
   clampAgentDockWidth,
   defaultAgentDockWidth,
@@ -16,13 +17,18 @@ type UseRightDockResizeOptions = {
   dockRef: Ref<HTMLElement | null>;
   collapsed?: Ref<boolean>;
   resolveDefaultWidth?: (viewportWidth: number) => number;
+  /** Separates persisted width + live CSS var per panel (IDE dock vs Operator rail). */
+  storageKey?: string;
+  cssVarName?: string;
 };
 
 export function useRightDockResize(options: UseRightDockResizeOptions) {
   const resolveDefault =
     options.resolveDefaultWidth ?? defaultAgentDockWidth;
+  const storageKey = options.storageKey ?? AGENT_DOCK_WIDTH_KEY;
+  const cssVarName = options.cssVarName ?? '--shell-agent-dock-width';
   const dockWidth = ref(
-    readStoredAgentDockWidth() ?? resolveDefault(window.innerWidth),
+    readStoredAgentDockWidth(storageKey) ?? resolveDefault(window.innerWidth),
   );
   const resizing = ref(false);
   const viewportWidth = ref(window.innerWidth);
@@ -37,14 +43,11 @@ export function useRightDockResize(options: UseRightDockResizeOptions) {
   function applyDockWidth(width: number): void {
     const clamped = clampAgentDockWidth(width, window.innerWidth);
     dockWidth.value = clamped;
-    shellRoot()?.style.setProperty('--shell-agent-dock-width', `${clamped}px`);
+    shellRoot()?.style.setProperty(cssVarName, `${clamped}px`);
   }
 
   function applyCollapsedDockWidth(): void {
-    shellRoot()?.style.setProperty(
-      '--shell-agent-dock-width',
-      `${AGENT_DOCK_COLLAPSED_WIDTH_PX}px`,
-    );
+    shellRoot()?.style.setProperty(cssVarName, `${AGENT_DOCK_COLLAPSED_WIDTH_PX}px`);
   }
 
   function syncDockWidthToShell(): void {
@@ -75,7 +78,7 @@ export function useRightDockResize(options: UseRightDockResizeOptions) {
       document.body.style.userSelect = '';
       document.removeEventListener('mousemove', onMove);
       document.removeEventListener('mouseup', onUp);
-      persistAgentDockWidth(dockWidth.value);
+      persistAgentDockWidth(dockWidth.value, storageKey);
     };
 
     document.body.style.cursor = 'col-resize';
@@ -86,7 +89,7 @@ export function useRightDockResize(options: UseRightDockResizeOptions) {
 
   function resetDockWidth(): void {
     applyDockWidth(resolveDefault(window.innerWidth));
-    persistAgentDockWidth(dockWidth.value);
+    persistAgentDockWidth(dockWidth.value, storageKey);
   }
 
   function onDockResizeKeydown(event: KeyboardEvent): void {
@@ -108,7 +111,7 @@ export function useRightDockResize(options: UseRightDockResizeOptions) {
     applyDockWidth(
       applyAgentDockResizeKeyAction(dockWidth.value, action, window.innerWidth),
     );
-    persistAgentDockWidth(dockWidth.value);
+    persistAgentDockWidth(dockWidth.value, storageKey);
   }
 
   onMounted(() => {
@@ -131,7 +134,7 @@ export function useRightDockResize(options: UseRightDockResizeOptions) {
         await nextTick();
         syncDockWidthToShell();
         if (!options.collapsed?.value) {
-          persistAgentDockWidth(dockWidth.value);
+          persistAgentDockWidth(dockWidth.value, storageKey);
         }
       },
     );

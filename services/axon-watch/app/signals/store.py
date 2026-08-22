@@ -23,6 +23,7 @@ from app.signals.watch_rule import watch_rule_for_inbox_item
 def get_inbox_snapshot(
     *,
     connector_records: list[dict[str, object]] | None = None,
+    force_email_refresh: bool = False,
 ) -> dict[str, object]:
     items: list[dict[str, object]] = []
     if include_summary_degraded_signal(connector_records=connector_records):
@@ -35,7 +36,7 @@ def get_inbox_snapshot(
     release_resolved_monitor_acknowledgements(monitor_records)
     monitor_items = monitor_inbox_items(monitor_records)
     items.extend(monitor_items)
-    email_items = email_inbox_items()
+    email_items = email_inbox_items(force=force_email_refresh)
     items.extend(email_items)
     if should_emit_bootstrap_signal(monitor_items, connector_items, email_items):
         items.insert(0, bootstrap_inbox_item())

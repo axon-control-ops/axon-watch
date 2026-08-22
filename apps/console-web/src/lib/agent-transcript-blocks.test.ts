@@ -331,6 +331,32 @@ describe('parseAgentTranscriptBlocks', () => {
     ]);
   });
 
+  it('routes plain numbered questions through interactive card rendering', () => {
+    const content = [
+      'What should the workspace validation cover?',
+      '',
+      '1. Graduation groups',
+      '2. Confirmed but unallocated children',
+      '3. Cross-system sync',
+      '4. All of the above',
+    ].join('\n');
+
+    expect(agentContentHasTranscriptBlocks(content)).toBe(true);
+    expect(parseAgentTranscriptBlocks(content)).toEqual([
+      {
+        kind: 'question',
+        prompt: 'What should the workspace validation cover?',
+        options: [
+          { id: '1', label: 'Graduation groups' },
+          { id: '2', label: 'Confirmed but unallocated children' },
+          { id: '3', label: 'Cross-system sync' },
+          { id: '4', label: 'All of the above' },
+        ],
+        open: false,
+      },
+    ]);
+  });
+
   it('parses edit-failed fences and legacy tool labels', () => {
     const content = [
       ':::edit-failed tests/test_foo.py',

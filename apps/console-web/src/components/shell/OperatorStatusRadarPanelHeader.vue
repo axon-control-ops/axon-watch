@@ -21,6 +21,7 @@ const props = defineProps<{
   kairoSubtitle: string;
   attentionBadgeCount: number;
   dispatchQueuedCount?: number;
+  openEmailCount?: number;
 }>();
 
 const emit = defineEmits<{
@@ -35,6 +36,7 @@ function tabBadge(view: OperatorCenterView): number | null {
     view,
     attentionCount: props.attentionBadgeCount,
     dispatchQueuedCount: props.dispatchQueuedCount ?? 0,
+    openEmailCount: props.openEmailCount ?? 0,
   });
 }
 </script>

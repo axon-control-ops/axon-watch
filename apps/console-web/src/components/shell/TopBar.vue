@@ -9,6 +9,11 @@ import AxonProductLogo from '../../components/AxonProductLogo.vue';
 import { navigateToAppSurface, type AppSurface } from '../../lib/app-surface-route';
 import { useAppSurface } from '../../composables/useAppSurface';
 import { openOperatorStandup } from '../../features/kairo-conversation/open-operator-standup';
+import {
+  openRecoveryCenter,
+  recoveryAttentionCount,
+  recoveryAttentionLabel,
+} from '../../features/recovery-center/recovery-overlay-state';
 import { shouldShowIdeInterruptStrip } from '../../lib/ide-interrupt-panel-view';
 import { useShellStore } from '../../stores/shell';
 
@@ -60,6 +65,10 @@ function openSettings(): void {
 
 async function openStandup(): Promise<void> {
   await openOperatorStandup(shell);
+}
+
+async function openAttention(): Promise<void> {
+  await openRecoveryCenter(shell.currentWorkspace?.workspace_id);
 }
 </script>
 
@@ -184,6 +193,16 @@ async function openStandup(): Promise<void> {
           </button>
         </div>
         <button
+          v-if="recoveryAttentionCount > 0"
+          type="button"
+          class="layout-toggle__button topbar-mockup__attention"
+          :aria-label="`Open Recovery Center. ${recoveryAttentionLabel}`"
+          :title="recoveryAttentionLabel"
+          @click="openAttention"
+        >
+          {{ recoveryAttentionLabel }}
+        </button>
+        <button
           type="button"
           class="layout-toggle__button topbar-mockup__standup"
           aria-label="Open VAXON stand-up report"
@@ -228,7 +247,8 @@ async function openStandup(): Promise<void> {
   z-index: 12;
 }
 
-.topbar-mockup__standup {
+.topbar-mockup__standup,
+.topbar-mockup__attention {
   margin-right: 0.35rem;
   letter-spacing: 0.06em;
   font-size: 0.68rem;

@@ -201,6 +201,22 @@ class LeadTaskPlanTests(unittest.TestCase):
         self.assertTrue(should_lead_decompose_dispatch(plan))
         self.assertEqual(["frontend"], [item.owner_role for item in plan.items])
 
+    def test_git_privacy_policy_routes_to_integrations_with_root_scope(self) -> None:
+        plan = build_lead_task_plan(
+            goal=(
+                "Harden TPS Git privacy controls: update root .gitignore, "
+                "and project.axon.yaml deny-list."
+            ),
+            roster=DASHPRO_ROSTER,
+            mode="sequential",
+        )
+
+        self.assertEqual(["integrations"], [item.owner_role for item in plan.items])
+        self.assertEqual(
+            [".gitignore", "project.axon.yaml"],
+            plan.items[0].allowed_paths,
+        )
+
     def test_parent_dashboard_ux_improvement_dispatches_to_frontend(self) -> None:
         goal = (
             "In the parents Dashboard - this screen doesn't make sense - what are "

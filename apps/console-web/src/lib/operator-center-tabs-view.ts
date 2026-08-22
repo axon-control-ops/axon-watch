@@ -33,6 +33,12 @@ export const OPERATOR_CENTER_TABS: readonly OperatorCenterTab[] = [
     eyebrow: 'Executive command',
   },
   {
+    id: 'email',
+    label: 'Email',
+    title: 'Email',
+    eyebrow: 'Operator center',
+  },
+  {
     id: 'graph',
     label: 'Brain Graph',
     title: 'Brain Graph',
@@ -51,12 +57,16 @@ export function operatorCenterTabBadgeCount(input: {
   view: OperatorCenterView;
   attentionCount: number;
   dispatchQueuedCount?: number;
+  openEmailCount?: number;
 }): number | null {
   if (input.view === 'attention' && input.attentionCount > 0) {
     return input.attentionCount;
   }
   if (input.view === 'dispatch' && (input.dispatchQueuedCount ?? 0) > 0) {
     return input.dispatchQueuedCount ?? 0;
+  }
+  if (input.view === 'email' && (input.openEmailCount ?? 0) > 0) {
+    return input.openEmailCount ?? 0;
   }
   return null;
 }

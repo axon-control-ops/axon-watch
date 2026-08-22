@@ -15,7 +15,11 @@ from app.chat.lane_b_generated_image_actions import (
 from app.chat.lane_b_lead_decompose_fast_path import maybe_post_lead_decompose_message
 from app.chat.lane_b_lead_fan_out_fast_path import maybe_post_lead_fan_out_message
 from app.chat.lane_b_lead_named_assign_fast_path import maybe_post_lead_named_assign_message
-from app.chat.lane_b_persona_fast_path import build_lane_b_persona_reply, post_lane_b_persona_message
+from app.chat.lane_b_persona_fast_path import (
+    build_ambiguous_reply_guard,
+    build_lane_b_persona_reply,
+    post_lane_b_persona_message,
+)
 from app.chat.lane_b_plan_run import finalize_lane_b_plan_run
 from app.chat.lane_b_run_dispatch import resolve_lane_b_agent_run
 from app.chat.lane_b_system_content import lane_b_system_content as _lane_b_system_content
@@ -196,6 +200,21 @@ def post_lane_b_message(
         message_id=message_id,
         thread_id=thread_id,
     )[0]
+    # A number typed into the free-text composer has no reliable connection to
+    # an earlier decision card.  Never recover a stale question from history or
+    # turn it into a Lead handoff.
+    ambiguous_reply = build_ambiguous_reply_guard(content)
+    if ambiguous_reply:
+        return post_lane_b_persona_message(
+            workspace_id=workspace_id,
+            content=content,
+            thread_id=thread_id,
+            created_at=created_at,
+            save_message=chat_store.save_message,
+            new_message_id=_new_message_id,
+            bind_attachments=bind_lane_b_attachments,
+            agent_content=ambiguous_reply,
+        )
     # Named assign before fan-out: "assign Cole…" must not become assign-all / Lead essay.
     lead_named_assign_response = maybe_post_lead_named_assign_message(
         workspace_id=workspace_id,

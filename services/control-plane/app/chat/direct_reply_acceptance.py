@@ -37,7 +37,11 @@ def narrative_outside_receipts(reply_text: str | None) -> str:
     return " ".join(without_closed.split()).strip()
 
 
-def evaluate_direct_reply_acceptance(reply_text: str | None) -> DirectReplyAcceptance:
+def evaluate_direct_reply_acceptance(
+    reply_text: str | None,
+    *,
+    run_id: str | None = None,
+) -> DirectReplyAcceptance:
     """Require an operator-facing conclusion, not merely exit code zero."""
     raw = str(reply_text or "")
     starts = len(_STRUCTURED_START_RE.findall(raw))
@@ -53,6 +57,34 @@ def evaluate_direct_reply_acceptance(reply_text: str | None) -> DirectReplyAccep
                 False,
                 "Direct reply incomplete: runtime output ended inside an unclosed receipt block",
             )
+
+    from app.workspace_agents.capability_routing import looks_like_terminal_capability_handoff
+
+    if looks_like_terminal_capability_handoff(reply_text=raw):
+        routed = False
+        clean_run = str(run_id or "").strip()
+        if clean_run:
+            try:
+                from app.persistence import run_store
+                from app.runs.service import get_run
+
+                history_ref = str(get_run(clean_run).get("history_ref") or "").strip()
+                for entry in run_store.list_history(history_ref):
+                    receipt = entry.get("receipt") if isinstance(entry, dict) else None
+                    if isinstance(receipt, dict) and receipt.get("type") == "capability_routed":
+                        routed = True
+                        break
+            except Exception:  # noqa: BLE001 — acceptance stays conservative
+                routed = False
+        if routed:
+            return DirectReplyAcceptance(
+                True,
+                "Terminal limits detected — smart-routed to scoped follow-up task",
+            )
+        return DirectReplyAcceptance(
+            False,
+            "Direct reply blocked on terminal policy — scoped follow-up required",
+        )
 
     narrative = narrative_outside_receipts(raw)
     substantive = _MARKDOWN_NOISE_RE.sub("", narrative)
@@ -78,7 +110,7 @@ def enforce_direct_reply_acceptance(
     current = get_run(run_id)
     if str(current.get("task_id") or "").strip():
         return True, None
-    acceptance = evaluate_direct_reply_acceptance(reply_text)
+    acceptance = evaluate_direct_reply_acceptance(reply_text, run_id=run_id)
     record = append_run_execution_receipt(
         run_id,
         receipt_type="direct_reply_acceptance",

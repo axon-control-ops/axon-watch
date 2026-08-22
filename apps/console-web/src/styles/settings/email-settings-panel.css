@@ -114,10 +114,45 @@
   background: rgba(6, 16, 28, 0.55);
 }
 
+.email-settings-panel__account-main {
+  flex: 1 1 14rem;
+  min-width: 0;
+}
+
 .email-settings-panel__account p {
   margin: 0.25rem 0 0;
   font-size: 0.72rem;
   color: rgba(180, 210, 230, 0.7);
+}
+
+.email-settings-panel__account-test {
+  margin: 0.45rem 0 0;
+  padding: 0.4rem 0.55rem;
+  border-radius: 0.35rem;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.04);
+  font-size: 0.72rem;
+  line-height: 1.35;
+  color: rgba(210, 230, 240, 0.9);
+  word-break: break-word;
+}
+
+.email-settings-panel__account-test--pending {
+  border-color: rgba(255, 196, 90, 0.4);
+  background: rgba(255, 180, 70, 0.1);
+  color: rgba(255, 220, 160, 0.95);
+}
+
+.email-settings-panel__account-test--ok {
+  border-color: rgba(80, 220, 150, 0.4);
+  background: rgba(40, 180, 110, 0.12);
+  color: rgba(180, 255, 210, 0.95);
+}
+
+.email-settings-panel__account-test--error {
+  border-color: rgba(255, 110, 110, 0.45);
+  background: rgba(180, 40, 50, 0.14);
+  color: rgba(255, 200, 200, 0.95);
 }
 
 .email-settings-panel__account-actions button,

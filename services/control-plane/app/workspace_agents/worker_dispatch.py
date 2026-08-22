@@ -145,7 +145,7 @@ def dispatch_continuous_worker_run(
     if not run_id:
         return False, None
 
-    if not claim_worker_dispatch(run_id):
+    if not claim_worker_dispatch(run_id, task_id=str(run_record.get("task_id") or "")):
         logger.warning("continuous worker dispatch already active for %s", run_id)
         return False, None
 

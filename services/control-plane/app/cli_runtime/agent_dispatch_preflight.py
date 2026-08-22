@@ -73,5 +73,13 @@ def validate_agent_dispatch_preflight(
             "npm is required for sandbox validation scripts but was not found in PATH."
         )
 
+    if sandbox_policy is not None:
+        for tool in ("awk", "bash"):
+            if shutil.which(tool) is None:
+                issues.append(
+                    f"{tool} is required for agent shell/PTY sessions but was not found in PATH. "
+                    "Install coreutils/gawk on the control-plane host."
+                )
+
     if issues:
         raise SandboxConfigurationError("Agent dispatch preflight failed: " + " ".join(issues))

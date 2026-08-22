@@ -208,16 +208,23 @@ def enqueue_agent_terminal_job(
     }
     register_job(record)
 
-    # Register the watcher before writing so no output is missed.
-    start_job_watcher(
-        job_id=job_id,
-        command=command_text,
-        runtime=runtime,
-        chat_target=stream_target,
-        timeout_seconds=deadline_seconds,
-    )
+    def _dispatch_to_session() -> None:
+        start_job_watcher(
+            job_id=job_id,
+            command=command_text,
+            runtime=runtime,
+            chat_target=stream_target,
+            timeout_seconds=deadline_seconds,
+        )
+        runtime.pty.write(f"{wrap_with_exit_sentinel(command_text, job_id)}\n".encode("utf-8"))
 
-    runtime.pty.write(f"{wrap_with_exit_sentinel(command_text, job_id)}\n".encode("utf-8"))
+    from app.terminal.agent_job_session_queue import enqueue_session_job
+
+    enqueue_session_job(
+        workspace_id=clean_workspace,
+        session_id=session.session_id,
+        dispatch=_dispatch_to_session,
+    )
 
     receipt = (
         f"Running in Axon terminal (`{session.session_id}`): `{command_text}`.\n"

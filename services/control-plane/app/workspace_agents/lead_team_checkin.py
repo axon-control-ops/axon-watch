@@ -27,6 +27,7 @@ from app.workspace_agents.lead_checkin_assign import (
     assign_owner_role_for_failed_shift,
     assign_owner_role_for_monitor,
 )
+from app.workspace_agents.lead_checkin_report import format_lead_checkin_message
 from app.workspace_agents.autonomous_attention_policy import attention_finding_auto_dispatches
 from app.workspace_agents.run_outcome import latest_role_run_outcome
 
@@ -166,26 +167,6 @@ def _post_lead_checkin_message(
             employee_role="lead",
         )
     thread_id = str(thread["thread_id"])
-    lines = [
-        f"{CHECKIN_GOAL_PREFIX} scheduled team health pass.",
-        f"Findings: {len(findings)} · Assignments created: {len(assigned)}",
-        "",
-    ]
-    for index, finding in enumerate(findings[:12], start=1):
-        flag = "ESCALATE" if finding.escalate_only else f"→ {finding.owner_role}"
-        lines.append(f"{index}. [{finding.kind}] {finding.title} ({flag})")
-        # finding.detail already went through normalize_operator_failure_detail +
-        # word-boundary truncation upstream (run_outcome.latest_role_run_outcome) —
-        # do not re-normalize or re-truncate it here.
-        if finding.detail:
-            lines.append(f"   {finding.detail}")
-    if not findings:
-        lines.append("No failed shifts or degraded third-party signals this pass.")
-    # No trailing "Hierarchy" / "Confidence" boilerplate: this is a deterministic
-    # status message, not an LLM turn — there's no model self-assessment to score,
-    # and the org-chart line is unparsed narration repeated on every check-in with
-    # no reader value (see app.kairo_conversation_runtime_context for the actual
-    # functional hierarchy line, which feeds VAXON's own reasoning context instead).
     message_id = f"message_system_{uuid4().hex}"
     chat_store.save_message(
         {
@@ -194,7 +175,7 @@ def _post_lead_checkin_message(
             "workspace_id": workspace_id,
             "run_id": None,
             "role": "agent",
-            "content": "\n".join(lines),
+            "content": format_lead_checkin_message(findings, assigned),
             "created_at": created_at,
         }
     )

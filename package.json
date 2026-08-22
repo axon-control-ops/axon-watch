@@ -12,6 +12,8 @@
     "dev": "./scripts/dev/up.sh",
     "down": "./scripts/dev/down.sh",
     "health": "./scripts/dev/check-health.sh",
+    "doctor": "./scripts/ops/platform-doctor.sh",
+    "verify:clean-baseline": "./scripts/verify/clean-baseline.sh",
     "verify:evidence": "./scripts/dev/collect-verify-evidence.sh",
     "verify:nightly": "./scripts/dev/verify-with-evidence.sh",
     "verify:nightly:strict": "./scripts/dev/verify-with-evidence.sh --strict-pending",

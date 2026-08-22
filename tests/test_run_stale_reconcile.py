@@ -574,7 +574,8 @@ class RunStaleReconcileTests(unittest.TestCase):
             employee_role="backend",
         )
         run_id = str(stale["run_id"])
-        _age_run(run_id, seconds=900)
+        # Default worker TTL is 1200s; 900s is still inside the live window.
+        _age_run(run_id, seconds=1320)
 
         with patch(
             "app.workspace_agents.scheduler.load_workspace_agent_configs",
@@ -597,7 +598,7 @@ class RunStaleReconcileTests(unittest.TestCase):
             employee_role="backend",
         )
         run_id = str(stale["run_id"])
-        _age_run(run_id, seconds=900)
+        _age_run(run_id, seconds=1320)
 
         with patch(
             "app.workspace_agents.scheduler.load_workspace_agent_configs",
@@ -761,7 +762,7 @@ class RunStaleReconcileTests(unittest.TestCase):
             employee_role="backend",
         )
         run_id = str(record["run_id"])
-        _age_run(run_id, seconds=900)
+        _age_run(run_id, seconds=1320)
 
         app = load_control_plane_app()
         with patch.dict(
@@ -796,7 +797,7 @@ class RunStaleReconcileTests(unittest.TestCase):
             employee_role="backend",
         )
         run_id = str(record["run_id"])
-        _age_run(run_id, seconds=900)
+        _age_run(run_id, seconds=1320)
 
         client = TestClient(load_control_plane_app())
         try:

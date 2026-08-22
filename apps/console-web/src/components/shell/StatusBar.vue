@@ -6,6 +6,7 @@ import {
   openWatchConnectors,
 } from '../../composables/useIdeEditorStatusBar';
 import { openOperatorStandup } from '../../features/kairo-conversation/open-operator-standup';
+import { openRecoveryCenter } from '../../features/recovery-center/recovery-overlay-state';
 import { isClaudeUsageStatusBarChip } from '../../lib/claude-usage-view';
 import { isConnectorStatusBarChip } from '../../lib/connector-glance-view';
 import { isCursorUsageStatusBarChip } from '../../lib/cursor-usage-view';
@@ -50,11 +51,19 @@ async function onOpenStandup(): Promise<void> {
 
 function isInteractiveCenterChip(id: string): boolean {
   return (
-    isConnectorStatusBarChip(id) || isCursorUsageStatusBarChip(id) || isClaudeUsageStatusBarChip(id)
+    isConnectorStatusBarChip(id) ||
+    isCursorUsageStatusBarChip(id) ||
+    isClaudeUsageStatusBarChip(id) ||
+    id === 'attention' ||
+    id === 'phase'
   );
 }
 
 function onCenterChipClick(id: string): void {
+  if (id === 'attention' || id === 'phase') {
+    void openRecoveryCenter(shell.currentWorkspace?.workspace_id);
+    return;
+  }
   if (isCursorUsageStatusBarChip(id) || isClaudeUsageStatusBarChip(id)) {
     openRuntimeUsageSettings(shell);
     return;

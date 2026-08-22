@@ -195,13 +195,16 @@ export function useComposerDisplayState(options: UseComposerDisplayStateOptions)
   });
   const instructionsGenerating = ref(false);
   const canConvertInstructions = computed(
-    () => Boolean(composerDraftModel.value.trim()) && !instructionsGenerating.value,
+    () =>
+      Boolean(shell.currentWorkspace?.workspace_id) &&
+      Boolean(composerDraftModel.value.trim()) &&
+      !instructionsGenerating.value,
   );
 
   async function convertDraftToInstructions(): Promise<void> {
-    const source = composerDraftModel.value.trim();
     const workspaceId = shell.currentWorkspace?.workspace_id;
-    if (!source || !workspaceId || instructionsGenerating.value) return;
+    const source = composerDraftModel.value.trim();
+    if (!workspaceId || !source || instructionsGenerating.value) return;
     instructionsGenerating.value = true;
     try {
       const result = await generateInstructions({
@@ -210,7 +213,11 @@ export function useComposerDisplayState(options: UseComposerDisplayStateOptions)
         runtime_target: shell.selectedRuntimeTargetId || null,
         runtime_model: shell.selectedComposerModel || null,
       });
-      composerDraftModel.value = result.content;
+      const markdown = result.content.trim();
+      if (!markdown) {
+        throw new Error('Instruction generation returned empty markdown');
+      }
+      composerDraftModel.value = markdown.endsWith('\n') ? markdown : `${markdown}\n`;
       await nextTick(syncComposerHeight);
     } catch (error) {
       shell.commandMutationError = error instanceof Error

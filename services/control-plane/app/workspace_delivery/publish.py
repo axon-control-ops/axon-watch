@@ -239,16 +239,22 @@ def _scan_secrets(isolation_root: Path, paths: list[str]) -> str | None:
 
 
 def _scan_private_company_material(paths: list[str]) -> str | None:
-    """Block business documents from every worker commit/push/PR."""
+    """Block every worker delivery touching a private path.
+
+    Repository migration is an operator-reviewed maintenance operation, not a
+    worker delivery. Blocking deletions also blocks a private-to-public rename
+    from evading the path gate.
+    """
     findings = evaluate_changed_paths(
         paths,
         allowed_paths=[],
         forbidden_path_globs=PRIVATE_COMPANY_PATH_GLOBS,
         max_paths=120,
     )
-    if not findings:
+    private_findings = [finding for finding in findings if finding.code == "forbidden_path"]
+    if not private_findings:
         return None
-    first = findings[0]
+    first = private_findings[0]
     return (
         f"private_company_material: {first.path} must stay local/private and "
         "cannot be staged, pushed, or included in a draft PR"

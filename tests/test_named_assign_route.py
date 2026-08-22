@@ -128,7 +128,7 @@ class NamedAssignRouteTests(unittest.TestCase):
         self.assertIn("routed a concrete Lead handoff to Cole", agent["content"])
         self.assertIn("Lesego login table", agent["content"])
 
-    def test_lead_fast_path_uses_prior_operator_ask_for_vague_named_assign(self) -> None:
+    def test_lead_fast_path_does_not_recover_stale_operator_ask(self) -> None:
         roster = _roster()
         saved: list[dict] = []
 
@@ -150,11 +150,6 @@ class NamedAssignRouteTests(unittest.TestCase):
             ],
         ), patch(
             "app.chat.lane_b_lead_named_assign_fast_path._create_named_handoff_task",
-            return_value={
-                "task": {"task_id": "task-prior"},
-                "run": {"run_id": "run-prior", "phase": "executing"},
-                "started": True,
-            },
         ) as create_task:
             response = maybe_post_lead_named_assign_message(
                 workspace_id="workspace_test",
@@ -171,8 +166,11 @@ class NamedAssignRouteTests(unittest.TestCase):
 
         self.assertIsNotNone(response)
         assert response is not None
-        self.assertEqual("task-prior", response["named_assign"]["task_id"])
-        self.assertIn("parent dashboard submission screen", create_task.call_args.kwargs["body"])
+        self.assertEqual("", response["named_assign"]["task_id"])
+        self.assertFalse(response["dispatched"])
+        create_task.assert_not_called()
+        agent = next(row for row in saved if row["role"] == "agent")
+        self.assertIn("send the exact goal/acceptance criteria", agent["content"])
 
     def test_lead_fast_path_skips_when_assigning_lead(self) -> None:
         roster = _roster()

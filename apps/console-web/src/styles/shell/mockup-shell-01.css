@@ -125,7 +125,7 @@
   grid-template-columns:
     var(--shell-left-sidebar-width, 280px)
     minmax(0, 1fr)
-    var(--shell-agent-dock-width, 380px);
+    var(--shell-live-ops-width, 360px);
 }
 
 .console-shell--mockup[data-layout-mode='ide'] {

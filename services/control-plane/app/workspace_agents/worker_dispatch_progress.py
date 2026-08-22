@@ -49,6 +49,12 @@ def throttled_worker_stream_progress(
                 receipt_summary="Continuous worker dispatch still executing",
                 actor="workspace_scheduler",
             )
+            try:
+                from app.platform_recovery.checkpoints import touch_meaningful_progress
+
+                touch_meaningful_progress(run_id, stage="executing")
+            except Exception:  # noqa: BLE001 — progress receipts must not fail dispatch
+                logger.exception("checkpoint touch failed for %s", run_id)
         except (RunLifecycleError, RunNotFoundError):
             return
 

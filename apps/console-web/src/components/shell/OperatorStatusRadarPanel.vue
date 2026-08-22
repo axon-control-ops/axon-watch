@@ -47,9 +47,11 @@ import OperatorRunStripPanel from './OperatorRunStripPanel.vue';
 import OperatorStatusRadarPanelHeader from './OperatorStatusRadarPanelHeader.vue';
 import OperatorTaskBoardPanel from './OperatorTaskBoardPanel.vue';
 import MissionControlLiveOpsPanel from './MissionControlLiveOpsPanel.vue';
+import OperatorEmailInboxPanel from './OperatorEmailInboxPanel.vue';
 import AttentionStackPanel from './AttentionStackPanel.vue';
 import LeadReviewOverlay from './LeadReviewOverlay.vue';
 import { closeLeadReviewOverlay } from '../../features/lead-review/lead-review-overlay-state';
+import { isEmailSignalRead } from '../../lib/email-read-state';
 
 const props = defineProps<{
   terminalVisible: boolean;
@@ -164,6 +166,13 @@ const attentionBadgeCount = computed(() =>
     inboxItems: shell.inboxItems,
     inboxLoadState: shell.inboxLoadState,
   }),
+);
+
+const openEmailCount = computed(
+  () =>
+    shell.inboxItems.filter(
+      (item) => item.source === 'email' && !isEmailSignalRead(item.signal_id),
+    ).length,
 );
 
 const dispatchQueuedCount = computed(() => {
@@ -419,6 +428,7 @@ async function onLeadReviewComplete(planId: string): Promise<void> {
         :kairo-subtitle="kairoParts.subtitle"
         :attention-badge-count="attentionBadgeCount"
         :dispatch-queued-count="dispatchQueuedCount"
+        :open-email-count="openEmailCount"
         @set-center-view="setCenterView"
         @toggle-terminal="toggleTerminal"
       />
@@ -737,10 +747,14 @@ async function onLeadReviewComplete(planId: string): Promise<void> {
         <template v-else-if="centerView === 'vaxon'">
           <MissionControlLiveOpsPanel layout="center" />
         </template>
+
+        <template v-else-if="centerView === 'email'">
+          <OperatorEmailInboxPanel />
+        </template>
       </div>
 
       <button
-        v-if="!props.terminalVisible && centerView !== 'vaxon'"
+        v-if="!props.terminalVisible && centerView !== 'vaxon' && centerView !== 'email'"
         type="button"
         class="operator-status-radar-panel__terminal-dock"
         :class="{

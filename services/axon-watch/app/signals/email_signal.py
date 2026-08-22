@@ -201,6 +201,7 @@ def _messages_from_live_bridge() -> list[dict[str, Any]] | None:
 def load_email_messages(
     *,
     stub_path: Path | None = None,
+    force: bool = False,
 ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
     """Load email messages: native IMAP → Signal bridge → optional stub."""
 
@@ -234,7 +235,7 @@ def load_email_messages(
                 account_workspaces[account_email] = workspace_id
         stub_config["account_workspaces"] = account_workspaces
 
-    native = fetch_native_email_messages()
+    native = fetch_native_email_messages(force=force)
     if native is not None:
         return native, stub_config
 
@@ -271,19 +272,12 @@ def email_inbox_item(
     # unconditionally, drafted a full reply, and stored it regardless of what
     # analyze_email_message had already concluded about the sender.
     no_reply_sender = bool(analysis.get("no_reply_sender"))
-    suggestion = (
-        {}
-        if no_reply_sender
-        else suggest_email_reply(
-            {
-                "subject": subject,
-                "from": sender,
-                "text": snippet,
-                "snippet": snippet,
-                "message_id": message_id,
-            }
-        )
-    )
+    # Pass the already-computed analysis (full-text based) straight through --
+    # not a message dict rebuilt from the truncated 280-char snippet, which
+    # used to make suggest_email_reply re-run analyze_email_message on a
+    # shorter, sometimes mid-sentence-truncated copy of the same email and
+    # reach a different (worse) recommended_action than the one above.
+    suggestion = {} if no_reply_sender else suggest_email_reply(analysis)
 
     return {
         "signal_id": f"signal_email_{_safe_signal_token(message_id)}",
@@ -373,8 +367,9 @@ def _workspace_for_message(
 def email_inbox_items(
     *,
     stub_path: Path | None = None,
+    force: bool = False,
 ) -> list[dict[str, object]]:
-    messages, config = load_email_messages(stub_path=stub_path)
+    messages, config = load_email_messages(stub_path=stub_path, force=force)
     fallback_workspace_id = str(config.get("workspace_id") or "workspace_axon_watch").strip()
     workspace_names = [
         str(name).strip()

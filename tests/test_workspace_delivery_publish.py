@@ -46,9 +46,18 @@ class WorkspaceDeliveryPublishTests(unittest.TestCase):
         detail = publish._scan_private_company_material(
             ["website/index.html", "docs/rfq/customer-submission.pdf"]
         )
-
         self.assertIn("private_company_material", str(detail))
         self.assertIn("docs/rfq/customer-submission.pdf", str(detail))
+
+    def test_private_path_deletion_or_rename_still_blocks_worker_delivery(self) -> None:
+        detail = publish._scan_private_company_material(
+            ["docs/rfq/customer-submission.pdf", "website/customer-submission.pdf"]
+        )
+        self.assertIn("docs/rfq/customer-submission.pdf", str(detail))
+
+    def test_large_public_diff_is_not_mislabeled_as_private_material(self) -> None:
+        paths = [f"tests/generated/test_{index}.py" for index in range(121)]
+        self.assertIsNone(publish._scan_private_company_material(paths))
 
     def test_smart_commit_message_names_type_scope_and_outcome(self) -> None:
         message = publish._derive_commit_message(
@@ -81,6 +90,33 @@ class WorkspaceDeliveryPublishTests(unittest.TestCase):
             self.assertNotIn("docs/ops/receipt.md", list_isolation_changed_paths(root))
             self.assertIn(
                 "docs/ops/receipt.md",
+                list_isolation_changed_paths(
+                    root, include_ignored_pathspecs=["docs/ops/receipt.md"]
+                ),
+            )
+
+    def test_ignored_directory_allowance_does_not_claim_historical_files(self) -> None:
+        with tempfile.TemporaryDirectory() as tempdir:
+            root = Path(tempdir)
+            self._git(root, "init")
+            self._git(root, "config", "user.email", "test@example.invalid")
+            self._git(root, "config", "user.name", "Axon-X test")
+            (root / ".gitignore").write_text("docs/ops/\n", encoding="utf-8")
+            (root / "README.md").write_text("baseline\n", encoding="utf-8")
+            self._git(root, "add", ".gitignore", "README.md")
+            self._git(root, "commit", "-m", "baseline")
+            target = root / "docs" / "ops" / "historical-private.pdf"
+            target.parent.mkdir(parents=True)
+            target.write_text("private\n", encoding="utf-8")
+
+            self.assertNotIn(
+                "docs/ops/historical-private.pdf",
+                list_isolation_changed_paths(
+                    root, include_ignored_pathspecs=["docs/ops/"]
+                ),
+            )
+            self.assertNotIn(
+                "docs/ops/historical-private.pdf",
                 list_isolation_changed_paths(
                     root, include_ignored_pathspecs=["docs/ops"]
                 ),

@@ -26,6 +26,7 @@ Use it to operate the console, teach Axon-X, understand the codebase, verify and
 3.67. [Auto-loop status & credits](how-to/auto-loop-and-credits.md) — are we autonomous yet? Cursor / API budget for multi-project
 3.68. [Company hierarchy & Lead check-in](how-to/company-hierarchy-and-lead-checkin.md) — VAXON attend loop + AUTONOMOUS ON safety matrix
 3.69. [Stuck agent recovery & School Operations Phase 1](how-to/agent-recovery-and-school-operations.md) — restart decisions, VAXON's recovery contract, and daily homework approval
+3.695. [IDE operator quick start](how-to/ide-operator-quickstart.md) — assigning Noor, Blair, and specialists safely; decisions, recovery, and Full Access
 3.70. [AXON-X Constitution registries](#axon-x-constitution-registries) — missions, evidence, decisions, capabilities, ADRs, debt, health, and self-healing proof
 3.7. [VAXON Desktop](#vaxon-desktop) — packaged Linux install
 4. [Teaching Axon-X](#teaching-axon-x-to-someone-else) — explain it to others
@@ -55,6 +56,7 @@ Use it to operate the console, teach Axon-X, understand the codebase, verify and
 | **Integrator / merge** | [CI, merge, and worker agents](how-to/ci-merge-and-worker-agents.md) | [`docs/CI_GATES.md`](CI_GATES.md), `./scripts/ops/watch-fast-gate.sh` |
 | **Autonomy / remote host** | [Auto-loop status & credits](how-to/auto-loop-and-credits.md) | [Autonomy gates & service identity](how-to/autonomy-gates-and-service-identity.md), [Recent operator features](how-to/recent-operator-features.md) |
 | **Stuck agent / school operator** | [Stuck agent recovery & School Operations Phase 1](how-to/agent-recovery-and-school-operations.md) | [Debugging playbook](#debugging-playbook), [Company hierarchy & Lead check-in](how-to/company-hierarchy-and-lead-checkin.md) |
+| **IDE operator (daily use)** | [IDE operator quick start](how-to/ide-operator-quickstart.md) | [Stuck agent recovery](how-to/agent-recovery-and-school-operations.md), [Reliability and deliberate controls](how-to/reliability-and-deliberate-controls.md) |
 | **Lead / autonomous agent** | [AXON-X Constitution registries](#axon-x-constitution-registries) | [Verification](#verification-commands), `docs/ops/agent-reports/axon-x-constitution-gap-audit-2026-08-09.md` |
 | **Debugger** | [Debugging playbook](#debugging-playbook) | [Troubleshooting](#troubleshooting) |
 | **Upgrader** | [Upgrading & updating](#upgrading-and-updating) | `./scripts/ops/sync_planning_mirror_to_axon_local.py` |

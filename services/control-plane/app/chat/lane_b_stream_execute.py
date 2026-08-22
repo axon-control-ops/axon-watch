@@ -158,6 +158,11 @@ def finalize_lane_b_agent_run(
     )
     try:
         if dispatched:
+            _maybe_route_terminal_capability_lane_b(
+                dispatch_run_id=dispatch_run_id,
+                run_record=run_record,
+                reply_text=reply_text,
+            )
             accepted, acceptance_record = enforce_direct_reply_acceptance(
                 dispatch_run_id, reply_text
             )
@@ -250,6 +255,48 @@ def finalize_lane_b_agent_run(
         reply_text=reply_text,
     )
     return dispatched, run_record
+
+
+def _maybe_route_terminal_capability_lane_b(
+    *,
+    dispatch_run_id: str,
+    run_record: dict[str, object] | None,
+    reply_text: str,
+) -> dict[str, object] | None:
+    """Smart-route one-shot Lane B shifts that hit terminal limits."""
+    if not isinstance(run_record, dict):
+        return None
+    if str(run_record.get("task_id") or "").strip():
+        return None
+    workspace_id = str(run_record.get("workspace_id") or "").strip()
+    role = str(run_record.get("employee_role") or "").strip().lower()
+    if not workspace_id or not role or role == "overview_agent":
+        return None
+    from app.workspace_agents.capability_routing import (
+        looks_like_terminal_capability_handoff,
+        try_route_capability_handoff,
+    )
+
+    if not looks_like_terminal_capability_handoff(reply_text=reply_text):
+        return None
+    try:
+        from app.workspace_agents import build_company_roster
+
+        name = role
+        for row in build_company_roster(workspace_id).get("employees") or []:
+            if str(row.get("role") or "").strip().lower() == role:
+                name = str(row.get("name") or role).strip() or role
+                break
+    except Exception:  # noqa: BLE001
+        name = role
+    return try_route_capability_handoff(
+        workspace_id=workspace_id,
+        source_run_id=dispatch_run_id,
+        source_role=role,
+        source_name=name,
+        reply_text=reply_text,
+        goal_hint=reply_text[:280],
+    )
 
 
 def _maybe_notify_lead_after_lane_b(

@@ -145,7 +145,14 @@ _ROLE_DEFAULTS: dict[str, AgentExecutionPolicy] = {
     ),
     "integrations": AgentExecutionPolicy(
         read_paths=(".",),
-        write_paths=("node_modules", ".github", "config", "scripts"),
+        write_paths=(
+            "node_modules",
+            ".github",
+            "config",
+            "scripts",
+            ".gitignore",
+            "project.axon.yaml",
+        ),
         forbidden_path_globs=(),
         approved_wrapper_names=(*_COMMON_AUDITED_WRAPPERS, "axonhealth", "watch-fast-gate.sh"),
         approved_command_prefixes=(*_COMMON_READ_PREFIXES, *_VALIDATION_PREFIXES, *_GH_READ_PREFIXES),

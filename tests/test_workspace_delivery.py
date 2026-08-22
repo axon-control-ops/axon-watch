@@ -224,7 +224,10 @@ class WorkspaceDeliveryTests(unittest.TestCase):
             self.assertIn("workspace_tps", policies)
             self.assertEqual(policies["workspace_tps"].base_branch, "main")
             clear_config_cache_for_tests()
-            self.assertIsNone(get_workspace_delivery_policy("workspace_tps"))
+            default_policy = get_workspace_delivery_policy("workspace_tps")
+            self.assertIsNotNone(default_policy)
+            assert default_policy is not None
+            self.assertEqual("master", default_policy.base_branch)
 
     def test_resolve_gh_cli_honors_override(self) -> None:
         import os

@@ -4,6 +4,7 @@ import { computed, onMounted, ref, watch } from 'vue';
 import {
   fetchEmailSettings,
   sendEmailReply,
+  suggestEmailReply,
   type EmailMailboxAccount,
 } from '../../api/email-settings-api';
 
@@ -20,6 +21,20 @@ const suggestedSubject = computed(() =>
   String(props.meta?.suggested_reply_subject ?? '').trim(),
 );
 const suggestedBody = computed(() => String(props.meta?.suggested_reply_body ?? '').trim());
+const sourceSubject = computed(() =>
+  String(props.meta?.subject ?? props.meta?.email_subject ?? suggestedSubject.value ?? '').trim(),
+);
+const sourceText = computed(() =>
+  String(
+    props.meta?.text
+      ?? props.meta?.body
+      ?? props.meta?.email_body
+      ?? props.meta?.snippet
+      ?? props.meta?.summary
+      ?? suggestedBody.value
+      ?? '',
+  ).trim(),
+);
 const recipient = computed(() => String(props.meta?.sender ?? '').trim());
 const isEmailSignal = computed(() => props.meta?.signal_family === 'email_triage');
 
@@ -36,11 +51,13 @@ const accountAddress = computed(
     || workspaceAccount.value?.smtp.from_email
     || '',
 );
+const operatorName = computed(() => String(workspaceAccount.value?.display_name || '').trim());
 
 const subject = ref('');
 const body = ref('');
 const approved = ref(false);
 const sending = ref(false);
+const suggestionLoading = ref(false);
 const sentReceipt = ref('');
 const sendError = ref('');
 
@@ -56,20 +73,67 @@ async function loadAccounts(): Promise<void> {
   }
 }
 
+function applyStoredSuggestion(): void {
+  subject.value = suggestedSubject.value;
+  body.value = suggestedBody.value;
+}
+
+function suggestionKey(): string {
+  return [
+    sourceSubject.value,
+    sourceText.value,
+    recipient.value,
+    operatorName.value,
+  ].join('\u0000');
+}
+
+async function refreshSuggestedDraft(): Promise<void> {
+  if (!isEmailSignal.value || !recipient.value || !sourceText.value) {
+    return;
+  }
+  const key = suggestionKey();
+  suggestionLoading.value = true;
+  try {
+    const draft = await suggestEmailReply({
+      subject: sourceSubject.value || suggestedSubject.value,
+      sender: recipient.value,
+      text: sourceText.value,
+      operator_name: operatorName.value,
+    });
+    if (key !== suggestionKey()) {
+      return;
+    }
+    subject.value = draft.reply_subject;
+    body.value = draft.reply_body;
+  } catch (error) {
+    if (key === suggestionKey()) {
+      sendError.value =
+        error instanceof Error ? error.message : 'Email reply suggestion failed';
+    }
+  } finally {
+    if (key === suggestionKey()) {
+      suggestionLoading.value = false;
+    }
+  }
+}
+
 watch(
   () => [
     suggestedSubject.value,
     suggestedBody.value,
+    sourceSubject.value,
+    sourceText.value,
     recipient.value,
     workspaceId.value,
     workspaceAccount.value?.account_id ?? '',
+    operatorName.value,
   ],
   () => {
-    subject.value = suggestedSubject.value;
-    body.value = suggestedBody.value;
+    applyStoredSuggestion();
     approved.value = false;
     sentReceipt.value = '';
     sendError.value = '';
+    void refreshSuggestedDraft();
   },
   { immediate: true },
 );
@@ -116,8 +180,10 @@ async function sendApprovedReply(): Promise<void> {
 </script>
 
 <template>
-  <section v-if="isEmailSignal && suggestedBody" class="email-reply-action">
-    <p class="email-reply-action__label">Suggested reply · review before sending</p>
+  <section v-if="isEmailSignal && (suggestedBody || sourceText)" class="email-reply-action">
+    <p class="email-reply-action__label">
+      Suggested reply · {{ suggestionLoading ? 'regenerating sender-facing draft…' : 'review before sending' }}
+    </p>
     <p class="email-reply-action__route">
       {{
         accountAddress

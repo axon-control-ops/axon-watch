@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 from app.cli_runtime.long_running_shell import is_long_running_ship_shell
 from app.cli_runtime.agent_shell_hook import evaluate_hook_payload
 from app.persistence import run_store, task_store
@@ -47,6 +49,21 @@ def _resolve_scoped_task_for_run(
     )
 
     candidate = find_open_verification_task(workspace_id, role)
+    if candidate is None:
+        from app.workspace_agents.capability_routing import find_open_routed_terminal_task
+
+        candidate = find_open_routed_terminal_task(workspace_id, role)
+    if candidate is None:
+        from app.workspace_agents.specialist_task_scope import try_lease_open_specialist_task
+
+        leased = try_lease_open_specialist_task(
+            workspace_id=workspace_id,
+            owner_role=role,
+            lease_holder=f"agent-terminal-{workspace_id}-{role}",
+            run_id=str(run.get("run_id") or "").strip() or None,
+        )
+        if leased is not None:
+            candidate = leased
     if candidate is None:
         return None, run
     cleaned_run = str(run.get("run_id") or "").strip()
@@ -116,6 +133,20 @@ def assert_agent_terminal_job_allowed(
             or role not in {"lead", "integrations"}
             or not is_long_running_ship_shell(command)
         ):
+            from app.workspace_agents.capability_routing import try_route_on_terminal_denial
+
+            routed = try_route_on_terminal_denial(
+                workspace_id=source,
+                run_id=clean_run,
+                role=role,
+                command=command,
+                reason="agent terminal run has no scoped task",
+            )
+            if routed is not None:
+                raise AgentTerminalPolicyError(
+                    f"Smart-routed to scoped task {routed.get('task_id')} "
+                    f"({routed.get('target_role')}); retry via assignment board"
+                )
             raise AgentTerminalPolicyError("agent terminal run has no scoped task")
         append_run_execution_receipt(
             clean_run,
@@ -147,6 +178,20 @@ def assert_agent_terminal_job_allowed(
             success=False,
             intent="terminal_command",
         )
+        from app.workspace_agents.capability_routing import try_route_on_terminal_denial
+
+        routed = try_route_on_terminal_denial(
+            workspace_id=source,
+            run_id=clean_run,
+            role=role,
+            command=command,
+            reason=reason,
+        )
+        if routed is not None:
+            raise AgentTerminalPolicyError(
+                f"Smart-routed to scoped task {routed.get('task_id')} "
+                f"({routed.get('target_role')}); use axon-agent-terminal-job on assignment"
+            )
         raise AgentTerminalPolicyError(reason)
     append_run_execution_receipt(
         clean_run,

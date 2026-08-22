@@ -18,6 +18,7 @@ import OperatorSettingsSurface from './components/settings/OperatorSettingsSurfa
 import ScanHierarchyPreview from './dev/ScanHierarchyPreview.vue';
 import { useAppSurface } from './composables/useAppSurface';
 import { startLiveEventsSession } from './lib/live-events-session';
+import { loadRecoveryCenter } from './features/recovery-center/recovery-overlay-state';
 import { useIdeLayoutShortcuts } from './composables/useIdeLayoutShortcuts';
 import { useIdeKairoInterrupt } from './composables/useIdeKairoInterrupt';
 import { useVoiceDeckOnBoot } from './features/voice-deck/use-voice-deck';
@@ -25,6 +26,7 @@ import { useVoiceCockpitPresence } from './features/voice-deck/use-voice-cockpit
 import { useKairoAppVoice } from './features/kairo-conversation/use-kairo-app-voice';
 import MobileVoiceCockpitStrip from './components/shell/MobileVoiceCockpitStrip.vue';
 import VoiceOrbHost from './features/brain-galaxy/VoiceOrbHost.vue';
+import RecoveryCenterPanel from './components/shell/RecoveryCenterPanel.vue';
 import ReportTheaterOverlay from './features/report-theater/ReportTheaterOverlay.vue';
 import './features/report-theater/report-theater.css';
 import HudHoloAtmosphere from './features/hud-holo/HudHoloAtmosphere.vue';
@@ -163,6 +165,13 @@ watch(
         }
         return shell.refreshRunSurfaces({ light: true });
       },
+      onResync: () => {
+        void loadRecoveryCenter(shell.currentWorkspace?.workspace_id);
+        if (shell.layoutMode === 'ide') {
+          return shell.loadRuntimeSummary({ background: true });
+        }
+        return shell.refreshRunSurfaces({ light: true });
+      },
       onPresenceRefresh: () => {
         if (shell.layoutMode === 'ide') {
           return;
@@ -172,6 +181,7 @@ watch(
       onSpokenBriefing: () => shell.speakOperatorBriefing(),
       onSpokenLine: (event) => shell.speakSpokenLine(event),
     });
+    void loadRecoveryCenter(shell.currentWorkspace?.workspace_id);
   },
   { immediate: true },
 );
@@ -250,6 +260,7 @@ onUnmounted(() => {
       </div>
       <VoiceOrbHost v-if="bootComplete && !isFoundationSurface" />
       <ReportTheaterOverlay v-if="bootComplete && !isFoundationSurface" />
+      <RecoveryCenterPanel v-if="bootComplete" />
     </template>
   </template>
 </template>

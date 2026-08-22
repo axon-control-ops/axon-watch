@@ -1,7 +1,9 @@
 /** Parse block-annotated agent transcripts (:::thinking / :::edit / :::tool / :::terminal). */
 
 import { sanitizeAgentThinkingForOperator, THINKING_SPEECH_FALLBACK } from './agent-live-line-view';
+import { tryParseClarifyingMarkdown } from './agent-question-view';
 import { tryParseLegacyLeadFanOutText } from './lead-fan-out-card';
+import { looksLikeLeadCheckinReport } from './lead-checkin-card';
 import { looksLikeLeadStandupReport } from './lead-standup-card';
 
 export type {
@@ -33,9 +35,17 @@ export function agentContentHasTranscriptBlocks(content: string): boolean {
   ) {
     return true;
   }
+  // Some runtimes and mobile clients emit a plain question plus numbered
+  // options instead of an :::ask fence. The parser already upgrades that
+  // shape; surface it through the same interactive card rendering path.
+  if (tryParseClarifyingMarkdown(content)) {
+    return true;
+  }
   // Legacy Lead essays (pre-fence) still get the cinematic fan-out / stand-up cards.
   return (
-    tryParseLegacyLeadFanOutText(content) != null || looksLikeLeadStandupReport(content)
+    tryParseLegacyLeadFanOutText(content) != null ||
+    looksLikeLeadStandupReport(content) ||
+    looksLikeLeadCheckinReport(content)
   );
 }
 

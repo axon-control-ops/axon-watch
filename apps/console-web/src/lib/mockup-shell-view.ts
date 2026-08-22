@@ -193,12 +193,17 @@ export function runPhaseProgress(phase: RunRecord['phase'] | null | undefined): 
   }
 }
 
-export function runPhaseTag(phase: RunRecord['phase'] | 'idle' | null | undefined): string {
+export function runPhaseTag(
+  phase: RunRecord['phase'] | 'idle' | 'recovery_required' | null | undefined,
+): string {
   if (!phase || phase === 'idle') {
     return 'IDLE';
   }
   if (phase === 'executing') {
     return 'EXECUTE';
+  }
+  if (phase === 'recovery_required') {
+    return 'RECOVERY';
   }
   return phase.replace(/_/g, ' ').toUpperCase();
 }
@@ -363,6 +368,7 @@ export function buildStatusBarZones(input: {
   layoutMode?: 'operator' | 'ide';
   idePresenceProfile?: IdePresenceProfile;
   activeSignalCount?: number | null;
+  attentionCount?: number | null;
 }): StatusBarZones {
   if (!input.runtimeSummary) {
     if (input.runtimeSummaryLoadState === 'loading') {
@@ -384,7 +390,9 @@ export function buildStatusBarZones(input: {
   const watchConnected = summary.watch.connected;
   const watchStatus = summary.watch.status.toUpperCase();
   const openSignals = input.activeSignalCount ?? summary.signals.open_count;
-  const phase = input.primaryActiveRun?.phase ?? 'idle';
+  const attentionCount = input.attentionCount ?? 0;
+  const phase = input.primaryActiveRun?.phase
+    ?? (attentionCount > 0 ? 'recovery_required' : 'idle');
   const workspaceLabel = input.workspaceId ?? 'no workspace';
   const layoutMode = input.layoutMode ?? 'operator';
   const ideProfile = input.idePresenceProfile ?? 'quiet';
@@ -412,7 +420,18 @@ export function buildStatusBarZones(input: {
 
   const center: StatusBarZoneItem[] = [];
   if (showOpsTelemetry) {
-    center.push({ id: 'phase', label: `RUN PHASE: ${runPhaseTag(phase)}`, tone: 'brand' });
+    center.push({
+      id: 'phase',
+      label: `RUN PHASE: ${runPhaseTag(phase)}`,
+      tone: attentionCount > 0 && !input.primaryActiveRun ? 'warning' : 'brand',
+    });
+    if (attentionCount > 0) {
+      center.push({
+        id: 'attention',
+        label: `ATTENTION ${attentionCount}`,
+        tone: 'warning',
+      });
+    }
     center.push({
       id: 'signals',
       label: `SIGNALS: ${openSignals} ACTIVE`,

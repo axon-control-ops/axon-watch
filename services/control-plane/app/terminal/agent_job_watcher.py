@@ -214,6 +214,18 @@ def start_job_watcher(
                 )
             mark_job_finished(job_id, status=status, exit_code=exit_code, note=note)
         release_job_watcher(job_id)
+        try:
+            from app.terminal.agent_job_registry import get_agent_terminal_job
+            from app.terminal.agent_job_session_queue import notify_session_job_finished
+
+            live = get_agent_terminal_job(job_id)
+            if live is not None:
+                notify_session_job_finished(
+                    workspace_id=str(live.get("workspace_id") or ""),
+                    session_id=str(live.get("session_id") or ""),
+                )
+        except Exception:  # noqa: BLE001 — queue drain must not block job finish
+            pass
         if chat_target is not None:
             from app.chat.chat_stream_defer import release_deferred_chat_stream_if_idle
 

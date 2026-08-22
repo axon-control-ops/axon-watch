@@ -86,7 +86,7 @@ _ROLE_CAPABILITY_ORDER: dict[str, tuple[str, ...]] = {
     "live_ops_scoped": ("backend", "integrations", "lead"),
     "ship_shell_no_task": ("integrations", "lead"),
     "document_scope": ("frontend", "lead", "backend"),
-    "terminal_scope": ("frontend", "backend", "integrations", "lead"),
+    "terminal_scope": ("integrations", "backend", "frontend", "lead"),
 }
 
 
@@ -121,6 +121,10 @@ def _capability_kind(*, blob: str, command: str) -> str:
 def _pick_target_role(*, source_role: str, capability: str) -> str:
     order = _ROLE_CAPABILITY_ORDER.get(capability, ("backend", "integrations", "lead"))
     normalized = str(source_role or "").strip().lower()
+    # A capability follow-up assigned back to the same Lead recreates the
+    # denied run and can loop indefinitely. Pick a non-Lead owner instead.
+    if normalized == "lead":
+        return next((role for role in order if role != "lead"), "integrations")
     if normalized in order:
         return normalized
     return order[0]
@@ -299,6 +303,17 @@ def try_route_capability_handoff(
         return None
 
     capability = _capability_kind(blob=blob, command=command)
+    if capability == "terminal_scope" and str((source_run or {}).get("task_id") or "").strip():
+        # A specialist already executing a scoped task must adapt the command
+        # or report the scope defect. Creating another ticket from inside that
+        # run duplicates ownership and can route the work back to the same
+        # person. Ops/ship/document handoffs remain eligible above this guard.
+        logger.warning(
+            "capability route suppressed for already-scoped run=%s task=%s",
+            cleaned_run,
+            source_run.get("task_id"),
+        )
+        return None
     target_role = _pick_target_role(source_role=source_role, capability=capability)
     goal, commands = _extract_goal_and_commands(
         reply_text=reply_text,

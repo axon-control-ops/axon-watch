@@ -37,7 +37,8 @@
         "SUPABASE_ACCESS_TOKEN"
       ],
       "live_verify_command_prefixes": [
-        ["npx", "supabase", "migration", "list", "--linked"]
+        ["npx", "supabase", "migration", "list", "--linked"],
+        ["npx", "--no-install", "tsx", "services/ops/fix-mebelo-email-password.ts"]
       ],
       "live_roles": ["backend", "integrations", "watcher"],
       "network_mode_for_live_roles": "audited"

@@ -341,15 +341,25 @@ async function startChat(employee: CompanyEmployeeRecord, kind: TeamMemberChatKi
   speakEmployeeLine(employee, kind);
 }
 
-function openSurface(surface: TeamMemberSurfaceAction): void {
-  if (shell.layoutMode !== 'ide') {
-    shell.setLayoutMode('ide');
-  }
+function openSurface(surface: TeamMemberSurfaceAction, employee: CompanyEmployeeRecord): void {
   if (surface === 'attention') {
+    if (shell.layoutMode !== 'ide') {
+      shell.setLayoutMode('ide');
+    }
     shell.focusAttentionSidebar();
     return;
   }
-  shell.focusKairoBriefing();
+  // A Lead's "Briefing" means status on *this* Lead's own work -- done, still
+  // to do, blockers -- not the general VAXON conversational briefing panel.
+  // The workspace detail overlay already builds exactly that (overview, next
+  // actions, full log) from the same workspace this Lead runs. It only
+  // mounts inside Operator Mission Control's fleet health grid, so land
+  // there first or the overlay has nothing to render into.
+  if (shell.layoutMode !== 'operator') {
+    shell.setLayoutMode('operator');
+  }
+  shell.setOperatorCenterView('mission');
+  shell.openWorkspaceDetail(employee.workspace_id || currentWorkspaceId.value || '');
 }
 
 function onQuickAction(employee: CompanyEmployeeRecord, action: TeamMemberQuickAction): void {
@@ -359,7 +369,7 @@ function onQuickAction(employee: CompanyEmployeeRecord, action: TeamMemberQuickA
   }
   if (action.kind === 'surface' && action.surface) {
     selectEmployee(employee);
-    openSurface(action.surface);
+    openSurface(action.surface, employee);
     return;
   }
   if (action.chatKind) {

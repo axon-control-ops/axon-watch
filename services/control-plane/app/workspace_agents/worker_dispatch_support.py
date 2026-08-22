@@ -18,6 +18,7 @@ from app.workspace_agents.verification_execution import (
     is_verification_task,
     resolve_verification_baseline,
     resolve_verification_command,
+    select_verification_commands,
     verification_commands_for_task,
 )
 from app.workspace_agents.worker_isolation import (
@@ -29,21 +30,39 @@ logger = logging.getLogger(__name__)
 
 _active_run_ids: set[str] = set()
 _active_run_ids_lock = threading.Lock()
+_active_task_ids: dict[str, str] = {}
 # Runs whose cwd is the durable composer Sandbox — must not be torn down as worker isolation.
 _sandbox_borrowed_run_ids: set[str] = set()
 
 
-def claim_worker_dispatch(run_id: str) -> bool:
+def claim_worker_dispatch(run_id: str, task_id: str = "") -> bool:
+    from app.platform_recovery.dispatch_guard import DuplicateDispatchError, assert_dispatch_allowed
+
     with _active_run_ids_lock:
+        try:
+            assert_dispatch_allowed(
+                task_id=task_id or None,
+                run_id=run_id,
+                active_run_ids=_active_run_ids,
+                active_task_ids=_active_task_ids,
+            )
+        except DuplicateDispatchError:
+            return False
         if run_id in _active_run_ids:
             return False
         _active_run_ids.add(run_id)
+        cleaned_task = str(task_id or "").strip()
+        if cleaned_task:
+            _active_task_ids[cleaned_task] = run_id
         return True
 
 
 def release_worker_dispatch(run_id: str) -> None:
     with _active_run_ids_lock:
         _active_run_ids.discard(run_id)
+        stale = [task_id for task_id, owner in _active_task_ids.items() if owner == run_id]
+        for task_id in stale:
+            _active_task_ids.pop(task_id, None)
 
 
 def fail_worker_run(run_id: str, *, receipt_summary: str) -> dict[str, Any] | None:
@@ -175,6 +194,7 @@ def enqueue_verification_terminal_jobs(
     if not is_verification_task(task):
         return
     commands = verification_commands_for_task(task)
+    commands = select_verification_commands(commands, limit=3)
     if not commands:
         logger.info("verification shift %s has no extracted verify commands", run_id)
         return
@@ -191,7 +211,7 @@ def enqueue_verification_terminal_jobs(
             job_target = TARGET_SANDBOX
     except Exception:  # noqa: BLE001 — fall back to bound root
         pass
-    for command in commands[:3]:
+    for command in commands:
         runnable, note = resolve_verification_command(command, workspace_root)
         if runnable is None:
             # Running a command against a path that does not exist only burns a

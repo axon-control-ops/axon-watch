@@ -13,6 +13,7 @@ import {
   fetchWorkspaceFiles,
   markRunReviewReady,
   createWorkspaceChatThread,
+  deleteChatThread,
   fetchWorkspaceChatThreads,
   uploadChatAttachment,
   postChatMessage,
@@ -1173,6 +1174,73 @@ export const useShellStore = defineStore('shell', () => {
     }
   }
 
+  /** Permanently delete a chat thread (history + messages), then focus a neighbor or new chat. */
+  async function deleteIdeThread(threadId: string): Promise<boolean> {
+    const workspaceId = currentWorkspace.value?.workspace_id;
+    const cleaned = threadId.trim();
+    if (!workspaceId || !cleaned) {
+      return false;
+    }
+
+    try {
+      await deleteChatThread(cleaned);
+    } catch (error) {
+      commandMutationError.value =
+        error instanceof Error ? error.message : 'Failed to delete chat';
+      return false;
+    }
+
+    const remaining = (ideThreadsByWorkspaceId.value[workspaceId] ?? []).filter(
+      (thread) => thread.thread_id !== cleaned,
+    );
+    ideThreadsByWorkspaceId.value = {
+      ...ideThreadsByWorkspaceId.value,
+      [workspaceId]: remaining,
+    };
+
+    disconnectChatStreamSession(cleaned);
+    setWorkspaceStreamUi(cleaned, {
+      active: false,
+      messageId: null,
+      activity: null,
+      ideAgentRunId: null,
+    });
+    const nextCache = { ...workspaceIdeThreadMessagesById.value };
+    delete nextCache[cleaned];
+    workspaceIdeThreadMessagesById.value = nextCache;
+    persistIdeComposerDraft(workspaceId, '', cleaned);
+
+    const currentOpen = openIdeThreadIdsByWorkspaceId.value[workspaceId] ?? [];
+    const wasActive = activeIdeThreadId.value === cleaned;
+    const nextOpen = currentOpen.filter((id) => id !== cleaned);
+    persistOpenIdeThreadTabs(workspaceId, nextOpen);
+
+    if (!wasActive) {
+      return true;
+    }
+
+    const nextActive =
+      resolveIdeThreadTabAfterClose({
+        openIds: currentOpen.length ? currentOpen : remaining.map((thread) => thread.thread_id),
+        closedId: cleaned,
+        activeId: cleaned,
+      }) ??
+      remaining[0]?.thread_id ??
+      null;
+
+    if (nextActive) {
+      if (!nextOpen.includes(nextActive)) {
+        persistOpenIdeThreadTabs(workspaceId, openIdeThreadTab(nextOpen, nextActive));
+      }
+      await selectIdeThread(nextActive);
+      return true;
+    }
+
+    clearWorkspaceSurfaceThreadId(workspaceId, 'ide');
+    const created = await createIdeThread();
+    return created != null;
+  }
+
   const workspaceThreadLoadQueue = createWorkspaceThreadLoadQueue();
   const ideThreadsLoadPromises = new Map<string, Promise<void>>();
   const ideChatHydratePromises = new Map<string, Promise<void>>();
@@ -2189,7 +2257,6 @@ export const useShellStore = defineStore('shell', () => {
     const askRewrite = rewriteComposerAskOptionAnswer(content, threadMessages.value);
     if (askRewrite) {
       content = askRewrite.content;
-      markQuestionAnswered(askRewrite.ask.messageId, askRewrite.ask.prompt);
     }
     const blockedReason = composerSubmitBlockReason(workspaceId, content, commandMutationState.value, agentStreamActive.value);
     if (blockedReason) {
@@ -2275,6 +2342,9 @@ export const useShellStore = defineStore('shell', () => {
         response.messages.map((message) => mapChatMessageRecord(message)),
       );
       threadMessages.value = filterThreadMessagesForSurface(merged, 'ide');
+      if (askRewrite) {
+        markQuestionAnswered(askRewrite.ask.messageId, askRewrite.ask.prompt);
+      }
       if (options.clearDraftOnSuccess !== false) {
         ideComposerDraft.value = '';
         // Persist synchronously: a force-refresh can cancel the debounced watcher
@@ -4000,6 +4070,7 @@ export const useShellStore = defineStore('shell', () => {
     rehydrateWorkspaceIdeStreams,
     selectIdeThread,
     closeIdeThreadTab,
+    deleteIdeThread,
     loadTerminalSessions,
     setActiveTerminalSession,
     createTerminalSession,

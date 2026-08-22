@@ -196,6 +196,7 @@ export type OperatorCenterView =
   | 'attention'
   | 'dispatch'
   | 'vaxon'
+  | 'email'
   | 'graph';
 
 /** @deprecated Legacy session value — maps to `mission`. */
@@ -208,6 +209,7 @@ const OPERATOR_CENTER_VIEWS: ReadonlySet<OperatorCenterView> = new Set([
   'attention',
   'dispatch',
   'vaxon',
+  'email',
   'graph',
 ]);
 
@@ -224,6 +226,9 @@ export function normalizeOperatorCenterView(raw: string | null | undefined): Ope
   }
   if (value === 'vaxon') {
     return 'vaxon';
+  }
+  if (value === 'email') {
+    return 'email';
   }
   // `grid` and unknown values default to the Mission Control tab.
   return 'mission';

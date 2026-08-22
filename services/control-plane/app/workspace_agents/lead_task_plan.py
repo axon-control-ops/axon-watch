@@ -52,6 +52,14 @@ _PATH_RE = re.compile(
     r"(?:^|[\s`\"'(])((?:app|apps|components|features|hooks|lib|locales|screens|services|packages|docs|tests|src)/[\w./\-]+)",
     re.I,
 )
+_GIT_POLICY_ROUTE_RE = re.compile(
+    r"\b(?:\.gitignore|project\.axon\.yaml|deny[- ]?list|delivery[- ]?gate|"
+    r"git privacy|privacy controls?)\b",
+    re.I,
+)
+_ROOT_GITIGNORE_RE = re.compile(r"(?<![/\w.-])\.gitignore(?![\w.-])", re.I)
+_PROJECT_AXON_RE = re.compile(r"(?<![/\w.-])project\.axon\.yaml(?![\w.-])", re.I)
+_EXPORTS_GITIGNORE_RE = re.compile(r"(?<![\w.-])data/exports/\.gitignore(?![\w.-])", re.I)
 
 _ROLE_FOCUS: dict[str, str] = {
     "frontend": "UI/screen/component",
@@ -144,6 +152,17 @@ def extract_exclusive_paths(text: str) -> list[str]:
         if key and key not in seen:
             seen.add(key)
             found.append(path)
+    # Root/dot policy files are not covered by the directory-only matcher. Add
+    # only paths the operator named; a generic privacy goal must not widen scope.
+    raw = str(text or "")
+    for matcher, path in (
+        (_EXPORTS_GITIGNORE_RE, "data/exports/.gitignore"),
+        (_ROOT_GITIGNORE_RE, ".gitignore"),
+        (_PROJECT_AXON_RE, "project.axon.yaml"),
+    ):
+        if matcher.search(raw) and path.lower() not in seen:
+            seen.add(path.lower())
+            found.append(path)
     return found
 
 
@@ -195,6 +214,12 @@ def _score_specialists(
 def _best_owner_role(goal: str, specialists: list[LeadPlanRosterMember]) -> str:
     if not specialists:
         return "backend"
+    # Repository policy and delivery-gate changes are integrations work, not
+    # frontend UI work.  This avoids a frontend worker producing partial
+    # ignore files while being unable to touch the authoritative root policy.
+    if _GIT_POLICY_ROUTE_RE.search(goal or ""):
+        if any(member.role == "integrations" for member in specialists):
+            return "integrations"
     scored = _score_specialists(goal, specialists)
     best_score, best_role = scored[0][1], scored[0][0].role
     if best_score > 0:

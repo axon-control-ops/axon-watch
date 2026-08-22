@@ -8,6 +8,7 @@ const {
   actionTone,
   saving,
   testingKey,
+  testResults,
   form,
   workspaces,
   accounts,
@@ -127,12 +128,27 @@ const {
 
       <ul v-else class="email-settings-panel__accounts">
         <li v-for="account in accounts" :key="account.account_id" class="email-settings-panel__account">
-          <div>
+          <div class="email-settings-panel__account-main">
             <strong>{{ account.email_address }}</strong>
             <p>
               {{ account.workspace_id }} · {{ account.imap.host || '?' }} →
               {{ account.imap.folder }} · poll {{ account.monitor.poll_seconds }}s ·
               {{ accountHasSecrets(account) ? 'passwords in Vault' : 'no passwords yet' }}
+            </p>
+            <p
+              v-if="testResults[account.account_id]"
+              class="email-settings-panel__account-test"
+              :class="{
+                'email-settings-panel__account-test--ok': testResults[account.account_id].tone === 'ok',
+                'email-settings-panel__account-test--error':
+                  testResults[account.account_id].tone === 'error',
+                'email-settings-panel__account-test--pending':
+                  testResults[account.account_id].tone === 'pending',
+              }"
+              role="status"
+              aria-live="polite"
+            >
+              {{ testResults[account.account_id].message }}
             </p>
           </div>
           <div class="email-settings-panel__account-actions">

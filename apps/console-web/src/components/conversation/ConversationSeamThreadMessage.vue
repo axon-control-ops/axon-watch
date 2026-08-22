@@ -385,7 +385,8 @@ const onCancelAgentTerminalJob = (jobId: string): void => void cancelAgentTermin
           segment.kind === 'question' ||
           segment.kind === 'research' ||
           segment.kind === 'lead-fan-out' ||
-          segment.kind === 'lead-standup'
+          segment.kind === 'lead-standup' ||
+          segment.kind === 'lead-checkin'
         "
         :segment="segment"
         :workspace-id="shell.currentWorkspace?.workspace_id ?? null"
@@ -393,13 +394,14 @@ const onCancelAgentTerminalJob = (jobId: string): void => void cancelAgentTermin
           segment.kind !== 'plan' &&
           segment.kind !== 'lead-fan-out' &&
           segment.kind !== 'lead-standup' &&
+          segment.kind !== 'lead-checkin' &&
           segment.open &&
           isStreamingMessage(message.message_id)
         "
         :message-id="message.message_id"
         :segment-index="segmentIndex"
         :answered-option="
-          segment.kind === 'question'
+          segment.kind === 'question' || segment.kind === 'lead-checkin'
             ? answeredOptionForQuestion(
               message.message_id,
               segment.prompt,

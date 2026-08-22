@@ -56,6 +56,25 @@ describe('agent question view', () => {
     expect(segments.some((segment) => segment.kind === 'question')).toBe(true);
   });
 
+  it('upgrades an explicit numbered question without a reply-with hint', () => {
+    const text = [
+      'What should the Young Eagles workspace fleet run for this validation plan?',
+      '',
+      '1. Check graduation groups only',
+      '2. Check confirmed and unallocated children',
+      '3. Cross-check all synced systems',
+      '4. All of the above',
+    ].join('\n');
+
+    const parsed = tryParseClarifyingMarkdown(text);
+
+    expect(parsed?.prompt).toBe(
+      'What should the Young Eagles workspace fleet run for this validation plan?',
+    );
+    expect(parsed?.options).toHaveLength(4);
+    expect(parsed?.options[3]).toEqual({ id: '4', label: 'All of the above' });
+  });
+
   it('parses pipe options and formats answers with id and label', () => {
     expect(
       parseAskOptions(['- 1 | Alpha', '- 2 | Beta']),

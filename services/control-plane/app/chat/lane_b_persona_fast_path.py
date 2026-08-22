@@ -2,10 +2,28 @@
 
 from __future__ import annotations
 
+import re
 from typing import Any, Callable
 
 from app.kairo_conversation_reply import compose_smalltalk_reply
 from app.operator_persona_stt_aliases import normalize_persona_stt_aliases
+
+
+def build_ambiguous_reply_guard(content: str) -> str | None:
+    """Fail closed for a bare option number sent through the free-text composer.
+
+    Option selections are only authoritative when the UI submits the option-card
+    event with its question id.  Treating a free-text ``"2"`` as a selection can
+    bind it to an old question and cause an invented handoff.
+    """
+    if re.fullmatch(r"[1-9]", str(content or "").strip()) is None:
+        return None
+    return (
+        "I did not treat that number as a task decision because this composer "
+        "message is not tied to a specific decision card. Please select the option "
+        "on its card, or send the full action in words. No task, handoff, command, "
+        "or file change was created."
+    )
 
 
 def build_lane_b_persona_reply(

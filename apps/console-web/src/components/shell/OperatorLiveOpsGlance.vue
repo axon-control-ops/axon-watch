@@ -1,8 +1,14 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 
+import type { InboxItem } from '../../contracts/canonical';
 import { useMcVaxonPresence } from '../../composables/use-mc-vaxon-presence';
 import { useShellStore } from '../../stores/shell';
+import {
+  dismissReplySuggestion,
+  isReplySuggestionDismissed,
+} from '../../lib/email-reply-dismiss-state';
+import EmailReplyAction from './EmailReplyAction.vue';
 import McVaxonHeroBlock from './McVaxonHeroBlock.vue';
 import MissionControlMachineCeoStrip from './MissionControlMachineCeoStrip.vue';
 
@@ -11,6 +17,27 @@ const isVaxonTab = computed(() => shell.operatorCenterView === 'vaxon');
 
 const { autonomyMode, fullAutonomyActive, liveBadge, modeChip, streamItems } =
   useMcVaxonPresence();
+
+// Visible from every Operator tab, not just Email -- a suggested reply is
+// something to act on or dismiss regardless of which tab the operator is
+// currently looking at.
+const pendingSuggestedReplies = computed<InboxItem[]>(() =>
+  shell.inboxItems.filter(
+    (item) =>
+      item.source === 'email' &&
+      String(item.meta?.suggested_reply_body ?? '').trim() &&
+      !isReplySuggestionDismissed(item.signal_id),
+  ),
+);
+
+function workspaceLabel(workspaceId: string): string {
+  const record = shell.workspaces.find((ws) => ws.workspace_id === workspaceId);
+  return record?.display_name?.trim() || workspaceId;
+}
+
+function subjectFor(item: InboxItem): string {
+  return String(item.meta?.subject ?? '').trim() || item.title;
+}
 </script>
 
 <template>
@@ -32,6 +59,41 @@ const { autonomyMode, fullAutonomyActive, liveBadge, modeChip, streamItems } =
     </header>
 
     <MissionControlMachineCeoStrip />
+
+    <section
+      v-if="pendingSuggestedReplies.length > 0"
+      class="operator-live-ops-glance__replies"
+      aria-label="Suggested email replies"
+    >
+      <header class="operator-live-ops-glance__section-head">
+        <p class="operator-live-ops-glance__section-label">Suggested replies</p>
+        <span class="operator-live-ops-glance__section-count">{{ pendingSuggestedReplies.length }}</span>
+      </header>
+
+      <ul class="operator-live-ops-glance__replies-list">
+        <li
+          v-for="item in pendingSuggestedReplies"
+          :key="item.signal_id"
+          class="operator-live-ops-glance__reply-card"
+        >
+          <div class="operator-live-ops-glance__reply-head">
+            <div class="operator-live-ops-glance__reply-meta">
+              <span class="operator-live-ops-glance__reply-workspace">{{ workspaceLabel(item.workspace_id) }}</span>
+              <span class="operator-live-ops-glance__reply-subject">{{ subjectFor(item) }}</span>
+            </div>
+            <button
+              type="button"
+              class="operator-live-ops-glance__reply-dismiss"
+              title="Dismiss this suggested reply"
+              @click="dismissReplySuggestion(item.signal_id)"
+            >
+              Dismiss
+            </button>
+          </div>
+          <EmailReplyAction :workspace-id="item.workspace_id" :meta="item.meta" />
+        </li>
+      </ul>
+    </section>
 
     <section
       v-if="isVaxonTab"
@@ -103,6 +165,81 @@ const { autonomyMode, fullAutonomyActive, liveBadge, modeChip, streamItems } =
 
 .operator-live-ops-glance--vaxon {
   gap: 0.4rem;
+}
+
+.operator-live-ops-glance__replies {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  flex: 0 1 auto;
+  max-height: 22rem;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.operator-live-ops-glance__replies-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  margin: 0;
+  padding: 0;
+}
+
+.operator-live-ops-glance__reply-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  padding: 0.45rem 0.5rem;
+  border: 1px solid rgba(72, 220, 255, 0.22);
+  border-radius: 0.42rem;
+  background: rgba(2, 14, 24, 0.78);
+}
+
+.operator-live-ops-glance__reply-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.4rem;
+}
+
+.operator-live-ops-glance__reply-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  min-width: 0;
+}
+
+.operator-live-ops-glance__reply-workspace {
+  color: rgba(140, 235, 255, 0.85);
+  font-size: 0.56rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.operator-live-ops-glance__reply-subject {
+  color: rgba(220, 240, 250, 0.95);
+  font-size: 0.68rem;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.operator-live-ops-glance__reply-dismiss {
+  flex: none;
+  border: 1px solid rgba(255, 150, 170, 0.32);
+  border-radius: 0.25rem;
+  padding: 0.2rem 0.45rem;
+  background: rgba(70, 8, 18, 0.35);
+  color: rgba(255, 170, 185, 0.92);
+  font-size: 0.6rem;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+
+.operator-live-ops-glance__reply-dismiss:hover {
+  background: rgba(90, 12, 22, 0.5);
 }
 
 .operator-live-ops-glance__vaxon-card {

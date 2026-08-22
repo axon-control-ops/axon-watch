@@ -47,10 +47,17 @@ def list_changed_paths(
         result = run(args, cwd=isolation_root)
         if result.returncode == 0:
             _append_paths(paths, result.stdout or "")
+    # Do not turn a directory-wide task allowance into a claim over every
+    # ignored file already present there. Sandboxes may bind historical report
+    # directories into the checkout, including private artifacts unrelated to
+    # the current run. Ignored deliverables must therefore be scoped by exact
+    # file path; normal tracked and unignored files are still discovered above.
     allowed = [
-        str(path).strip().lstrip("./")
+        cleaned
         for path in (include_ignored_pathspecs or [])
-        if str(path).strip().lstrip("./")
+        if (cleaned := str(path).strip().lstrip("./"))
+        and not cleaned.endswith("/")
+        and not (isolation_root / cleaned).is_dir()
     ]
     if allowed:
         result = run(

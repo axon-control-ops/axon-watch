@@ -18,6 +18,8 @@ from app.delivery.store import delivery_summary, list_receipts
 from app.events.store import list_events
 from app.events.stream import watch_events_stream_response
 from app.internal_auth import InternalServiceTokenMiddleware
+from app.signals.email_folders import fetch_role_messages, list_account_folders
+from app.signals.email_imap_poll import load_operator_email_projection
 from app.signals.inbox_assembly import include_summary_degraded_signal
 from app.signals.store import get_inbox_snapshot
 from app.tunnel.tunnel_control import (
@@ -248,8 +250,36 @@ def sentry_probe_write() -> dict[str, object]:
 
 
 @app.get("/internal/watch/inbox")
-def inbox() -> dict[str, object]:
-    return get_inbox_snapshot(connector_records=probe_all_connectors())
+def inbox(force: bool = False) -> dict[str, object]:
+    return get_inbox_snapshot(
+        connector_records=probe_all_connectors(),
+        force_email_refresh=force,
+    )
+
+
+def _find_account(account_id: str) -> dict[str, object] | None:
+    projection = load_operator_email_projection()
+    for account in projection.get("accounts") or []:
+        if isinstance(account, dict) and str(account.get("account_id") or "") == account_id:
+            return account
+    return None
+
+
+@app.get("/internal/watch/email/folders")
+def email_folders(account_id: str) -> dict[str, object]:
+    account = _find_account(account_id)
+    if account is None:
+        raise HTTPException(status_code=404, detail=f"unknown account_id: {account_id}")
+    return {"account_id": account_id, "folders": list_account_folders(account)}
+
+
+@app.get("/internal/watch/email/messages")
+def email_messages(account_id: str, role: str = "inbox", limit: int = 25) -> dict[str, object]:
+    account = _find_account(account_id)
+    if account is None:
+        raise HTTPException(status_code=404, detail=f"unknown account_id: {account_id}")
+    messages = fetch_role_messages(account, role, limit=limit)
+    return {"account_id": account_id, "role": role, "items": messages, "count": len(messages)}
 
 
 @app.get("/internal/watch/vault/status")

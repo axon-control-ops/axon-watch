@@ -388,6 +388,133 @@ class NoReplySenderTests(unittest.TestCase):
         self.assertIsNotNone(item)
         self.assertTrue(item["meta"]["suggested_reply_body"])
 
+    def test_suggested_reply_matches_the_full_text_classification_past_280_chars(self) -> None:
+        # Regression: email_inbox_item used to hand suggest_email_reply the
+        # already-truncated 280-char analysis["snippet"] (not the original
+        # body), which re-ran analyze_email_message a second time on that
+        # shorter text and could reach a *different* recommended_action than
+        # the one already computed from the full email -- silently
+        # overriding it in meta, and quoting a sentence fragment truncated
+        # mid-word. This body's actionable request starts well past the
+        # 280-char mark, so the bug reliably reproduces here.
+        padding = "Good day, I hope this email finds you well. " * 6
+        text = (
+            f"{padding}"
+            "Please send us the batch number for the product quoted "
+            "so we can confirm it is the exact item requested by Friday."
+        )
+        self.assertGreater(len(text), 280)
+        analysis = self.analyze_email_message(
+            {
+                "subject": "Re: Quotation follow-up",
+                "from": '"Visser, Mathilda" <visser@example.gov>',
+                "text": text,
+                "message_id": "<visser-1@example.gov>",
+            }
+        )
+        self.assertEqual(analysis["recommended_action"], "capture_follow_up")
+        item = self.email_signal.email_inbox_item(analysis, workspace_id="workspace_tps")
+        self.assertIsNotNone(item)
+        # The bug's symptom: meta ends up "monitor_email" (or a reply quoting
+        # a mid-word fragment) despite the full-text analysis above already
+        # correctly reaching "capture_follow_up".
+        self.assertEqual(item["meta"]["recommended_action"], "capture_follow_up")
+        self.assertIn("batch number", item["meta"]["suggested_reply_body"])
+        self.assertTrue(item["meta"]["suggested_reply_body"].startswith("Hi Mathilda,"))
+        self.assertNotIn("Axon operator", item["meta"]["suggested_reply_body"])
+
+    def test_suggested_reply_for_batch_number_is_sender_facing(self) -> None:
+        text = (
+            "Good day,\n\n"
+            "Kindly provide us with the batch number for the product quoted, namely "
+            "the MNT240XED Magnetic Name Tag, in order for us to verify that it is the exact item.\n\n"
+            "________________________________\n"
+            "From: info@thapelosego.co.za <info@thapelosego.co.za>\n"
+            "Sent: Thursday, 20 August\n"
+            "Please note that a batch number is a unique identification code.\n"
+            "Please send it to both my emails addresses as listed below "
+            "Visser.Ma@dbe.gov.za VisserMathilda.dbe@hotmail.com\n"
+        )
+        analysis = self.analyze_email_message(
+            {
+                "subject": (
+                    "Re: RFQ26052 — Quotation Submission: MNT240XED Magnetic Name Tags "
+                    "(9 000 units) — THAPELOSEGO"
+                ),
+                "from": '"Visser, Mathilda" <Visser.Ma@dbe.gov.za>',
+                "text": text,
+                "message_id": "<visser-batch@example.gov>",
+            }
+        )
+        item = self.email_signal.email_inbox_item(analysis, workspace_id="workspace_tps")
+        self.assertIsNotNone(item)
+        body = item["meta"]["suggested_reply_body"]
+        self.assertTrue(body.startswith("Hi Mathilda,"))
+        self.assertIn("MNT240XED Magnetic Name Tag", body)
+        self.assertIn("batch number", body)
+        self.assertNotIn("Please note that a batch number", body)
+        self.assertNotIn("Please send it to both my emails", body)
+        self.assertNotIn("Timing noted", body)
+        self.assertNotIn("Axon operator", body)
+
+    def test_action_extraction_ignores_quoted_history_and_disclaimer_footers(self) -> None:
+        # Regression: a real government-sender email whose own IT disclaimer
+        # footer ("Please be advised that... email servers are currently
+        # experiencing technical difficulties") contains the word "please"
+        # like any real request does. Before this fix, that boilerplate line
+        # was picked up as an action_request/due_marker ahead of the sender's
+        # actual ask, so the drafted reply answered the disclaimer instead of
+        # the real message -- and a quoted "Sent: Thursday, 20 August" header
+        # from a forwarded thread was read as a due date the sender gave us.
+        text = (
+            "Good Day, "
+            "Following a comprehensive evaluation process, we are pleased to advise that your "
+            "quotation has been accepted. Please proceed with delivery of the 9 000 units by 2026-08-28. "
+            "________________________________ "
+            "IMPORTANT NOTICE - EMAIL COMMUNICATION Please be advised that the Department's official "
+            "email servers are currently experiencing technical difficulties."
+        )
+        analysis = self.analyze_email_message(
+            {
+                "subject": "RE: Official appointment / order confirmation",
+                "from": '"Visser, Mathilda" <visser@example.gov>',
+                "text": text,
+                "message_id": "<visser-2@example.gov>",
+            }
+        )
+        self.assertEqual(analysis["recommended_action"], "capture_follow_up")
+        self.assertEqual(len(analysis["action_requests"]), 1)
+        self.assertIn("proceed with delivery", analysis["action_requests"][0])
+        self.assertNotIn("technical difficulties", " ".join(analysis["action_requests"]))
+        self.assertEqual(analysis["due_markers"], ["2026-08-28"])
+
+    def test_action_extraction_drops_all_caps_section_headers(self) -> None:
+        # Regression: a standalone ALL-CAPS section header ("REQUIRED
+        # DOCUMENTATION") sits on its own line in the source email, but
+        # whitespace-collapsing (needed to find sentences at all) erases
+        # that line break, gluing the header onto the next real sentence --
+        # so the extracted action request read "REQUIRED DOCUMENTATION
+        # Furthermore, kindly ensure..." instead of just the sentence.
+        text = (
+            "Good day,\n\n"
+            "DELIVERY SCHEDULE\n\n"
+            "You are kindly requested to confirm your delivery schedule for Monday.\n\n"
+            "REQUIRED DOCUMENTATION\n\n"
+            "Furthermore, kindly ensure that the attached form is signed and returned."
+        )
+        analysis = self.analyze_email_message(
+            {
+                "subject": "Order confirmation",
+                "from": '"Visser, Mathilda" <visser@example.gov>',
+                "text": text,
+                "message_id": "<visser-3@example.gov>",
+            }
+        )
+        joined = " ".join(analysis["action_requests"])
+        self.assertNotIn("DELIVERY SCHEDULE", joined)
+        self.assertNotIn("REQUIRED DOCUMENTATION", joined)
+        self.assertIn("Furthermore, kindly ensure", joined)
+
     def test_is_no_reply_sender_matches_common_shapes(self) -> None:
         for sender in (
             "GitHub <noreply@github.com>",

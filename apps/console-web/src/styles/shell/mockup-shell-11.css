@@ -220,9 +220,11 @@
   min-height: 0;
 }
 
-/* Operator Mission Control: give LIVE OPERATIONS a mockup-width rail. */
+/* Operator Mission Control: give LIVE OPERATIONS a mockup-width rail.
+   Its own variable -- must stay independent of the IDE agent dock's
+   --shell-agent-dock-width, which resizing the IDE panel also writes to. */
 .console-shell--mockup.console-shell--operator {
-  --shell-agent-dock-width: min(26rem, 32vw);
+  --shell-live-ops-width: min(26rem, 32vw);
 }
 
 /* Brain Graph: full-bleed galaxy stage. Left shell rail stays hidden
@@ -251,7 +253,7 @@
   grid-template-columns:
     minmax(14rem, var(--shell-left-sidebar-width, 340px))
     minmax(0, 1fr)
-    var(--shell-agent-dock-width, 360px);
+    var(--shell-live-ops-width, 360px);
 }
 
 .console-shell--mockup.console-shell--operator.console-shell--mission-control .region-right-dock {

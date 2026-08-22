@@ -4,7 +4,7 @@ import { computed, ref } from 'vue';
 import AgentDock from '../ide/AgentDock.vue';
 import OperatorLiveOpsGlance from './OperatorLiveOpsGlance.vue';
 import { useRightDockResize } from '../../composables/useRightDockResize';
-import { defaultOperatorLiveOpsGlanceWidth } from '../../lib/agent-dock-width';
+import { defaultOperatorLiveOpsGlanceWidth, LIVE_OPS_WIDTH_KEY } from '../../lib/agent-dock-width';
 import { useShellStore } from '../../stores/shell';
 
 const shell = useShellStore();
@@ -25,6 +25,8 @@ const {
 } = useRightDockResize({
   dockRef,
   resolveDefaultWidth: defaultOperatorLiveOpsGlanceWidth,
+  storageKey: LIVE_OPS_WIDTH_KEY,
+  cssVarName: '--shell-live-ops-width',
 });
 </script>
 

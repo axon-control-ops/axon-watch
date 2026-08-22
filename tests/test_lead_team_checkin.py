@@ -26,6 +26,10 @@ from app.workspace_agents.lead_team_checkin import (  # noqa: E402
     run_lead_team_checkin,
     workspace_due_for_checkin,
 )
+from app.workspace_agents.lead_checkin_report import (  # noqa: E402
+    format_lead_checkin_message,
+    humanize_lead_failure_detail,
+)
 
 
 class LeadAssignmentGuardrailTests(unittest.TestCase):
@@ -223,6 +227,29 @@ class LeadTeamCheckinTests(unittest.TestCase):
         self.assertEqual("operator_blocker", receipt["kind"])
         self.assertIn("lead", receipt["title"].lower())
         self.assertIn("must not remain stuck", receipt["detail"])
+
+
+class LeadCheckinReportTests(unittest.TestCase):
+    def test_formats_gate6_finding_with_next_steps(self) -> None:
+        findings = [
+            LeadCheckinFinding(
+                kind="failed_shift",
+                workspace_id="workspace_dashpro",
+                owner_role="frontend",
+                title="Priya (frontend) last shift failed",
+                detail=(
+                    "Lane B finalization failed: acceptance_evidence did not pass "
+                    "[Gate 6] | policy=out_of_scope [run=run_abc]"
+                ),
+                dedupe_key="failed_shift:workspace_dashpro:frontend",
+            )
+        ]
+        body = format_lead_checkin_message(findings, [])
+        self.assertIn("Lead check-in:", body)
+        self.assertIn("[failed_shift] Priya (frontend) last shift failed (→ frontend)", body)
+        self.assertIn("out of scope", humanize_lead_failure_detail(findings[0].detail).lower())
+        self.assertIn("## Next steps", body)
+        self.assertIn("Inspect Priya", body)
 
 
 if __name__ == "__main__":

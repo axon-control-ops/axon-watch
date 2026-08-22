@@ -27,7 +27,15 @@ def _release_restart_interrupted_task(record: dict[str, Any]) -> None:
 
 
 def _cancel_employee_run_on_restart(record: dict[str, Any]) -> dict[str, Any] | None:
-    """Cancel role-tagged worker runs so the scheduler can restart shifts cleanly."""
+    """Cancel role-tagged worker runs so the scheduler can restart shifts cleanly.
+
+    Checkpointed work is paused as RESUMABLE instead of cancelled.
+    """
+    from app.platform_recovery.restart import maybe_preserve_checkpointed_run
+
+    preserved = maybe_preserve_checkpointed_run(record)
+    if preserved is not None:
+        return preserved
     from app.runs.service import RunLifecycleError, RunNotFoundError, _transition_record
 
     phase = str(record.get("phase") or "").strip()
