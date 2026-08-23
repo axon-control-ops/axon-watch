@@ -46,6 +46,17 @@
       "attempt_budget": 3,
       "push_policy": "draft_pr",
       "notes": "Worker delivery opens draft PRs into development. Production web (Vercel) tracks main \u2014 merge development\u2192preview\u2192main only after CI green; production OTA/Play remain hard-gated."
+    },
+    {
+      "workspace_id": "workspace_tps",
+      "enabled": true,
+      "base_branch": "master",
+      "github_owner": "axon-control-ops",
+      "github_repo": "tps",
+      "workflow_names": [],
+      "attempt_budget": 3,
+      "push_policy": "draft_pr",
+      "notes": "Worker delivery opens private draft PRs into master. TPS currently has no configured CI workflows; verification receipts remain mandatory before publication."
     }
   ]
 }

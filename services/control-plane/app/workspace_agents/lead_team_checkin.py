@@ -18,7 +18,6 @@ from uuid import uuid4
 
 from app.persistence import chat_store, task_store
 from app.workspace_agents.config_loader import load_workspace_agent_configs
-from app.workspace_agents.failure_detail import normalize_operator_failure_detail
 from app.workspace_agents.lead_checkin_assign import (
     ASSIGN_GOAL_PREFIX,
     ATTEND_GOAL_PREFIX,
@@ -28,6 +27,7 @@ from app.workspace_agents.lead_checkin_assign import (
     assign_owner_role_for_failed_shift,
     assign_owner_role_for_monitor,
 )
+from app.workspace_agents.lead_checkin_report import format_lead_checkin_message
 from app.workspace_agents.autonomous_attention_policy import attention_finding_auto_dispatches
 from app.workspace_agents.run_outcome import latest_role_run_outcome
 
@@ -35,7 +35,7 @@ logger = logging.getLogger(__name__)
 
 DEFAULT_MIN_INTERVAL_SECONDS = 900.0
 DEFAULT_MAX_ASSIGNMENTS_PER_WORKSPACE = 2
-SKIP_OUTCOME_ROLES = frozenset({"lead", "overview_agent"})
+SKIP_OUTCOME_ROLES = frozenset({"overview_agent"})
 
 
 def _utc_now() -> datetime:
@@ -167,28 +167,6 @@ def _post_lead_checkin_message(
             employee_role="lead",
         )
     thread_id = str(thread["thread_id"])
-    lines = [
-        f"{CHECKIN_GOAL_PREFIX} scheduled team health pass.",
-        f"Findings: {len(findings)} · Assignments created: {len(assigned)}",
-        "",
-    ]
-    for index, finding in enumerate(findings[:12], start=1):
-        flag = "ESCALATE" if finding.escalate_only else f"→ {finding.owner_role}"
-        lines.append(f"{index}. [{finding.kind}] {finding.title} ({flag})")
-        if finding.detail:
-            detail = " ".join(finding.detail.split())
-            if len(detail) > 180:
-                detail = f"{detail[:179].rstrip()}…"
-            lines.append(f"   {detail}")
-    if not findings:
-        lines.append("No failed shifts or degraded third-party signals this pass.")
-    lines.extend(
-        [
-            "",
-            "Hierarchy: You → VAXON → Lead → specialist → Lead rollup → VAXON → Decide.",
-            "Confidence: 8/10",
-        ]
-    )
     message_id = f"message_system_{uuid4().hex}"
     chat_store.save_message(
         {
@@ -197,7 +175,7 @@ def _post_lead_checkin_message(
             "workspace_id": workspace_id,
             "run_id": None,
             "role": "agent",
-            "content": "\n".join(lines),
+            "content": format_lead_checkin_message(findings, assigned),
             "created_at": created_at,
         }
     )
@@ -217,18 +195,33 @@ def collect_failed_shift_findings(workspace_id: str) -> list[LeadCheckinFinding]
         outcome = latest_role_run_outcome(workspace_id, role)
         if not outcome or str(outcome.get("outcome") or "").strip().lower() != "failed":
             continue
-        detail = normalize_operator_failure_detail(str(outcome.get("detail") or ""))
-        owner_role, escalate_only = assign_owner_role_for_failed_shift(role, detail)
+        # latest_role_run_outcome already ran normalize_operator_failure_detail +
+        # truncation — re-normalizing here was redundant work on already-clean text.
+        detail = str(outcome.get("detail") or "")
+        if role == "lead":
+            owner_role, escalate_only = "watcher", True
+        else:
+            owner_role, escalate_only = assign_owner_role_for_failed_shift(role, detail)
         run_id = str(outcome.get("run_id") or "").strip() or "unknown"
         name = str(employee.name or role).strip() or role
+        # Soft key omits run_id so the same role failure does not stack Needs-you cards.
         findings.append(
             LeadCheckinFinding(
                 kind="operator_blocker" if escalate_only else "failed_shift",
                 workspace_id=workspace_id,
                 owner_role=owner_role,
                 title=f"{name} ({role}) last shift failed",
-                detail=detail or "failed shift without detail",
-                dedupe_key=f"failed_shift:{workspace_id}:{role}:{run_id}",
+                detail=(
+                    (detail or "failed shift without detail")
+                    + f" [run={run_id}]"
+                    + (
+                        " Lead roles must not remain stuck in Error; VAXON should "
+                        "triage the control-plane/runtime cause or ask the operator."
+                        if role == "lead"
+                        else ""
+                    )
+                ),
+                dedupe_key=f"failed_shift:{workspace_id}:{role}",
                 escalate_only=escalate_only,
             )
         )
@@ -416,6 +409,55 @@ def enqueue_lead_assignments(
     return created
 
 
+def escalate_operator_blockers_to_vaxon(
+    *,
+    workspace_id: str,
+    findings: list[LeadCheckinFinding],
+    max_escalations: int = 5,
+) -> list[dict[str, Any]]:
+    """Create VAXON/operator attention receipts for non-dispatchable blockers."""
+    workspace = workspace_id.strip()
+    if not workspace or max_escalations <= 0:
+        return []
+    try:
+        from app.persistence import autonomous_attention_store
+    except Exception:  # noqa: BLE001 — check-in must remain fail-open
+        logger.exception("lead check-in could not load VAXON attention store")
+        return []
+
+    escalated: list[dict[str, Any]] = []
+    for finding in findings:
+        if len(escalated) >= max(1, int(max_escalations)):
+            break
+        if not finding.escalate_only and finding.kind != "operator_blocker":
+            continue
+        dedupe_key = finding.dedupe_key
+        try:
+            if autonomous_attention_store.has_recent_dedupe_key(dedupe_key):
+                continue
+            receipt = autonomous_attention_store.append_receipt(
+                kind=finding.kind,
+                decision="escalate",
+                tier="operator_gated",
+                risk="high",
+                title=finding.title,
+                detail=finding.detail,
+                dedupe_key=dedupe_key,
+                workspace_id=workspace,
+                ask_operator=True,
+                payload={
+                    "owner_role": finding.owner_role,
+                    "source": "lead_team_checkin",
+                    "reason": "lead_or_runtime_blocker",
+                },
+            )
+        except Exception:  # noqa: BLE001 — never break the scheduler over a receipt
+            logger.exception("lead check-in VAXON escalation failed for %s", dedupe_key)
+            continue
+        escalated.append(receipt)
+    return escalated
+
+
 def run_lead_team_checkin(
     *,
     min_interval_seconds: float = DEFAULT_MIN_INTERVAL_SECONDS,
@@ -435,6 +477,7 @@ def run_lead_team_checkin(
         "skipped_cooldown": [],
         "findings": [],
         "created_tasks": [],
+        "escalated": [],
         "lead_messages": [],
     }
     for workspace_id in targets:
@@ -460,6 +503,10 @@ def run_lead_team_checkin(
             findings=findings,
             max_new_tasks=max_assignments_per_workspace,
         )
+        escalated = escalate_operator_blockers_to_vaxon(
+            workspace_id=workspace,
+            findings=findings,
+        )
         message_id = None
         if post_lead_message and (findings or assigned):
             try:
@@ -474,6 +521,7 @@ def run_lead_team_checkin(
         result["checked_workspaces"].append(workspace)
         result["findings"].extend(item.to_dict() for item in findings)
         result["created_tasks"].extend(assigned)
+        result["escalated"].extend(escalated)
         if message_id:
             result["lead_messages"].append(
                 {"workspace_id": workspace, "message_id": message_id}
@@ -493,6 +541,7 @@ __all__ = [
     "collect_watch_findings",
     "collect_workspace_findings",
     "enqueue_lead_assignments",
+    "escalate_operator_blockers_to_vaxon",
     "mark_workspace_checked_in",
     "run_lead_team_checkin",
     "workspace_due_for_checkin",

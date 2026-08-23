@@ -163,6 +163,15 @@
   color: rgba(255, 159, 0, 0.96);
 }
 
+.terminal-tabbar__action-error {
+  margin: 0;
+  padding: 0.3rem 0.55rem;
+  font-size: 0.72rem;
+  color: #ff7a7a;
+  background: rgba(255, 80, 80, 0.08);
+  border-bottom: 1px solid var(--border-glass);
+}
+
 .editor-tabbar,
 .terminal-tabbar {
   display: flex;

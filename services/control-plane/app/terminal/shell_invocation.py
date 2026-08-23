@@ -6,6 +6,8 @@ import os
 import shutil
 from pathlib import Path
 
+from app.cli_runtime.user_bin_path import runtime_path_with_user_bins
+
 _TERMINAL_DIR = Path(__file__).resolve().parent
 _ZDOTDIR = _TERMINAL_DIR / "zdotdir"
 
@@ -55,6 +57,7 @@ def build_shell_env(
     session_id: str | None = None,
 ) -> dict[str, str]:
     env = base_env.copy()
+    env["PATH"] = runtime_path_with_user_bins(env.get("PATH", ""))
     env.setdefault("TERM", "xterm-256color")
     env.setdefault("COLORTERM", "truecolor")
     env["PWD"] = workspace_root

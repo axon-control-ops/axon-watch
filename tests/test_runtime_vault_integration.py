@@ -13,6 +13,7 @@ WATCH_ROOT = Path(__file__).resolve().parents[1] / "services" / "axon-watch"
 sys.path.insert(0, str(CONTROL_PLANE_ROOT))
 
 from app.cli_runtime import catalog, vault_keys  # noqa: E402
+from app.cli_runtime.auth_probes import codex_auth_status  # noqa: E402
 
 
 class RuntimeVaultIntegrationTests(unittest.TestCase):
@@ -106,6 +107,32 @@ class RuntimeVaultIntegrationTests(unittest.TestCase):
             ):
                 merged = vault_keys.runtime_subprocess_env(force_refresh=True)
         self.assertEqual("from-process", merged["CURSOR_API_KEY"])
+
+    def test_runtime_subprocess_env_includes_supabase_access_token_from_vault(self) -> None:
+        with patch(
+            "app.cli_runtime.vault_keys.runtime_vault_env",
+            return_value={"SUPABASE_ACCESS_TOKEN": "sbp_from_vault"},
+        ):
+            merged = vault_keys.runtime_subprocess_env(force_refresh=True)
+        self.assertEqual("sbp_from_vault", merged["SUPABASE_ACCESS_TOKEN"])
+
+    @patch("app.cli_runtime.auth_probes._run_command")
+    def test_codex_prefers_chatgpt_session_over_vault_key(self, mock_run) -> None:
+        mock_run.return_value = subprocess.CompletedProcess(
+            args=["codex", "login", "status"],
+            returncode=0,
+            stdout="Logged in using ChatGPT",
+            stderr="",
+        )
+        status = codex_auth_status(
+            "/usr/bin/codex",
+            vault_posture={"unlocked": True, "posture": "ready", "runtime_keys": {"codex_local": True}},
+            env_keys={"CODEX_API_KEY": "stale-vault-key"},
+            probe_env={"CODEX_API_KEY": "stale-vault-key"},
+        )
+        self.assertTrue(status["logged_in"])
+        self.assertEqual("chatgpt", status["auth_method"])
+        self.assertIn("ignored", status["message"])
 
     @patch("app.cli_runtime.vault_keys.watch_adapter.request_json", side_effect=RuntimeError("HTTP 404"))
     def test_runtime_context_falls_back_when_watch_runtime_posture_is_missing(self, _mock_request) -> None:

@@ -4,6 +4,8 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue';
 import WorkbenchIcon from '../WorkbenchIcon.vue';
 import {
   DEFAULT_OPERATOR_TERMINAL_SESSION_ID,
+  terminalSessionBranchBadge,
+  terminalSessionRootTitle,
   terminalSessionTabLabel,
 } from '../../lib/terminal-session-view';
 
@@ -12,6 +14,9 @@ type TerminalSessionRow = {
   title: string;
   role: 'operator' | 'agent' | string;
   runId: string | null;
+  cwd?: string;
+  branch?: string;
+  isolated?: boolean;
 };
 
 const props = defineProps<{
@@ -41,15 +46,30 @@ const contextSession = computed(() =>
   props.sessions.find((session) => session.id === contextMenu.value?.sessionId) ?? null,
 );
 
-function sessionLabel(session: TerminalSessionRow): string {
-  return terminalSessionTabLabel({
+function toRecord(session: TerminalSessionRow) {
+  return {
     session_id: session.id,
     workspace_id: props.workspaceId,
     role: session.role,
     title: session.title,
     run_id: session.runId,
     created_at: '',
-  });
+    cwd: session.cwd,
+    branch: session.branch,
+    isolated: session.isolated,
+  };
+}
+
+function sessionLabel(session: TerminalSessionRow): string {
+  return terminalSessionTabLabel(toRecord(session));
+}
+
+function branchBadge(session: TerminalSessionRow): string {
+  return terminalSessionBranchBadge(toRecord(session));
+}
+
+function rootTitle(session: TerminalSessionRow): string {
+  return terminalSessionRootTitle(toRecord(session));
 }
 
 function closeContextMenu(): void {
@@ -180,8 +200,13 @@ onBeforeUnmount(() => {
             @keydown="handleRenameKeydown"
             @blur="commitRename"
           >
-          <span v-else class="terminal-session-rail__label">
+          <span v-else class="terminal-session-rail__label" :title="rootTitle(session)">
             {{ sessionLabel(session) }}
+            <span
+              v-if="branchBadge(session)"
+              class="terminal-session-rail__branch"
+              :title="rootTitle(session)"
+            >{{ branchBadge(session) }}</span>
           </span>
         </button>
 
@@ -335,6 +360,16 @@ onBeforeUnmount(() => {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.terminal-session-rail__branch {
+  margin-left: 0.3rem;
+  padding: 0 0.28rem;
+  border-radius: 3px;
+  background: rgba(250, 204, 21, 0.16);
+  color: rgb(250, 204, 21);
+  font-size: 0.56rem;
+  vertical-align: middle;
 }
 
 .terminal-session-rail__rename-input {

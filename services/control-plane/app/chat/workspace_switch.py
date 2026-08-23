@@ -7,7 +7,7 @@ from dataclasses import dataclass
 
 from app.workspace_catalog import WorkspaceNotFoundError, get_workspace_record
 from app.workspace_files import WorkspaceFileError, list_workspace_files
-from app.workspace_project_bindings import load_workspace_project_bindings
+from app.workspace_project_bindings import list_valid_workspace_project_bindings
 
 
 class WorkspaceSwitchError(ValueError):
@@ -55,14 +55,14 @@ def _looks_like_workspace_switch(content: str) -> bool:
     normalized = _normalize_alias(content)
     return "workspace" in text or any(
         alias in normalized
-        for binding in load_workspace_project_bindings().values()
+        for binding in list_valid_workspace_project_bindings().values()
         for alias in _workspace_aliases(binding.workspace_id, binding.display_name)
     )
 
 
 def _match_target_workspace(content: str) -> tuple[str, str] | None:
     normalized = _normalize_alias(content)
-    bindings = load_workspace_project_bindings()
+    bindings = list_valid_workspace_project_bindings()
     matches: list[tuple[str, str, str]] = []
 
     for binding in bindings.values():

@@ -5,15 +5,16 @@ import { useAgentDockComposerToolbarProps } from '../../composables/agent-dock/u
 import AgentDockComposerAccessBanner from './agent-dock/AgentDockComposerAccessBanner.vue';
 import AgentDockComposerChrome from './agent-dock/AgentDockComposerChrome.vue';
 import AgentDockComposerInput from './agent-dock/AgentDockComposerInput.vue';
+import AgentDockSandboxActionStrip from './agent-dock/AgentDockSandboxActionStrip.vue';
 import AgentDockComposerToolbar from './agent-dock/AgentDockComposerToolbar.vue';
 import AgentDockKairoComposerFooter from './agent-dock/AgentDockKairoComposerFooter.vue';
-
 const composer = useAgentDockComposer();
 const toolbarProps = useAgentDockComposerToolbarProps(composer);
 </script>
 
 <template>
   <AgentDockComposerChrome
+    :ref="(el) => { composer.composerRootRef.value = el as HTMLElement | null; }"
     :show-full-access-consent="composer.showFullAccessConsent.value"
     :full-access-consent-checked="composer.fullAccessConsentChecked.value"
     :show-sandbox-consent="composer.showSandboxConsent.value"
@@ -26,10 +27,12 @@ const toolbarProps = useAgentDockComposerToolbarProps(composer);
     :command-mutation-pending="composer.shell.commandMutationState === 'submitting'"
     :agent-stream-active="composer.shell.agentStreamActive"
     :show-approval-banner="composer.showApprovalBanner.value"
+    :approval-current-step="composer.shell.ideAgentLinkedRun?.current_step"
     :can-approve-ide-agent-run="composer.shell.canApproveIdeAgentRun"
     :run-mutation-pending="composer.shell.runMutationPending"
     :plan-soft-switch-notice="composer.planSoftSwitchNotice.value"
     :teammate-route-notice="composer.teammateRouteNotice.value"
+    :workspace-scope-notice="composer.workspaceScopeNotice.value"
     @update:full-access-consent-checked="composer.fullAccessConsentChecked.value = $event"
     @cancel-full-access-consent="composer.cancelFullAccessConsent()"
     @confirm-full-access-consent="composer.confirmFullAccessConsent()"
@@ -38,7 +41,7 @@ const toolbarProps = useAgentDockComposerToolbarProps(composer);
     @confirm-sandbox-consent="composer.confirmSandboxConsent()"
     @close-composer-image-lightbox="composer.closeComposerImageLightbox()"
     @debug-reproduce-proceed="composer.handleDebugReproduceProceed"
-    @debug-reproduce-dismiss="composer.handleDebugReproduceDismiss()"
+    @debug-reproduce-resolved="composer.handleDebugReproduceResolved"
     @approve-run="composer.handleApproveRun()"
     @reject-run="composer.handleRejectRun()"
     @undo-plan-soft-switch="composer.undoPlanSoftSwitch()"
@@ -47,6 +50,8 @@ const toolbarProps = useAgentDockComposerToolbarProps(composer);
     @decline-plan-soft-switch-offer="composer.declinePlanSoftSwitchOffer()"
     @undo-teammate-route="composer.undoTeammateRoute()"
     @dismiss-teammate-route="composer.dismissTeammateRoute()"
+    @switch-workspace-scope="composer.switchComposerWorkspaceScope()"
+    @dismiss-workspace-scope="composer.dismissWorkspaceScopeNotice($event)"
   />
   <form
     class="agent-dock-composer"
@@ -61,6 +66,21 @@ const toolbarProps = useAgentDockComposerToolbarProps(composer);
         <AgentDockComposerAccessBanner
           v-if="composer.composerAccessBanner.value"
           :banner="composer.composerAccessBanner.value"
+        />
+        <AgentDockSandboxActionStrip
+          :show="composer.sandboxSessionEnabled.value"
+          :dirty="composer.sandboxDirty.value"
+          :pending="composer.sandboxSessionPending.value"
+          :message="composer.sandboxSessionError.value"
+          :preview-url="composer.sandboxPreviewUrl.value"
+          :collapsed="composer.sandboxStripCollapsed.value"
+          @review="composer.reviewSandboxSessionChanges"
+          @start-preview="composer.startSandboxPreview"
+          @stop-preview="composer.stopSandboxPreview"
+          @restart-preview="composer.restartSandboxPreview"
+          @toggle-collapsed="composer.toggleSandboxStripCollapsed"
+          @publish="composer.publishSandboxSessionChanges"
+          @discard="composer.discardSandboxSessionChanges"
         />
         <AgentDockComposerInput
           :set-input-ref="composer.setInputRef"
@@ -95,6 +115,7 @@ const toolbarProps = useAgentDockComposerToolbarProps(composer);
           :typeahead-rows="composer.typeaheadRows.value"
           :typeahead-selected-index="composer.typeaheadSelectedIndex.value"
           @update:draft="composer.updateComposerDraft"
+          @clear-draft="composer.clearComposerDraft"
           @remove-chip="composer.removeChip"
           @open-image="composer.openComposerImage"
           @remove-image="composer.removeComposerImage"
@@ -133,7 +154,7 @@ const toolbarProps = useAgentDockComposerToolbarProps(composer);
               @switch-consultative="composer.switchToConsultativeAccess"
               @request-sandbox-session="composer.requestSandboxSession"
               @disable-sandbox-session="composer.disableSandboxSessionAccess"
-              @open-vault="composer.openVaultSurface"
+              @review-sandbox-session="composer.reviewSandboxSessionChanges" @publish-sandbox-session="composer.publishSandboxSessionChanges" @discard-sandbox-session="composer.discardSandboxSessionChanges" @open-vault="composer.openVaultSurface"
             />
           </template>
         </AgentDockComposerInput>
@@ -147,6 +168,9 @@ const toolbarProps = useAgentDockComposerToolbarProps(composer);
       :command-mutation-error="composer.shell.commandMutationError"
       :run-mutation-error="composer.shell.runMutationError"
       :workspace-selected="Boolean(composer.shell.currentWorkspace)"
+      @dismiss-kairo-conversation-error="composer.kairoConversationError.value = null"
+      @dismiss-command-mutation-error="composer.shell.commandMutationError = null"
+      @dismiss-run-mutation-error="composer.shell.runMutationError = null"
     />
   </form>
 </template>

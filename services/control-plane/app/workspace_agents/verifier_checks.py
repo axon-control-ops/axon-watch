@@ -114,6 +114,7 @@ def evaluate_acceptance(
         effective_allowed = resolve_effective_allowed_paths(
             contract_allowed_paths=contract.get("allowed_paths") or [],
             task_allowed_paths=task_allowed_paths or [],
+            fail_closed_missing_task=True,
         )
         findings.extend(
             evaluate_changed_paths(

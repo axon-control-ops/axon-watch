@@ -152,6 +152,17 @@ def list_runs() -> list[dict[str, Any]]:
     return [_row_to_record(row) for row in rows]
 
 
+def list_failed_runs_since(since_iso: str) -> list[dict[str, Any]]:
+    """Failed runs updated at/after ``since_iso``, using idx_runs_phase / idx_runs_updated_at."""
+    with _managed_connection() as connection:
+        rows = connection.execute(
+            "SELECT * FROM runs WHERE phase = 'failed' AND updated_at >= ? "
+            "ORDER BY updated_at ASC, run_id ASC",
+            (since_iso,),
+        ).fetchall()
+    return [_row_to_record(row) for row in rows]
+
+
 def delete_run(run_id: str) -> bool:
     """Remove one run and its history. Returns False when the run does not exist."""
     cleaned = str(run_id or "").strip()
@@ -178,6 +189,11 @@ def append_transition(history_ref: str, transition: dict[str, Any]) -> None:
     payload = deepcopy(transition)
     encoded = json.dumps(payload, separators=(",", ":"), sort_keys=True)
     with _managed_connection() as connection:
+        # Sequence allocation and insertion must share one write transaction.
+        # Heartbeats, streamed progress, and lifecycle receipts can arrive from
+        # separate threads; a deferred transaction allowed two writers to read
+        # the same MAX(sequence) before either inserted it.
+        connection.execute("BEGIN IMMEDIATE")
         sequence = connection.execute(
             "SELECT COALESCE(MAX(sequence), 0) + 1 FROM run_history WHERE history_ref = ?",
             (history_ref,),

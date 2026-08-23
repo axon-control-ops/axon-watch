@@ -55,6 +55,123 @@ function pushItem(
   });
 }
 
+/**
+ * Strips raw backend identifiers and translates signal titles into plain English
+ * that an operator can act on without knowing internal run IDs or branch names.
+ *
+ * Examples:
+ *   "Docs Policy Enforcement still red on worker/run_1071031bf1cd"
+ *     → "Policy check failing — talk to Soren (Integrations)"
+ *   "Inspect Android CI/CD Pipeline failed on feature/chat-pop-ingest"
+ *     → "Android CI failing — ask Soren to investigate"
+ *   "Lead reviews are ready in Mission Control — Six of them"
+ *     → (unchanged, already readable)
+ */
+export function humanizeSignalTitle(raw: string): string {
+  if (!raw) return raw;
+
+  let text = raw.trim();
+
+  // Strip run IDs: worker/run_<hex>, run/<hex>, etc.
+  text = text.replace(/\bworker\/run_[a-f0-9]+\b/gi, '').trim();
+  text = text.replace(/\brun\/[a-f0-9]+\b/gi, '').trim();
+  // Strip branch names: feature/<slug>, fix/<slug>, chore/<slug>
+  text = text.replace(/\b(feature|fix|chore|hotfix|release)\/[\w\-.]+\b/gi, (m) => {
+    // Keep just the human part after the prefix for readability
+    const slug = m.replace(/^[^/]+\//, '').replace(/[-_]/g, ' ');
+    return slug;
+  });
+  // Normalise trailing noise after stripping IDs
+  text = text.replace(/\s+(still\s+)?on\s*$/i, '').trim();
+  text = text.replace(/\s+/g, ' ').replace(/\s*—\s*$/, '').trim();
+
+  // Translate known policy / check patterns
+  const lower = text.toLowerCase();
+
+  if (/docs\s*policy/i.test(text) && /red|fail|still/i.test(text)) {
+    return 'Policy check failing — talk to Soren (Integrations) to resolve';
+  }
+  if (/android\s*(ci|cd|pipeline)/i.test(text) && /fail/i.test(text)) {
+    return `Android CI failing${extractBranchHint(raw)} — ask Soren to investigate`;
+  }
+  if (/ci\/cd.*fail/i.test(text) || /pipeline.*fail/i.test(text)) {
+    const pipeline = text.match(/^[\w\s]+ Pipeline/i)?.[0] ?? 'Pipeline';
+    return `${pipeline} failing${extractBranchHint(raw)} — ask Soren to investigate`;
+  }
+  if (/deploy.*fail/i.test(text)) {
+    return 'Deployment failing — check with Soren (Integrations)';
+  }
+  if (/policy.*red|red.*policy/i.test(lower)) {
+    return 'Policy check still failing — talk to Soren to fix';
+  }
+  if (/test.*fail|fail.*test/i.test(lower)) {
+    return `Tests failing${extractBranchHint(raw)} — ask the relevant specialist`;
+  }
+  if (/lead.*review.*ready|review.*ready/i.test(lower)) {
+    // Already readable, just clean up
+    return text;
+  }
+
+  return text;
+}
+
+function extractBranchHint(raw: string): string {
+  const m = raw.match(/\b(feature|fix|chore|hotfix|release)\/([\w\-.]+)\b/i);
+  if (!m) return '';
+  const name = m[2]!.replace(/[-_]/g, ' ');
+  return ` on "${name}"`;
+}
+
+function normalizeStreamText(text: string): string {
+  return text
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, ' ')
+    .replace(/[.…]+$/g, '')
+    .replace(/^(inspect|review|check)\s+/i, '')
+    .replace(/\.$/, '');
+}
+
+function streamTextsNearDuplicate(left: string, right: string): boolean {
+  const a = normalizeStreamText(left);
+  const b = normalizeStreamText(right);
+  if (!a || !b) {
+    return false;
+  }
+  if (a === b) {
+    return true;
+  }
+  // Truncated spoken vs advise often share a long prefix but not full containment.
+  const prefixLen = 40;
+  if (a.length >= prefixLen && b.length >= prefixLen && a.slice(0, prefixLen) === b.slice(0, prefixLen)) {
+    return true;
+  }
+  const shorter = a.length <= b.length ? a : b;
+  const longer = a.length <= b.length ? b : a;
+  return shorter.length >= 24 && longer.includes(shorter);
+}
+
+/** Prefer the richer line when spoken/notice/advise/signal overlap. */
+export function collapseNearDuplicateStreamItems(
+  items: LiveOperationsStreamItem[],
+): LiveOperationsStreamItem[] {
+  const out: LiveOperationsStreamItem[] = [];
+  for (const item of items) {
+    const matchIndex = out.findIndex((existing) =>
+      streamTextsNearDuplicate(existing.text, item.text),
+    );
+    if (matchIndex < 0) {
+      out.push(item);
+      continue;
+    }
+    const existing = out[matchIndex]!;
+    if (item.text.trim().length > existing.text.trim().length) {
+      out[matchIndex] = item;
+    }
+  }
+  return out;
+}
+
 /** Compact mission ticker for the LIVE OPERATIONS orb card. */
 export function projectLiveOperationsStream(input: {
   briefing: OperatorBriefing | null;
@@ -146,10 +263,10 @@ export function projectLiveOperationsStream(input: {
   }
 
   const notice = input.briefing?.notice?.trim();
-  if (notice) {
+  if (notice && !(utterance && streamTextsNearDuplicate(utterance, notice))) {
     pushItem(items, {
       id: 'notice',
-      text: truncate(notice),
+      text: truncate(humanizeSignalTitle(notice)),
       tone: 'attention',
       kind: 'signal',
       agent: 'OPS',
@@ -157,10 +274,10 @@ export function projectLiveOperationsStream(input: {
     });
   }
   const advise = input.briefing?.advise?.trim();
-  if (advise) {
+  if (advise && !(utterance && streamTextsNearDuplicate(utterance, advise))) {
     pushItem(items, {
       id: 'advise',
-      text: truncate(advise),
+      text: truncate(humanizeSignalTitle(advise)),
       tone: 'attention',
       kind: 'signal',
       agent: 'OPS',
@@ -176,7 +293,7 @@ export function projectLiveOperationsStream(input: {
     const severity = String(signal.severity || '').toLowerCase();
     pushItem(items, {
       id: `signal-${signal.signal_id || title}`,
-      text: truncate(title),
+      text: truncate(humanizeSignalTitle(title)),
       tone: severity === 'critical' ? 'critical' : severity === 'high' ? 'attention' : 'info',
       kind: 'signal',
       agent: 'SENTRY',
@@ -272,5 +389,10 @@ export function projectLiveOperationsStream(input: {
     });
   }
 
-  return items.slice(0, 8);
+  // Collapse exact + nested near-duplicates (spoken often wraps notice/advise).
+  const deduped = collapseNearDuplicateStreamItems(items);
+  const limited = deduped.slice(0, 8);
+
+
+  return limited;
 }

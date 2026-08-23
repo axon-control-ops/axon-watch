@@ -179,9 +179,30 @@ function markFollowupIfNeeded(options: DeliverSpokenAlertOptions): void {
   }
 }
 
+function defaultSpokenAlertStorage(): Pick<Storage, 'getItem' | 'setItem'> {
+  try {
+    if (typeof localStorage !== 'undefined') {
+      return localStorage;
+    }
+  } catch {
+    /* private mode */
+  }
+  try {
+    if (typeof sessionStorage !== 'undefined') {
+      return sessionStorage;
+    }
+  } catch {
+    /* ignore */
+  }
+  return {
+    getItem: () => null,
+    setItem: () => undefined,
+  };
+}
+
 export async function deliverSpokenOperatorAlert(
   alert: SpokenAlertEligibility,
-  storage: Pick<Storage, 'getItem' | 'setItem'> = sessionStorage,
+  storage: Pick<Storage, 'getItem' | 'setItem'> = defaultSpokenAlertStorage(),
   options: DeliverSpokenAlertOptions = {},
 ): Promise<SpokenAlertDeliveryChannel> {
   if (options.dedupe !== false && !shouldSpeakAlert(alert, storage)) {

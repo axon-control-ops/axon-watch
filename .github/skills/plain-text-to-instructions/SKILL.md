@@ -17,11 +17,15 @@ description: >-
 ## Rules
 
 1. Convert the request into Instructions markdown first.
-2. **Out of scope is binding.** If they did not ask for commit / push / merge / release, do not add those steps.
-3. Prefer the product helper when available: composer **Instructions** button, or
-   `apps/console-web/src/lib/plain-text-to-instructions.ts`.
-4. Then execute only the listed steps.
-5. Reply with a short summary of what changed.
+2. **Out of scope is binding** for request-specific exclusions — if they did not ask for
+   commit / push / merge / release, do not add those steps.
+3. **Constraints is binding** for standing process guardrails (deploy/publish/notify unless
+   asked, no unverified completion claims) — do not duplicate these into Out of scope.
+4. Prefer the product helper when available: composer **Instructions** button, backed by
+   `services/control-plane/app/instructions_engine.py` (prompt) and
+   `services/control-plane/app/plain_text_to_instructions.py` (parsing/fallback).
+5. Then execute only the listed steps.
+6. Reply with a short summary of what changed.
 
 ## Output shape
 
@@ -29,25 +33,37 @@ description: >-
 # Instructions
 
 ## Goal
-One sentence outcome.
+One or two sentence outcome — must stand on its own, no bullets.
 
 ## In scope
 - …
 
 ## Out of scope
-- Any task that was not asked for
+- Request-specific exclusion (any task that was not asked for)
 
 ## Steps
 1. …
 2. …
+(at least 4, each independently verifiable — don't restate In scope)
 
 ## Constraints
 - Follow only the steps listed above
 - Do not invent tasks that were not asked for
+- Do not deploy, publish, or notify external parties unless explicitly requested
+- Do not claim work was implemented, tested, or verified without evidence
+
+## Assumptions
+(optional — include only if a missing detail had to be inferred; state it plus why;
+omit the whole heading if nothing was inferred)
+
+## Source request
+(optional — include only when exact wording must be preserved for traceability or
+fidelity; verbatim and unmodified; omit the whole heading otherwise)
 ```
 
 ## Do not
 
-- Invent “clear the desk” / commit chores
+- Invent "clear the desk" / commit chores
 - Expand into unrelated refactors
-- Soften or drop an explicit “do not …” constraint
+- Soften or drop an explicit "do not …" constraint
+- Pad the document with Assumptions or Source request when neither earns its place

@@ -36,6 +36,7 @@ import {
   notifyKairoVoiceUtterance,
   type KairoVoiceSpeaker,
 } from './kairo-voice-utterance';
+import { withKairoCrossContextVoiceLock } from './kairo-cross-context-voice-lock';
 
 export type KairoVoiceEngine = 'azure' | 'browser' | 'skipped' | 'idle';
 
@@ -365,17 +366,19 @@ function resolveAzureFallbackReason(response: KairoTtsResponse): string {
  * Play one sanitized line now. Does not interrupt other jobs — the global
  * voice queue (`enqueueKairoSpeech` / `speakKairoLine`) owns serialization.
  */
-export async function playKairoUtteranceNow(
+type PlayKairoUtteranceOptions = {
+  preferBrowser?: boolean;
+  speechRate?: number;
+  speechPitch?: number;
+  azureVoiceId?: string;
+  speaker?: KairoVoiceSpeaker | null;
+  ttsTimeoutMs?: number;
+  onPlaybackStart?: () => void;
+};
+
+async function playKairoUtteranceNowUnlocked(
   text: string,
-  options: {
-    preferBrowser?: boolean;
-    speechRate?: number;
-    speechPitch?: number;
-    azureVoiceId?: string;
-    speaker?: KairoVoiceSpeaker | null;
-    ttsTimeoutMs?: number;
-    onPlaybackStart?: () => void;
-  } = {},
+  options: PlayKairoUtteranceOptions = {},
 ): Promise<KairoVoicePlaybackResult> {
   const trimmed = sanitizeSpokenReply(text);
   const tuning = resolveSpeechTuning(options);
@@ -485,6 +488,23 @@ export async function playKairoUtteranceNow(
     }
     return speakWithBrowser(trimmed, 'fetch_error', tuning, speaker, notifyPlaybackStart);
   }
+}
+
+export async function playKairoUtteranceNow(
+  text: string,
+  options: PlayKairoUtteranceOptions = {},
+): Promise<KairoVoicePlaybackResult> {
+  const locked = await withKairoCrossContextVoiceLock(
+    () => playKairoUtteranceNowUnlocked(text, options),
+    {
+      isHidden: () =>
+        typeof document !== 'undefined' && document.visibilityState === 'hidden',
+    },
+  );
+  if (!locked.ran) {
+    return { engine: 'skipped', reason: 'hidden_document' };
+  }
+  return locked.result ?? { engine: 'skipped', reason: 'cross_context_lock' };
 }
 
 /**

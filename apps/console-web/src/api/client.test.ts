@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { fetchJson } from './client';
+import { fetchJson, fetchWithTimeout } from './client';
 
 describe('fetchJson timeout', () => {
   afterEach(() => {
@@ -67,5 +67,62 @@ describe('fetchJson timeout', () => {
     await expect(fetchJson('/api/chat/messages', { method: 'POST' }, 'chat message submit failed')).rejects.toThrow(
       /chat message submit failed: cross-origin mutation blocked/,
     );
+  });
+
+  it('includes HttpOnly session credentials by default', async () => {
+    const fetchMock = vi.fn(async () => ({
+      ok: true,
+      status: 200,
+      json: async () => ({ ok: true }),
+    }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await fetchJson('/api/auth/session');
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/api/auth/session',
+      expect.objectContaining({ credentials: 'include' }),
+    );
+  });
+});
+
+describe('fetchWithTimeout', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.useRealTimers();
+  });
+
+  it('rejects instead of hanging forever when the network stalls', async () => {
+    // Regression: several callers used bare fetch() with no signal, so a
+    // stalled (not failed) connection left the request pending forever with
+    // no error and no recovery — e.g. tunnel start/stop, attachment upload,
+    // inbox acknowledge, Sentry resolve/attend.
+    vi.useFakeTimers();
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((_url: string, init?: RequestInit) => {
+        return new Promise((_resolve, reject) => {
+          init?.signal?.addEventListener('abort', () => {
+            reject(new DOMException('Aborted', 'AbortError'));
+          });
+        });
+      }),
+    );
+
+    const pending = fetchWithTimeout('/api/tunnel/start', { method: 'POST' }, 50);
+    const expectation = expect(pending).rejects.toThrow(/timed out/);
+    await vi.advanceTimersByTimeAsync(60);
+    await expectation;
+  });
+
+  it('resolves with the raw Response so callers can branch on status themselves', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => ({ ok: false, status: 404, text: async () => 'not found' })),
+    );
+
+    const response = await fetchWithTimeout('/api/inbox/signals/acknowledge', { method: 'POST' });
+    expect(response.ok).toBe(false);
+    expect(response.status).toBe(404);
   });
 });

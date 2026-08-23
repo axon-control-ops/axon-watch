@@ -34,9 +34,9 @@ def build_runtime_inventory(
         "codex": codex_auth_status,
     }
     local_labels = {
-        "cursor": "Cursor CLI (local)",
-        "claude": "Claude Code CLI (local)",
-        "codex": "Codex CLI (local)",
+        "cursor": "Cursor",
+        "claude": "Claude",
+        "codex": "Codex",
     }
     local = [
         local_runtime_record(

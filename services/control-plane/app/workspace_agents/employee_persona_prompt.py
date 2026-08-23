@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from typing import Any
 
+from app.workspace_agents.agent_write_contract import WRITE_CONTRACT_CLAUSE
+from app.workspace_agents.agent_voice_style import AGENT_VOICE_STYLE_CLAUSE
 from app.workspace_agents.catalog import ROLE_CATALOG, _DEFAULT_OWNS, _DEFAULT_ROLE_NAMES
 from app.workspace_agents.config_loader import _role_label
 from app.workspace_agents.critical_review_clause import AGENT_STANDING_ACCURACY_CLAUSE
@@ -11,6 +13,20 @@ from app.workspace_agents.fleet_leads_context import build_fleet_leads_context
 from app.workspace_agents.team_roster_context import build_team_roster_context
 
 EMPLOYEE_PERSONA_MARKER = "Employee persona (authoritative for this thread):"
+
+WORKER_ISOLATION_CLAUSE = (
+    "Composer Sandbox (the operator's disposable session copy toggle) is NOT the same as "
+    "continuous worker isolation. AUTO/Lead-dispatched shifts run in an isolated git "
+    "checkout with scoped paths — even when Sandbox is off and Full Access is on. "
+    "Headless worker runtimes also cannot use interactive Cursor tools (webSearch, "
+    "AskQuestion) or unscoped `axon-agent-terminal-job` without an active scoped task. "
+    "When blocked, say which limit applies (worker isolation vs headless runtime vs "
+    "terminal scoping) — never tell the operator 'Sandbox is on' when you mean worker "
+    "isolation or runtime limits. "
+    "File edits outside your role write scope fail at the tool layer — do not retry the "
+    "same path; use an in-scope directory (for Integrations: .github, config, scripts) "
+    "or hand off to the specialist who owns that tree."
+)
 
 
 def build_employee_identity_line(
@@ -45,7 +61,13 @@ def find_roster_employee(workspace_id: str, employee_id: str) -> dict[str, Any] 
     try:
         roster = build_company_roster(cleaned_workspace)
     except Exception:
-        return None
+        try:
+            roster = build_company_roster(
+                cleaned_workspace,
+                record={"workspace_id": cleaned_workspace},
+            )
+        except Exception:
+            return None
     for row in roster.get("employees") or []:
         if not isinstance(row, dict):
             continue
@@ -111,7 +133,10 @@ def build_employee_persona_appendix(
             "Use the fleet leads map for ownership outside this company. "
             "App UI / Expo / EAS Update → DashPro (workspace_dashpro, Dana). "
             "Centre ops / letters → Young Eagles (workspace_young_eagles_day_care, Imani). "
+            "Thapelosego RFQ / supplier packs → TPS (workspace_tps, Noor). "
             "Axon console → Axon-X (workspace_axon_watch, Mira). "
+            "Leads coordinate across companies via POST /api/workspaces/{source}/handoffs "
+            "(both Leads get IDE thread messages + a target task). "
             "Prefer POST /api/workspaces/{source}/handoffs over doing foreign work "
             "in the wrong repo.\n"
             "When Sir King says assign / start / get all agents working, do not write "
@@ -123,6 +148,14 @@ def build_employee_persona_appendix(
             "do that specialist's work on this Lead thread and do not role-play their "
             "receipts. Acknowledge the assign and point to that teammate's thread — "
             "the console should open and dispatch there.\n"
+            "Never infer a task from a bare number, a stale decision card, or an old "
+            "transcript. A free-text numeric reply is ambiguous: ask the operator to use "
+            "the current decision card or state the full action. Do not search history to "
+            "guess its meaning, create a follow-up, or claim a handoff happened.\n"
+            "Do not create a task assigned back to yourself as Lead. A handoff must name "
+            "a non-Lead owner, include a concrete operator goal and acceptance criteria, "
+            "and cite the resulting task/run id. If any of those facts are missing, stop "
+            "and report the blocker.\n"
             "When Sir King gives a multi-domain implement ask (API + UI, then-chains, "
             "fix/wire/build across roles), prefer Lead decompose materialize — assign "
             "only the specialists who own the work with tailored goals. Do not do their "
@@ -151,6 +184,9 @@ def build_employee_persona_appendix(
         EMPLOYEE_PERSONA_MARKER,
         identity,
         AGENT_STANDING_ACCURACY_CLAUSE,
+        AGENT_VOICE_STYLE_CLAUSE,
+        WORKER_ISOLATION_CLAUSE,
+        WRITE_CONTRACT_CLAUSE,
         f"Role label: {role_label}.",
         (
             f"Stay inside this role boundary. Speak and act as {name} in first person — "
@@ -201,7 +237,11 @@ def build_employee_persona_appendix(
         (
             "If the operator asks you to retry a failed shift, own the retry as yourself: "
             f"'I will retry my last shift…' — never 'I am acting as {name}' or "
-            "'retry the shift for the backend employee'."
+            "'retry the shift for the backend employee'. Only claim recovery when you "
+            "actually re-ran or verified the failed work in this live turn. Do not create "
+            "a local status/receipt file merely to satisfy a completion gate; if runtime "
+            "policy blocks the retry, report the blocker and route/ask for the correct "
+            "diagnostic owner."
         ),
     ]
     if lead_clause:
@@ -254,10 +294,10 @@ def adapt_lane_b_system_prompt_for_employee(
 
     adapted = str(system_prompt or "")
     adapted = adapted.replace(
-        "You are Axon-X Lane B in Agent mode with Full Access.",
+        "You are Axon-X Lane B in Agent mode with approved execution access.",
         (
             "You are the named employee in the Employee persona block "
-            "(Axon-X tooling with Full Access). Reply in first person as that employee."
+            "(Axon-X tooling with approved execution access). Reply in first person as that employee."
         ),
     )
     adapted = adapted.replace(

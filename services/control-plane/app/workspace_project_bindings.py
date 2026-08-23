@@ -3,9 +3,13 @@
 from __future__ import annotations
 
 import json
+import logging
 import os
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
+
+logger = logging.getLogger(__name__)
 
 
 class WorkspaceBindingError(ValueError):
@@ -47,11 +51,15 @@ def project_root_allowlist() -> tuple[Path, ...]:
             return tuple(roots)
 
     repo_root = _repo_root()
-    return (
+    defaults = [
         repo_root.resolve(),
         repo_root.parent.resolve(),
         Path.home().resolve(),
-    )
+    ]
+    parts = repo_root.resolve().parts
+    if len(parts) >= 4 and parts[:3] == ("/", "run", "media"):
+        defaults.append(Path(*parts[:4]).resolve())
+    return tuple(dict.fromkeys(defaults))
 
 
 def _resolve_project_root(raw_root: str, *, bindings_file: Path) -> Path:
@@ -106,7 +114,19 @@ def load_workspace_project_bindings(
         if not isinstance(entry, dict):
             raise WorkspaceBindingError(f"binding for {normalized_id} must be an object")
 
-        project_root = _resolve_project_root(str(entry.get("project_root", "")), bindings_file=path)
+        # Bindings are operator-maintained and project folders can be moved or
+        # archived. One stale optional workspace must not make `/api/workspaces`
+        # fail and leave the whole console in an unusable empty-shell state.
+        try:
+            project_root = _resolve_project_root(
+                str(entry.get("project_root", "")), bindings_file=path
+            )
+        except WorkspaceBindingError as exc:
+            # Missing folders are stale operational data; an out-of-allowlist
+            # root is a security configuration error and must still fail closed.
+            if "does not exist:" in str(exc):
+                continue
+            raise
         display_name = str(entry.get("display_name", "")).strip() or None
         bindings[normalized_id] = WorkspaceProjectBinding(
             workspace_id=normalized_id,
@@ -117,11 +137,96 @@ def load_workspace_project_bindings(
     return bindings
 
 
+def _read_bindings_entries(bindings_file: Path | None = None) -> tuple[Path, dict[str, Any]]:
+    """Parse the raw bindings JSON without resolving any single entry.
+
+    Split out of load_workspace_project_bindings so a single-workspace lookup
+    (get_workspace_project_binding) never has to materialize every other
+    workspace's binding just to reach its own -- which is what made an
+    unrelated misconfigured workspace (one whose project_root moved outside
+    the allowlist) break get_workspace_record, and therefore effectively every
+    feature that resolves a workspace, for every *other* workspace too.
+    """
+    path = bindings_file or default_bindings_file()
+    if not path.is_file():
+        return path, {}
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise WorkspaceBindingError(f"unable to read bindings file: {path}") from exc
+    entries = payload.get("bindings")
+    if not isinstance(entries, dict):
+        raise WorkspaceBindingError("bindings file must contain a bindings object")
+    return path, entries
+
+
+def list_valid_workspace_project_bindings(
+    bindings_file: Path | None = None,
+) -> dict[str, WorkspaceProjectBinding]:
+    """Every binding that resolves cleanly; a bad one is skipped, not fatal.
+
+    load_workspace_project_bindings deliberately fails closed for the whole
+    map on an allowlist violation -- the right contract for a caller that must
+    trust every binding it gets back. list_workspace_records (the catalog
+    listing behind /api/workspaces) is not that caller: it is a best-effort
+    "what workspaces exist" scan, and one misconfigured, unrelated workspace
+    must not take the whole catalog down for every other one. Still logs
+    loudly, since a workspace silently missing from a listing is real
+    misconfiguration worth noticing, just not worth a 500.
+    """
+    path, entries = _read_bindings_entries(bindings_file)
+    bindings: dict[str, WorkspaceProjectBinding] = {}
+    for workspace_id, entry in entries.items():
+        normalized_id = str(workspace_id).strip()
+        if not normalized_id or not isinstance(entry, dict):
+            continue
+        try:
+            project_root = _resolve_project_root(
+                str(entry.get("project_root", "")), bindings_file=path
+            )
+        except WorkspaceBindingError as exc:
+            logger.warning(
+                "skipping invalid binding for %s in a best-effort listing: %s",
+                normalized_id,
+                exc,
+            )
+            continue
+        display_name = str(entry.get("display_name", "")).strip() or None
+        bindings[normalized_id] = WorkspaceProjectBinding(
+            workspace_id=normalized_id,
+            project_root=project_root,
+            display_name=display_name,
+        )
+    return bindings
+
+
 def get_workspace_project_binding(workspace_id: str) -> WorkspaceProjectBinding | None:
+    """Resolve exactly one workspace's binding, ignoring every other entry.
+
+    Still fails closed (raises) if *this* workspace's own project_root sits
+    outside the allowlist -- the security contract load_workspace_project_bindings
+    enforces is preserved for the entry actually being asked about. It simply
+    never touches, validates, or can be broken by any other workspace's entry.
+    """
     normalized_id = workspace_id.strip()
     if not normalized_id:
         return None
-    return load_workspace_project_bindings().get(normalized_id)
+    path, entries = _read_bindings_entries()
+    entry = entries.get(normalized_id)
+    if not isinstance(entry, dict):
+        return None
+    try:
+        project_root = _resolve_project_root(str(entry.get("project_root", "")), bindings_file=path)
+    except WorkspaceBindingError as exc:
+        if "does not exist:" in str(exc):
+            return None
+        raise
+    display_name = str(entry.get("display_name", "")).strip() or None
+    return WorkspaceProjectBinding(
+        workspace_id=normalized_id,
+        project_root=project_root,
+        display_name=display_name,
+    )
 
 
 def _normalize_workspace_id(workspace_id: str) -> str:
@@ -177,8 +282,19 @@ def upsert_workspace_project_binding(
     tmp_path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     tmp_path.replace(path)
 
-    return WorkspaceProjectBinding(
+    binding = WorkspaceProjectBinding(
         workspace_id=normalized_id,
         project_root=resolved_root,
         display_name=label,
     )
+    try:
+        from app.workspace_agents.workspace_runtime_bootstrap import provision_workspace_runtime
+
+        provision_workspace_runtime(
+            normalized_id,
+            project_root=resolved_root,
+            display_name=label,
+        )
+    except Exception as exc:  # noqa: BLE001 — binding must succeed even if bootstrap fails
+        logger.warning("workspace runtime bootstrap deferred for %s: %s", normalized_id, exc)
+    return binding

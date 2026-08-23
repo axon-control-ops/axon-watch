@@ -3,10 +3,12 @@ import type { RunRecord } from '../contracts/canonical';
 import type { ChatUiAction } from '../lib/chat-ui-action';
 
 import {
-  apiUrl,
+  ATTACHMENT_UPLOAD_TIMEOUT_MS,
   CHAT_MESSAGE_FETCH_TIMEOUT_MS,
   controlPlaneBaseUrl,
+  DEFAULT_FETCH_TIMEOUT_MS,
   fetchJson,
+  fetchWithTimeout,
   THREAD_HISTORY_FETCH_TIMEOUT_MS,
 } from './client';
 import type { TerminalSessionRecord } from './workspace-api';
@@ -66,6 +68,34 @@ export interface PostChatMessageResponse {
   stream_agent_message_id?: string;
   ui_action?: ChatUiAction | null;
   agent_terminal_session?: TerminalSessionRecord | null;
+}
+
+export interface GenerateInstructionsRequest {
+  workspace_id: string;
+  content: string;
+  runtime_target?: string | null;
+  runtime_model?: string | null;
+}
+
+export interface GenerateInstructionsResponse {
+  content: string;
+  runtime_id: string;
+  runtime_label: string;
+}
+
+export async function generateInstructions(
+  body: GenerateInstructionsRequest,
+): Promise<GenerateInstructionsResponse> {
+  return fetchJson<GenerateInstructionsResponse>(
+    '/api/composer/instructions',
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    },
+    'instruction generation failed',
+    CHAT_MESSAGE_FETCH_TIMEOUT_MS,
+  );
 }
 
 export interface WorkspaceChatThreadListItem {
@@ -152,6 +182,32 @@ export async function fetchThreadHistory(threadId: string): Promise<ThreadHistor
   );
 }
 
+export interface SyncThreadExecutionAccessNoticesResponse {
+  thread_id: string;
+  updated: number;
+}
+
+/**
+ * Retroactively rewrites any stored "consultative-only" / "Full Access enabled"
+ * notice in this thread to match the operator's current Full Access toggle.
+ */
+export async function syncThreadExecutionAccessNotices(
+  threadId: string,
+  executionAccess: string,
+): Promise<SyncThreadExecutionAccessNoticesResponse> {
+  const encodedThreadId = encodeURIComponent(threadId);
+  return fetchJson<SyncThreadExecutionAccessNoticesResponse>(
+    `/api/chat/threads/${encodedThreadId}/execution-access-notices`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ execution_access: executionAccess }),
+    },
+    'thread execution-access notice sync failed',
+    DEFAULT_FETCH_TIMEOUT_MS,
+  );
+}
+
 export async function fetchWorkspaceChatThread(
   workspaceId: string,
   options: { surface?: 'operator' | 'ide' } = {},
@@ -174,10 +230,11 @@ export async function uploadChatAttachment(
   formData.append('workspace_id', workspaceId);
   formData.append('file', file, file.name);
 
-  const response = await fetch(apiUrl('/api/chat/attachments'), {
-    method: 'POST',
-    body: formData,
-  });
+  const response = await fetchWithTimeout(
+    '/api/chat/attachments',
+    { method: 'POST', body: formData },
+    ATTACHMENT_UPLOAD_TIMEOUT_MS,
+  );
 
   if (!response.ok) {
     throw new Error(`chat attachment upload failed with status ${response.status}`);
@@ -198,6 +255,15 @@ export async function fetchWorkspaceChatThreads(
     `/api/workspaces/${encodedWorkspaceId}/chat/threads${query}`,
     {},
     'workspace chat thread list failed',
+  );
+}
+
+export async function deleteChatThread(threadId: string): Promise<{ thread_id: string; deleted: boolean }> {
+  const encodedThreadId = encodeURIComponent(threadId);
+  return fetchJson<{ thread_id: string; deleted: boolean }>(
+    `/api/chat/threads/${encodedThreadId}`,
+    { method: 'DELETE' },
+    'chat thread delete failed',
   );
 }
 

@@ -11,6 +11,7 @@ from typing import Any
 
 SESSION_COOKIE = "axon_desktop_session"
 SESSION_HEADER = "x-axon-desktop-session"
+SESSION_COOKIE_MAX_AGE_SECONDS = 60 * 60 * 24 * 30
 _BOOTSTRAP_TTL_SECONDS = 120
 
 # One-time bootstrap codes minted by the desktop shell (token -> expires_at).

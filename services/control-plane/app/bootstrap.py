@@ -12,6 +12,7 @@ from app.runs.service import (
     drain_terminal_employee_runs,
     reap_abandoned_review_ready_runs,
     reap_stale_employee_runs,
+    reconcile_employee_runs_missing_tasks,
     reconcile_orphaned_runs_on_startup,
 )
 from app.workspace_agents.scheduler import (
@@ -22,9 +23,41 @@ from app.workspace_agents.scheduler import (
 logger = logging.getLogger(__name__)
 
 
+def _log_auth_posture() -> None:
+    """Make the effective auth posture visible on every boot.
+
+    auth_mode() only forces local_token when AXON_WATCH_PUBLIC_BASE_URL (or
+    AXON_WATCH_REMOTELY_REACHABLE) correctly reflects real reachability — a
+    process bound to 0.0.0.0 without that env set still resolves to "off"
+    silently. This doesn't change the default (would risk breaking local dev
+    setups relying on it); it just stops that gap from being invisible.
+    """
+    from app.auth.settings import auth_mode, is_remotely_reachable
+
+    mode = auth_mode()
+    reachable = is_remotely_reachable()
+    if mode == "off":
+        logger.warning(
+            "auth_mode=off (reachable=%s) — mutating API routes accept anonymous "
+            "requests. If this process is reachable beyond localhost, set "
+            "AXON_WATCH_PUBLIC_BASE_URL to its real address or "
+            "AXON_WATCH_REMOTELY_REACHABLE=1 to force local_token.",
+            reachable,
+        )
+    else:
+        logger.info("auth_mode=%s (reachable=%s)", mode, reachable)
+
+
 @asynccontextmanager
 async def control_plane_lifespan(_app: FastAPI):
     # Startup before requests (FastAPI lifespan): reconcile, then start worker tick.
+    _log_auth_posture()
+    try:
+        from app.cli_runtime.composer_sandbox import reconcile_persisted_sandboxes
+
+        reconcile_persisted_sandboxes()
+    except Exception:  # noqa: BLE001 — recovery failure must remain visible without blocking boot
+        logger.exception("composer Sandbox startup reconciliation failed")
     reconcile_orphaned_runs_on_startup(boot_id=_BOOT_ID)
     abandoned = reap_abandoned_review_ready_runs()
     if abandoned:
@@ -37,6 +70,12 @@ async def control_plane_lifespan(_app: FastAPI):
         logger.info(
             "startup stale employee-run reap cleared %s run(s)",
             len(reaped),
+        )
+    missing_task_runs = reconcile_employee_runs_missing_tasks()
+    if missing_task_runs:
+        logger.info(
+            "startup missing-task employee-run reconcile cleared %s run(s)",
+            len(missing_task_runs),
         )
     pruned = drain_terminal_employee_runs()
     if pruned:

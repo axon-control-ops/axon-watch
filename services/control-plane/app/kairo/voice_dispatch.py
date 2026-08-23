@@ -21,6 +21,7 @@ from app.cli_runtime.catalog import runtime_status_snapshot
 from app.cli_runtime.recovery import ordered_runtime_candidates
 from app.kairo.teammate_handoff import build_specialty_task_action
 from app.kairo.voice_autonomy import resolve_voice_action_tier
+from app.kairo.voice_reply_summary import spoken_delivery_summary
 from app.kairo_conversation_reply import (
     compose_conversation_reply,
     compose_smalltalk_reply,
@@ -41,7 +42,6 @@ ConversationSource = Literal["template", "model", "fallback"]
 ConversationTurnKind = Literal["status_question", "open_question", "command", "chat", "action"]
 
 _MAX_RUNTIME_VOICE_REPLY_CHARS = 1200
-
 # Dedicated VAXON pool — independent from IDE Composer UI selection.
 _DEFAULT_VAXON_MODEL_POOL = (
     "cursor-grok-4.5-high-fast",
@@ -50,46 +50,6 @@ _DEFAULT_VAXON_MODEL_POOL = (
     "claude-sonnet-5-thinking-high",
 )
 _DEFAULT_VAXON_MODEL_ID = "cursor-grok-4.5-high-fast"
-
-
-def _short_spoken_summary(
-    reply: str,
-    *,
-    max_chars: int = 280,
-    max_sentences: int = 2,
-) -> str:
-    import re
-
-    trimmed = re.sub(r"\s+", " ", reply.strip())
-    if not trimmed:
-        return ""
-    sentences = re.split(r"(?<=[.!?])\s+", trimmed)
-    summary = ""
-    sentence_count = 0
-    for sentence in sentences:
-        candidate = sentence.strip()
-        if not candidate:
-            continue
-        next_summary = f"{summary} {candidate}".strip()
-        if len(next_summary) > max_chars:
-            break
-        summary = next_summary
-        sentence_count += 1
-        if sentence_count >= max_sentences:
-            break
-    if summary:
-        return summary
-    if len(trimmed) <= max_chars:
-        return trimmed
-    shortened = trimmed[: max_chars - 1].rstrip(" ,;:")
-    return f"{shortened}…"
-
-
-def _spoken_delivery_summary(reply: str, *, deep: bool) -> str:
-    """TTS may be shorter than the UI reply; deep/status reports keep more detail."""
-    if deep:
-        return _short_spoken_summary(reply, max_chars=900, max_sentences=6)
-    return _short_spoken_summary(reply, max_chars=280, max_sentences=2)
 
 
 @dataclass(frozen=True)
@@ -203,7 +163,21 @@ def should_use_vaxon_runtime(
     use_runtime: bool,
     answer_tier: ConversationAnswerTier,
     voice_routing_mode: VoiceRoutingMode,
+    consultative: bool = False,
 ) -> bool:
+    # Ask mode is a deliberate executive consultation, not a collection of
+    # keyword-triggered status templates. It stays read-only at the runtime
+    # boundary; Dispatch is the only mode that may dispatch work.
+    if consultative:
+        # Free-form chat has no templated answer to fall back to, so it always
+        # goes to the model — there's no tier to gate on. Status/open
+        # questions DO have a correct, instant templated answer at "fast", so
+        # ignoring the caller's requested tier there would force a real
+        # (slow, costly) model call on every Ask turn regardless of what tier
+        # was asked for.
+        if turn_kind == "chat":
+            return True
+        return turn_kind in {"open_question", "status_question"} and answer_tier == "deep"
     mode = normalize_voice_routing_mode(voice_routing_mode)
     if turn_kind not in {"open_question", "status_question"}:
         return False
@@ -247,6 +221,8 @@ def route_voice_turn(
     context_signal_id: str | None = None,
     context_node_id: str | None = None,
     preferred_model: str | None = None,
+    allow_actions: bool = True,
+    consultative: bool = False,
 ) -> VoiceDispatchDecision:
     """Route a classified turn into a VAXON lane with autonomy + model receipts."""
     mode = normalize_voice_routing_mode(voice_routing_mode)
@@ -290,7 +266,7 @@ def route_voice_turn(
             },
         )
 
-    if turn_kind == "command":
+    if turn_kind == "command" and allow_actions:
         normalized = expand_command_shortcuts(content)
         requires_confirmation = command_requires_confirmation(normalized)
         tier = resolve_voice_action_tier(normalized)
@@ -321,7 +297,7 @@ def route_voice_turn(
             model_receipt=receipt,
         )
 
-    if turn_kind in {"chat", "open_question"}:
+    if allow_actions and turn_kind in {"chat", "open_question"}:
         specialty_action = build_specialty_task_action(
             content,
             workspace_id=workspace_id,
@@ -355,6 +331,7 @@ def route_voice_turn(
         use_runtime=use_runtime,
         answer_tier=answer_tier,
         voice_routing_mode=mode,
+        consultative=consultative,
     ):
         reply = compose_conversation_reply(
             content=content,
@@ -379,11 +356,20 @@ def route_voice_turn(
         )
 
     if should_use_vaxon_runtime(
-        turn_kind=turn_kind if turn_kind in {"open_question", "status_question"} else "open_question",
+        # Non-consultative (Dispatch) routing only knows open_question/status_question,
+        # so chat/command/action get coerced to open_question there. Consultative
+        # (Ask) mode needs the real turn_kind through — its "chat" branch never
+        # gates on tier, unlike open_question — so only coerce when not consultative.
+        turn_kind=(
+            turn_kind
+            if consultative or turn_kind in {"open_question", "status_question"}
+            else "open_question"
+        ),
         content=content,
         use_runtime=use_runtime,
         answer_tier=answer_tier,
         voice_routing_mode=mode,
+        consultative=consultative,
     ):
         runtime_id, runtime_label, model, attempts = select_vaxon_runtime(
             preferred_model=preferred_model,
@@ -453,7 +439,7 @@ def route_voice_turn(
             or bool(OPEN_DETAIL_RE.search(content))
             or bool(STATUS_REPORT_RE.search(content))
         )
-        spoken = _spoken_delivery_summary(reply, deep=deep)
+        spoken = spoken_delivery_summary(reply, deep=deep)
         remember_top_signal(session_id, pack, fallback_workspace_id=workspace_id)
         return VoiceDispatchDecision(
             lane="vaxon_runtime",

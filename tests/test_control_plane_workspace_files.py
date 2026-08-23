@@ -132,6 +132,69 @@ class ControlPlaneWorkspaceFilesTests(unittest.TestCase):
         old_response = self.client.get("/api/workspaces/workspace_alpha/files/src/deep.txt")
         self.assertEqual(404, old_response.status_code)
 
+    def test_read_workspace_file_returns_content_sha256(self) -> None:
+        self.client.put(
+            "/api/workspaces/workspace_alpha/files/notes.txt",
+            json={"content": "hello\n"},
+        )
+        read_response = self.client.get("/api/workspaces/workspace_alpha/files/notes.txt")
+        self.assertEqual(200, read_response.status_code)
+        payload = read_response.json()
+        self.assertIn("content_sha256", payload)
+        self.assertEqual(64, len(payload["content_sha256"]))
+
+    def test_write_with_stale_base_sha256_is_rejected(self) -> None:
+        self.client.put(
+            "/api/workspaces/workspace_alpha/files/notes.txt",
+            json={"content": "original\n"},
+        )
+        loaded = self.client.get("/api/workspaces/workspace_alpha/files/notes.txt")
+        stale_sha = loaded.json()["content_sha256"]
+
+        # Someone else (an agent, another operator tab) changes the file first.
+        self.client.put(
+            "/api/workspaces/workspace_alpha/files/notes.txt",
+            json={"content": "changed by someone else\n"},
+        )
+
+        conflict_response = self.client.put(
+            "/api/workspaces/workspace_alpha/files/notes.txt",
+            json={"content": "my stale edit\n", "base_sha256": stale_sha},
+        )
+        self.assertEqual(409, conflict_response.status_code)
+
+        # The other writer's content must survive — no last-write-wins clobber.
+        read_response = self.client.get("/api/workspaces/workspace_alpha/files/notes.txt")
+        self.assertEqual("changed by someone else\n", read_response.json()["content"])
+
+    def test_write_with_current_base_sha256_succeeds(self) -> None:
+        self.client.put(
+            "/api/workspaces/workspace_alpha/files/notes.txt",
+            json={"content": "original\n"},
+        )
+        loaded = self.client.get("/api/workspaces/workspace_alpha/files/notes.txt")
+        current_sha = loaded.json()["content_sha256"]
+
+        write_response = self.client.put(
+            "/api/workspaces/workspace_alpha/files/notes.txt",
+            json={"content": "updated\n", "base_sha256": current_sha},
+        )
+        self.assertEqual(200, write_response.status_code)
+        self.assertEqual("updated\n", self.client.get(
+            "/api/workspaces/workspace_alpha/files/notes.txt"
+        ).json()["content"])
+
+    def test_write_without_base_sha256_keeps_last_write_wins(self) -> None:
+        self.client.put(
+            "/api/workspaces/workspace_alpha/files/notes.txt",
+            json={"content": "first\n"},
+        )
+        write_response = self.client.put(
+            "/api/workspaces/workspace_alpha/files/notes.txt",
+            json={"content": "second, no version check\n"},
+        )
+        self.assertEqual(200, write_response.status_code)
+
     def test_rename_workspace_file_rejects_existing_target(self) -> None:
         self.client.put(
             "/api/workspaces/workspace_alpha/files/src/deep.txt",

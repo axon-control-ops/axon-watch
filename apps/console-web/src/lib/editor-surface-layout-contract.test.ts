@@ -118,6 +118,20 @@ describe('IDE editor surface layout contract', () => {
     expect(focus).toMatch(/outline-offset:\s*2px/);
   });
 
+  it('styles the IDE editor status-bar problems chip with failure attention', () => {
+    const panels = readCss('shell/editor-statusbar-panels.css');
+    const chip = ruleBlock(panels, '.editor-statusbar__panel-toggle--problems');
+    expect(chip).toMatch(/border-color:\s*rgba\(255,\s*110,\s*90,\s*0\.38\)/);
+    expect(chip).toMatch(/box-shadow:\s*inset 0 -1px 0 rgba\(190,\s*80,\s*60,\s*0\.38\)/);
+
+    const focus = ruleBlock(
+      panels,
+      '.editor-statusbar__panel-toggle--problems:focus-visible',
+    );
+    expect(focus).toMatch(/outline:\s*2px solid rgba\(220,\s*110,\s*90,\s*0\.55\)/);
+    expect(focus).toMatch(/outline-offset:\s*2px/);
+  });
+
   it('styles the IDE editor status-bar team-attention chips with roster tones', () => {
     const panels = readCss('shell/editor-statusbar-panels.css');
     const failure = ruleBlock(panels, '.editor-statusbar__panel-toggle--team-failure');
@@ -345,6 +359,25 @@ describe('IDE editor surface layout contract', () => {
 
     const hintAlert = ruleBlock(rosterAlert, '.company-roster__hint--alert');
     expect(hintAlert).toMatch(/border:\s*1px solid rgba\(190,\s*80,\s*60,\s*0\.32\)/);
+  });
+
+  it('keeps the TEAM header fixed and makes the persona dock the sole vertical scroller', () => {
+    const shell32 = readCss('shell/mockup-shell-32.css');
+    const teamScroll = readCss('shell/mockup-shell-team-scroll.css');
+    const roster = ruleBlock(shell32, '.company-roster--ide');
+    const teamBody = ruleBlock(shell32, '.ide-team-panel__body');
+    const dock = ruleBlock(teamScroll, '.company-roster--ide .company-roster__dock-host');
+    const persona = ruleBlock(
+      teamScroll,
+      '.company-roster--ide .agent-persona-dock,\n.console-shell--mockup.console-shell--glass3d .ide-team-panel .agent-persona-dock',
+    );
+
+    expect(roster).toMatch(/overflow:\s*hidden/);
+    expect(teamBody).toMatch(/overflow:\s*hidden/);
+    expect(dock).toMatch(/max-height:\s*100%/);
+    expect(dock).toMatch(/min-height:\s*0/);
+    expect(dock).toMatch(/scrollbar-gutter:\s*stable/);
+    expect(persona).toMatch(/min-height:\s*0/);
   });
 
   it('loads composer file attachment styles from the ide-layout aggregator', () => {

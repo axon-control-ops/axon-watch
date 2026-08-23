@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Callable
 
 from app.adapters.watch_client import fetch_watch_inbox
+from app.signal_explanation import resolve_signal_explanation
 
 WatchInboxFetcher = Callable[[], dict[str, object] | None]
 
@@ -33,8 +34,16 @@ def project_inbox_item(item: dict[str, object]) -> dict[str, object]:
             ),
         }
     )
-    if isinstance(item.get("meta"), dict):
-        projected["meta"] = item["meta"]
+    meta = dict(item["meta"]) if isinstance(item.get("meta"), dict) else {}
+    explanation = resolve_signal_explanation(projected)
+    if explanation is not None:
+        # Feed the existing frontend override contract (operator-signal-hints.ts,
+        # metaPlainOverride) instead of adding a parallel explanation field —
+        # that resolver already renders what/youDo/agentDo in the Attention panel.
+        meta.setdefault("operator_what", explanation.plain_explanation)
+        meta.setdefault("operator_you_do", explanation.next_step)
+    if meta:
+        projected["meta"] = meta
     return projected
 
 
@@ -100,14 +109,57 @@ def _merge_ci_remediation_items(
     return out
 
 
+def _merge_fleet_repair_items(
+    projected: dict[str, object],
+) -> dict[str, object]:
+    """Overlay VAXON fleet self-heal signals stored in control-plane onto watch inbox."""
+    try:
+        from app.fleet_self_heal.report import fleet_repair_inbox_items
+    except Exception:  # noqa: BLE001 — inbox must stay available if module fails
+        return projected
+    fleet_items = fleet_repair_inbox_items()
+    if not fleet_items:
+        return projected
+    existing = projected.get("items")
+    items = [row for row in existing if isinstance(row, dict)] if isinstance(existing, list) else []
+    seen = {
+        str(row.get("signal_id") or "").strip()
+        for row in items
+        if str(row.get("signal_id") or "").strip()
+    }
+    merged = list(items)
+    for raw in fleet_items:
+        projected_item = project_inbox_item(raw)
+        signal_id = str(projected_item.get("signal_id") or "").strip()
+        if signal_id and signal_id in seen:
+            continue
+        if signal_id:
+            seen.add(signal_id)
+        merged.insert(0, projected_item)
+    out = dict(projected)
+    out["items"] = merged
+    out["count"] = len(merged)
+    return out
+
+
 def build_inbox_response(
     *,
     inbox_fetcher: WatchInboxFetcher | None = None,
     allow_empty_unavailable: bool = False,
+    force_refresh: bool = False,
 ) -> dict[str, object]:
-    fetcher = inbox_fetcher or fetch_watch_inbox
+    if inbox_fetcher is not None:
+        raw = inbox_fetcher()
+    elif force_refresh:
+        # Bypass both this control-plane's short cache and the watch
+        # service's own ~45s IMAP-poll cache -- an operator-triggered
+        # "Refresh" must reach real IMAP, not project a stale snapshot.
+        raw = fetch_watch_inbox(force_refresh=True)
+    else:
+        raw = fetch_watch_inbox()
     projected = project_watch_inbox(
-        fetcher(),
+        raw,
         allow_empty_unavailable=allow_empty_unavailable,
     )
-    return _merge_ci_remediation_items(projected)
+    projected = _merge_ci_remediation_items(projected)
+    return _merge_fleet_repair_items(projected)

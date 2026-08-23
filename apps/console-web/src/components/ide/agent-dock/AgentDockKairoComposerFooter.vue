@@ -10,6 +10,12 @@ defineProps<{
   runMutationError: string | null;
   workspaceSelected: boolean;
 }>();
+
+const emit = defineEmits<{
+  dismissKairoConversationError: [];
+  dismissCommandMutationError: [];
+  dismissRunMutationError: [];
+}>();
 </script>
 
 <template>
@@ -26,7 +32,18 @@ defineProps<{
     role="alert"
   >
     <span class="agent-dock-notice__rail" aria-hidden="true" />
-    <p class="agent-dock-notice__copy">{{ kairoConversationError }}</p>
+    <div class="agent-dock-notice__body">
+      <p class="agent-dock-notice__copy">{{ kairoConversationError }}</p>
+      <div class="agent-dock-notice__actions">
+        <button
+          type="button"
+          class="agent-dock-notice__link"
+          @click="emit('dismissKairoConversationError')"
+        >
+          Dismiss
+        </button>
+      </div>
+    </div>
   </div>
   <p v-else-if="composerMode === 'kairo'" class="agent-dock-composer__kairo-hint">
     Tap header {{ operatorPersonaName }} to pause or continue · Esc stops speech · Mic barge-in
@@ -38,7 +55,18 @@ defineProps<{
     role="alert"
   >
     <span class="agent-dock-notice__rail" aria-hidden="true" />
-    <p class="agent-dock-notice__copy">{{ commandMutationError }}</p>
+    <div class="agent-dock-notice__body">
+      <p class="agent-dock-notice__copy">{{ commandMutationError }}</p>
+      <div class="agent-dock-notice__actions">
+        <button
+          type="button"
+          class="agent-dock-notice__link"
+          @click="emit('dismissCommandMutationError')"
+        >
+          Dismiss
+        </button>
+      </div>
+    </div>
   </div>
   <div
     v-if="runMutationError"
@@ -46,6 +74,17 @@ defineProps<{
     role="alert"
   >
     <span class="agent-dock-notice__rail" aria-hidden="true" />
-    <p class="agent-dock-notice__copy">{{ runMutationError }}</p>
+    <div class="agent-dock-notice__body">
+      <p class="agent-dock-notice__copy">{{ runMutationError }}</p>
+      <div class="agent-dock-notice__actions">
+        <button
+          type="button"
+          class="agent-dock-notice__link"
+          @click="emit('dismissRunMutationError')"
+        >
+          Dismiss
+        </button>
+      </div>
+    </div>
   </div>
 </template>

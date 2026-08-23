@@ -9,6 +9,7 @@ import uuid
 from typing import Any
 
 from app.persistence import run_store_sqlite
+from app.persistence.schema_serialization import serialized_schema
 
 _HANDOFF_COLUMNS = (
     "handoff_id",
@@ -22,6 +23,7 @@ _HANDOFF_COLUMNS = (
     "routed_employee_id",
     "communication_thread_id",
     "source_communication_thread_id",
+    "mission_id",
     "created_at",
     "updated_at",
 )
@@ -32,6 +34,7 @@ _OPTIONAL_COLUMNS: tuple[tuple[str, str], ...] = (
     ("routed_employee_id", "TEXT NOT NULL DEFAULT ''"),
     ("communication_thread_id", "TEXT"),
     ("source_communication_thread_id", "TEXT"),
+    ("mission_id", "TEXT"),
 )
 
 
@@ -63,6 +66,7 @@ def _utc_now_iso() -> str:
     )
 
 
+@serialized_schema
 def ensure_handoff_schema(connection: Any) -> None:
     connection.execute(
         """
@@ -78,6 +82,7 @@ def ensure_handoff_schema(connection: Any) -> None:
             routed_employee_id TEXT NOT NULL DEFAULT '',
             communication_thread_id TEXT,
             source_communication_thread_id TEXT,
+            mission_id TEXT,
             created_at TEXT NOT NULL,
             updated_at TEXT NOT NULL
         )
@@ -128,6 +133,7 @@ def _row_to_record(row: Any) -> dict[str, Any]:
         "routed_employee_id": str(_get("routed_employee_id", "") or ""),
         "communication_thread_id": _get("communication_thread_id"),
         "source_communication_thread_id": _get("source_communication_thread_id"),
+        "mission_id": _get("mission_id"),
         "created_at": row["created_at"],
         "updated_at": row["updated_at"],
     }
@@ -153,6 +159,7 @@ def save_handoff(record: dict[str, Any]) -> dict[str, Any]:
         "routed_employee_id": str(record.get("routed_employee_id") or ""),
         "communication_thread_id": record.get("communication_thread_id"),
         "source_communication_thread_id": record.get("source_communication_thread_id"),
+        "mission_id": record.get("mission_id"),
         "created_at": str(record["created_at"]),
         "updated_at": str(record["updated_at"]),
     }
@@ -176,6 +183,7 @@ def create_handoff_record(
     target_workspace_id: str,
     task: str,
     reason: str = "",
+    mission_id: str | None = None,
 ) -> dict[str, Any]:
     timestamp = _utc_now_iso()
     record = {
@@ -190,6 +198,7 @@ def create_handoff_record(
         "routed_employee_id": "",
         "communication_thread_id": None,
         "source_communication_thread_id": None,
+        "mission_id": (mission_id or "").strip() or None,
         "created_at": timestamp,
         "updated_at": timestamp,
     }
@@ -209,6 +218,7 @@ def update_handoff(handoff_id: str, **fields: Any) -> dict[str, Any] | None:
         "source_communication_thread_id",
         "task",
         "reason",
+        "mission_id",
     }
     updates = {key: value for key, value in fields.items() if key in allowed}
     if not updates:

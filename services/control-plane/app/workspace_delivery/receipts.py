@@ -51,3 +51,12 @@ def delivery_refs_from_record(record: dict[str, Any] | None) -> dict[str, Any]:
         if value not in (None, "") and key not in refs:
             refs[key] = value
     return refs
+
+
+def mission_refs_for_task(task_id: str | None) -> dict[str, str]:
+    if not task_id:
+        return {}
+    from app.persistence import task_store
+
+    mission_id = str((task_store.get_task(task_id) or {}).get("mission_id") or "").strip()
+    return {"mission_id": mission_id} if mission_id else {}

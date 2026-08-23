@@ -1,14 +1,23 @@
 import { describe, expect, it } from 'vitest';
 
-import { shouldShowVaxonRosterVoiceDock } from './use-vaxon-roster-voice-dock';
+import {
+  shouldShowVaxonRosterVoiceDock,
+  vaxonRosterDisplayLine,
+} from './use-vaxon-roster-voice-dock';
 
 describe('shouldShowVaxonRosterVoiceDock', () => {
-  it('hides the roster popup on Mission Control because right Live Ops owns VAXON', () => {
+  it('always renders the canonical VAXON name', () => {
+    expect(vaxonRosterDisplayLine('Vekson is attending the signal.')).toBe(
+      'VAXON is attending the signal.',
+    );
+  });
+
+  it('hides the roster popup on Mission Control because the VAXON tab owns presence', () => {
     expect(
       shouldShowVaxonRosterVoiceDock({
         layoutMode: 'operator',
         operatorBrainGalaxyActive: false,
-        operatorCenterView: 'grid',
+        operatorCenterView: 'mission',
         voiceDockVisible: true,
       }),
     ).toBe(false);

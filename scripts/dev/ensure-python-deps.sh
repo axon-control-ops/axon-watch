@@ -3,6 +3,7 @@ set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 source "${repo_root}/scripts/dev/lib/common.sh"
+cd "${repo_root}"
 
 python_bin="$(resolve_python)"
 

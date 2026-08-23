@@ -75,10 +75,14 @@
   overflow: auto;
   overflow-x: hidden;
   overscroll-behavior: contain;
-  padding: 0 0.8rem 0.7rem;
+  /* Extra bottom room so the last reply clears sticky chrome + composer seam. */
+  padding: 0 0.8rem 1.6rem;
+  scroll-padding-bottom: 1.25rem;
 }
 
 .agent-dock__transcript .conversation-seam {
+  flex: 0 0 auto;
+  height: auto;
   min-height: min-content;
   min-width: 0;
   max-width: 100%;
@@ -88,8 +92,10 @@
 
 .agent-dock__transcript .conversation-seam__list {
   gap: 0.55rem;
+  /* Never become a competing scrollport — transcript owns vertical scroll. */
   overflow: visible;
-  flex: 1 1 auto;
+  flex: 0 0 auto;
+  height: auto;
   min-height: 0;
   min-width: 0;
   max-width: 100%;
@@ -127,6 +133,11 @@
 
 .agent-dock__transcript .conversation-seam__turn-reply {
   min-width: 0;
+}
+
+.agent-dock__transcript .conversation-seam__list > .conversation-seam__turn:last-child,
+.agent-dock__transcript .conversation-seam__list > .conversation-seam__item:last-child {
+  scroll-margin-bottom: 1rem;
 }
 
 .agent-dock__transcript .conversation-seam__item--agent {
@@ -178,6 +189,30 @@
   width: 100%;
   max-width: 100%;
   box-sizing: border-box;
+}
+
+/* Operator prompts stay compact even when an Instructions brief is long.
+ * The complete source remains available through this internal scroll area,
+ * while the following agent reply keeps its usable vertical space. */
+.agent-dock__transcript .conversation-seam__content--operator {
+  max-height: 6.25rem;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 0.38rem 0.62rem;
+  border: 1px solid rgba(104, 204, 255, 0.16);
+  border-radius: 0.45rem;
+  background: rgba(25, 29, 36, 0.8);
+  scrollbar-width: thin;
+  scrollbar-color: rgba(99, 216, 255, 0.5) transparent;
+}
+
+.agent-dock__transcript .conversation-seam__content--operator::-webkit-scrollbar {
+  width: 0.32rem;
+}
+
+.agent-dock__transcript .conversation-seam__content--operator::-webkit-scrollbar-thumb {
+  border-radius: 99px;
+  background: rgba(99, 216, 255, 0.5);
 }
 
 .agent-dock__transcript .conversation-seam__role {
@@ -398,7 +433,8 @@
 
 /* Quieter IDE transcript density — more events visible without a prose wall. */
 .console-shell--mockup.console-shell--ide .agent-dock__transcript {
-  padding: 0 0.65rem 0.55rem;
+  padding: 0 0.65rem 1.6rem;
+  scroll-padding-bottom: 1.25rem;
 }
 
 .console-shell--mockup.console-shell--ide .agent-dock__transcript .conversation-seam__list {
@@ -426,4 +462,3 @@
   padding-left: 0.7rem;
   padding-right: 0.7rem;
 }
-

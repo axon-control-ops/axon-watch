@@ -114,12 +114,12 @@ const BOOTSTRAP_SUMMARY_SIGNAL_IDS = new Set([
   'signal_watch_bootstrap_ready',
 ]);
 
-export function isBootstrapSummarySignal(signalId: string, title: string): boolean {
-  return (
-    BOOTSTRAP_SUMMARY_SIGNAL_IDS.has(signalId) ||
-    title.toLowerCase().includes('bootstrap') ||
-    title.toLowerCase().includes('runtime summary stale')
-  );
+export function isBootstrapSummarySignal(signalId: string, _title: string): boolean {
+  // Match on the exact known placeholder signal IDs only. A loose title
+  // substring match (e.g. "bootstrap") would also swallow real errors like
+  // "Failed to bootstrap connector after 3 retries" and wrongly tell the
+  // operator to ignore them.
+  return BOOTSTRAP_SUMMARY_SIGNAL_IDS.has(signalId);
 }
 
 function workspaceLabel(meta: Record<string, unknown> | null | undefined): string {
@@ -284,7 +284,7 @@ export function explainOperatorAlert(input: {
 
   if (isBootstrapSummarySignal(signalId, title)) {
     return {
-      what: 'This is a normal “still warming up” note in local development — not a production outage.',
+      what: 'This is a normal “still warming up” note while Watch finishes connecting — not an outage.',
       youDo: 'You can ignore it, or keep using Command as usual. No repair step is required.',
       agentDo: 'Do not treat this as an incident. Confirm Watch is connected, then continue with the operator’s real request.',
       spoken: askShapedSpoken(

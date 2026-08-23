@@ -28,9 +28,10 @@ if (($#)); then
 fi
 export AXON_WATCH_VITE_HMR="$HMR"
 
-# Gate 2: local_token + AUTH_ALLOW_LOOPBACK=0 means the Vite /api proxy must
-# inject AXON_WATCH_OPERATOR_TOKEN. Always-on :4173 gets this via systemd
-# EnvironmentFile; load the same deployment.env for the :5173 edit window.
+# Load deployment settings so Vite and the control-plane agree on auth mode.
+# Browser mutations use the HttpOnly operator session by default. A trusted
+# local developer may explicitly restore legacy proxy injection with
+# AXON_WATCH_VITE_INJECT_OPERATOR_TOKEN=1.
 env_file="${AXON_WATCH_DEPLOYMENT_ENV:-${HOME}/.config/axon-watch/deployment.env}"
 if [[ ! -f "${env_file}" && -f /etc/axon-watch/deployment.env ]]; then
   env_file=/etc/axon-watch/deployment.env

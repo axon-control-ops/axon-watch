@@ -6,6 +6,7 @@ import {
   resolveAgentContinuePrompt,
   runContinueActionLabel,
   shouldOfferRunContinue,
+  shouldOfferRunStop,
 } from './run-lifecycle-ui';
 
 describe('run-lifecycle-ui', () => {
@@ -20,7 +21,13 @@ describe('run-lifecycle-ui', () => {
     expect(isOperatorCompletablePhase('cancelled')).toBe(false);
   });
 
-  it('offers continue for idle agent execute and resumable phases', () => {
+  it('offers stop only when the backend grants can_stop', () => {
+    expect(shouldOfferRunStop(true)).toBe(true);
+    expect(shouldOfferRunStop(false)).toBe(false);
+    expect(shouldOfferRunStop(undefined)).toBe(false);
+  });
+
+  it('offers resume only for paused or input-blocked resumable runs', () => {
     expect(
       shouldOfferRunContinue({
         phase: 'executing',
@@ -28,7 +35,7 @@ describe('run-lifecycle-ui', () => {
         agentStreamActive: false,
         mode: 'agent',
       }),
-    ).toBe(true);
+    ).toBe(false);
     expect(
       shouldOfferRunContinue({
         phase: 'executing',
@@ -44,7 +51,7 @@ describe('run-lifecycle-ui', () => {
         agentStreamActive: false,
         mode: 'debug',
       }),
-    ).toBe(true);
+    ).toBe(false);
     expect(
       shouldOfferRunContinue({
         phase: 'executing',
@@ -60,6 +67,20 @@ describe('run-lifecycle-ui', () => {
         agentStreamActive: false,
       }),
     ).toBe(true);
+    expect(
+      shouldOfferRunContinue({
+        phase: 'awaiting_input',
+        canResume: true,
+        agentStreamActive: false,
+      }),
+    ).toBe(true);
+    expect(
+      shouldOfferRunContinue({
+        phase: 'review_ready',
+        canResume: true,
+        agentStreamActive: false,
+      }),
+    ).toBe(false);
   });
 
   it('labels idle agent execute as CONTINUE', () => {

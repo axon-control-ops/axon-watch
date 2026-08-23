@@ -16,12 +16,24 @@ const emit = defineEmits<{
   openVaxonReview: [planId: string | null | undefined];
 }>();
 
-const MAX_VISIBLE_PLANS = 10;
+/** Keep the chip row short — Mission Control was a horizontal maze at 9+. */
+const MAX_VISIBLE_PLANS = 4;
 
 const plannedGroups = computed(() => props.planGroups.filter((item) => item.planId));
-const visiblePlans = computed(() => plannedGroups.value.slice(0, MAX_VISIBLE_PLANS));
+
+/** Engage-first so the row is a map, not a dump of every goal snippet. */
+const rankedPlans = computed(() =>
+  [...plannedGroups.value].sort((left, right) => {
+    if (left.awaitingEngagement !== right.awaitingEngagement) {
+      return left.awaitingEngagement ? -1 : 1;
+    }
+    return 0;
+  }),
+);
+
+const visiblePlans = computed(() => rankedPlans.value.slice(0, MAX_VISIBLE_PLANS));
 const hiddenPlanCount = computed(() =>
-  Math.max(0, plannedGroups.value.length - MAX_VISIBLE_PLANS),
+  Math.max(0, rankedPlans.value.length - MAX_VISIBLE_PLANS),
 );
 const engageGroups = computed(() =>
   plannedGroups.value.filter((item) => item.awaitingEngagement),
@@ -41,6 +53,21 @@ const showFilter = computed(
     reopenGroups.value.length > 0,
 );
 
+/** One Close CTA — not a Close chip per engage plan. */
+const primaryClosePlan = computed(() => {
+  if (props.planFilterId !== 'all') {
+    return engageGroups.value.find((group) => group.planId === props.planFilterId) ?? null;
+  }
+  return engageGroups.value[0] ?? null;
+});
+
+const primaryReopenPlan = computed(() => {
+  if (props.planFilterId !== 'all') {
+    return reopenGroups.value.find((group) => group.planId === props.planFilterId) ?? null;
+  }
+  return reopenGroups.value[0] ?? null;
+});
+
 function selectEngagePlan(planId: string | null | undefined): void {
   emit('update:planFilterId', planId ?? 'all');
   emit('openVaxonReview', planId);
@@ -49,9 +76,35 @@ function selectEngagePlan(planId: string | null | undefined): void {
 
 <template>
   <div v-if="showFilter" class="operator-task-board__plan-filter">
-    <p class="operator-task-board__plan-filter-label">Plans</p>
+    <div class="operator-task-board__plan-filter-top">
+      <p class="operator-task-board__plan-filter-label">Plans</p>
+      <p class="operator-task-board__plan-filter-help">
+        Filter the board. Review now opens the Lead rollup over Live operations.
+      </p>
+    </div>
+    <section
+      v-for="group in engageGroups"
+      :key="`decision-${group.planId}`"
+      class="operator-task-board__lead-decision"
+    >
+      <p class="operator-task-board__lead-decision-eyebrow">Lead decision ready</p>
+      <strong>{{ group.planLabel }}</strong>
+      <p>{{ group.planGoal }}</p>
+      <small>Review the verified Lead rollup before starting any follow-up work.</small>
+      <div class="operator-task-board__lead-decision-actions">
+        <button type="button" @click="selectEngagePlan(group.planId)">Review now</button>
+        <button
+          type="button"
+          class="operator-task-board__lead-decision-complete"
+          :disabled="leadPlansMutating"
+          @click="emit('closeLeadPlan', group.planId)"
+        >
+          Mark review complete
+        </button>
+      </div>
+    </section>
     <p class="operator-task-board__plan-filter-help">
-      Engage = Lead synthesis waiting in VAXON. Dismiss closes that review; Re-open brings the chip back.
+      Review now overlays the verified Lead rollup on the right dock. Mark review complete when no follow-up is needed.
     </p>
     <div class="operator-task-board__plan-tabs" role="tablist" aria-label="Lead plan filter">
       <button
@@ -62,7 +115,10 @@ function selectEngagePlan(planId: string | null | undefined): void {
         :aria-selected="planFilterId === 'all'"
         @click="emit('update:planFilterId', 'all')"
       >
-        All plans
+        All
+        <span v-if="plannedGroups.length" class="operator-task-board__plan-chip-count">
+          {{ plannedGroups.length }}
+        </span>
       </button>
       <button
         v-for="group in visiblePlans"
@@ -74,7 +130,7 @@ function selectEngagePlan(planId: string | null | undefined): void {
         :aria-selected="planFilterId === group.planId"
         :title="
           group.awaitingEngagement
-            ? `Open VAXON Lead review · ${group.planGoal}`
+            ? `Review Lead rollup · ${group.planGoal}`
             : group.planGoal
         "
         @click="
@@ -85,38 +141,61 @@ function selectEngagePlan(planId: string | null | undefined): void {
       >
         <span class="operator-task-board__plan-chip-text">{{ group.planLabel }}</span>
         <span v-if="group.awaitingEngagement" class="operator-task-board__plan-chip-tag">
-          engage
+          review now
         </span>
       </button>
       <span
         v-if="hiddenPlanCount > 0"
         class="operator-task-board__plan-more"
-        :title="`${hiddenPlanCount} older plan(s) hidden — filter via All or open a task`"
+        :title="`${hiddenPlanCount} older plan(s) hidden — pick All or open a task`"
       >
-        +{{ hiddenPlanCount }} more
+        +{{ hiddenPlanCount }}
       </span>
       <button
-        v-for="group in engageGroups"
-        :key="`close-${group.planId}`"
+        v-if="primaryClosePlan"
         type="button"
         class="operator-task-board__plan-chip operator-task-board__plan-chip--close"
         :disabled="leadPlansMutating"
-        :title="`Dismiss Lead review in VAXON: ${group.planGoal}`"
-        @click.stop="emit('closeLeadPlan', group.planId)"
+        :title="`Close Lead review: ${primaryClosePlan.planGoal}`"
+        @click.stop="emit('closeLeadPlan', primaryClosePlan.planId)"
       >
-        Dismiss review · {{ group.planLabel }}
+        Close review
+        <span v-if="engageGroups.length > 1" class="operator-task-board__plan-chip-count">
+          {{ engageGroups.length }}
+        </span>
       </button>
       <button
-        v-for="group in reopenGroups"
-        :key="`reopen-${group.planId}`"
+        v-if="primaryReopenPlan"
         type="button"
         class="operator-task-board__plan-chip"
         :disabled="leadPlansMutating"
-        :title="`Re-open Lead review chip for: ${group.planGoal}`"
-        @click.stop="emit('reopenLeadPlan', group.planId)"
+        :title="`Re-open Lead review for: ${primaryReopenPlan.planGoal}`"
+        @click.stop="emit('reopenLeadPlan', primaryReopenPlan.planId)"
       >
-        Re-open review · {{ group.planLabel }}
+        Re-open
       </button>
     </div>
+    <label v-if="hiddenPlanCount > 0" class="operator-task-board__plan-select-label">
+      <span class="sr-only">Jump to plan</span>
+      <select
+        class="operator-task-board__plan-select"
+        :value="planFilterId"
+        @change="
+          emit(
+            'update:planFilterId',
+            (($event.target as HTMLSelectElement).value || 'all') as string | 'all',
+          )
+        "
+      >
+        <option value="all">All plans ({{ plannedGroups.length }})</option>
+        <option
+          v-for="group in rankedPlans"
+          :key="group.planId ?? 'none'"
+          :value="group.planId ?? 'all'"
+        >
+          {{ group.awaitingEngagement ? 'Engage · ' : '' }}{{ group.planLabel }}
+        </option>
+      </select>
+    </label>
   </div>
 </template>

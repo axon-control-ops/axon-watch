@@ -8,6 +8,7 @@ import {
   type OperatorEvidenceRecord,
   type OperatorMemoryRecord,
 } from '../../api/operator-api';
+import { fetchWorkspaceComposerPrefs, saveWorkspaceComposerPrefs } from '../../api/workspace-api';
 import {
   evidenceKindLabel,
   projectEmailTriageHandoffMeta,
@@ -15,6 +16,8 @@ import {
   projectEvidenceRows,
   projectEvidenceTags,
 } from './operator-evidence-projector';
+
+const ALL_RUNTIMES = ['codex', 'claude', 'cursor'];
 
 const props = defineProps<{
   nodeId: string | null;
@@ -56,6 +59,46 @@ const workspaceId = computed(() => {
   const source = evidence.value?.sources.find((item) => item.workspace_id?.trim());
   return source?.workspace_id?.trim() ?? '';
 });
+
+const workspaceAutoAllowed = ref<string[]>([]);
+const workspaceAutonomyLoaded = ref(false);
+const workspaceAutonomySaving = ref(false);
+const workspaceAutonomyOn = computed(() => workspaceAutoAllowed.value.length > 0);
+
+async function loadWorkspaceAutonomy(id: string): Promise<void> {
+  workspaceAutonomyLoaded.value = false;
+  if (!id) {
+    workspaceAutoAllowed.value = [];
+    return;
+  }
+  try {
+    const prefs = await fetchWorkspaceComposerPrefs(id);
+    workspaceAutoAllowed.value = prefs.auto_allowed_runtimes ?? [];
+  } catch {
+    workspaceAutoAllowed.value = [];
+  } finally {
+    workspaceAutonomyLoaded.value = true;
+  }
+}
+
+async function toggleWorkspaceAutonomy(): Promise<void> {
+  const id = workspaceId.value;
+  if (!id || workspaceAutonomySaving.value) {
+    return;
+  }
+  const nextRuntimes = workspaceAutonomyOn.value ? [] : [...ALL_RUNTIMES];
+  workspaceAutonomySaving.value = true;
+  try {
+    const saved = await saveWorkspaceComposerPrefs(id, { auto_allowed_runtimes: nextRuntimes });
+    workspaceAutoAllowed.value = saved.auto_allowed_runtimes ?? nextRuntimes;
+  } catch (toggleError) {
+    statusLine.value = toggleError instanceof Error ? toggleError.message : 'Autonomy toggle failed.';
+  } finally {
+    workspaceAutonomySaving.value = false;
+  }
+}
+
+watch(workspaceId, (id) => void loadWorkspaceAutonomy(id), { immediate: true });
 
 const shownTitle = computed(() => evidence.value?.title ?? props.fallbackTitle);
 const shownBody = computed(() => evidence.value?.summary ?? props.fallbackBody);
@@ -202,6 +245,25 @@ watch(
     >
       {{ autonomyStatus.label }}
     </p>
+
+    <div v-if="workspaceId && workspaceAutonomyLoaded" class="galaxy-inspector__autonomy-toggle">
+      <span class="galaxy-inspector__autonomy-toggle-label">
+        AUTO dispatch for this workspace
+      </span>
+      <button
+        type="button"
+        class="galaxy-inspector__autonomy-switch"
+        role="switch"
+        :aria-checked="workspaceAutonomyOn"
+        :aria-label="`Toggle AUTO dispatch for ${workspaceId}`"
+        :disabled="workspaceAutonomySaving"
+        :class="{ 'galaxy-inspector__autonomy-switch--on': workspaceAutonomyOn }"
+        @click="toggleWorkspaceAutonomy"
+      >
+        <span class="galaxy-inspector__autonomy-switch-knob" />
+      </button>
+    </div>
+
     <p v-if="shownHint" class="galaxy-inspector__hint">{{ shownHint }}</p>
 
     <p v-if="loading" class="galaxy-inspector__status">Loading evidence…</p>

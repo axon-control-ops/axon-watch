@@ -19,15 +19,25 @@ export type IdeComposerActivity = {
 export function buildIdeComposerActivityLabel(
   mode: 'ask' | 'plan' | 'agent' | 'debug',
   executionAccess: AgentExecutionAccess,
+  runtimeFamily?: string | null,
 ): string {
+  const family = String(runtimeFamily ?? '').trim().toLowerCase();
+  const runtimePhrase =
+    family === 'cursor'
+      ? 'Cursor runtime'
+      : family === 'claude'
+        ? 'Claude runtime'
+        : family === 'codex'
+          ? 'Codex runtime'
+          : 'runtime';
   if (mode === 'debug' && executionAccess === 'full') {
-    return 'Debug · Full Access — contacting runtime…';
+    return `Debug · Full Access — contacting ${runtimePhrase}…`;
   }
   if (mode === 'debug') {
     return 'Debug — contacting runtime…';
   }
   if (mode === 'agent' && executionAccess === 'full') {
-    return 'Full Access — contacting Cursor/Codex runtime…';
+    return `Full Access — contacting ${runtimePhrase}…`;
   }
   if (mode === 'agent') {
     return 'Agent — contacting runtime…';

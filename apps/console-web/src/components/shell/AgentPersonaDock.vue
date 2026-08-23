@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, nextTick, ref, watch } from 'vue';
 
 import type { CompanyEmployeeRecord } from '../../contracts/canonical';
 import { buildEmployeeAvatar } from '../../features/workspace-agents/employee-avatar';
@@ -17,12 +17,23 @@ import {
   employeeFailureLine,
   employeeMetaLine,
   employeeRoleBadge,
+  employeeRuntimeShiftHint,
   employeeShiftNeedsContinuation,
   employeeStatusLabel,
   employeeTalkLine,
   employeeTalkLineDetailTooltip,
 } from '../../features/workspace-agents/company-roster-view';
+import {
+  APPROVE_PENDING_RECOVERY_ID,
+  failedShiftSubject,
+  pendingDecisionCardOptions,
+  pendingDecisionPrompt as resolvePendingDecisionPrompt,
+} from '../../features/workspace-agents/company-roster-focus';
 import { resolveEmployeeDeliveryLinks } from '../../features/workspace-agents/employee-delivery-handoff-view';
+import {
+  buildTeamPanelTranscriptLines,
+  type TeamPanelTranscriptLine,
+} from '../../lib/team-panel-transcript-view';
 
 const props = defineProps<{
   employee: CompanyEmployeeRecord;
@@ -30,11 +41,22 @@ const props = defineProps<{
   controlBusy: boolean;
   liveBusy?: boolean;
   handoffWaiting?: boolean;
+  /** Short hint while a headless worker shift is in flight. */
+  runtimeShiftHint?: string | null;
+  /** True while THIS employee's own thread is the one live-streaming right
+   * now — reveals `transcript` while the roster stays available. */
+  reporting?: boolean;
+  /** Full live/latest reply text for this employee's active turn. Only
+   * meaningful (and only rendered) while `reporting` is true. */
+  transcript?: string;
 }>();
 
 const emit = defineEmits<{
   action: [action: TeamMemberQuickAction];
   talk: [];
+  decision: [];
+  decisionOption: [option: { id: string; label: string }];
+  recoverFailure: [];
 }>();
 
 const avatar = computed(() =>
@@ -64,6 +86,23 @@ const deliveryLinks = computed(() =>
   }),
 );
 const liveBeat = computed(() => {
+  if (props.reporting) {
+    return (
+      props.runtimeShiftHint?.trim() ||
+      'Live shift in progress — activity streams below. Open the agent dock for full detail.'
+    );
+  }
+  if (props.liveBusy && props.runtimeShiftHint?.trim()) {
+    return props.runtimeShiftHint.trim();
+  }
+  const decisionSubject = failedShiftSubject(props.employee);
+  if (
+    props.employee.pending_decision_id
+    && decisionSubject
+    && decisionSubject.role !== (props.employee.role ?? '').trim().toLowerCase()
+  ) {
+    return `${props.employee.name} is holding a recovery review for ${decisionSubject.name} (${decisionSubject.role}).`;
+  }
   if (failure.value) {
     return failure.value;
   }
@@ -72,6 +111,19 @@ const liveBeat = computed(() => {
   }
   return employeeTalkLine(props.employee) || `${employeeStatusLabel(employeeDisplayStatus(props.employee))} on ${props.employee.owns || 'assigned work'}.`;
 });
+const transcriptLines = computed((): TeamPanelTranscriptLine[] => {
+  if (!props.reporting || !props.transcript?.trim()) {
+    return [];
+  }
+  return buildTeamPanelTranscriptLines(props.transcript, {
+    streaming: true,
+    maxLines: 14,
+  });
+});
+const showReceipt = computed(
+  () => Boolean(receiptDetail.value || receiptRunId.value) && !props.reporting,
+);
+const showDeliveryLinks = computed(() => Boolean(deliveryLinks.value) && !props.reporting);
 const receiptDetail = computed(() => employeeDockReceiptDetail(props.employee));
 const receiptRunId = computed(() => employeeDockReceiptRunId(props.employee));
 const receiptRunLabel = computed(() => employeeDockReceiptRunLabel(receiptRunId.value));
@@ -81,16 +133,69 @@ const receiptsAction = computed(() =>
 const displayActions = computed(() =>
   employeeDockDisplayActions(props.actions, props.employee),
 );
+const dockPrimaryActionIds = new Set(['start_now', 'retry', 'talk', 'stop']);
+const dockPrimaryActions = computed(() =>
+  displayActions.value.filter((action) => dockPrimaryActionIds.has(action.id)),
+);
+const dockSecondaryActions = computed(() =>
+  displayActions.value.filter((action) => !dockPrimaryActionIds.has(action.id)),
+);
+const pendingDecision = computed(() => Boolean(props.employee.pending_decision_id));
+const pendingDecisionCopy = computed(
+  () => resolvePendingDecisionPrompt(props.employee) || 'Review the pending decision',
+);
+const pendingDecisionSubject = computed(() =>
+  failedShiftSubject(props.employee),
+);
+const pendingDecisionOptions = computed(() =>
+  pendingDecisionCardOptions(props.employee).slice(0, 3),
+);
+const hasRecoveryDecisionOption = computed(() =>
+  pendingDecisionOptions.value.some((option) => option.id === APPROVE_PENDING_RECOVERY_ID),
+);
+const retryActionLabel = computed(
+  () => displayActions.value.find((action) => action.id === 'retry')?.label ?? 'Try again',
+);
+
+const transcriptRef = ref<HTMLElement | null>(null);
+
+// Follow the stream: keep the newest text in view as it grows, matching the
+// terminal/chat convention rather than leaving the operator scrolled to the
+// top of a card that's still filling in.
+watch(
+  () => props.transcript,
+  () => {
+    void nextTick(() => {
+      const target = transcriptRef.value;
+      if (!target) {
+        return;
+      }
+      target.scrollTop = target.scrollHeight;
+    });
+  },
+);
 </script>
 
 <template>
   <article
     class="agent-persona-dock"
-    :class="{ 'agent-persona-dock--interrupted': interruptedShift }"
+    :class="{
+      'agent-persona-dock--interrupted': interruptedShift,
+      'agent-persona-dock--reporting': reporting,
+    }"
     :data-presence="avatar.presence"
     :data-role="employee.role"
     :aria-label="`${employee.name} agent dock`"
   >
+    <button
+      v-if="employee.owns?.trim()"
+      type="button"
+      class="agent-persona-dock__owns-info"
+      :title="employee.owns"
+      :aria-label="`${employee.name} scope: ${employee.owns}`"
+    >
+      <span aria-hidden="true">i</span>
+    </button>
     <header class="agent-persona-dock__hero">
       <button
         type="button"
@@ -139,6 +244,13 @@ const displayActions = computed(() =>
             {{ employeeRoleBadge(employee) }}
           </span>
           <span
+            v-if="runtimeShiftHint"
+            class="company-roster__badge company-roster__badge--runtime"
+            :title="runtimeShiftHint"
+          >
+            Headless
+          </span>
+          <span
             v-if="!employee.enabled"
             class="company-roster__badge company-roster__badge--paused"
           >
@@ -148,7 +260,6 @@ const displayActions = computed(() =>
         <p v-if="employeeMetaLine(employee)" class="agent-persona-dock__meta">
           {{ employeeMetaLine(employee) }}
         </p>
-        <p class="agent-persona-dock__owns">{{ employee.owns }}</p>
       </div>
       <span
         class="agent-persona-dock__status"
@@ -158,22 +269,113 @@ const displayActions = computed(() =>
       </span>
     </header>
 
-    <p
-      class="agent-persona-dock__beat"
+    <div class="agent-persona-dock__scroll">
+    <div class="agent-persona-dock__body">
+    <button
+      v-if="failure"
+      type="button"
+      class="agent-persona-dock__beat agent-persona-dock__beat-btn"
       :class="{
-        'agent-persona-dock__beat--failed': !!failure && !interruptedShift,
-        'agent-persona-dock__beat--interrupted': !!failure && interruptedShift,
+        'agent-persona-dock__beat--failed': !interruptedShift,
+        'agent-persona-dock__beat--interrupted': interruptedShift,
       }"
       :title="beatDetailTooltip ?? undefined"
-      :aria-label="failureBeatAriaLabel ?? undefined"
-      :aria-live="failure ? 'polite' : undefined"
+      :aria-label="`${failureBeatAriaLabel ?? liveBeat}. Tap to ${retryActionLabel}.`"
+      @click="emit('recoverFailure')"
+    >
+      {{ liveBeat }}
+      <span class="agent-persona-dock__beat-cta">{{ retryActionLabel }} →</span>
+    </button>
+    <p
+      v-else
+      class="agent-persona-dock__beat"
+      :class="{ 'agent-persona-dock__beat--live': reporting }"
+      :title="beatDetailTooltip ?? undefined"
       role="status"
     >
       {{ liveBeat }}
     </p>
 
+    <section
+      v-if="pendingDecision"
+      class="agent-persona-dock__decision-alert"
+      aria-labelledby="agent-pending-decision-title"
+    >
+      <button
+        type="button"
+        class="agent-persona-dock__decision-main"
+        :aria-label="`Review ${employee.name}'s pending decision in the agent composer`"
+        @click="emit('decision')"
+      >
+        <span class="agent-persona-dock__decision-icon" aria-hidden="true">!</span>
+        <span class="agent-persona-dock__decision-copy">
+          <span class="agent-persona-dock__decision-kicker">
+            {{ pendingDecisionSubject ? `Recovery review for ${pendingDecisionSubject.name}` : 'Decision required' }}
+          </span>
+          <strong id="agent-pending-decision-title">{{ pendingDecisionCopy }}</strong>
+          <small v-if="pendingDecisionSubject && pendingDecisionSubject.role !== (employee.role ?? '').trim().toLowerCase()">
+            Decision owner: {{ employee.name }} ({{ employee.role }}) · Affected agent: {{ pendingDecisionSubject.name }} ({{ pendingDecisionSubject.role }})
+          </small>
+          <small v-else-if="pendingDecisionSubject">
+            Shift failure · {{ pendingDecisionSubject.name }} ({{ pendingDecisionSubject.role }})
+          </small>
+          <small v-else-if="pendingDecisionOptions.length">
+            {{ pendingDecisionOptions.map((option) => option.label).join(' · ') }}
+          </small>
+        </span>
+        <span class="agent-persona-dock__decision-open">Open decision in composer →</span>
+      </button>
+      <p class="agent-persona-dock__decision-help">
+        Opens this decision as an editable operator reply. The primary action creates a narrow
+        diagnosis task for the decision owner; it does not silently rerun the affected agent,
+        deploy, or make broad changes.
+      </p>
+      <div
+        v-if="pendingDecisionOptions.length"
+        class="agent-persona-dock__decision-options"
+        role="group"
+        :aria-label="`Decision options for ${employee.name}`"
+      >
+        <button
+          v-for="option in pendingDecisionOptions"
+          :key="option.id"
+          type="button"
+          class="agent-persona-dock__decision-option"
+          :class="{
+            'agent-persona-dock__decision-option--primary':
+              option.id === APPROVE_PENDING_RECOVERY_ID,
+          }"
+          @click="emit('decisionOption', option)"
+        >
+          {{ option.label }}
+        </button>
+      </div>
+      <p v-if="hasRecoveryDecisionOption" class="agent-persona-dock__decision-footnote">
+        Use diagnosis for recoverable runtime, quota, connectivity, or stale-shift blockers. Use
+        composer review when you need to steer the team or explicitly retry the affected agent.
+      </p>
+    </section>
+
+    <ul
+      v-if="transcriptLines.length"
+      ref="transcriptRef"
+      class="agent-persona-dock__transcript-list"
+      aria-label="Live shift activity"
+      aria-live="polite"
+    >
+      <li
+        v-for="line in transcriptLines"
+        :key="line.id"
+        class="agent-persona-dock__transcript-line"
+        :data-kind="line.kind"
+        :data-live="line.live ? 'true' : undefined"
+      >
+        {{ line.text }}
+      </li>
+    </ul>
+
     <div
-      v-if="deliveryLinks"
+      v-if="showDeliveryLinks && deliveryLinks"
       class="agent-persona-dock__delivery-links"
       aria-label="Open pull request and CI"
     >
@@ -202,7 +404,7 @@ const displayActions = computed(() =>
       </a>
     </div>
 
-    <section v-if="receiptDetail || receiptRunId" class="agent-persona-dock__receipt">
+    <section v-if="showReceipt" class="agent-persona-dock__receipt">
       <p class="agent-persona-dock__receipt-label">Last job</p>
       <p v-if="receiptDetail" class="agent-persona-dock__receipt-detail">
         {{ receiptDetail }}
@@ -224,30 +426,59 @@ const displayActions = computed(() =>
         <span v-else :title="receiptRunId">{{ receiptRunLabel || receiptRunId }}</span>
       </p>
     </section>
+    </div>
 
     <div
-      v-if="displayActions.length"
-      class="agent-persona-dock__actions"
+      v-if="dockPrimaryActions.length || dockSecondaryActions.length"
+      class="agent-persona-dock__action-stack"
       role="group"
       :aria-label="`Actions for ${employee.name}`"
     >
-      <button
-        v-for="action in displayActions"
-        :key="action.id"
-        type="button"
-        class="company-roster__action"
-        :class="{
-          'company-roster__action--surface': action.kind === 'surface',
-          'company-roster__action--retry': action.id === 'retry',
-          'company-roster__action--receipts': action.id === 'receipts',
-          'company-roster__action--control': action.kind === 'control',
-          'company-roster__action--start-now': action.id === 'start_now',
-        }"
-        :disabled="controlBusy && action.kind === 'control'"
-        @click="emit('action', action)"
+      <div
+        v-if="dockPrimaryActions.length"
+        class="agent-persona-dock__actions agent-persona-dock__actions--primary"
       >
-        {{ action.label }}
-      </button>
+        <button
+          v-for="action in dockPrimaryActions"
+          :key="action.id"
+          type="button"
+          class="company-roster__action"
+          :class="{
+            'company-roster__action--surface': action.kind === 'surface',
+            'company-roster__action--retry': action.id === 'retry',
+            'company-roster__action--receipts': action.id === 'receipts',
+            'company-roster__action--control': action.kind === 'control',
+            'company-roster__action--start-now': action.id === 'start_now',
+          }"
+          :disabled="controlBusy && action.kind === 'control'"
+          @click="emit('action', action)"
+        >
+          {{ action.label }}
+        </button>
+      </div>
+      <div
+        v-if="dockSecondaryActions.length"
+        class="agent-persona-dock__actions agent-persona-dock__actions--secondary"
+      >
+        <button
+          v-for="action in dockSecondaryActions"
+          :key="action.id"
+          type="button"
+          class="company-roster__action"
+          :class="{
+            'company-roster__action--surface': action.kind === 'surface',
+            'company-roster__action--retry': action.id === 'retry',
+            'company-roster__action--receipts': action.id === 'receipts',
+            'company-roster__action--control': action.kind === 'control',
+            'company-roster__action--start-now': action.id === 'start_now',
+          }"
+          :disabled="controlBusy && action.kind === 'control'"
+          @click="emit('action', action)"
+        >
+          {{ action.label }}
+        </button>
+      </div>
+    </div>
     </div>
   </article>
 </template>

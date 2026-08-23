@@ -2,8 +2,11 @@ import { describe, expect, it } from 'vitest';
 
 import {
   buildCursorCatalogRows,
+  composerRuntimeFamilyLabel,
   cursorComposerPickerRows,
   cursorComposerPickerRowsForActiveModel,
+  cursorComposerRuntimeLabel,
+  cursorModelLabel,
   isCursorComposerModel,
   resolveCursorComposerModel,
 } from './cursor-catalog-view';
@@ -58,5 +61,31 @@ describe('cursor-catalog-view', () => {
       row.id === 'gpt-5.4-high' ? { ...row, available: false } : row,
     );
     expect(resolveCursorComposerModel('gpt-5.4-high', withUnavailable)).toBe('composer-2.5-fast');
+  });
+});
+
+describe('composer runtime display labels', () => {
+  it('shows Cursor as the family strip label without local/cloud', () => {
+    expect(composerRuntimeFamilyLabel('cursor')).toBe('Cursor');
+    expect(composerRuntimeFamilyLabel('Cursor')).toBe('Cursor');
+    expect(cursorModelLabel('auto', [])).toBe('Auto');
+    expect(
+      cursorModelLabel('cursor-grok-4.5-high-fast', [
+        {
+          id: 'cursor-grok-4.5-high-fast',
+          label: 'Cursor Grok 4.5 Fast',
+          description: '',
+          available: true,
+        },
+      ]),
+    ).toBe('Grok 4.5 Fast');
+    expect(
+      cursorComposerRuntimeLabel({
+        family: 'cursor',
+        scope: 'local',
+        modelId: 'auto',
+        rows: [],
+      }),
+    ).toBe('Cursor · Auto');
   });
 });

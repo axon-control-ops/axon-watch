@@ -1,5 +1,8 @@
 @import './agent-persona-dock.css';
+@import './agent-persona-decision.css';
 @import './agent-persona-handoff.css';
+@import './agent-persona-dock-responsive.css';
+@import './agent-persona-dock-reporting.css';
 @import './company-roster-alert.css';
 @import './vaxon-roster-voice-dock.css';
 /* Company roster — workspace-as-company employee staffing */
@@ -7,8 +10,7 @@
 .company-roster {
   margin-top: 0.75rem;
   padding: 0.7rem 0.75rem 0.8rem;
-  border-top: 1px solid rgba(120, 170, 210, 0.14);
-  background: linear-gradient(180deg, rgba(8, 18, 28, 0.55), rgba(6, 12, 18, 0.2));
+  border-top: 1px solid rgba(120, 170, 210, 0.14); background: linear-gradient(180deg, rgba(8, 18, 28, 0.55), rgba(6, 12, 18, 0.2));
 }
 
 .company-roster__header {
@@ -16,9 +18,10 @@
 }
 
 .company-roster--persona-dock .company-roster__dock-host {
-  display: grid; gap: 0.55rem; flex: 1 1 auto; min-height: 6rem;
+  display: grid; gap: 0.55rem; flex: 1 1 auto; min-height: 0;
   overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain;
   container-type: inline-size; container-name: roster-dock;
+  scrollbar-gutter: stable;
 }
 .company-roster__header-row {
   display: flex;
@@ -306,6 +309,11 @@
   background: rgba(120, 80, 20, 0.35);
 }
 
+.company-roster__badge--runtime {
+  color: rgba(180, 220, 255, 0.95);
+  background: rgba(40, 90, 140, 0.35);
+}
+
 .company-roster__row--paused {
   opacity: 0.72;
 }
@@ -466,19 +474,59 @@
 
 .company-roster--ide {
   margin-top: 0;
-  padding: 0.55rem 0.7rem 0.75rem;
+  padding: clamp(0.45rem, 1.2vw, 0.7rem) clamp(0.45rem, 1.4vw, 0.75rem) 0.65rem;
   border-top: none;
   background: transparent;
   height: 100%;
   display: flex;
   flex-direction: column;
   min-height: 0;
+  min-width: 0;
+  overflow: hidden;
 }
 
-.company-roster--ide .company-roster__header,
+.company-roster--ide .company-roster__title {
+  flex-wrap: wrap;
+  row-gap: 0.25rem;
+  font-size: clamp(0.82rem, 2.4vw, 0.95rem);
+  line-height: 1.25;
+}
+
+.company-roster--ide .company-roster__hint {
+  font-size: clamp(0.64rem, 2vw, 0.72rem);
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.company-roster--ide .company-roster__action {
+  min-height: 1.85rem;
+  font-size: clamp(0.62rem, 2vw, 0.68rem);
+}
+
+.company-roster--ide .company-roster__header {
+  flex-shrink: 0;
+  min-width: 0;
+}
+
+.company-roster--ide .company-roster__header-row {
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.company-roster--ide .company-roster__header-row > div:first-child {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
 .company-roster--ide .company-presence-strip,
 .company-roster--ide .company-roster__empty {
   flex-shrink: 0;
+}
+
+.company-roster--ide .company-roster__dock-host {
+  flex: 1 1 auto;
+  min-height: 8rem;
+  max-height: 100%;
 }
 
 .company-roster--ide .company-roster__list {
@@ -498,7 +546,7 @@
 .ide-team-panel__body {
   flex: 1 1 auto;
   min-height: 0;
-  overflow: auto;
+  overflow: hidden;
   display: flex;
   flex-direction: column;
 }
@@ -509,6 +557,7 @@
   margin-top: 0;
   border-top: 0;
   background: transparent;
+  overflow: hidden;
 }
 
 @keyframes company-roster-glow-pulse {

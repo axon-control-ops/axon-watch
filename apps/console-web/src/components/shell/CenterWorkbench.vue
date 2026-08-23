@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 
 import WorkbenchTerminalDock from '../WorkbenchTerminalDock.vue';
 import AgentEditReviewViewer from '../AgentEditReviewViewer.vue';
@@ -11,6 +11,7 @@ import EditorCsvToolbar from './EditorCsvToolbar.vue';
 import CenterWorkbenchIdeQuickGuide from './CenterWorkbenchIdeQuickGuide.vue';
 import CenterWorkbenchEditorChrome from './CenterWorkbenchEditorChrome.vue';
 import CenterWorkbenchEditorFooter from './CenterWorkbenchEditorFooter.vue';
+import CenterWorkbenchEmptyEditor from './CenterWorkbenchEmptyEditor.vue';
 import EditorPdfPreview from './EditorPdfPreview.vue';
 import OperatorStatusRadarPanel from './OperatorStatusRadarPanel.vue';
 import {
@@ -27,6 +28,7 @@ import {
   isShellLayoutGeometrySane,
   readShellFooterGapPx,
 } from '../../lib/shell-column-layout';
+import { dispatchEditorSurfaceLayoutSync } from '../../lib/editor-surface-layout';
 import { useShellStore } from '../../stores/shell';
 import { renderAgentMessageMarkdown } from '../../lib/agent-message-markdown';
 import { handleMarkdownContainerClick } from '../../lib/markdown-link-click';
@@ -90,6 +92,7 @@ const {
   ideEditorStatusGitChip,
   ideEditorStatusSearchChip,
   ideEditorStatusTeamChip,
+  ideEditorStatusProblemsChip,
   ideQuickGuide,
 } = useIdeEditorStatusBar({
   shell,
@@ -351,6 +354,9 @@ const onIdeQuickGuideAction = (actionId: IdeQuickGuideActionId): void =>
 const onOpenWatchConnectors = (): void => openWatchConnectors(shell);
 const onOpenSourceControl = (): void => openIdeSourceControl(shell);
 const onOpenSearch = (): void => openIdeSearch(shell);
+const onShowProblems = (): void => shell.revealIdeWorkbenchProblems();
+const onOpenExplorer = (): void => shell.focusIdeSidebarView('explorer');
+const onCreateNewFile = (): void => shell.requestIdeExplorerInlineCreate('file');
 
 function startTerminalResize(event: MouseEvent): void {
   if (event.button !== 0) {
@@ -463,6 +469,14 @@ function runLayoutSync(trigger: 'mount' | 'resize'): void {
   }
 }
 
+function scheduleEditorSurfaceLayoutSync(): void {
+  runLayoutSync('resize');
+  requestAnimationFrame(() => {
+    runLayoutSync('resize');
+    dispatchEditorSurfaceLayoutSync();
+  });
+}
+
 function scheduleResizeLayoutSync(): void {
   if (resizeObserverFrame !== null) {
     return;
@@ -515,15 +529,36 @@ watch(
     terminalPanelVisible.value = readStoredWorkbenchTerminalPanelVisible(workbenchLayoutMode.value);
     shell.syncWorkbenchTerminalPanelVisible(terminalPanelVisible.value);
     syncTerminalHeightToContainer();
-    runLayoutSync('resize');
+    scheduleEditorSurfaceLayoutSync();
+  },
+);
+
+watch(
+  () => shell.currentWorkspace?.workspace_id,
+  async () => {
+    await nextTick();
+    scheduleEditorSurfaceLayoutSync();
+  },
+);
+
+watch(
+  () => shell.workspaceFilesLoadState,
+  async (state) => {
+    if (state !== 'loaded') {
+      return;
+    }
+    await nextTick();
+    scheduleEditorSurfaceLayoutSync();
   },
 );
 
 watch(
   () => shell.activeEditorDocumentId,
-  () => {
+  async () => {
     editorCursorLine.value = 1;
     editorCursorColumn.value = 1;
+    await nextTick();
+    dispatchEditorSurfaceLayoutSync();
   },
 );
 </script>
@@ -580,8 +615,16 @@ watch(
           v-if="shell.activeEditorDocument && showAgentDiffReviewViewer"
           :content="shell.activeEditorDocument.value"
         />
+        <CenterWorkbenchEmptyEditor
+          v-else-if="!shell.activeEditorDocument"
+          :has-workspace="Boolean(shell.currentWorkspace?.workspace_id)"
+          @open-explorer="onOpenExplorer"
+          @open-search="onOpenSearch"
+          @create-new-file="onCreateNewFile"
+          @show-agent="showAgentDock"
+        />
         <EditorHost
-          v-else-if="shell.activeEditorDocument && (!isMarkdownEditorDocument || !editorPreviewEnabled) && (!isCsvEditorDocument || !csvTablePreviewEnabled) && !isImageEditorDocument && !isPdfEditorDocument && !isBinaryEditorDocument"
+          v-else-if="(!isMarkdownEditorDocument || !editorPreviewEnabled) && (!isCsvEditorDocument || !csvTablePreviewEnabled) && !isImageEditorDocument && !isPdfEditorDocument && !isBinaryEditorDocument"
           :key="shell.activeEditorDocument.id"
           :document-key="shell.activeEditorDocument.id"
           variant="mockup"
@@ -637,8 +680,10 @@ watch(
           :git-chip="ideEditorStatusGitChip"
           :search-chip="ideEditorStatusSearchChip"
           :team-chip="ideEditorStatusTeamChip"
+          :problems-chip="ideEditorStatusProblemsChip"
           :agent-chip="ideEditorStatusAgentChip"
           @show-terminal="showTerminalPanel"
+          @show-problems="onShowProblems"
           @open-connectors="onOpenWatchConnectors"
           @open-source-control="onOpenSourceControl"
           @open-search="onOpenSearch"

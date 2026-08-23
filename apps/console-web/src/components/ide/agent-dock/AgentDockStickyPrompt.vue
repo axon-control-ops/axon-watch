@@ -6,7 +6,11 @@ import {
   resendOperatorMessage,
   submitOperatorPromptInline,
 } from '../../../lib/operator-message-composer-actions';
-import { formatThreadTimestamp } from '../../../lib/thread-message-view';
+import {
+  formatThreadTimestamp,
+  stickyPromptCanExpand,
+  stickyPromptPreviewText,
+} from '../../../lib/thread-message-view';
 import { useShellStore } from '../../../stores/shell';
 
 const props = withDefaults(
@@ -14,10 +18,12 @@ const props = withDefaults(
     text: string;
     createdAt?: string | null;
     showResend?: boolean;
+    attachmentCount?: number;
   }>(),
   {
     createdAt: null,
     showResend: true,
+    attachmentCount: 0,
   },
 );
 
@@ -26,8 +32,20 @@ const rootRef = ref<HTMLElement | null>(null);
 const editorRef = ref<HTMLTextAreaElement | null>(null);
 const active = ref(false);
 const editing = ref(false);
+const expanded = ref(false);
 const draft = ref(props.text);
 const saving = ref(false);
+
+const canExpand = computed(
+  () => stickyPromptCanExpand(props.text) || props.attachmentCount > 0,
+);
+const displayText = computed(() =>
+  expanded.value ? props.text : stickyPromptPreviewText(props.text),
+);
+
+function toggleExpanded(): void {
+  expanded.value = !expanded.value;
+}
 
 const modelChip = computed(() => {
   const model = String(shell.selectedComposerModel ?? '').trim();
@@ -43,6 +61,7 @@ watch(
     if (!editing.value) {
       draft.value = next;
     }
+    expanded.value = false;
   },
 );
 
@@ -200,6 +219,12 @@ onUnmounted(() => {
         >
           {{ formatThreadTimestamp(createdAt) }}
         </time>
+        <span
+          v-if="!expanded && attachmentCount > 0"
+          class="agent-dock-sticky-prompt__attachment-hint"
+        >
+          · {{ attachmentCount }} {{ attachmentCount === 1 ? 'file' : 'files' }}
+        </span>
       </div>
       <OperatorMessageActions
         class="agent-dock-sticky-prompt__actions"
@@ -213,8 +238,6 @@ onUnmounted(() => {
         @resend="() => void resendOperatorMessage(text)"
       />
     </div>
-
-    <slot name="attachments" />
 
     <textarea
       v-if="editing"
@@ -230,10 +253,24 @@ onUnmounted(() => {
     <p
       v-else
       class="agent-dock-sticky-prompt__text"
+      :class="{ 'agent-dock-sticky-prompt__text--expanded': expanded }"
       title="Click to edit"
     >
-      {{ text }}
+      {{ displayText }}
     </p>
+    <button
+      v-if="!editing && canExpand"
+      type="button"
+      class="agent-dock-sticky-prompt__expand-toggle"
+      :aria-expanded="expanded"
+      @click.stop="toggleExpanded"
+    >
+      {{ expanded ? 'Show less' : 'Show more' }}
+    </button>
+
+    <div v-if="expanded && !editing" class="agent-dock-sticky-prompt__attachments">
+      <slot name="attachments" />
+    </div>
 
     <div
       v-if="editing"

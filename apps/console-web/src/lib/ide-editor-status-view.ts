@@ -244,6 +244,30 @@ export function buildIdeEditorStatusGitChip(input: {
   return { label, title, ariaLabel, count };
 }
 
+export type IdeEditorStatusProblemsChip = {
+  label: string;
+  title: string;
+  ariaLabel: string;
+  count: number;
+};
+
+/** Problems chip for the IDE editor status bar when the terminal panel is hidden. */
+export function buildIdeEditorStatusProblemsChip(input: {
+  problemCount: number;
+  terminalVisible: boolean;
+}): IdeEditorStatusProblemsChip | null {
+  if (input.problemCount <= 0 || input.terminalVisible) {
+    return null;
+  }
+
+  const count = input.problemCount;
+  const label = count === 1 ? '1 PROBLEM' : `${count} PROBLEMS`;
+  const title = 'Workbench problems — open the Problems tab in the terminal dock';
+  const ariaLabel = `${label}. ${title}.`;
+
+  return { label, title, ariaLabel, count };
+}
+
 /** Search chip for the IDE editor status bar when workspace files fail to load. */
 export function buildIdeEditorStatusSearchChip(input: {
   loadState: IdeSearchPanelLoadState;

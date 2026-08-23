@@ -56,6 +56,26 @@ describe('agent terminal mirror', () => {
     ).toBe('$ npm test\nok\n');
   });
 
+  it('mirrors OTA status polls as compact job receipts without zshenv noise', () => {
+    const text = buildAgentTerminalMirrorText({
+      kind: 'terminal',
+      command: 'axon-agent-terminal-job --status agent-job-792f81463677',
+      output: [
+        '/home/edp/.zshenv:.:1: no such file or directory: "/home/edp/.cargo/env"',
+        JSON.stringify({
+          job_id: 'agent-job-792f81463677',
+          status: 'running',
+          command: 'npm run ota:canary',
+        }),
+      ].join('\n'),
+      open: false,
+    });
+    expect(text).toContain('$ npm run ota:canary');
+    expect(text).toContain('# running · agent-job-792f81463677 · npm run ota:canary');
+    expect(text).toContain('Status: running');
+    expect(text).not.toMatch(/zshenv/);
+  });
+
   it('builds scrollback for OTA retries so prior output stays in the dock', () => {
     const transcript = [
       ':::terminal npm run ota',
@@ -69,21 +89,25 @@ describe('agent terminal mirror', () => {
         '$ npm run ota',
         'Release guard: dirty tree',
         '',
-        '$ RELEASE_GUARD_ALLOW_DIRTY=1 npm run ota',
+        '$ npm run ota',
         'running…',
       ].join('\n') + '\n',
     );
   });
 
-  it('keeps every terminal segment unless a caller explicitly limits history', () => {
+  it('keeps a recent terminal window by default so long OTA threads stay responsive', () => {
     const transcript = Array.from(
       { length: 12 },
       (_, index) => `:::terminal command-${index}\noutput-${index}\n:::`,
     ).join('\n');
 
     const scrollback = buildAgentTerminalMirrorScrollback(transcript);
-    expect(scrollback).toContain('$ command-0\noutput-0');
+    expect(scrollback).not.toContain('$ command-0\noutput-0');
+    expect(scrollback).toContain('$ command-6\noutput-6');
     expect(scrollback).toContain('$ command-11\noutput-11');
+    expect(buildAgentTerminalMirrorScrollback(transcript, { maxSegments: 12 })).toContain(
+      '$ command-0\noutput-0',
+    );
   });
 
   it('tracks terminal output length even when prose follows the shell block', () => {

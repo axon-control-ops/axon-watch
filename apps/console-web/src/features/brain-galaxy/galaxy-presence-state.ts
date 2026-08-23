@@ -25,6 +25,8 @@ export type GalaxyPresenceInput = {
   pendingApprovals: number;
   criticalSignals: number;
   highSignals: number;
+  /** All currently open signals, including warning/info items. */
+  openSignals?: number;
   /** True when operator autonomy_mode is full (Mission Control AUTONOMOUS ON). */
   fullAutonomyActive?: boolean;
 };
@@ -64,7 +66,8 @@ export function resolveGalaxyPresence(input: GalaxyPresenceInput): GalaxyPresenc
   } else if (
     input.pendingApprovals > 0 ||
     input.criticalSignals > 0 ||
-    input.highSignals > 0
+    input.highSignals > 0 ||
+    (input.openSignals ?? 0) > 0
   ) {
     phase = 'alerting';
   } else if (input.selectedNodeId && input.selectedNodeKind === 'workspace') {

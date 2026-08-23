@@ -57,6 +57,48 @@ class LeadPlanReadApiTests(unittest.TestCase):
         self.assertEqual(plan_id, detail.json()["plan_id"])
         self.assertIn("task_links", detail.json())
 
+    def test_plan_detail_vaxon_handoff_is_none_before_synthesis_posted(self) -> None:
+        from app.workspace_agents.lead_fan_out import materialize_lead_fan_out
+
+        created = materialize_lead_fan_out(
+            workspace_id="workspace_axon_watch",
+            goal="Check whether the rollup navigation regression test is wired",
+            mode="auto",
+            create_runs=False,
+        )
+        plan_id = str(created.get("plan_id") or "")
+
+        detail = self.client.get(f"/api/lead/plans/{plan_id}")
+        self.assertEqual(200, detail.status_code)
+        self.assertIsNone(detail.json()["vaxon_handoff"])
+
+    def test_plan_detail_vaxon_handoff_points_at_the_posted_rollup_message(self) -> None:
+        from app.workspace_agents.lead_fan_out import materialize_lead_fan_out
+        from app.workspace_agents.lead_vaxon_handoff import post_lead_synthesis_to_vaxon
+
+        created = materialize_lead_fan_out(
+            workspace_id="workspace_axon_watch",
+            goal="Check whether Review now can find its rollup message",
+            mode="auto",
+            create_runs=False,
+        )
+        plan_id = str(created.get("plan_id") or "")
+
+        posted = post_lead_synthesis_to_vaxon(
+            plan_id=plan_id,
+            workspace_id="workspace_axon_watch",
+            goal="Check whether Review now can find its rollup message",
+            summary="All specialists reported in; nothing blocking.",
+            findings=[],
+        )
+
+        detail = self.client.get(f"/api/lead/plans/{plan_id}")
+        self.assertEqual(200, detail.status_code)
+        handoff = detail.json()["vaxon_handoff"]
+        self.assertIsNotNone(handoff)
+        self.assertEqual(posted["thread_id"], handoff["thread_id"])
+        self.assertEqual(posted["message_id"], handoff["message_id"])
+
 
 if __name__ == "__main__":
     unittest.main()

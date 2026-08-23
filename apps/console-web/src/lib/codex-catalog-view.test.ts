@@ -1,0 +1,27 @@
+import { describe, expect, it } from 'vitest';
+
+import { buildCodexCatalogRows, codexModelLabel } from './codex-catalog-view';
+
+describe('codex-catalog-view', () => {
+  const rows = buildCodexCatalogRows({
+    installed: true,
+    binary: '/usr/bin/codex',
+    auth: { logged_in: true, auth_method: 'chatgpt' },
+    available_models: [
+      { id: 'gpt-5.5', label: 'GPT-5.5', description: 'Frontier coding model.', badge: 'Medium', default_reasoning_level: 'medium', reasoning_levels: ['low', 'medium', 'high', 'xhigh'] },
+      { id: 'gpt-5.4-mini', label: 'GPT-5.4-Mini', description: 'Fast coding model.' },
+    ],
+    codex_models: [],
+    catalog_source: 'live',
+  });
+
+  it('keeps only the exact models exposed by the signed-in Codex runtime', () => {
+    expect(rows.map((row) => row.id)).toEqual(['gpt-5.5', 'gpt-5.5@low', 'gpt-5.5@high', 'gpt-5.5@xhigh', 'gpt-5.4-mini']);
+    expect(rows[0]?.badge).toBe('Medium');
+  });
+
+  it('uses the catalog display name for the selected Codex model', () => {
+    expect(codexModelLabel('gpt-5.5', rows)).toBe('GPT-5.5 · Medium');
+    expect(codexModelLabel('', rows)).toBe('GPT-5.5 · Medium');
+  });
+});

@@ -62,9 +62,22 @@ export function extractProposedFileContentFromDiff(diff: string): string {
   return proposed.join('\n').replace(/^\n+/, '').replace(/\n+$/, '\n');
 }
 
-export function formatAgentEditReviewContent(
-  edit: Pick<IdeAgentEditSummary, 'path' | 'diff' | 'added' | 'removed' | 'open'>,
-): string {
+export type AgentEditReviewInput = Pick<
+  IdeAgentEditSummary,
+  'path' | 'diff' | 'added' | 'removed' | 'open'
+> & {
+  /**
+   * Render the diff as a review draft even though the edit is finished.
+   *
+   * Sandbox reviews need this: the changed file lives in the disposable
+   * checkout, so opening the real workspace path shows the bound project's
+   * copy — empty for files the sandbox created. `open` cannot express that,
+   * because it also means "still streaming" and would mislabel the draft.
+   */
+  preferDraft?: boolean;
+};
+
+export function formatAgentEditReviewContent(edit: AgentEditReviewInput): string {
   const path = normalizeEditedFilePath(edit.path);
   const diff = edit.diff.trim();
 
@@ -112,10 +125,11 @@ export function agentEditReviewDocumentTitle(path: string): string {
  * the editor canvas / preview surfaces work.
  */
 export function shouldOpenWorkspaceFileForEditReview(
-  edit: Pick<IdeAgentEditSummary, 'path' | 'diff' | 'open'>,
+  edit: Pick<IdeAgentEditSummary, 'path' | 'diff' | 'open'> & { preferDraft?: boolean },
 ): boolean {
   // Still streaming — keep the review draft so green + lines stay visible.
-  return !edit.open;
+  // preferDraft forces the draft for content that is not on disk at this path.
+  return !edit.open && !edit.preferDraft;
 }
 
 const DOCK_MARKDOWN_PREVIEW_CHARS = 1200;

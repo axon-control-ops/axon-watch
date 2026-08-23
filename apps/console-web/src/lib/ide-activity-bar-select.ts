@@ -3,6 +3,7 @@ import type { IdeActivityView } from './ide-layout-prefs';
 export type IdeActivityBarSelectAction =
   | 'toggle-explorer'
   | 'toggle-agent'
+  | 'open-agent-dock'
   | 'toggle-terminal'
   | 'set-view';
 
@@ -16,8 +17,8 @@ export function resolveIdeActivityBarSelectAction(input: {
   /** When set, any of these views re-click collapses the explorer sidebar. */
   sidebarViews?: ReadonlySet<string>;
 }): IdeActivityBarSelectAction {
-  if (input.view === 'agent' && !input.agentDockCollapsed) {
-    return 'toggle-agent';
+  if (input.view === 'agent') {
+    return input.agentDockCollapsed ? 'open-agent-dock' : 'toggle-agent';
   }
 
   if (input.view === 'terminal' && input.terminalPanelVisible) {

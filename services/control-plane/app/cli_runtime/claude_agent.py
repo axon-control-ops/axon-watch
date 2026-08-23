@@ -6,6 +6,10 @@ import json
 from collections.abc import Callable
 from pathlib import Path
 
+from app.cli_runtime.agent_sandbox import AgentSandboxPolicy
+from app.cli_runtime.stream_blocks.edit_blocks import render_edit_block, render_edit_block_for_path
+from app.cli_runtime.stream_blocks.terminal_blocks import _relative_path, terminal_block
+from app.cli_runtime.stream_blocks.transcript_dedupe import collapse_duplicated_body
 from app.cli_runtime.subprocess_runner import (
     RuntimeProcessStoppedError,
     communicate_registered_process,
@@ -14,13 +18,26 @@ from app.cli_runtime.subprocess_runner import (
 )
 
 
-def _claude_permission_mode(composer_mode: str, execution_tier: str) -> str:
-    """Map Axon composer modes onto Claude Code permission modes."""
+def _claude_permission_mode(
+    composer_mode: str,
+    execution_tier: str,
+    *,
+    outer_sandboxed: bool = False,
+) -> str:
+    """Map Axon access onto Claude without weakening an unsandboxed launch."""
     if composer_mode in {"ask", "plan"}:
         return "plan"
     if execution_tier == "executing":
-        return "acceptEdits"
+        # Axon's outer Bubblewrap boundary owns filesystem scope and its
+        # immutable PreToolUse hook owns the command allowlist. Claude's
+        # acceptEdits mode adds a second interactive Bash gate inside that
+        # disposable checkout, making effective Full Access misleading.
+        # Bypass only when that outer containment is actually present.
+        return "bypassPermissions" if outer_sandboxed else "acceptEdits"
     return "plan"
+
+
+_CLAUDE_EFFORT_LEVELS = frozenset({"low", "medium", "high", "xhigh", "max"})
 
 
 def build_claude_agent_command(
@@ -30,6 +47,8 @@ def build_claude_agent_command(
     composer_mode: str,
     execution_tier: str = "consultative",
     model: str = "",
+    reasoning_effort: str = "",
+    outer_sandboxed: bool = False,
 ) -> list[str]:
     """Build the Claude Code argv for headless Lane B dispatch."""
     command = [
@@ -41,10 +60,17 @@ def build_claude_agent_command(
         "--include-partial-messages",
         "--no-session-persistence",
         "--permission-mode",
-        _claude_permission_mode(composer_mode, execution_tier),
+        _claude_permission_mode(
+            composer_mode,
+            execution_tier,
+            outer_sandboxed=outer_sandboxed,
+        ),
     ]
     if model:
         command.extend(["--model", model])
+    effort = str(reasoning_effort or "").strip().lower()
+    if effort and effort in _CLAUDE_EFFORT_LEVELS:
+        command.extend(["--effort", effort])
     command.append(prompt)
     return command
 
@@ -133,7 +159,131 @@ def _iter_json_payloads(stream_text: str) -> list[dict[str, object]]:
     return payloads
 
 
-def _extract_claude_text(stream_text: str) -> tuple[str, str]:
+def _diff_from_before_after(
+    *,
+    relative_path: str,
+    before: str,
+    after: str,
+) -> str:
+    from difflib import unified_diff
+
+    return "\n".join(
+        unified_diff(
+            before.splitlines(),
+            after.splitlines(),
+            fromfile=f"a/{relative_path}",
+            tofile=f"b/{relative_path}",
+            lineterm="",
+        )
+    ).strip()
+
+
+def _claude_edit_block(name: str, tool_input: dict[str, object], workspace_root: Path) -> str:
+    path = str(tool_input.get("file_path") or tool_input.get("path") or "").strip()
+    relative_path = _relative_path(path, str(workspace_root)) if path else ""
+    if not relative_path:
+        return ""
+    clean_name = name.strip().lower()
+    if clean_name == "multiedit":
+        chunks: list[str] = []
+        raw_edits = tool_input.get("edits")
+        edits = raw_edits if isinstance(raw_edits, list) else []
+        for edit in edits:
+            if not isinstance(edit, dict):
+                continue
+            before = str(edit.get("old_string") or "")
+            after = str(edit.get("new_string") or "")
+            diff = _diff_from_before_after(
+                relative_path=relative_path,
+                before=before,
+                after=after,
+            )
+            if diff:
+                chunks.append(diff)
+        if chunks:
+            return render_edit_block(path=relative_path, diff="\n".join(chunks))
+        return render_edit_block_for_path(
+            workspace_root=workspace_root,
+            path=path,
+        )
+
+    before = str(tool_input.get("old_string") or "")
+    after = str(tool_input.get("new_string") or tool_input.get("content") or "")
+    if before or after:
+        return render_edit_block(
+            path=relative_path,
+            diff=_diff_from_before_after(
+                relative_path=relative_path,
+                before=before,
+                after=after,
+            ),
+        )
+    return render_edit_block_for_path(
+        workspace_root=workspace_root,
+        path=path,
+    )
+
+
+def _claude_tool_transcript(stream_text: str, workspace_root: Path) -> str:
+    """Turn Claude stream-json tool activity into the shared transcript blocks.
+
+    Cursor already emits these blocks directly. Without this adapter, Claude
+    tool use was invisible to every workspace despite Full Access being active.
+    """
+    emitted: set[str] = set()
+    commands: dict[str, str] = {}
+    blocks: list[str] = []
+    for payload in _iter_json_payloads(stream_text):
+        event_type = str(payload.get("type") or "")
+        content: object = None
+        if event_type == "assistant":
+            message = payload.get("message")
+            content = message.get("content") if isinstance(message, dict) else payload.get("content")
+        elif event_type == "user":
+            message = payload.get("message")
+            content = message.get("content") if isinstance(message, dict) else payload.get("content")
+        if not isinstance(content, list):
+            continue
+        for block in content:
+            if not isinstance(block, dict):
+                continue
+            block_type = str(block.get("type") or "")
+            if block_type == "tool_use":
+                tool_id = str(block.get("id") or "").strip()
+                if not tool_id or tool_id in emitted:
+                    continue
+                emitted.add(tool_id)
+                name = str(block.get("name") or "Tool").strip()
+                tool_input = block.get("input") if isinstance(block.get("input"), dict) else {}
+                command = str(tool_input.get("command") or "").strip()
+                if name.lower() in {"bash", "shell", "terminal"} and command:
+                    commands[tool_id] = command
+                    continue
+                path = str(tool_input.get("file_path") or tool_input.get("path") or "").strip()
+                relative_path = _relative_path(path, str(workspace_root)) if path else ""
+                if name.lower() in {"edit", "write", "multiedit"} and relative_path:
+                    block = _claude_edit_block(name, tool_input, workspace_root)
+                    if block:
+                        blocks.append(block)
+                else:
+                    suffix = f" {relative_path}" if relative_path else ""
+                    blocks.append(f":::tool {name}{suffix}\n")
+            elif block_type == "tool_result":
+                tool_id = str(block.get("tool_use_id") or "").strip()
+                command = commands.get(tool_id)
+                if not command:
+                    continue
+                result = _text_from_content_blocks(block.get("content"))
+                blocks.append(terminal_block(command, result))
+                commands.pop(tool_id, None)
+    # Keep in-progress commands visible in a live transcript even before their
+    # tool_result message arrives.
+    for command in commands.values():
+        blocks.append(f"\n:::terminal {command}\n:::\n")
+    return "".join(blocks).strip()
+
+
+def _extract_claude_text(stream_text: str, workspace_root: Path | None = None) -> tuple[str, str]:
     """Return (assistant_text, error_text) from Claude Code stream-json/json output."""
     final_text = ""
     accumulated_deltas: list[str] = []
@@ -152,7 +302,12 @@ def _extract_claude_text(stream_text: str) -> tuple[str, str]:
         final_text = text
     if not final_text and accumulated_deltas:
         final_text = "".join(accumulated_deltas).strip()
-    return final_text, error_text
+    # Parity with the Cursor stream path (cursor_stream_events.collapse_echo_text):
+    # the Claude runtime can also emit a final aggregate that glues a repeated
+    # sentence/section onto the end of the same reply with no separator.
+    final_text = collapse_duplicated_body(final_text)
+    transcript = _claude_tool_transcript(stream_text, workspace_root or Path.cwd())
+    return "\n\n".join(part for part in (transcript, final_text) if part).strip(), error_text
 
 
 def run_claude_local(
@@ -163,10 +318,12 @@ def run_claude_local(
     composer_mode: str,
     execution_tier: str = "consultative",
     model: str = "",
+    reasoning_effort: str = "",
     timeout_seconds: int = 240,
     subprocess_env: dict[str, str] | None = None,
     run_id: str = "",
     on_chunk: Callable[[str, str], None] | None = None,
+    sandbox_policy: AgentSandboxPolicy | None = None,
 ) -> str:
     command = build_claude_agent_command(
         binary=binary,
@@ -174,13 +331,15 @@ def run_claude_local(
         composer_mode=composer_mode,
         execution_tier=execution_tier,
         model=model,
+        reasoning_effort=reasoning_effort,
+        outer_sandboxed=sandbox_policy is not None,
     )
     run_cwd = str(workspace_root.resolve()) if workspace_root else None
 
     def _emit_claude_chunk(accumulated: str, delta: str) -> None:
         if on_chunk is None:
             return
-        extracted, _error = _extract_claude_text(accumulated)
+        extracted, _error = _extract_claude_text(accumulated, workspace_root)
         if extracted:
             on_chunk(extracted, delta)
 
@@ -192,6 +351,7 @@ def run_claude_local(
             timeout_seconds=timeout_seconds,
             subprocess_env=subprocess_env,
             cwd=run_cwd,
+            sandbox_policy=sandbox_policy,
             **({"on_chunk": _emit_claude_chunk} if on_chunk is not None else {}),
         )
     except RuntimeProcessStoppedError:
@@ -199,7 +359,7 @@ def run_claude_local(
     except RuntimeError:
         raise
     raise_if_operator_stopped(returncode=returncode, stderr=stderr, stdout=stdout)
-    output, error_text = _extract_claude_text(stdout)
+    output, error_text = _extract_claude_text(stdout, workspace_root)
     if not output:
         output = stdout.strip() or stderr.strip()
     if returncode != 0:

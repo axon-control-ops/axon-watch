@@ -1,6 +1,6 @@
 import type { InboxItem } from '../contracts/canonical';
 
-import { apiUrl, fetchJson, INBOX_FETCH_TIMEOUT_MS } from './client';
+import { fetchJson, fetchWithTimeout, INBOX_FETCH_TIMEOUT_MS } from './client';
 
 export interface InboxSnapshot {
   items: InboxItem[];
@@ -16,11 +16,64 @@ export interface AcknowledgeInboxSignalsResult {
   status?: string;
 }
 
-export async function fetchInbox(): Promise<InboxSnapshot> {
+export async function fetchInbox(options?: { force?: boolean }): Promise<InboxSnapshot> {
+  const path = options?.force ? '/api/inbox?force=true' : '/api/inbox';
   return fetchJson<InboxSnapshot>(
-    '/api/inbox',
+    path,
     {},
     'inbox request failed',
+    INBOX_FETCH_TIMEOUT_MS,
+  );
+}
+
+export type EmailFolderRole = 'inbox' | 'sent' | 'junk' | 'archive' | 'trash' | 'drafts';
+
+export interface EmailFoldersResult {
+  account_id: string;
+  folders: Partial<Record<EmailFolderRole, string>>;
+}
+
+export interface EmailFolderMessage {
+  uid: string;
+  message_id: string;
+  subject: string;
+  from: string;
+  text: string;
+  snippet: string;
+  sent_at: string;
+  account_id: string;
+  account_email: string;
+}
+
+export interface EmailMessagesResult {
+  account_id: string;
+  role: string;
+  items: EmailFolderMessage[];
+  count: number;
+}
+
+export async function fetchEmailFolders(workspaceId: string): Promise<EmailFoldersResult> {
+  return fetchJson<EmailFoldersResult>(
+    `/api/email/folders?workspace_id=${encodeURIComponent(workspaceId)}`,
+    {},
+    'email folders request failed',
+    INBOX_FETCH_TIMEOUT_MS,
+  );
+}
+
+export async function fetchEmailMessages(
+  workspaceId: string,
+  role: EmailFolderRole,
+  options?: { limit?: number },
+): Promise<EmailMessagesResult> {
+  const params = new URLSearchParams({ workspace_id: workspaceId, role });
+  if (options?.limit) {
+    params.set('limit', String(options.limit));
+  }
+  return fetchJson<EmailMessagesResult>(
+    `/api/email/messages?${params.toString()}`,
+    {},
+    'email messages request failed',
     INBOX_FETCH_TIMEOUT_MS,
   );
 }
@@ -28,7 +81,7 @@ export async function fetchInbox(): Promise<InboxSnapshot> {
 async function acknowledgeInboxSignalsViaWatchCommand(
   signalIds: string[],
 ): Promise<AcknowledgeInboxSignalsResult> {
-  const response = await fetch(apiUrl('/api/watch/commands'), {
+  const response = await fetchWithTimeout('/api/watch/commands', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -74,7 +127,7 @@ async function acknowledgeInboxSignalsViaWatchCommand(
 export async function acknowledgeInboxSignals(
   signalIds: string[],
 ): Promise<AcknowledgeInboxSignalsResult> {
-  const response = await fetch(apiUrl('/api/inbox/signals/acknowledge'), {
+  const response = await fetchWithTimeout('/api/inbox/signals/acknowledge', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ signal_ids: signalIds }),

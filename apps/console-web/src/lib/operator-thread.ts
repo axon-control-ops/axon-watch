@@ -13,6 +13,9 @@ export interface OperatorThreadEntry extends ThreadMessage {
   role: ThreadMessageRole;
   content: string;
   created_at: string;
+  speaker_name?: string | null;
+  speaker_role?: string | null;
+  speaker_employee_id?: string | null;
   attachments?: ThreadMessageAttachment[];
 }
 
@@ -109,6 +112,9 @@ export function mapChatMessageRecord(record: {
   role: string;
   content: string;
   created_at: string;
+  speaker_name?: string | null;
+  speaker_role?: string | null;
+  speaker_employee_id?: string | null;
   attachments?: ThreadMessageAttachment[];
 }): OperatorThreadEntry {
   const attachments = (record.attachments ?? [])
@@ -133,6 +139,9 @@ export function mapChatMessageRecord(record: {
           : 'operator',
     content: record.content,
     created_at: record.created_at,
+    speaker_name: record.speaker_name ?? null,
+    speaker_role: record.speaker_role ?? null,
+    speaker_employee_id: record.speaker_employee_id ?? null,
     ...(attachments.length ? { attachments } : {}),
   };
 }

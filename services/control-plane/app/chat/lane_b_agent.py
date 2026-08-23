@@ -10,6 +10,8 @@ from app.cli_runtime.router import dispatch_ide_composer
 from app.chat.lane_b_git_dispatch import try_lane_b_git_commit_dispatch
 from app.research.availability import format_capability_line, research_capability_snapshot
 from app.terminal.workspace_roots import WorkspaceRootError, resolve_workspace_root
+from app.workspace_agents.execution_policy import AgentExecutionPolicy
+from app.workspace_catalog import WorkspaceNotFoundError
 from app.workspace_files import WorkspaceFileError, list_workspace_files
 
 
@@ -45,16 +47,40 @@ def _read_file_preview(workspace_id: str, path: str, *, max_chars: int = 1200) -
         return ""
 
 
-def build_lane_b_context_block(context: LaneBContext) -> str:
+def build_lane_b_context_block(
+    context: LaneBContext,
+    *,
+    workspace_root: Path | None = None,
+) -> str:
     lines = [
         f"Workspace: {context.workspace_id}",
         f"Composer mode: {context.composer_mode}",
     ]
-    try:
-        root = resolve_workspace_root(context.workspace_id)
+    if workspace_root is not None:
+        root = workspace_root.resolve()
         lines.append(f"Project root: {root}")
-    except WorkspaceRootError as exc:
-        lines.append(f"Project root unavailable: {exc}")
+        lines.append(
+            "This is the active disposable checkout. Use it as the working directory; "
+            "do not switch to a remembered or bound host-project path."
+        )
+        jest_bin = root / "node_modules" / ".bin" / "jest"
+        if jest_bin.is_file() or jest_bin.is_symlink():
+            lines.append(
+                "Sandbox toolchain: node_modules is linked into this checkout — "
+                "run tests with `npx --no-install jest <paths>` or `npm test -- <paths>` "
+                "before claiming jest is missing."
+            )
+        elif (root / "node_modules").is_dir():
+            lines.append(
+                "Sandbox toolchain: node_modules exists but jest bin was not found — "
+                "try `npm test -- <paths>` or report the exact shell error."
+            )
+    else:
+        try:
+            root = resolve_workspace_root(context.workspace_id)
+            lines.append(f"Project root: {root}")
+        except WorkspaceRootError as exc:
+            lines.append(f"Project root unavailable: {exc}")
 
     if context.active_file_path:
         preview = _read_file_preview(context.workspace_id, context.active_file_path)
@@ -85,7 +111,9 @@ def build_lane_b_context_block(context: LaneBContext) -> str:
         if files:
             sample = ", ".join(item["path"] for item in files[:12])
             lines.append(f"Workspace files (sample): {sample}")
-    except (WorkspaceFileError, OSError):
+    except (WorkspaceFileError, WorkspaceNotFoundError, OSError):
+        # Ask/template turns still need a context block when the catalog miss
+        # or the on-disk root is not ready yet.
         pass
 
     snapshot = research_capability_snapshot()
@@ -114,6 +142,10 @@ def generate_lane_b_result(
     on_chunk: Callable[[str, str], None] | None = None,
     cursor_trust_policy: str = "operator",
     workspace_root: Path | None = None,
+    execution_policy: AgentExecutionPolicy | None = None,
+    allow_git_dispatch: bool = True,
+    fallback_runtime_families: tuple[str, ...] = (),
+    respect_cached_usage_limit: bool = False,
 ) -> dict[str, object]:
     trimmed = user_prompt.strip()
     if not trimmed:
@@ -125,11 +157,18 @@ def generate_lane_b_result(
             "reason": "empty prompt",
         }
 
-    context_block = build_lane_b_context_block(context)
-    git_result = try_lane_b_git_commit_dispatch(
-        workspace_id=context.workspace_id,
-        user_prompt=trimmed,
-        execution_access=execution_access,
+    context_block = build_lane_b_context_block(context, workspace_root=workspace_root)
+    # Continuous-worker prompts carry commit safety language as policy, not as
+    # operator intent. Only interactive turns may route through direct Git.
+    git_result = (
+        try_lane_b_git_commit_dispatch(
+            workspace_id=context.workspace_id,
+            user_prompt=trimmed,
+            execution_access=execution_access,
+            execution_policy=execution_policy,
+        )
+        if allow_git_dispatch
+        else None
     )
     if git_result is not None:
         continue_prompt = str(git_result.get("continue_prompt") or "").strip()
@@ -149,6 +188,9 @@ def generate_lane_b_result(
                 on_chunk=on_chunk,
                 cursor_trust_policy=cursor_trust_policy,
                 workspace_root=workspace_root,
+                execution_policy=execution_policy,
+                fallback_runtime_families=fallback_runtime_families,
+                respect_cached_usage_limit=respect_cached_usage_limit,
             )
         except RuntimeError as exc:
             return {
@@ -190,6 +232,9 @@ def generate_lane_b_result(
             on_chunk=on_chunk,
             cursor_trust_policy=cursor_trust_policy,
             workspace_root=workspace_root,
+            execution_policy=execution_policy,
+            fallback_runtime_families=fallback_runtime_families,
+            respect_cached_usage_limit=respect_cached_usage_limit,
         )
     except RuntimeError as exc:
         return {

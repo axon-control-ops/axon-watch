@@ -83,9 +83,23 @@ export function rewriteNamedAssignPrompt(
   prompt: string,
   employeeName: string,
 ): string {
+  const body = namedAssignActionBody(prompt, employeeName);
+  return (
+    `You own this assignment from Lead. Complete it and report back when done.\n\n` +
+    `Operator ask: ${
+      body ??
+      'Lead did not include a concrete task body in this handoff. Ask Lead/operator for the specific goal, expected files, and acceptance criteria.'
+    }`
+  );
+}
+
+export function namedAssignActionBody(
+  prompt: string,
+  employeeName: string,
+): string | null {
   const text = String(prompt || '').trim();
   if (!text) {
-    return text;
+    return null;
   }
   const name = employeeName.trim();
   const first = name.split(/\s+/)[0] || name;
@@ -107,14 +121,17 @@ export function rewriteNamedAssignPrompt(
     .replace(/^[\s,.;:!?-]+|[\s,.;:!?-]+$/g, '')
     .trim();
 
-  const body =
-    cleaned.length >= 8
-      ? cleaned
-      : 'Complete the assigned task from the Lead handoff and report back when done.';
-  return (
-    `You own this assignment from Lead. Complete it and report back when done.\n\n` +
-    `Operator ask: ${body}`
-  );
+  if (cleaned.length < 8) {
+    return null;
+  }
+  if (/^(?:it|this|that|task|job|work|handoff|assignment)$/i.test(cleaned)) {
+    return null;
+  }
+  return cleaned;
+}
+
+export function isVagueNamedAssignPrompt(prompt: string, employeeName: string): boolean {
+  return namedAssignActionBody(prompt, employeeName) === null;
 }
 
 export function namedAssignRouteReason(employee: TeammateRouteEmployee): string {

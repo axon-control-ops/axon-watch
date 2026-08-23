@@ -1,0 +1,69 @@
+.constitution-overview {
+  display: grid;
+  gap: 1rem;
+}
+
+.constitution-overview__counts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(8rem, 1fr));
+  gap: 0.75rem;
+}
+
+.constitution-overview__count-card,
+.constitution-overview__list-card {
+  border: 1px solid rgba(0, 229, 255, 0.2);
+  border-radius: 0.875rem;
+  background: rgba(3, 13, 24, 0.72);
+  box-shadow: inset 0 0 18px rgba(0, 229, 255, 0.06);
+}
+
+.constitution-overview__count-card {
+  display: grid;
+  gap: 0.25rem;
+  padding: 0.85rem;
+}
+
+.constitution-overview__count-value {
+  color: #70f6ff;
+  font-family: 'JetBrains Mono', 'SFMono-Regular', Consolas, monospace;
+  font-size: 1.4rem;
+  font-weight: 700;
+}
+
+.constitution-overview__count-label {
+  color: rgba(219, 246, 255, 0.72);
+  font-size: 0.78rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.constitution-overview__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
+  gap: 0.85rem;
+}
+
+.constitution-overview__list-card {
+  padding: 1rem;
+}
+
+.constitution-overview__list-card h3 {
+  margin: 0 0 0.7rem;
+  color: #e8fbff;
+  font-size: 0.95rem;
+}
+
+.constitution-overview__list-card ul {
+  display: grid;
+  gap: 0.55rem;
+  margin: 0;
+  padding-left: 1.05rem;
+  color: rgba(219, 246, 255, 0.82);
+  font-size: 0.83rem;
+}
+
+.constitution-overview__empty {
+  margin: 0;
+  color: rgba(219, 246, 255, 0.55);
+  font-size: 0.83rem;
+}

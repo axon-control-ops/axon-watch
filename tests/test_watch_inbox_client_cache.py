@@ -20,7 +20,7 @@ class WatchInboxClientCacheTests(unittest.TestCase):
     def test_cached_only_returns_immediately_without_blocking(self) -> None:
         started = threading.Event()
 
-        def _slow_fetch(timeout_seconds: float) -> dict[str, object] | None:
+        def _slow_fetch(timeout_seconds: float, *, force: bool = False) -> dict[str, object] | None:
             started.set()
             time.sleep(0.5)
             return {"items": [], "count": 0, "updated_at": "bg"}
@@ -55,7 +55,7 @@ class WatchInboxClientCacheTests(unittest.TestCase):
         refreshed = {"items": [{"signal_id": "sig_2"}], "count": 1, "updated_at": "fresh"}
         refresh_started = threading.Event()
 
-        def _slow_refresh(timeout_seconds: float) -> dict[str, object] | None:
+        def _slow_refresh(timeout_seconds: float, *, force: bool = False) -> dict[str, object] | None:
             refresh_started.set()
             time.sleep(0.05)
             return refreshed
@@ -79,7 +79,7 @@ class WatchInboxClientCacheTests(unittest.TestCase):
         gate = threading.Event()
         release = threading.Event()
 
-        def _slow_fetch(timeout_seconds: float) -> dict[str, object] | None:
+        def _slow_fetch(timeout_seconds: float, *, force: bool = False) -> dict[str, object] | None:
             calls["n"] += 1
             gate.set()
             release.wait(1.0)

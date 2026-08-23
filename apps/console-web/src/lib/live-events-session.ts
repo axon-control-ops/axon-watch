@@ -82,6 +82,7 @@ export function shouldTriggerSpokenLine(event: LiveEventPayload): boolean {
 
 export interface LiveEventsSessionOptions {
   onRefresh: () => void | Promise<void>;
+  onResync?: () => void | Promise<void>;
   onPresenceRefresh?: () => void | Promise<void>;
   onSpokenBriefing?: () => void | Promise<void>;
   /** Lead takeover / synthesis — speak the provided line as that teammate. */
@@ -89,12 +90,45 @@ export interface LiveEventsSessionOptions {
   /** Lead rollups / review_ready — refresh engagement surfaces without speaking. */
   onMaterialChange?: () => void | Promise<void>;
   pollIntervalMs?: number;
+  reconnectBackoffMs?: number[];
   EventSourceImpl?: typeof EventSource;
   documentRef?: Pick<Document, 'visibilityState' | 'addEventListener' | 'removeEventListener'>;
 }
 
 export interface LiveEventsSession {
   disconnect: () => void;
+}
+
+export type LiveEventsTelemetry = {
+  connection_count: number;
+  disconnect_count: number;
+  reconnect_count: number;
+  last_event_at: number | null;
+  last_resync_at: number | null;
+};
+
+const DEFAULT_RECONNECT_BACKOFF_MS = [1000, 2000, 4000, 8000, 16000];
+
+let telemetry: LiveEventsTelemetry = {
+  connection_count: 0,
+  disconnect_count: 0,
+  reconnect_count: 0,
+  last_event_at: null,
+  last_resync_at: null,
+};
+
+export function getLiveEventsTelemetry(): LiveEventsTelemetry {
+  return { ...telemetry };
+}
+
+export function resetLiveEventsTelemetryForTests(): void {
+  telemetry = {
+    connection_count: 0,
+    disconnect_count: 0,
+    reconnect_count: 0,
+    last_event_at: null,
+    last_resync_at: null,
+  };
 }
 
 function isDocumentVisible(
@@ -105,15 +139,19 @@ function isDocumentVisible(
 
 export function startLiveEventsSession(options: LiveEventsSessionOptions): LiveEventsSession {
   const pollIntervalMs = options.pollIntervalMs ?? DEFAULT_POLL_INTERVAL_MS;
+  const reconnectBackoffMs = options.reconnectBackoffMs ?? DEFAULT_RECONNECT_BACKOFF_MS;
   const EventSourceImpl = options.EventSourceImpl ?? EventSource;
   const documentRef = options.documentRef ?? document;
 
   let eventSource: EventSource | null = null;
   let pollTimer: ReturnType<typeof setInterval> | null = null;
+  let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   let refreshInFlight = false;
   let presenceRefreshInFlight = false;
   let materialChangeInFlight = false;
+  let resyncInFlight = false;
   let disconnected = false;
+  let reconnectAttempt = 0;
 
   async function invokeRefresh(): Promise<void> {
     if (refreshInFlight || disconnected || !isDocumentVisible(documentRef)) {
@@ -183,10 +221,27 @@ export function startLiveEventsSession(options: LiveEventsSessionOptions): LiveE
     }, pollIntervalMs);
   }
 
+  async function invokeResync(): Promise<void> {
+    if (resyncInFlight || disconnected || !isDocumentVisible(documentRef)) {
+      return;
+    }
+    resyncInFlight = true;
+    telemetry.last_resync_at = Date.now();
+    try {
+      await (options.onResync ?? options.onRefresh)();
+    } finally {
+      resyncInFlight = false;
+    }
+  }
+
   function handleMessage(raw: string): void {
     const event = parseLiveEventData(raw);
     if (!event) {
       return;
+    }
+    telemetry.last_event_at = Date.now();
+    if (event.type === 'connected') {
+      reconnectAttempt = 0;
     }
     if (shouldTriggerSpokenBriefing(event)) {
       void options.onSpokenBriefing?.();
@@ -223,6 +278,31 @@ export function startLiveEventsSession(options: LiveEventsSessionOptions): LiveE
     void invokePresenceRefresh();
   }
 
+  function stopReconnect(): void {
+    if (reconnectTimer !== null) {
+      clearTimeout(reconnectTimer);
+      reconnectTimer = null;
+    }
+  }
+
+  function scheduleReconnect(): void {
+    if (disconnected || reconnectTimer !== null) {
+      return;
+    }
+    if (reconnectAttempt >= reconnectBackoffMs.length) {
+      startPolling();
+      return;
+    }
+    const delay = reconnectBackoffMs[reconnectAttempt] ?? reconnectBackoffMs[reconnectBackoffMs.length - 1];
+    reconnectTimer = setTimeout(() => {
+      reconnectTimer = null;
+      reconnectAttempt += 1;
+      telemetry.reconnect_count += 1;
+      connectEventSource();
+      void invokeResync();
+    }, delay);
+  }
+
   function disconnectEventSource(): void {
     if (eventSource) {
       eventSource.close();
@@ -240,6 +320,7 @@ export function startLiveEventsSession(options: LiveEventsSessionOptions): LiveE
 
     try {
       eventSource = new EventSourceImpl(buildLiveEventsUrl());
+      telemetry.connection_count += 1;
     } catch {
       startPolling();
       return;
@@ -250,8 +331,9 @@ export function startLiveEventsSession(options: LiveEventsSessionOptions): LiveE
     };
 
     eventSource.onerror = () => {
+      telemetry.disconnect_count += 1;
       disconnectEventSource();
-      startPolling();
+      scheduleReconnect();
     };
   }
 
@@ -267,6 +349,7 @@ export function startLiveEventsSession(options: LiveEventsSessionOptions): LiveE
       disconnected = true;
       disconnectEventSource();
       stopPolling();
+      stopReconnect();
       documentRef.removeEventListener('visibilitychange', onVisibilityChange);
     },
   };

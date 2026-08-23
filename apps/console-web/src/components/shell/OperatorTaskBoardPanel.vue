@@ -1,11 +1,11 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, ref, watch } from 'vue';
 
+import { openLeadReviewOverlay, leadReviewOverlayError } from '../../features/lead-review/lead-review-overlay-state';
 import {
   fetchWorkerSchedulerStatus,
   type WorkerSchedulerStatus,
 } from '../../api/worker-scheduler-api';
-import { listWorkspaceHandoffs } from '../../api/workspace-api';
 import HudHoloPanelShell from '../../features/hud-holo/HudHoloPanelShell.vue';
 import {
   taskBoardBucketToHoloTone,
@@ -19,15 +19,11 @@ import {
   dismissDoneTaskIds,
   loadDismissedDoneTaskIds,
 } from '../../lib/task-board-dismissed-done';
-import {
-  incomingHandoffHeadline,
-  mapWorkspaceHandoffRows,
-  type IncomingHandoffRow,
-} from '../../lib/workspace-handoff-board-view';
 import { useShellStore } from '../../stores/shell';
 
 import OperatorTaskBoardColumns from './operator-task-board/OperatorTaskBoardColumns.vue';
 import OperatorTaskBoardCreateForm from './operator-task-board/OperatorTaskBoardCreateForm.vue';
+import OperatorTaskBoardHandoffs from './operator-task-board/OperatorTaskBoardHandoffs.vue';
 import OperatorTaskBoardNextUp from './operator-task-board/OperatorTaskBoardNextUp.vue';
 import OperatorTaskBoardPlanFilter from './operator-task-board/OperatorTaskBoardPlanFilter.vue';
 import OperatorTaskBoardSelectedDrawer from './operator-task-board/OperatorTaskBoardSelectedDrawer.vue';
@@ -47,14 +43,16 @@ const riskDraft = ref('normal');
 const attemptBudgetDraft = ref(3);
 const dependenciesDraft = ref('');
 const createAsLeadPlan = ref(false);
-const showCreate = ref(false);
+// Mission Control is VAXON's orchestration surface. Keep the task composer
+// visible so an operator can delegate or fan out work without dropping into
+// the compact conversational reply seam.
+const showCreate = ref(true);
 const showHistory = ref(false);
 const selectedTaskId = ref<string | null>(null);
 const selectedDrawerEl = ref<HTMLElement | null>(null);
 const planFilterId = ref<string | 'all'>('all');
 const scheduler = ref<WorkerSchedulerStatus | null>(null);
 const schedulerError = ref<string | null>(null);
-const handoffRows = ref<IncomingHandoffRow[]>([]);
 const dismissedDoneIds = ref<Set<string>>(loadDismissedDoneTaskIds());
 
 const boardView = computed(() => {
@@ -76,8 +74,6 @@ const boardView = computed(() => {
     runPhaseByTaskId,
   );
 });
-
-const openHandoffRows = computed(() => handoffRows.value.slice(0, 6));
 
 const roleOptions = computed(() => {
   const fromRoster = shell.companyEmployeesForCurrentWorkspace
@@ -142,6 +138,7 @@ const doneVisibleCount = computed(
   () => visibleColumns.value.find((column) => column.id === 'done')?.count ?? 0,
 );
 
+
 const holoTone = computed<HudHoloTone>(() => {
   const buckets = boardView.value.rows
     .filter((row) => row.bucket !== 'cancelled')
@@ -191,43 +188,9 @@ async function refreshScheduler(): Promise<void> {
   }
 }
 
-async function refreshHandoffs(): Promise<void> {
-  const workspaceId = shell.currentWorkspace?.workspace_id;
-  if (!workspaceId) {
-    handoffRows.value = [];
-    return;
-  }
-  try {
-    const snapshot = await listWorkspaceHandoffs(workspaceId);
-    const taskStatusById: Record<string, string | undefined> = {};
-    for (const task of shell.workspaceTasksForCurrentWorkspace) {
-      taskStatusById[task.task_id] = task.status;
-    }
-    handoffRows.value = mapWorkspaceHandoffRows(snapshot.items, workspaceId, {
-      taskStatusById,
-    });
-  } catch {
-    handoffRows.value = [];
-  }
-}
-
-function focusHandoffTask(row: IncomingHandoffRow): void {
-  if (row.targetTaskId) {
-    selectedTaskId.value = row.targetTaskId;
-  }
-}
-
 onMounted(() => {
   void refreshScheduler();
-  void refreshHandoffs();
 });
-
-watch(
-  () => shell.currentWorkspace?.workspace_id ?? null,
-  () => {
-    void refreshHandoffs();
-  },
-);
 
 function selectTask(taskId: string): void {
   selectedTaskId.value = selectedTaskId.value === taskId ? null : taskId;
@@ -259,7 +222,7 @@ function activateTaskCard(taskId: string): void {
     void openSpecialist(action.row);
     shell.setLayoutMode('ide');
   } else if (action.kind === 'open_vaxon_review') {
-    openVaxonReview(action.planId);
+    void openVaxonReview(action.planId);
   }
   void revealSelectedDrawer();
 }
@@ -289,9 +252,19 @@ async function reopenLeadPlan(planId: string | null | undefined): Promise<void> 
   await shell.loadOperatorBriefing({ background: true, light: true });
 }
 
-function openVaxonReview(planId?: string | null): void {
-  planFilterId.value = String(planId || '').trim() || planFilterId.value;
+async function openVaxonReview(planId?: string | null): Promise<void> {
+  const cleaned = String(planId || '').trim();
+  planFilterId.value = cleaned || planFilterId.value;
   shell.focusLiveOperations();
+  if (!cleaned) {
+    return;
+  }
+  const opened = await openLeadReviewOverlay(cleaned);
+  if (!opened) {
+    shell.commandMutationError =
+      leadReviewOverlayError.value
+      || 'Could not open the Lead rollup in Live operations.';
+  }
 }
 
 const selectedPlanAwaitingEngagement = computed(() => {
@@ -329,7 +302,6 @@ async function submitTask(): Promise<void> {
   goalDraft.value = '';
   acceptanceDraft.value = '';
   dependenciesDraft.value = '';
-  showCreate.value = false;
   if (result.selectedTaskId) {
     selectedTaskId.value = result.selectedTaskId;
   }
@@ -460,7 +432,7 @@ function activateNextUp(row: TaskBoardRow): void {
               :aria-expanded="showCreate ? 'true' : 'false'"
               @click="showCreate = !showCreate"
             >
-              {{ showCreate ? 'Hide form' : '+ Add task' }}
+              {{ showCreate ? 'Hide work composer' : 'Show work composer' }}
             </button>
           </div>
         </div>
@@ -482,36 +454,7 @@ function activateNextUp(row: TaskBoardRow): void {
         @open-fleet="openFleetControls"
       />
 
-      <section
-        v-if="openHandoffRows.length"
-        class="operator-task-board__handoffs"
-        data-orb-field
-        aria-label="Cross-workspace handoffs"
-      >
-        <header class="operator-task-board__handoffs-head">
-          <h4>Cross-workspace tickets</h4>
-          <span>{{ openHandoffRows.length }}</span>
-        </header>
-        <ul class="operator-task-board__handoff-list">
-          <li
-            v-for="row in openHandoffRows"
-            :key="row.handoffId"
-            class="operator-task-board__handoff-item"
-            :class="`operator-task-board__handoff-item--${row.direction}`"
-          >
-            <button
-              type="button"
-              class="operator-task-board__handoff-button"
-              @click="focusHandoffTask(row)"
-            >
-              <span class="operator-task-board__handoff-meta">
-                {{ incomingHandoffHeadline(row) }} · {{ row.status }}
-              </span>
-              <span class="operator-task-board__handoff-task">{{ row.task }}</span>
-            </button>
-          </li>
-        </ul>
-      </section>
+      <OperatorTaskBoardHandoffs @select-task="selectedTaskId = $event" />
 
       <OperatorTaskBoardPlanFilter
         :plan-groups="boardView.planGroups"
@@ -557,7 +500,7 @@ function activateNextUp(row: TaskBoardRow): void {
         @start-task="void startTask($event)"
         @cancel-task="void cancelTask($event)"
         @dismiss-done="dismissDoneTask"
-        @cancel-all-waiting="void clearDuplicateWaiting()"
+        @clear-duplicate-waiting="void clearDuplicateWaiting()"
         @update:show-history="showHistory = $event"
       />
 

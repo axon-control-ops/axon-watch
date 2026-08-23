@@ -2,6 +2,7 @@
 import type { AgentQuestionOption } from '../../lib/agent-question-view';
 import type { AgentTranscriptSegment } from '../../lib/agent-transcript-blocks';
 import AgentLeadFanOutBlock from './AgentLeadFanOutBlock.vue';
+import AgentLeadCheckinBlock from './AgentLeadCheckinBlock.vue';
 import AgentLeadStandupBlock from './AgentLeadStandupBlock.vue';
 import AgentPlanBlock from './AgentPlanBlock.vue';
 import AgentQuestionBlock from './AgentQuestionBlock.vue';
@@ -15,6 +16,7 @@ defineProps<{
     | { kind: 'research' }
     | { kind: 'lead-fan-out' }
     | { kind: 'lead-standup' }
+    | { kind: 'lead-checkin' }
   >;
   workspaceId: string | null;
   live?: boolean;
@@ -45,6 +47,18 @@ defineProps<{
     :confidence="segment.confidence"
     :verification-notice="segment.verificationNotice"
     :workspace-id="workspaceId"
+  />
+  <AgentLeadCheckinBlock
+    v-else-if="segment.kind === 'lead-checkin'"
+    :title="segment.title"
+    :summary="segment.summary"
+    :findings="segment.findings"
+    :next-steps="segment.nextSteps"
+    :prompt="segment.prompt"
+    :options="segment.options"
+    :message-id="messageId"
+    :segment-index="segmentIndex"
+    :answered-option="answeredOption"
   />
   <AgentPlanBlock
     v-else-if="segment.kind === 'plan'"

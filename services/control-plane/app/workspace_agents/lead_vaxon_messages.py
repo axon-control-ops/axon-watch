@@ -40,7 +40,9 @@ def build_lead_synthesis_vaxon_message(
         lines.append(f"- {detail}{run_bit}")
 
     lines.append("Open Dana's Lead thread for the full narrative, or ask me what to do next.")
-    lines.append("Confidence: 8/10")
+    # No trailing Confidence boilerplate: this is a deterministic rollup, not
+    # an LLM turn — there's no model self-assessment to score (see
+    # lead_team_checkin.py's identical reasoning for the check-in message).
     return "\n".join(lines)
 
 
@@ -76,7 +78,6 @@ def build_ad_hoc_lead_vaxon_message(
     lines.append(
         "Ask me REPORT / update anytime — I keep fleet state from Lead handoffs."
     )
-    lines.append("Confidence: 8/10")
     return "\n".join(lines)
 
 

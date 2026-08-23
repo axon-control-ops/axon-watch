@@ -35,6 +35,7 @@ class VoiceTranscriptStoreTests(unittest.TestCase):
             stt_note="stt_normalized",
             duration_ms=187,
             runtime_dispatched=False,
+            submission_intent="ask",
         )
         entries = list_recent_voice_transcripts(limit=5)
         self.assertEqual(len(entries), 1)
@@ -42,6 +43,7 @@ class VoiceTranscriptStoreTests(unittest.TestCase):
         self.assertEqual(entries[0]["stt_note"], "stt_normalized")
         self.assertEqual(entries[0]["duration_ms"], 187)
         self.assertEqual(entries[0]["runtime_dispatched"], 0)
+        self.assertEqual(entries[0]["submission_intent"], "ask")
 
     def test_list_recent_voice_transcripts_filters_by_session(self) -> None:
         append_voice_transcript(

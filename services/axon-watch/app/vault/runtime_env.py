@@ -4,8 +4,44 @@ from __future__ import annotations
 
 import importlib.util
 from pathlib import Path
+from typing import Any
 
-from app.vault.session import VaultSession
+_INJECTED_VAULT_SESSION = globals().get("VaultSession")
+_INJECTED_VAULT_RESOLVE_NAMED_SECRET = globals().get("vault_resolve_named_secret")
+_INJECTED_VAULT_RESOLVE_PROVIDER_KEY = globals().get("vault_resolve_provider_key")
+_INJECTED_VAULT_RESOLVE_ALL_PROVIDER_KEYS = globals().get("vault_resolve_all_provider_keys")
+
+
+def _vault_session() -> Any:
+    if _INJECTED_VAULT_SESSION is not None:
+        return _INJECTED_VAULT_SESSION
+    from app.vault.session import VaultSession
+
+    return VaultSession
+
+
+def _vault_ops() -> tuple[Any, Any, Any]:
+    if (
+        _INJECTED_VAULT_RESOLVE_NAMED_SECRET is not None
+        and _INJECTED_VAULT_RESOLVE_PROVIDER_KEY is not None
+        and _INJECTED_VAULT_RESOLVE_ALL_PROVIDER_KEYS is not None
+    ):
+        return (
+            _INJECTED_VAULT_RESOLVE_NAMED_SECRET,
+            _INJECTED_VAULT_RESOLVE_PROVIDER_KEY,
+            _INJECTED_VAULT_RESOLVE_ALL_PROVIDER_KEYS,
+        )
+    from app.vault.operations import (
+        vault_resolve_all_provider_keys,
+        vault_resolve_named_secret,
+        vault_resolve_provider_key,
+    )
+
+    return (
+        vault_resolve_named_secret,
+        vault_resolve_provider_key,
+        vault_resolve_all_provider_keys,
+    )
 
 
 def _runtime_provider_ids() -> dict[str, str]:
@@ -26,7 +62,8 @@ def _runtime_provider_ids() -> dict[str, str]:
 
 def vault_runtime_env() -> dict[str, str]:
     """Resolve CLI runtime env keys from unlocked vault (internal control-plane use only)."""
-    from app.vault.operations import vault_resolve_named_secret, vault_resolve_provider_key
+    VaultSession = _vault_session()
+    vault_resolve_named_secret, vault_resolve_provider_key, _ = _vault_ops()
 
     if not VaultSession.is_unlocked():
         return {}
@@ -37,6 +74,7 @@ def vault_runtime_env() -> dict[str, str]:
         ("CODEX_API_KEY", "codex_cli"),
         ("OPENAI_API_KEY", "openai_gpts"),
         ("ANTHROPIC_API_KEY", "anthropic"),
+        ("SUPABASE_ACCESS_TOKEN", "supabase_cli"),
     )
     for env_name, provider_id in named_bindings:
         value = vault_resolve_named_secret(env_name) or vault_resolve_provider_key(provider_id)
@@ -97,10 +135,8 @@ def vault_runtime_env() -> dict[str, str]:
 
 def vault_runtime_posture() -> dict[str, object]:
     """Operator-safe runtime vault posture (no secret values)."""
-    from app.vault.operations import (
-        vault_resolve_all_provider_keys,
-        vault_resolve_named_secret,
-    )
+    VaultSession = _vault_session()
+    vault_resolve_named_secret, _, vault_resolve_all_provider_keys = _vault_ops()
 
     unlocked = VaultSession.is_unlocked()
     resolved_map = vault_resolve_all_provider_keys() if unlocked else {}
@@ -113,6 +149,9 @@ def vault_runtime_posture() -> dict[str, object]:
         "CODEX_API_KEY": bool(vault_resolve_named_secret("CODEX_API_KEY")) if unlocked else False,
         "OPENAI_API_KEY": bool(vault_resolve_named_secret("OPENAI_API_KEY")) if unlocked else False,
         "ANTHROPIC_API_KEY": bool(vault_resolve_named_secret("ANTHROPIC_API_KEY")) if unlocked else False,
+        "SUPABASE_ACCESS_TOKEN": bool(vault_resolve_named_secret("SUPABASE_ACCESS_TOKEN"))
+        if unlocked
+        else False,
         "AZURE_SPEECH_KEY": bool(
             vault_resolve_named_secret("AZURE_SPEECH_KEY")
             or vault_resolve_named_secret("azure_speech_key")

@@ -26,8 +26,10 @@ export function latestUnansweredAskFromMessages(
       return null;
     }
     const questions = parseAgentTranscriptBlocks(message.content ?? '').filter(
-      (segment): segment is Extract<typeof segment, { kind: 'question' }> =>
-        segment.kind === 'question',
+      (
+        segment,
+      ): segment is Extract<typeof segment, { kind: 'question' } | { kind: 'lead-checkin' }> =>
+        segment.kind === 'question' || segment.kind === 'lead-checkin',
     );
     for (let q = questions.length - 1; q >= 0; q -= 1) {
       const question = questions[q];

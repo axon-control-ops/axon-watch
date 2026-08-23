@@ -37,9 +37,12 @@ export async function submitQuestionAnswer(
   }
   const mode = resolveSubmitMode(input.workspaceId, shell.activeIdeThreadId);
   requestIdeComposerMode(mode);
+  shell.openIdeComposerWithDraft(answer);
+  const submitted = await shell.submitIdeComposer(mode);
+  if (submitted === false) {
+    throw new Error('Unable to send this choice. Your selection is still available.');
+  }
   if (input.messageId && input.prompt) {
     markQuestionAnswered(input.messageId, input.prompt);
   }
-  shell.openIdeComposerWithDraft(answer);
-  await shell.submitIdeComposer(mode);
 }

@@ -55,6 +55,39 @@ describe('composer-teammate-route', () => {
     expect(isAmbiguousTeammateRoute(decision)).toBe(true);
   });
 
+  it('keeps multi-role Lead dispatch prompts on Dana', () => {
+    const dana = dashproRoster[0];
+    const decision = shouldSoftRouteToTeammate(
+      'The three tasks from this morning are still open — task-ec42c713997048aa, task-c3f1c233ea184ade, and task-138a5dec16bf4ddf — they were never dispatched. Assign the two UI tasks to Priya (frontend) and the teacher query task to the backend specialist now. Use materialize_lead_fan_out with create_runs=True or directly lease those tasks and create queued runs.',
+      dana,
+      dashproRoster,
+    );
+    expect(decision.shouldRoute).toBe(false);
+    expect(decision.reason).toBe('lead_fan_out');
+  });
+
+  it('does not named-route multi-role fan-out when active employee is not hydrated', () => {
+    const decision = shouldSoftRouteToTeammate(
+      'The three tasks from this morning are still open — task-ec42c713997048aa, task-c3f1c233ea184ade, and task-138a5dec16bf4ddf — they were never dispatched. Assign the two UI tasks to Priya (frontend) and the teacher query task to the backend specialist now. Use materialize_lead_fan_out with create_runs=True or directly lease those tasks and create queued runs.',
+      null,
+      dashproRoster,
+    );
+    expect(decision.shouldRoute).toBe(false);
+    expect(decision.reason).toBe('lead_fan_out');
+  });
+
+  it('does not switch teammates for pronoun-only named assigns', () => {
+    const dana = dashproRoster[0];
+    const decision = shouldSoftRouteToTeammate(
+      'Route the task to Priya',
+      dana,
+      dashproRoster,
+    );
+    expect(decision.shouldRoute).toBe(false);
+    expect(decision.reason).toBe('vague_named_assign');
+    expect(decision.employee?.name).toBe('Priya');
+  });
+
   it('does not spend a model call on a zero-signal prompt', () => {
     const decision = shouldSoftRouteToTeammate(
       'check canary',

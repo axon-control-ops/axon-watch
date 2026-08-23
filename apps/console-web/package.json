@@ -25,6 +25,7 @@
     "@types/node": "latest",
     "@types/three": "^0.185.0",
     "@vitejs/plugin-vue": "latest",
+    "playwright": "^1.62.1",
     "typescript": "latest",
     "vite": "latest",
     "vitest": "latest",

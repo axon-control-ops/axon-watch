@@ -72,6 +72,15 @@ class CiRemediationTests(unittest.TestCase):
         self.addCleanup(task_store.reset_store)
         self.addCleanup(run_store.reset_store)
 
+        # build_repair_goal() consults staleness.stale_ci_infra_hint(), which
+        # shells out to `gh`. Stub it so this test file never makes a live
+        # network call; tests that care about the hint text patch it back in.
+        gh_patch = mock.patch(
+            "app.ci_remediation.staleness._default_gh_runner", return_value=None
+        )
+        gh_patch.start()
+        self.addCleanup(gh_patch.stop)
+
     def test_hmac_rejects_bad_signature(self) -> None:
         from app.ci_remediation.hmac_verify import verify_github_signature
 
@@ -172,6 +181,20 @@ class CiRemediationTests(unittest.TestCase):
         items = ci_inbox_items()
         self.assertTrue(any("Fast Gate failed" in str(i.get("title")) for i in items))
 
+    def test_completed_repair_task_reconciles_its_open_signal(self) -> None:
+        from app.ci_remediation.ingest import ingest_workflow_run_event
+        from app.ci_remediation.report import ci_inbox_items
+        from app.persistence import task_store
+
+        with mock.patch(
+            "app.ci_remediation.ingest.dispatch_repair_run",
+            return_value=None,
+        ):
+            result = ingest_workflow_run_event(_failure_payload(), dispatch=False)
+        task_store.complete_task(result.task_id, terminal_outcome="CI confirmed green")
+
+        self.assertEqual([], ci_inbox_items())
+
     def test_inbox_projection_merges_ci_items(self) -> None:
         from app.ci_remediation.ingest import ingest_workflow_run_event
         from app.inbox_projection import build_inbox_response
@@ -239,6 +262,55 @@ class CiRemediationTests(unittest.TestCase):
         )
         self.assertIn("Gate 9 CI remediation", prompt)
         self.assertIn("report-outcome", prompt)
+
+    def test_repair_goal_includes_stale_ci_infra_hint_when_present(self) -> None:
+        from app.ci_remediation.classify import classify_workflow_run_event
+        from app.ci_remediation.config import match_binding
+        from app.ci_remediation.dispatch_repair import build_repair_goal
+
+        classified = classify_workflow_run_event(_failure_payload())
+        assert classified is not None
+        binding = match_binding(
+            github_owner="axon-control-ops",
+            github_repo="axon-watch",
+            workflow_name="Axon-X Fast Gate",
+        )
+        assert binding is not None
+
+        with mock.patch(
+            "app.ci_remediation.staleness.stale_ci_infra_hint",
+            return_value=(
+                "Axon-X Fast Gate is green on `development` and this head is "
+                "missing 1 CI-infra path change(s) already on it: "
+                ".github/workflows/fast-gate.yml. Before editing SQL/app "
+                "content, merge `development` into this branch."
+            ),
+        ):
+            goal = build_repair_goal(classified, binding, dedupe_key="ci:test:key")
+
+        self.assertIn("CI repair:", goal)
+        self.assertIn("is green on `development`", goal)
+        self.assertIn("merge `development` into this branch", goal)
+
+    def test_repair_goal_omits_hint_when_nothing_stale(self) -> None:
+        from app.ci_remediation.classify import classify_workflow_run_event
+        from app.ci_remediation.config import match_binding
+        from app.ci_remediation.dispatch_repair import build_repair_goal
+
+        classified = classify_workflow_run_event(_failure_payload())
+        assert classified is not None
+        binding = match_binding(
+            github_owner="axon-control-ops",
+            github_repo="axon-watch",
+            workflow_name="Axon-X Fast Gate",
+        )
+        assert binding is not None
+
+        # setUp() already stubs the gh runner to return None, so no live call
+        # is made and the hint is naturally absent.
+        goal = build_repair_goal(classified, binding, dedupe_key="ci:test:key")
+        self.assertIn("CI repair:", goal)
+        self.assertNotIn("is green on", goal)
 
     def test_repair_parks_under_ship_intent_lead_plan(self) -> None:
         from app.ci_remediation.classify import classify_workflow_run_event

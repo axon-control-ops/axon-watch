@@ -4,7 +4,7 @@ import json
 import sys
 import unittest
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 from tests.support.control_plane_db import isolate_control_plane_db
 
@@ -82,7 +82,7 @@ class RuntimeSummaryAssemblerTests(unittest.TestCase):
         self.assertFalse(payload["capabilities"]["watch_connected"])
 
     def test_default_watch_probe_surfaces_connection_refused_detail(self) -> None:
-        health_url = "http://127.0.0.1:8788/internal/watch/health"
+        readiness_url = "http://127.0.0.1:8788/internal/watch/readiness"
         with patch(
             "app.runtime_summary_assembler.urlopen",
             side_effect=URLError("[Errno 111] Connection refused"),
@@ -94,7 +94,61 @@ class RuntimeSummaryAssemblerTests(unittest.TestCase):
 
         self.assertFalse(connected)
         self.assertEqual("unavailable", status)
-        self.assertEqual(f"Connection refused on {health_url}", degraded_reason)
+        self.assertEqual(f"Connection refused on {readiness_url}", degraded_reason)
+
+    def test_default_watch_probe_reports_degraded_when_required_connector_down(self) -> None:
+        with patch(
+            "app.runtime_summary_assembler.urlopen"
+        ) as mock_urlopen, patch(
+            "app.runtime_summary_assembler._watch_base_url",
+            return_value="http://127.0.0.1:8788",
+        ):
+            mock_response = MagicMock()
+            mock_response.read.return_value = json.dumps(
+                {
+                    "service": "axon-watch",
+                    "status": "ready",
+                    "dependencies": {
+                        "connectors_configured": 3,
+                        "connectors_ok": 2,
+                        "connectors_required_unavailable": 1,
+                    },
+                }
+            ).encode("utf-8")
+            mock_urlopen.return_value.__enter__.return_value = mock_response
+
+            connected, status, degraded_reason, _generated_at = default_watch_probe()
+
+        self.assertFalse(connected)
+        self.assertEqual("degraded", status)
+        self.assertEqual("1 required connector(s) unavailable", degraded_reason)
+
+    def test_default_watch_probe_connected_when_all_required_connectors_ok(self) -> None:
+        with patch(
+            "app.runtime_summary_assembler.urlopen"
+        ) as mock_urlopen, patch(
+            "app.runtime_summary_assembler._watch_base_url",
+            return_value="http://127.0.0.1:8788",
+        ):
+            mock_response = MagicMock()
+            mock_response.read.return_value = json.dumps(
+                {
+                    "service": "axon-watch",
+                    "status": "ready",
+                    "dependencies": {
+                        "connectors_configured": 3,
+                        "connectors_ok": 3,
+                        "connectors_required_unavailable": 0,
+                    },
+                }
+            ).encode("utf-8")
+            mock_urlopen.return_value.__enter__.return_value = mock_response
+
+            connected, status, degraded_reason, _generated_at = default_watch_probe()
+
+        self.assertTrue(connected)
+        self.assertEqual("ready", status)
+        self.assertIsNone(degraded_reason)
 
     def test_assembler_reflects_connected_watch_in_capabilities(self) -> None:
         payload = assemble_runtime_summary(watch_probe=_connected_probe, inbox_fetcher=lambda: None)

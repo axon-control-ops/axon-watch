@@ -19,32 +19,6 @@ export type RunMutationState =
   | 'rejecting'
   | 'reviewing'
   | 'completing';
-export type WorkbenchSurface = 'editor' | 'preview';
-
-export interface EditorTabDescriptor {
-  id: string;
-  title: string;
-  surface: WorkbenchSurface;
-  state: 'placeholder';
-}
-
-export interface DockContextDescriptor {
-  id: string;
-  title: string;
-  state: 'placeholder';
-}
-
-export const DEFAULT_EDITOR_TABS: EditorTabDescriptor[] = [
-  { id: 'editor-shell', title: 'Editor', surface: 'editor', state: 'placeholder' },
-  { id: 'preview-shell', title: 'Preview', surface: 'preview', state: 'placeholder' },
-];
-
-export const DEFAULT_DOCK_CONTEXT: DockContextDescriptor = {
-  id: 'dock-thread',
-  title: 'Dock Thread Shell',
-  state: 'placeholder',
-};
-
 export function hydrateWorkspaceSurfaceThreadIds(): Record<
   string,
   Partial<Record<ThreadSurface, string>>

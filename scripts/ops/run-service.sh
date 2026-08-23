@@ -12,11 +12,19 @@ repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 env_file="${AXON_WATCH_DEPLOYMENT_ENV:-/etc/axon-watch/deployment.env}"
 
 if [[ -f "${env_file}" ]]; then
+  # deployment.env is a process environment contract, not only shell-local
+  # configuration. Export values while sourcing so Python services and their
+  # worker subprocesses inherit the same DB/token/root paths after a manual
+  # restart.
+  set -a
   # shellcheck disable=SC1090
   source "${env_file}"
+  set +a
 elif [[ -f "${repo_root}/config/deployment.env.example" ]]; then
+  set -a
   # shellcheck disable=SC1091
   source "${repo_root}/config/deployment.env.example"
+  set +a
 fi
 
 : "${AXON_WATCH_REPO_ROOT:=${repo_root}}"
@@ -29,6 +37,20 @@ fi
 # Ensure user-local CLIs (gh, cursor, …) remain visible when systemd starts
 # control-plane with a minimal PATH.
 export PATH="${HOME}/.local/bin:/usr/local/bin:${PATH}"
+
+# CLI runtimes installed via `npm install -g` under nvm (codex, etc.) carry a
+# `#!/usr/bin/env node` shebang. Without the nvm bin dir on PATH, systemd's
+# minimal environment resolves that shebang to a system `node` (if any) —
+# a different major version than the one the package's optional native
+# dependency was resolved against — instead of the nvm-managed node the
+# global install actually used. Prepend the highest installed nvm version so
+# subprocess dispatch stays on the same node the CLI was installed under.
+if [[ -d "${HOME}/.nvm/versions/node" ]]; then
+  nvm_node_bin="$(find "${HOME}/.nvm/versions/node" -maxdepth 1 -mindepth 1 -type d 2>/dev/null | sort -V | tail -1)"
+  if [[ -n "${nvm_node_bin}" && -x "${nvm_node_bin}/bin/node" ]]; then
+    export PATH="${nvm_node_bin}/bin:${PATH}"
+  fi
+fi
 
 # Gate 2 safety net for always-on: if local_token is required but the token is
 # missing, mint one into deployment.env so console proxy + CP stay aligned.

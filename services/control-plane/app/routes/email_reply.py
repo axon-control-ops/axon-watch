@@ -20,7 +20,7 @@ class EmailSuggestReplyRequest(BaseModel):
     subject: str = ""
     sender: str = ""
     text: str = ""
-    operator_name: str = "Axon operator"
+    operator_name: str = ""
 
 
 class EmailSendRequest(BaseModel):
@@ -39,7 +39,7 @@ def email_suggest_reply(body: EmailSuggestReplyRequest) -> dict[str, Any]:
         subject=body.subject,
         sender=body.sender,
         text=body.text,
-        operator_name=body.operator_name or "Axon operator",
+        operator_name=body.operator_name,
     )
 
 

@@ -139,7 +139,14 @@ describe('operator-brain-graph-view', () => {
 
   it('defaults Mission Control fleet when no center view is stored', () => {
     vi.stubGlobal('sessionStorage', memorySessionStorage());
-    expect(readStoredOperatorCenterView()).toBe('grid');
+    expect(readStoredOperatorCenterView()).toBe('mission');
+  });
+
+  it('migrates legacy grid session value to mission', () => {
+    const storage = memorySessionStorage();
+    storage.setItem('axon.operator.center-view', 'grid');
+    vi.stubGlobal('sessionStorage', storage);
+    expect(readStoredOperatorCenterView()).toBe('mission');
   });
 
   it('restores Brain Graph when sessionStorage says graph', () => {

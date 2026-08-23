@@ -9,6 +9,7 @@ import {
   shouldAutoOpenAgentReportInEditor,
   shouldOfferMarkdownPreview,
   shouldOfferOpenInEditor,
+  shouldRenderAgentProseMarkdown,
   shouldUseAgentMarkdownBlock,
   splitAgentMessageForPreview,
 } from './agent-message-markdown';
@@ -89,7 +90,7 @@ describe('agent-message-markdown', () => {
 
   it('renders all non-empty agent prose blocks', () => {
     expect(shouldUseAgentMarkdownBlock('')).toBe(false);
-    expect(shouldUseAgentMarkdownBlock('Search returned no results — trying Cursor docs.')).toBe(
+    expect(shouldUseAgentMarkdownBlock('Search returned no results — trying Cursor docs.', false)).toBe(
       false,
     );
     expect(shouldUseAgentMarkdownBlock('## Summary\n\n- item one')).toBe(true);
@@ -112,9 +113,16 @@ describe('agent-message-markdown', () => {
     expect(isMarkdownFileAgentResponse(content)).toBe(true);
   });
 
-  it('keeps interim status lines out of markdown preview', () => {
+  it('keeps interim status lines out of markdown preview while streaming', () => {
     expect(shouldUseAgentMarkdownBlock('Searching the docs…', false)).toBe(false);
-    expect(shouldUseAgentMarkdownBlock('Searching the docs…', true)).toBe(false);
+  });
+
+  it('renders complete agent prose as markdown even without list markers', () => {
+    expect(
+      shouldRenderAgentProseMarkdown('Confidence: 7/10\n\nDelivery is blocked until CI is green.', {
+        isComplete: true,
+      }),
+    ).toBe(true);
   });
 
   it('does not treat multi-line prose as interim status', () => {

@@ -9,6 +9,7 @@ from uuid import uuid4
 
 from app.persistence import chat_store
 from app.workspace_agents import lead_plan_store
+from app.workspace_agents.lead_executive_brief import compress_ask, needs_operator_gate
 from app.workspace_agents.lead_fan_out import _employee_id_for_role
 from app.workspace_agents.lead_text import truncate_text as _truncate
 
@@ -66,6 +67,46 @@ def _ensure_dana_ide_thread(workspace_id: str) -> dict[str, Any] | None:
     return thread
 
 
+def _dynamic_next_best_steps(findings: list[dict[str, Any]]) -> list[str]:
+    """Concrete, fleet-state-derived steps instead of a fixed placeholder list.
+
+    Surfaces real failed specialists and real operator-gate asks pulled from
+    findings; only falls back to generic guidance when nothing concrete was
+    found (e.g. every shift completed cleanly with no decision pending).
+    """
+    steps: list[str] = []
+    failed_names = [
+        str(row.get("assignee_name") or row.get("owner_role") or "a specialist").strip()
+        for row in findings
+        if str(row.get("status") or "").lower() == "failed"
+    ]
+    if failed_names:
+        shown = ", ".join(failed_names[:3])
+        more = f" (+{len(failed_names) - 3} more)" if len(failed_names) > 3 else ""
+        steps.append(f"Dig into {shown}{more} — failed and needs a decision on retry vs. reassign.")
+
+    seen_asks: set[str] = set()
+    for row in findings:
+        excerpt = str(row.get("specialist_reply_excerpt") or "").strip()
+        if not excerpt or not needs_operator_gate(excerpt):
+            continue
+        ask = compress_ask(excerpt, max_len=150)
+        if not ask or ask in seen_asks:
+            continue
+        seen_asks.add(ask)
+        owner = str(row.get("assignee_name") or row.get("owner_role") or "").strip()
+        prefix = f"Confirm ({owner}): " if owner else "Confirm: "
+        steps.append(f"{prefix}{ask}")
+        if len(steps) >= 4:
+            break
+
+    if not steps:
+        steps.append("Tell me which specialist to dig into, or what to approve next.")
+    steps.append("Confirm any blocked live checks (auth/network/headcount) before rollout.")
+    steps.append("I will keep holding cross-team decisions until you engage.")
+    return steps[:4]
+
+
 def build_lead_synthesis_dana_message(
     *,
     plan_id: str,
@@ -116,15 +157,13 @@ def build_lead_synthesis_dana_message(
         lines.append(f"Compressed outcome line: {clean_summary}")
         lines.append("")
 
+    lines.append("Next best steps (operator):")
+    for index, step in enumerate(_dynamic_next_best_steps(findings), start=1):
+        lines.append(f"{index}) {step}")
     lines.extend(
         [
-            "Next best steps (operator):",
-            "1) Tell me which specialist to dig into, or what to approve next.",
-            "2) Confirm any blocked live checks (auth/network/headcount) before rollout.",
-            "3) I will keep holding cross-team decisions until you engage.",
             "",
             "Ask me anything about this rollup — I stay with you conversationally.",
-            "Confidence: 8/10",
         ]
     )
     return "\n".join(lines).rstrip() + "\n"

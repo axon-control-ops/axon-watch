@@ -73,6 +73,22 @@ export interface CompanyEmployeeRecord {
   last_run_id?: string | null;
   /** Newest non-terminal role-tagged run, when a shift is in progress. */
   active_run_id?: string | null;
+  /** A durable operator choice is waiting for this teammate. */
+  pending_decision_id?: string | null;
+  /** Short operator-facing summary of the pending decision. */
+  pending_decision_title?: string | null;
+  /** Exact question requiring an operator answer, without agent-name boilerplate. */
+  pending_decision_prompt?: string | null;
+  /** Why work cannot safely continue without the decision. */
+  pending_decision_reason?: string | null;
+  /** Human-readable choices supplied by the worker. */
+  pending_decision_options?: Array<{ id: string; label: string }> | null;
+  /** Role responsible for deciding or diagnosing this recovery. */
+  pending_decision_owner_role?: string | null;
+  /** Role whose failed run caused this decision. */
+  pending_decision_subject_role?: string | null;
+  /** Exact failed run that caused this decision. */
+  pending_decision_subject_run_id?: string | null;
   /** Optional Azure neural voice for Talk / teammate TTS (falls back to operator voice). */
   azure_voice_id?: string | null;
   /** Latest worker delivery stage for this role (git/PR/CI pipeline). */

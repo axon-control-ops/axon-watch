@@ -1,16 +1,18 @@
 from __future__ import annotations
 
 import concurrent.futures
+import os
 import sys
 import tempfile
 import unittest
 from contextlib import closing
 from pathlib import Path
+from unittest.mock import patch
 
 CONTROL_PLANE_ROOT = Path(__file__).resolve().parents[1] / "services" / "control-plane"
 sys.path.insert(0, str(CONTROL_PLANE_ROOT))
 
-from app.persistence import run_store_sqlite  # noqa: E402
+from app.persistence import run_store, run_store_sqlite  # noqa: E402
 
 
 class RunStoreSqliteConcurrencyTests(unittest.TestCase):
@@ -52,6 +54,30 @@ class RunStoreSqliteConcurrencyTests(unittest.TestCase):
                     "SELECT COUNT(*) FROM operator_presence_settings"
                 ).fetchone()[0]
             self.assertEqual(24, count)
+
+    def test_concurrent_history_appends_allocate_unique_sequences(self) -> None:
+        with tempfile.TemporaryDirectory() as tempdir:
+            db_path = str(Path(tempdir) / "control-plane.sqlite3")
+            with patch.dict(
+                os.environ,
+                {"AXON_WATCH_CONTROL_PLANE_DB": db_path},
+                clear=False,
+            ):
+                def append(index: int) -> None:
+                    run_store.append_transition(
+                        "history-concurrent",
+                        {"index": index},
+                    )
+
+                with concurrent.futures.ThreadPoolExecutor(max_workers=12) as executor:
+                    futures = [executor.submit(append, index) for index in range(48)]
+                    for future in futures:
+                        future.result(timeout=10)
+
+                history = run_store.list_history("history-concurrent")
+
+        self.assertEqual(48, len(history))
+        self.assertEqual(set(range(48)), {item["index"] for item in history})
 
 
 if __name__ == "__main__":

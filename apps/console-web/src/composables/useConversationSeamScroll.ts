@@ -1,5 +1,11 @@
 import { nextTick, onMounted, onUnmounted, ref, type Ref } from 'vue';
 
+import {
+  elementCanScrollInDirection,
+  isConversationNearBottom,
+  pinConversationScrollToBottom,
+} from '../lib/conversation-seam-scroll';
+
 function wheelDeltaPixels(event: WheelEvent): number {
   if (event.deltaMode === WheelEvent.DOM_DELTA_LINE) {
     return event.deltaY * 16;
@@ -17,13 +23,19 @@ function targetHasScrollableRoom(
 ): boolean {
   let element = target instanceof HTMLElement ? target : null;
   while (element && element !== container) {
-    if (element.scrollHeight > element.clientHeight + 1) {
-      const canScrollUp = deltaY < 0 && element.scrollTop > 0;
-      const canScrollDown =
-        deltaY > 0 && element.scrollTop + element.clientHeight < element.scrollHeight - 1;
-      if (canScrollUp || canScrollDown) {
-        return true;
-      }
+    const overflowY = window.getComputedStyle(element).overflowY;
+    if (
+      elementCanScrollInDirection(
+        {
+          scrollTop: element.scrollTop,
+          clientHeight: element.clientHeight,
+          scrollHeight: element.scrollHeight,
+          overflowY,
+        },
+        deltaY,
+      )
+    ) {
+      return true;
     }
     element = element.parentElement;
   }
@@ -63,32 +75,46 @@ export function useConversationSeamScroll(options: {
   const stickToBottom = ref(true);
   let resizeObserver: ResizeObserver | null = null;
   let scrollContainer: HTMLElement | null = null;
+  let programmaticScroll = false;
 
   function scrollContainerElement(): HTMLElement | null {
     return resolveConversationScrollContainer(options.rootRef.value, options.listRef.value);
   }
 
-  function isNearBottom(container: HTMLElement): boolean {
-    return container.scrollHeight - container.scrollTop - container.clientHeight < 48;
-  }
-
   function updateStickToBottom(): void {
+    if (programmaticScroll) {
+      stickToBottom.value = true;
+      return;
+    }
     const container = scrollContainerElement();
     if (!container) {
       stickToBottom.value = true;
       return;
     }
-    stickToBottom.value = isNearBottom(container);
+    stickToBottom.value = isConversationNearBottom(container);
   }
 
-  async function scrollToLatest(reason = 'explicit'): Promise<void> {
+  async function scrollToLatest(_reason = 'explicit'): Promise<void> {
     await nextTick();
     const container = scrollContainerElement();
     if (!container) {
       return;
     }
-    container.scrollTop = container.scrollHeight;
+    programmaticScroll = true;
     stickToBottom.value = true;
+    pinConversationScrollToBottom(container);
+    // Second paint: markdown/images/fonts can grow after the first pin.
+    await new Promise<void>((resolve) => {
+      window.requestAnimationFrame(() => {
+        pinConversationScrollToBottom(container);
+        window.requestAnimationFrame(() => {
+          pinConversationScrollToBottom(container);
+          programmaticScroll = false;
+          stickToBottom.value = true;
+          resolve();
+        });
+      });
+    });
   }
 
   async function scrollToLatestIfPinned(reason = 'pinned'): Promise<void> {

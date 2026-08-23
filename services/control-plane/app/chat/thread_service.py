@@ -3,8 +3,19 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+import re
 
+from app.cli_runtime.approval_gate import (
+    agent_tool_execution_enabled,
+    rewritten_execution_access_notice,
+)
 from app.persistence import attachment_store, chat_store
+from app.workspace_agents import build_company_roster
+from app.workspace_agents.assignment_messages import (
+    assignment_card,
+    employee_display_name,
+    readable_goal,
+)
 from app.workspace_catalog import get_workspace_record
 
 
@@ -17,18 +28,157 @@ def _normalize_thread_kind(thread_kind: str | None) -> str:
     return kind if kind in {"operator", "ide"} else "operator"
 
 
-def _enrich_message_records(records: list[dict[str, object]]) -> list[dict[str, object]]:
+def _thread_employee_speaker(thread: dict[str, object]) -> dict[str, str | None]:
+    employee_id = str(thread.get("employee_id") or "").strip()
+    employee_role = str(thread.get("employee_role") or "").strip().lower()
+    if not employee_id and not employee_role:
+        return {"speaker_name": None, "speaker_role": None, "speaker_employee_id": None}
+    title = str(thread.get("title") or "").strip()
+    speaker_name = title.split("·", 1)[0].strip() if title else ""
+    return {
+        "speaker_name": speaker_name or None,
+        "speaker_role": employee_role or None,
+        "speaker_employee_id": employee_id or None,
+    }
+
+
+def _company_employee(workspace_id: str, *, employee_id: str = "", role: str = "") -> dict[str, object] | None:
+    company = build_company_roster(workspace_id)
+    rows = company.get("employees") if isinstance(company, dict) else None
+    if not isinstance(rows, list):
+        return None
+    wanted_id = employee_id.strip()
+    wanted_role = role.strip().lower()
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        if wanted_id and str(row.get("employee_id") or "").strip() == wanted_id:
+            return row
+        if wanted_role and str(row.get("role") or "").strip().lower() == wanted_role:
+            return row
+    return None
+
+
+def _legacy_key_values(content: str) -> dict[str, str]:
+    values: dict[str, str] = {}
+    for line in content.splitlines():
+        if ":" not in line:
+            continue
+        key, value = line.split(":", 1)
+        values[key.strip().lower()] = value.strip()
+    return values
+
+
+def _legacy_assignment_message(
+    record: dict[str, object],
+    *,
+    thread: dict[str, object] | None,
+    fallback_speaker: dict[str, str | None],
+) -> dict[str, object] | None:
+    content = str(record.get("content") or "").strip()
+    workspace_id = str(record.get("workspace_id") or (thread or {}).get("workspace_id") or "")
+    run_id = str(record.get("run_id") or "").strip()
+    thread_employee_id = str((thread or {}).get("employee_id") or "").strip()
+    thread_role = str((thread or {}).get("employee_role") or fallback_speaker.get("speaker_role") or "")
+
+    if content.startswith("Continuous worker dispatch started."):
+        values = _legacy_key_values(content)
+        role = values.get("role") or thread_role
+        task_id = values.get("task") or "task pending"
+        goal = values.get("goal") or "Complete the assigned work and report back with verification."
+        employee = _company_employee(workspace_id, employee_id=thread_employee_id, role=role)
+        name = employee_display_name(employee, role)
+        return {
+            **record,
+            "role": "agent",
+            "content": assignment_card(
+                assignee_name=name,
+                assignee_role=role,
+                goal=goal,
+                task_id=task_id,
+                run_id=run_id or values.get("run") or "run pending",
+                state="started",
+            ),
+            "speaker_name": name,
+            "speaker_role": role,
+            "speaker_employee_id": str((employee or {}).get("employee_id") or thread_employee_id),
+        }
+
+    if content.startswith("Queued for dispatch ·"):
+        goal = readable_goal(content.split("·", 1)[1] if "·" in content else content)
+        assignee = _company_employee(workspace_id, employee_id=thread_employee_id, role=thread_role)
+        lead = _company_employee(workspace_id, role="lead")
+        lead_name = employee_display_name(lead, "lead")
+        assignee_name = employee_display_name(assignee, thread_role)
+        return {
+            **record,
+            "role": "agent",
+            "content": assignment_card(
+                assignee_name=assignee_name,
+                assignee_role=thread_role,
+                goal=goal,
+                task_id="task pending",
+                run_id=run_id or "run pending",
+                state="queued",
+                lead_name=lead_name,
+            ),
+            "speaker_name": lead_name,
+            "speaker_role": "lead",
+            "speaker_employee_id": str((lead or {}).get("employee_id") or ""),
+        }
+    return None
+
+
+def _report_speaker(record: dict[str, object]) -> dict[str, str | None] | None:
+    """Tag legacy worker reports that were saved as system text.
+
+    Older runs wrote lines such as ``Cass (watcher) reported in`` without
+    speaker columns.  Preserve their content but give the transcript a real
+    roster identity so it renders with the same role chip as current agents.
+    """
+    content = str(record.get("content") or "").strip()
+    match = re.match(r"^([A-Za-z][A-Za-z .'-]{0,48})\s*\((lead|watcher|frontend|backend|integrations)\)\s+(?:reported|completed|handoff)", content, re.I)
+    if not match:
+        return None
+    workspace_id = str(record.get("workspace_id") or "").strip()
+    role = match.group(2).lower()
+    employee = _company_employee(workspace_id, role=role)
+    return {
+        "speaker_name": match.group(1).strip(),
+        "speaker_role": role,
+        "speaker_employee_id": str((employee or {}).get("employee_id") or "") or None,
+    }
+
+
+def _enrich_message_records(
+    records: list[dict[str, object]],
+    *,
+    thread: dict[str, object] | None = None,
+) -> list[dict[str, object]]:
     message_ids = [str(item.get("message_id") or "") for item in records]
     grouped = attachment_store.list_attachments_for_messages(message_ids)
+    fallback_speaker = _thread_employee_speaker(thread or {})
     enriched: list[dict[str, object]] = []
     for record in records:
-        next_record = dict(record)
+        next_record = _legacy_assignment_message(
+            record,
+            thread=thread,
+            fallback_speaker=fallback_speaker,
+        ) or dict(record)
+        if not str(next_record.get("speaker_name") or "").strip():
+            inferred = _report_speaker(next_record)
+            if inferred:
+                next_record.update(inferred)
         message_id = str(record.get("message_id") or "")
         attachments = grouped.get(message_id, [])
         if attachments:
             next_record["attachments"] = [
                 attachment_store.serialize_attachment(item) for item in attachments
             ]
+        if next_record.get("role") == "agent":
+            for key, value in fallback_speaker.items():
+                if not str(next_record.get(key) or "").strip() and value:
+                    next_record[key] = value
         enriched.append(next_record)
     return enriched
 
@@ -40,27 +190,92 @@ def get_chat_thread(thread_id: str) -> dict[str, object]:
     return thread
 
 
-def get_chat_thread_history(thread_id: str) -> dict[str, object]:
+# Continuous-worker leads can accumulate thousands of messages / tens of MB per
+# thread over weeks of shifts. Serving that unbounded to the browser forces it to
+# JSON-parse and reactively render the whole history on every open, pegging the
+# renderer's main thread for minutes (observed: 100%+ CPU, "Page Unresponsive").
+# Cap what the UI gets by default; pass limit<=0 to opt into the full history.
+#
+# DashPro Lead (Dana) measured 2026-08-06: 4629 msgs total; a 300-msg window was
+# still ~1.4MB with a single 550KB agent turn and 137 :::terminal fences — enough
+# to freeze Chromium when Vue mounted every card. Keep the default window small
+# and hard-cap per-message body size for the history payload.
+DEFAULT_THREAD_HISTORY_LIMIT = 80
+MAX_HISTORY_MESSAGE_CHARS = 64_000
+
+
+def _cap_history_message_content(content: str) -> str:
+    text = str(content or "")
+    if len(text) <= MAX_HISTORY_MESSAGE_CHARS:
+        return text
+    head = 40_000
+    tail = 20_000
+    omitted = len(text) - head - tail
+    return (
+        f"{text[:head].rstrip()}\n\n"
+        f"… [{omitted:,} characters omitted to keep the console responsive] …\n\n"
+        f"{text[-tail:].lstrip()}"
+    )
+
+
+def get_chat_thread_history(
+    thread_id: str,
+    *,
+    limit: int | None = DEFAULT_THREAD_HISTORY_LIMIT,
+) -> dict[str, object]:
     from app.cli_runtime.research_stream_blocks import normalize_transcript_content
 
     thread = get_chat_thread(thread_id)
     items = chat_store.list_thread_messages(thread_id)
+    total_count = len(items)
+    if limit is not None and limit > 0 and total_count > limit:
+        items = items[-limit:]
     normalized_items: list[dict[str, object]] = []
     for item in items:
         record = dict(item)
-        if record.get("role") == "agent":
-            content = str(record.get("content") or "")
-            if content.strip():
-                record["content"] = normalize_transcript_content(content)
+        content = str(record.get("content") or "")
+        if record.get("role") == "agent" and content.strip():
+            content = normalize_transcript_content(content)
+        if content:
+            record["content"] = _cap_history_message_content(content)
         normalized_items.append(record)
-    enriched_items = _enrich_message_records(normalized_items)
+    enriched_items = _enrich_message_records(normalized_items, thread=thread)
     return {
         "thread_id": thread["thread_id"],
         "workspace_id": thread["workspace_id"],
         "run_id": thread["run_id"],
         "items": enriched_items,
         "count": len(enriched_items),
+        "total_count": total_count,
     }
+
+
+def sync_thread_execution_access_notices(thread_id: str, execution_access: str) -> int:
+    """Rewrite stored consultative/Full-Access notices in this thread to match the
+    operator's current Full Access toggle.
+
+    Deliberately retroactive: the operator asked for old notices to track the live
+    toggle rather than staying frozen at whatever was true when they were written.
+    Only the fixed notice sentence is swapped (see ``rewritten_execution_access_notice``)
+    — nothing else about the historical turn is touched. Returns the number of
+    messages rewritten.
+    """
+    get_chat_thread(thread_id)  # raises ChatThreadNotFoundError if missing
+    wants_full = agent_tool_execution_enabled(execution_access)
+    now = datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+    updated = 0
+    for item in chat_store.list_thread_messages(thread_id):
+        content = str(item.get("content") or "")
+        new_content = rewritten_execution_access_notice(content, wants_full=wants_full)
+        if new_content is None:
+            continue
+        chat_store.update_message_content(
+            message_id=str(item["message_id"]),
+            content=new_content,
+            updated_at=now,
+        )
+        updated += 1
+    return updated
 
 
 def _thread_preview_label(thread: dict[str, object]) -> str:

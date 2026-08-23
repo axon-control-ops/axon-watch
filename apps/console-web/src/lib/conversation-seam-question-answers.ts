@@ -73,8 +73,10 @@ export function bareDigitTargetsThisAsk(input: {
   optionId: string;
 }): boolean {
   const questions = parseAgentTranscriptBlocks(input.messageContent).filter(
-    (segment): segment is Extract<typeof segment, { kind: 'question' }> =>
-      segment.kind === 'question',
+    (
+      segment,
+    ): segment is Extract<typeof segment, { kind: 'question' } | { kind: 'lead-checkin' }> =>
+      segment.kind === 'question' || segment.kind === 'lead-checkin',
   );
   for (let index = questions.length - 1; index >= 0; index -= 1) {
     const question = questions[index];

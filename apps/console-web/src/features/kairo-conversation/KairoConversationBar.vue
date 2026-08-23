@@ -16,7 +16,10 @@ import { clearKairoVoiceFollowupWindow } from '../../lib/kairo-voice-followup-wi
 import { formatVoiceGateFeedback } from '../../lib/kairo-voice-gate';
 import { operatorExecutionStage } from '../../lib/operator-status-radar-view';
 import { formatRunShortId } from '../../lib/run-display';
-import { runContinueActionLabel } from '../../lib/run-lifecycle-ui';
+import {
+  runContinueActionLabel,
+  shouldOfferRunStop,
+} from '../../lib/run-lifecycle-ui';
 import {
   dismissEmployeeSpecialtyRoute,
   undoEmployeeSpecialtyRoute,
@@ -68,10 +71,8 @@ const showRunOrbit = computed(
     pendingApprovals.value > 0,
 );
 
-const showStopAction = computed(
-  () =>
-    Boolean(shell.primaryActiveRun?.can_stop) ||
-    shell.primaryActiveRun?.phase === 'executing',
+const showStopAction = computed(() =>
+  shouldOfferRunStop(shell.primaryActiveRun?.can_stop),
 );
 
 const continueActionLabel = computed(() =>
@@ -207,7 +208,11 @@ const micTitle = computed(() => {
 });
 
 async function handleSubmit(): Promise<void> {
-  await submitTurn();
+  await submitTurn(undefined, { submissionIntent: 'ask' });
+}
+
+async function handleDispatch(): Promise<void> {
+  await submitTurn(undefined, { submissionIntent: 'dispatch' });
 }
 
 function startManualPtt(): boolean {
@@ -397,7 +402,16 @@ onUnmounted(() => {
           }}
         </button>
         <button type="submit" class="kairo-conversation-bar__send" :disabled="!canSubmit">
-          Send
+          Ask
+        </button>
+        <button
+          type="button"
+          class="kairo-conversation-bar__send kairo-conversation-bar__send--dispatch"
+          :disabled="!canSubmit"
+          title="Dispatch this as an action; VAXON will request confirmation when required"
+          @click="handleDispatch"
+        >
+          Dispatch
         </button>
       </form>
 
@@ -412,7 +426,7 @@ onUnmounted(() => {
           v-if="showStopAction"
           type="button"
           class="brain-galaxy-stage__run-btn brain-galaxy-stage__run-btn--stop"
-          :disabled="!shell.canStopPrimaryRun && shell.primaryActiveRun?.phase !== 'executing'"
+          :disabled="!shell.canStopPrimaryRun"
           @click="shell.stopPrimaryRun()"
         >
           Stop

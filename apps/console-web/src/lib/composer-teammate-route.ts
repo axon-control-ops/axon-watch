@@ -6,6 +6,7 @@
 import type { CompanyEmployeeRecord } from '../contracts/canonical';
 import { isBuildPlanImplementPrompt } from './build-plan-prompt';
 import {
+  isVagueNamedAssignPrompt,
   matchNamedAssignEmployee,
   namedAssignRouteReason,
 } from './named-assign-route';
@@ -39,6 +40,9 @@ const AMBIGUOUS_REASONS = new Set([
   'current_still_competitive',
   'score_too_low',
 ]);
+
+const LEAD_FAN_OUT_RE =
+  /\bmaterialize[_\s-]lead[_\s-]fan[_\s-]out\b|\b(?:assign|dispatch|route|lease|queue)\b[\s\S]{0,160}\b(?:two|three|\d+)\b[\s\S]{0,120}\b(?:frontend|ui|backend|integrations?|watcher)\b[\s\S]{0,120}\b(?:frontend|ui|backend|integrations?|watcher|specialists?)\b/i;
 
 type RoleBag = {
   role: string;
@@ -239,6 +243,10 @@ function scoreRoster(
   return scored;
 }
 
+function isLeadFanOutDirective(text: string): boolean {
+  return LEAD_FAN_OUT_RE.test(text);
+}
+
 /**
  * Soft-route when the prompt clearly belongs to another specialist.
  * Cold-start (no active employee) picks a clear roster winner.
@@ -261,9 +269,32 @@ export function shouldSoftRouteToTeammate(
   if (isBuildPlanImplementPrompt(text)) {
     return { shouldRoute: false, reason: 'build_plan_implement', source: 'deterministic' };
   }
+  if (isLeadFanOutDirective(text)) {
+    const currentId = currentEmployee?.employee_id?.trim() ?? '';
+    return {
+      shouldRoute: false,
+      reason: 'lead_fan_out',
+      fromEmployeeId: currentId || undefined,
+      fromName: currentEmployee?.name.trim() || undefined,
+      source: 'deterministic',
+      routingReceipt: 'lead_fan_out;multi_specialist_directive',
+    };
+  }
 
   const named = matchNamedAssignEmployee(text, employees);
   if (named) {
+    if (isVagueNamedAssignPrompt(text, named.employee.name)) {
+      const currentId = currentEmployee?.employee_id?.trim() ?? '';
+      return {
+        shouldRoute: false,
+        reason: 'vague_named_assign',
+        employee: named.employee,
+        fromEmployeeId: currentId || undefined,
+        fromName: currentEmployee?.name.trim() || (currentId ? 'teammate' : 'workspace'),
+        source: 'deterministic',
+        routingReceipt: `named_assign;vague;as=${named.matchedAs};to=${named.employee.employee_id}`,
+      };
+    }
     const currentId = currentEmployee?.employee_id?.trim() ?? '';
     const target = named.employee;
     if (currentId && target.employee_id.trim() === currentId) {

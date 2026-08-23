@@ -87,6 +87,9 @@ export function createKairoVoiceSlice(input: CreateKairoVoiceSliceInput) {
   }
 
   function voiceDeliveryAllowed(): boolean {
+    if (typeof document !== 'undefined' && document.visibilityState === 'hidden') {
+      return false;
+    }
     return ideVoiceSpeechAllowed({
       layoutMode: input.layoutMode.value,
       settings: input.operatorPresenceSettings.value,

@@ -130,5 +130,52 @@ class LeadDanaReportTests(unittest.TestCase):
         self.assertTrue(any("Next best steps" in body for body in agent_bodies))
 
 
+class DynamicNextBestStepsTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self._saved = prepare_control_plane_imports()
+        self.addCleanup(self._restore)
+
+    def _restore(self) -> None:
+        for name in list(sys.modules):
+            if name == "app" or name.startswith("app."):
+                del sys.modules[name]
+        sys.modules.update(self._saved)
+
+    def test_surfaces_failed_specialists_by_name(self) -> None:
+        from app.workspace_agents.lead_dana_report import _dynamic_next_best_steps
+
+        findings = [
+            {"assignee_name": "Lila", "owner_role": "frontend", "status": "failed"},
+            {"assignee_name": "Cole", "owner_role": "backend", "status": "completed"},
+        ]
+        steps = _dynamic_next_best_steps(findings)
+        self.assertTrue(any("Lila" in step and "failed" in step for step in steps))
+
+    def test_surfaces_real_decision_gate_from_excerpt(self) -> None:
+        from app.workspace_agents.lead_dana_report import _dynamic_next_best_steps
+
+        findings = [
+            {
+                "assignee_name": "Dana",
+                "owner_role": "frontend",
+                "status": "completed",
+                "specialist_reply_excerpt": (
+                    "Confirm the DashPro chat-ingest handoff before I ship it live."
+                ),
+            },
+        ]
+        steps = _dynamic_next_best_steps(findings)
+        self.assertTrue(any(step.startswith("Confirm (Dana):") for step in steps))
+
+    def test_falls_back_to_generic_step_when_nothing_concrete(self) -> None:
+        from app.workspace_agents.lead_dana_report import _dynamic_next_best_steps
+
+        findings = [
+            {"assignee_name": "Cole", "owner_role": "backend", "status": "completed"},
+        ]
+        steps = _dynamic_next_best_steps(findings)
+        self.assertTrue(any("dig into" in step.lower() for step in steps))
+
+
 if __name__ == "__main__":
     unittest.main()

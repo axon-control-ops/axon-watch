@@ -201,6 +201,7 @@ def _messages_from_live_bridge() -> list[dict[str, Any]] | None:
 def load_email_messages(
     *,
     stub_path: Path | None = None,
+    force: bool = False,
 ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
     """Load email messages: native IMAP → Signal bridge → optional stub."""
 
@@ -234,7 +235,7 @@ def load_email_messages(
                 account_workspaces[account_email] = workspace_id
         stub_config["account_workspaces"] = account_workspaces
 
-    native = fetch_native_email_messages()
+    native = fetch_native_email_messages(force=force)
     if native is not None:
         return native, stub_config
 
@@ -266,15 +267,17 @@ def email_inbox_item(
     account_id = str(analysis.get("account_id") or "").strip()
     account_email = str(analysis.get("account_email") or "").strip()
     now = utc_now_iso()
-    suggestion = suggest_email_reply(
-        {
-            "subject": subject,
-            "from": sender,
-            "text": snippet,
-            "snippet": snippet,
-            "message_id": message_id,
-        }
-    )
+    # A no-reply sender cannot receive a reply at all (it bounces or is
+    # discarded server-side), so no draft is generated -- previously this ran
+    # unconditionally, drafted a full reply, and stored it regardless of what
+    # analyze_email_message had already concluded about the sender.
+    no_reply_sender = bool(analysis.get("no_reply_sender"))
+    # Pass the already-computed analysis (full-text based) straight through --
+    # not a message dict rebuilt from the truncated 280-char snippet, which
+    # used to make suggest_email_reply re-run analyze_email_message on a
+    # shorter, sometimes mid-sentence-truncated copy of the same email and
+    # reach a different (worse) recommended_action than the one above.
+    suggestion = {} if no_reply_sender else suggest_email_reply(analysis)
 
     return {
         "signal_id": f"signal_email_{_safe_signal_token(message_id)}",
@@ -302,8 +305,9 @@ def email_inbox_item(
             "commitments": list(analysis.get("commitments") or [])[:5],
             "due_markers": list(analysis.get("due_markers") or [])[:5],
             "workspace_hints": list(analysis.get("workspace_hints") or [])[:5],
-            "suggested_reply_subject": suggestion.get("reply_subject"),
-            "suggested_reply_body": suggestion.get("reply_body"),
+            "suggested_reply_subject": suggestion.get("reply_subject") if not no_reply_sender else None,
+            "suggested_reply_body": suggestion.get("reply_body") if not no_reply_sender else None,
+            "no_reply_sender": no_reply_sender,
             "email_account_id": account_id,
             "email_account_address": account_email,
         },
@@ -363,8 +367,9 @@ def _workspace_for_message(
 def email_inbox_items(
     *,
     stub_path: Path | None = None,
+    force: bool = False,
 ) -> list[dict[str, object]]:
-    messages, config = load_email_messages(stub_path=stub_path)
+    messages, config = load_email_messages(stub_path=stub_path, force=force)
     fallback_workspace_id = str(config.get("workspace_id") or "workspace_axon_watch").strip()
     workspace_names = [
         str(name).strip()

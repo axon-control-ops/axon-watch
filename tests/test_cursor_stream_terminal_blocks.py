@@ -247,6 +247,30 @@ class CursorStreamPartialDedupeTests(unittest.TestCase):
             assembler.feed_line(line)
         self.assertEqual("hello world", assembler.finalize())
 
+    def test_edit_failure_renders_edit_failed_fence_with_reason(self) -> None:
+        event = {
+            "type": "tool_call",
+            "subtype": "completed",
+            "tool_call": {
+                "editToolCall": {
+                    "args": {"path": "/tmp/ws/tests/test_foo.py"},
+                    "result": {
+                        "error": {
+                            "agentMessage": "Sandbox policy denied write to tests/test_foo.py",
+                        }
+                    },
+                }
+            },
+        }
+        block = tool_block_from_event(event, "/tmp/ws")
+        self.assertIn(":::edit-failed tests/test_foo.py", block)
+        self.assertIn("Sandbox policy denied write", block)
+        self.assertTrue(block.rstrip().endswith(":::"))
+
+    def test_legacy_edit_failed_tool_label_still_parses(self) -> None:
+        block = "\n:::tool Edit failed scripts/workflow/foo.mjs\n"
+        self.assertIn("Edit failed", block)
+
     def test_finalize_does_not_reappend_result_when_assistant_text_exists(self) -> None:
         assembler = CursorStreamAssembler()
         assembler.feed_line(

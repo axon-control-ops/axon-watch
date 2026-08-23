@@ -210,6 +210,84 @@
   word-break: break-word;
 }
 
+.agent-block--edit-failed {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  max-width: 100%;
+  min-width: 0;
+  padding: 0.45rem 0.55rem;
+  border: 1px solid rgba(248, 113, 113, 0.38);
+  border-radius: 0.45rem;
+  background: rgba(48, 12, 16, 0.55);
+}
+
+.agent-block__edit-failed-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+  min-width: 0;
+}
+
+.agent-block__edit-failed-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.08rem 0.35rem;
+  border-radius: 999px;
+  background: rgba(248, 113, 113, 0.18);
+  color: rgba(252, 165, 165, 0.98);
+  font-size: 0.56rem;
+  font-weight: 650;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.agent-block__edit-failed-path {
+  padding: 0;
+  border: none;
+  background: none;
+  color: rgba(254, 202, 202, 0.95);
+  font-size: 0.62rem;
+  font-family: var(--font-mono, ui-monospace, monospace);
+  text-align: left;
+  cursor: pointer;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.agent-block__edit-failed-path--static {
+  cursor: default;
+}
+
+.agent-block__edit-failed-path:hover {
+  color: rgba(255, 228, 228, 1);
+  text-decoration: underline;
+}
+
+.agent-block__edit-failed-reason {
+  margin: 0;
+  font-size: 0.62rem;
+  line-height: 1.45;
+  color: rgba(254, 226, 226, 0.92);
+  white-space: pre-wrap;
+}
+
+.agent-block__edit-failed-toggle {
+  align-self: flex-start;
+  padding: 0;
+  border: none;
+  background: none;
+  color: rgba(252, 165, 165, 0.88);
+  font-size: 0.56rem;
+  cursor: pointer;
+}
+
+.agent-block__edit-failed-toggle:hover {
+  color: rgba(254, 202, 202, 1);
+  text-decoration: underline;
+}
+
 .agent-block__tool-dot {
   width: 0.32rem;
   height: 0.32rem;

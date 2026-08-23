@@ -2,23 +2,13 @@
 
 **The master operator, teaching, debugging, and upgrade manual for Axon-X.**
 
-This handbook is the **single front door** for working with **Axon-X** (`axon-watch`).
-It is written for operators, reviewers, developers, and agents — in plain language first,
-with copy-paste snippets, source pointers, and debugging steps when things go wrong.
+This handbook is the **single front door** for working with **Axon-X** (`axon-watch`). It is written for operators, reviewers, developers, and agents — in plain language first, with copy-paste snippets, source pointers, and debugging steps when things go wrong.
 
-Use it to:
-
-- **Operate** the console day-to-day (`:4173`)
-- **Teach** someone else how Axon-X works
-- **Understand** the codebase without reading every file
-- **Verify** changes before merge
-- **Upgrade** the stack after pulls or dependency changes
-- **Debug** when the UI, API, or tests misbehave
+Use it to operate the console, teach Axon-X, understand the codebase, verify and merge changes, upgrade the stack, and debug the UI, API, or tests.
 
 **Last verified:** 2026-07-29 — IDE Soft Attention actions (**Try again** / **Explain** / **Open team**) live on the agent review strip with **Review N files**; **Try again** hides after a successful shift. Claude Code CLI is a local runtime target. After every push: `./scripts/ops/watch-fast-gate.sh`.
 
-**PDF (Desktop):** After every edit to this handbook or `docs/how-to/*.md`, rebuild:
-`./scripts/docs/build-howto-handbook-pdf.sh` → `~/Desktop/Axon-X-How-To-Handbook.pdf`
+**PDF (Desktop):** After every edit to this handbook or `docs/how-to/*.md`, rebuild: `./scripts/docs/build-howto-handbook-pdf.sh` → `~/Desktop/Axon-X-How-To-Handbook.pdf`
 
 **Production URL:** http://127.0.0.1:4173 — [`docs/PRODUCTION_OPERATOR_SURFACE.md`](PRODUCTION_OPERATOR_SURFACE.md)
 
@@ -35,6 +25,9 @@ Use it to:
 3.66. [Recent operator features](how-to/recent-operator-features.md) — task board, concurrent tabs, galaxy labels, Lead planner, CI watch
 3.67. [Auto-loop status & credits](how-to/auto-loop-and-credits.md) — are we autonomous yet? Cursor / API budget for multi-project
 3.68. [Company hierarchy & Lead check-in](how-to/company-hierarchy-and-lead-checkin.md) — VAXON attend loop + AUTONOMOUS ON safety matrix
+3.69. [Stuck agent recovery & School Operations Phase 1](how-to/agent-recovery-and-school-operations.md) — restart decisions, VAXON's recovery contract, and daily homework approval
+3.695. [IDE operator quick start](how-to/ide-operator-quickstart.md) — assigning Noor, Blair, and specialists safely; decisions, recovery, and Full Access
+3.70. [AXON-X Constitution registries](#axon-x-constitution-registries) — missions, evidence, decisions, capabilities, ADRs, debt, health, and self-healing proof
 3.7. [VAXON Desktop](#vaxon-desktop) — packaged Linux install
 4. [Teaching Axon-X](#teaching-axon-x-to-someone-else) — explain it to others
 5. [Codebase in plain English](#codebase-in-plain-english) — what happens under the hood
@@ -62,6 +55,9 @@ Use it to:
 | **Developer** | [Codebase in plain English](#codebase-in-plain-english) | [Source index](#source-index), [Common working patterns](#common-working-patterns) |
 | **Integrator / merge** | [CI, merge, and worker agents](how-to/ci-merge-and-worker-agents.md) | [`docs/CI_GATES.md`](CI_GATES.md), `./scripts/ops/watch-fast-gate.sh` |
 | **Autonomy / remote host** | [Auto-loop status & credits](how-to/auto-loop-and-credits.md) | [Autonomy gates & service identity](how-to/autonomy-gates-and-service-identity.md), [Recent operator features](how-to/recent-operator-features.md) |
+| **Stuck agent / school operator** | [Stuck agent recovery & School Operations Phase 1](how-to/agent-recovery-and-school-operations.md) | [Debugging playbook](#debugging-playbook), [Company hierarchy & Lead check-in](how-to/company-hierarchy-and-lead-checkin.md) |
+| **IDE operator (daily use)** | [IDE operator quick start](how-to/ide-operator-quickstart.md) | [Stuck agent recovery](how-to/agent-recovery-and-school-operations.md), [Reliability and deliberate controls](how-to/reliability-and-deliberate-controls.md) |
+| **Lead / autonomous agent** | [AXON-X Constitution registries](#axon-x-constitution-registries) | [Verification](#verification-commands), `docs/ops/agent-reports/axon-x-constitution-gap-audit-2026-08-09.md` |
 | **Debugger** | [Debugging playbook](#debugging-playbook) | [Troubleshooting](#troubleshooting) |
 | **Upgrader** | [Upgrading & updating](#upgrading-and-updating) | `./scripts/ops/sync_planning_mirror_to_axon_local.py` |
 
@@ -101,7 +97,7 @@ for Vite recovery, manual STAND-UP, speech onset, and AgentDock hover actions.
 **Dev bootstrap (alternate, not used when systemd owns the ports):**
 
 ```bash
-cd /home/edp/axon-nvme/repos/axon-watch
+cd /run/media/vaxon/axon-data/repos/axon-nvme/repos/axon-watch
 ./scripts/dev/up.sh
 ./scripts/dev/check-health.sh
 ```
@@ -109,6 +105,47 @@ cd /home/edp/axon-nvme/repos/axon-watch
 Open **http://127.0.0.1:4173** and hard-refresh after upgrades (`Ctrl+Shift+R`).
 
 > **Important:** `./scripts/dev/down.sh` does **not** stop systemd always-on units. On this host use `axonrestart` / `axonrevive`.
+## AXON-X Constitution registries
+
+The Constitution work adds a durable executive memory layer for AXON-X. It does **not** replace the original execution stores; it indexes them so VAXON, Dana, specialists, and the operator can answer: what mission is active, what evidence exists, what decision was made, what capability owns it, and what platform health looked like at the time.
+
+### What changed
+
+The control plane now has these SQLite-backed registries:
+
+| Registry | What it means | Why it makes AXON-X stronger |
+| --- | --- | --- |
+| Evidence | Pointers to run history, Lead receipts, autonomy receipts, deliveries, and host-action receipts | Agents stop inventing receipts and can point to source records. |
+| Missions | Operator goals with workspace, risk, Lead-plan link, checkpoint, and success criteria | Lead work becomes durable mission progress, not only chat text. |
+| Decisions | Autonomous/operator-gated decisions with actor, tier, risk, confidence note, and evidence IDs | “Why did VAXON/Dana do that?” has a queryable answer. |
+| Capabilities | Stable `CAP-###` anchors for major platform abilities | Blockers can name the exact capability that is missing or degraded. |
+| ADRs | Canonical `docs/adr/ADR-*.md` records | Architecture choices are visible to agents without rereading the repo. |
+| Technical debt | Known gaps with severity, area, and evidence links | Gaps survive handoffs instead of being rediscovered. |
+| Platform health | Runtime/watch/degraded snapshots | Self-healing decisions can prove current service posture first. |
+
+### How agents should use it
+
+- Before claiming a dispatch, recovery, or blocker is real, look for evidence through `/api/operator/constitution/evidence`.
+- When a Lead plan is persisted, the system creates a linked mission automatically and attaches Lead receipt evidence to that mission.
+- When VAXON/autonomous attention records a safe action, the system records both evidence and a decision row.
+- If platform health matters, capture it with `POST /api/operator/constitution/health/capture-runtime-summary`.
+- If seed data is missing, run `POST /api/operator/constitution/seed`; this indexes canonical ADR markdown and seeds stable capability anchors such as `CAP-007`, `CAP-034`, and `CAP-070`.
+
+### Operator console surface
+
+Open **Settings → Constitution** to view the registry counts and recent human-readable summaries for missions, decisions, capabilities, ADRs, debt, and health. This surface is read-only on purpose: it gives visibility without letting a UI refresh mutate planning state.
+
+### Verification
+
+Use:
+
+```bash
+npm run verify:constitution
+python -m pytest tests/test_constitution_registry.py tests/test_constitution_gate_script.py -q
+npm run test -w @axon-watch/console-web -- constitution-overview-view
+```
+
+`verify:constitution` checks the registry spine, required routes, ADR/capability seed anchors, auth coverage for mutating routes, focused tests, and the handoff ledger.
 
 ### Pick a real workspace
 
@@ -222,9 +259,16 @@ finished; Mission Control is asking you to **COMPLETE** (usual) or **RESUME** (i
 steps expected).
 
 ### Mission Control AUTONOMOUS (bounded)
-
 In **OPERATOR → Mission Control**, use **AUTONOMOUS ON/OFF** for bounded worker control.
 See [Auto-loop status & credits](how-to/auto-loop-and-credits.md) for the complete safety matrix, approval behavior, dedupe rules, and emergency procedure.
+
+After unattended AUTO work, use [Isolated worker delivery & morning AUTO briefing](how-to/isolated-worker-delivery-and-auto-briefing.md) before merging, committing host WIP, or releasing.
+
+If DashPro Actions remain queued, use the self-hosted CI recovery section in
+that runbook. First distinguish an offline runner from a busy runner; do not
+create retry storms. After a host reinstall, restore the official runner on
+persistent storage, cancel obsolete queued runs, and verify a fresh run before
+declaring CI healthy.
 
 ### “2 runs are ready for operator review” — what that means
 
@@ -376,9 +420,8 @@ Select **Claude Code CLI (local)** in the composer runtime picker (or set `AXON_
 | `claude_runtime` | `claude auth login` **or** `ANTHROPIC_API_KEY` in vault | Max/Pro subscription preferred |
 | `codex_runtime` | `codex login` **or** Codex/OpenAI vault keys | |
 | `openai_provider` | `OPENAI_API_KEY` in vault | Direct OpenAI fallback |
+| `supabase_cli` | `SUPABASE_ACCESS_TOKEN` in vault | Read-only migration audits; pushes stay operator-gated. See [`docs/how-to/supabase-cli-auth.md`](how-to/supabase-cli-auth.md). |
 | DashPro monitor consumers | Required monitor keys in vault/import | |
-
-Source: `services/axon-watch/app/vault/snapshot.py`, `cli_runtime_probe.py`
 
 **Runtime dispatch** (actually running a model) lives in the control-plane:
 
@@ -559,11 +602,11 @@ The target product combines:
 
 The implementation repo is here:
 
-- `/home/edp/axon-nvme/repos/axon-watch`
+- `/run/media/vaxon/axon-data/repos/axon-nvme/repos/axon-watch`
 
 The frozen planning source-of-truth still lives here:
 
-- `/home/edp/axon-nvme/repos/axon-local/Plans/Axon-Watch/`
+- `/run/media/vaxon/axon-data/repos/axon-nvme/repos/axon-local/Plans/Axon-Watch/`
 
 Important rule:
 
@@ -802,7 +845,7 @@ It avoids:
 ## 1. Go to the repo
 
 ```bash
-cd /home/edp/axon-nvme/repos/axon-watch
+cd /run/media/vaxon/axon-data/repos/axon-nvme/repos/axon-watch
 ```
 
 ## 2. Install JavaScript dependencies
@@ -1214,6 +1257,11 @@ Avoid:
 
 ## Debugging playbook
 
+For failed employee agents, first use the cause-specific recovery table in
+[Stuck agent recovery & School Operations Phase 1](how-to/agent-recovery-and-school-operations.md).
+In particular, do not restart a healthy control plane just to clear a failed
+card: a restart interrupts in-flight shifts.
+
 Use this order when something breaks:
 
 1. **Stack health** — `axonhealth` (or `./scripts/dev/check-health.sh`).
@@ -1617,7 +1665,7 @@ systemctl --user restart console-web.service
 After pulling new commits or changing dependencies:
 
 ```bash
-cd /home/edp/axon-nvme/repos/axon-watch
+cd /run/media/vaxon/axon-data/repos/axon-nvme/repos/axon-watch
 git pull
 npm install
 ./scripts/dev/down.sh && ./scripts/dev/up.sh
@@ -1713,6 +1761,33 @@ A good next slice should:
 - Conversation and Command dock seams backed by control-plane chat endpoints
   (`POST /api/chat/messages`, `GET /api/workspaces/{workspace_id}/chat/thread`,
   `GET /api/chat/threads/{thread_id}/history`)
+- always-on watcher/action split: company watchers can keep polling and
+  escalating health while worker dispatch stays governed by Auto/Semi/Manual
+- visible monitoring lane: Settings → Agent Fleet now shows watcher status
+  separately from worker status, so the operator can let Dana/specialists work
+  while AXON-X watches for blockers without starting extra shifts
+- scheduler decision trace: continuous worker dispatch/refusal decisions are
+  indexed into the Constitution registry with task evidence so later reviews can
+  explain why a worker did or did not start
+- restart-safe Lead handoff rescue: watcher ticks retry explicit queued Lead
+  handoffs, so a control-plane restart between Dana queuing work and Priya/Marco
+  starting no longer leaves specialists stranded in Manual/Semi
+- runtime account-scope warning/guardrail: Runtime settings now explain that
+  local CLI browser login and logout are host-profile scoped. Axon-X shows
+  host sign-out instructions but does not run OAuth/ChatGPT/Claude browser
+  logout from the console, because that can sign out Cursor/IDE/CLI sessions
+  sharing the same host profile. Use Vault/API-key auth for a second account
+  where supported until true isolated runtime profiles land. Vault-backed
+  runtimes still show CLI sign-in / host sign-out-help actions so account
+  switching is not hidden behind a passive “Connected” chip.
+- Codex usage visibility: Runtime settings expose Codex local usage telemetry,
+  matching the status-bar behavior when Codex is the selected runtime
+- Lead coordination delivery: Lead plan-advance/rollup/decision tasks can
+  complete from receipts without code diffs, while ordinary implementation
+  tasks still fail if no publishable changes were produced
+- Lead failure escalation: Lead roles must not remain inert in Error; failed
+  Lead shifts become VAXON/operator attention receipts instead of silent red
+  roster state or incorrect specialist spam
 
 **Suggested next slices (2026-07-04):**
 

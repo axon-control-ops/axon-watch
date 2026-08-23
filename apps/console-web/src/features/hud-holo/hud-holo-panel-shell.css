@@ -17,7 +17,7 @@
 }
 
 .hud-holo-shell__canvas,
-.hud-holo-shell__canvas-host :deep(canvas) {
+.hud-holo-shell__canvas-host canvas {
   position: absolute !important;
   inset: 0 !important;
   width: 100% !important;
@@ -145,7 +145,7 @@
 }
 
 .hud-holo-atmosphere__canvas,
-.hud-holo-atmosphere :deep(canvas) {
+.hud-holo-atmosphere canvas {
   position: absolute !important;
   inset: 0 !important;
   width: 100% !important;
@@ -178,7 +178,7 @@
 }
 
 .hud-holo-voice-orb__canvas,
-.hud-holo-voice-orb :deep(canvas) {
+.hud-holo-voice-orb canvas {
   position: absolute !important;
   inset: 0 !important;
   width: 100% !important;

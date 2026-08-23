@@ -11,6 +11,7 @@ import json
 import logging
 import subprocess
 from typing import Any, Callable
+from urllib.parse import quote
 
 from app.adapters.watch_client import reset_watch_inbox_cache
 from app.ci_remediation import store as ci_store
@@ -42,6 +43,27 @@ def parse_dedupe_parts(dedupe_key: str) -> dict[str, str]:
     }
 
 
+def repo_from_dedupe_key(dedupe_key: str) -> str:
+    """Return ``owner/repo`` for gh lookups; default axon-watch when unknown."""
+    repo = str(parse_dedupe_parts(dedupe_key).get("repo") or "").strip()
+    if "/" in repo:
+        return repo
+    return "axon-control-ops/axon-watch"
+
+
+def repo_from_signal(signal: dict[str, Any]) -> str:
+    meta = signal.get("meta") if isinstance(signal.get("meta"), dict) else {}
+    workspace_id = str(signal.get("workspace_id") or meta.get("workspace_id") or "").strip()
+    if workspace_id == "workspace_dashpro":
+        return "axon-control-ops/dashpro"
+    dedupe_repo = repo_from_dedupe_key(str(signal.get("dedupe_key") or ""))
+    if dedupe_repo != "axon-control-ops/axon-watch":
+        return dedupe_repo
+    if workspace_id == "workspace_axon_watch":
+        return "axon-control-ops/axon-watch"
+    return dedupe_repo
+
+
 def is_drill_branch(head_branch: str) -> bool:
     branch = str(head_branch or "").strip().lower()
     return branch.startswith("drill/") or "/drill/" in branch or branch.startswith("drill-")
@@ -67,6 +89,8 @@ def classify_stale_reason(
 
     if not branch_health:
         return None
+    if str(branch_health.get("branch_state") or "").strip().lower() == "missing":
+        return "stale_branch_missing"
     conclusion = str(branch_health.get("conclusion") or "").strip().lower()
     latest_sha = str(branch_health.get("head_sha") or "").strip().lower()
     if conclusion != "success":
@@ -125,12 +149,21 @@ def fetch_branch_health_via_gh(
     row = rows[0]
     if not isinstance(row, dict):
         return None
-    return {
+    health = {
         "conclusion": str(row.get("conclusion") or "").strip().lower(),
         "head_sha": str(row.get("headSha") or "").strip(),
         "run_id": str(row.get("databaseId") or "").strip(),
         "status": str(row.get("status") or "").strip().lower(),
     }
+    if health["conclusion"] == "success":
+        return health
+    branch_probe = subprocess.run(
+        ["gh", "api", f"repos/{repo}/branches/{quote(branch, safe='')}"],
+        check=False, capture_output=True, text=True, timeout=20,
+    )
+    if branch_probe.returncode != 0 and "HTTP 404" in (branch_probe.stderr or ""):
+        health["branch_state"] = "missing"
+    return health
 
 
 def resolve_open_for_branch_success(
@@ -193,11 +226,9 @@ def sweep_stale_ci_signals(
     max_resolve: int = 40,
 ) -> dict[str, Any]:
     """Scan open CI alerts; resolve only after stale/useless confirmation."""
-    fetcher = branch_health_fetcher
-    if fetcher is None and confirm_with_gh:
-        fetcher = lambda workflow, branch: fetch_branch_health_via_gh(workflow, branch)
+    use_health_lookup = branch_health_fetcher is not None or confirm_with_gh
 
-    health_cache: dict[tuple[str, str], BranchHealth | None] = {}
+    health_cache: dict[tuple[str, str, str], BranchHealth | None] = {}
     resolved: list[dict[str, Any]] = []
     skipped: list[dict[str, str]] = []
 
@@ -216,13 +247,23 @@ def sweep_stale_ci_signals(
         health: BranchHealth | None = None
         if include_drills and is_drill_branch(branch):
             health = None
-        elif fetcher is not None and workflow and branch:
-            key = (workflow.lower(), branch)
+        elif use_health_lookup and workflow and branch:
+            gh_repo = repo_from_signal(signal)
+            key = (gh_repo, workflow.lower(), branch)
             if key not in health_cache:
                 try:
-                    health_cache[key] = fetcher(workflow, branch)
+                    health_cache[key] = (
+                        branch_health_fetcher(workflow, branch)
+                        if branch_health_fetcher is not None
+                        else fetch_branch_health_via_gh(workflow, branch, repo=gh_repo)
+                    )
                 except Exception:  # noqa: BLE001 — sweep must stay fail-open
-                    logger.exception("branch health fetch failed for %s %s", workflow, branch)
+                    logger.exception(
+                        "branch health fetch failed for %s %s %s",
+                        gh_repo,
+                        workflow,
+                        branch,
+                    )
                     health_cache[key] = None
             health = health_cache[key]
 

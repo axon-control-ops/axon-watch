@@ -11,6 +11,7 @@ from typing import Any
 
 from app.safe_improvement.isolated_executor import read_baseline_metadata
 from app.workspace_agents.diff_policy import (
+    PRIVATE_COMPANY_PATH_GLOBS,
     evaluate_changed_paths,
     resolve_effective_allowed_paths,
     scan_text_for_secrets,
@@ -22,10 +23,10 @@ from app.workspace_delivery.config import (
 )
 from app.workspace_delivery.gh_cli import gh_missing_hint, resolve_gh_cli
 from app.workspace_delivery import store as delivery_store
-from app.workspace_delivery.receipts import delivery_refs_from_record, emit_delivery_receipt
+from app.workspace_delivery.receipts import delivery_refs_from_record, emit_delivery_receipt, mission_refs_for_task
+from app.workspace_delivery.changed_paths import list_changed_paths
 
 logger = logging.getLogger(__name__)
-
 _GIT_TIMEOUT = 60
 _GH_TIMEOUT = 90
 _PROTECTED_PUSH_RE = re.compile(r"^(main|master|dev|production|release)$", re.IGNORECASE)
@@ -38,7 +39,6 @@ class PublishResult:
     delivery: dict[str, Any] | None
     detail: str
     cleanup_isolation: bool
-
 
 def _run(
     args: list[str],
@@ -62,37 +62,74 @@ def _combined(result: subprocess.CompletedProcess[str]) -> str:
     ).strip() or "(no output)"
 
 
-def list_isolation_changed_paths(isolation_root: Path) -> list[str]:
-    paths: list[str] = []
-    for args in (
-        ["git", "diff", "--name-only", "HEAD"],
-        ["git", "diff", "--name-only", "--cached"],
-        ["git", "ls-files", "--others", "--exclude-standard"],
-    ):
-        result = _run(args, cwd=isolation_root)
-        if result.returncode != 0:
-            continue
-        for line in (result.stdout or "").splitlines():
-            cleaned = line.strip()
-            if cleaned and cleaned not in paths and not cleaned.startswith(".axon-si/"):
-                paths.append(cleaned)
-    return paths
+def list_isolation_changed_paths(
+    isolation_root: Path,
+    *,
+    include_ignored_pathspecs: list[str] | None = None,
+) -> list[str]:
+    return list_changed_paths(
+        isolation_root,
+        run=_run,
+        include_ignored_pathspecs=include_ignored_pathspecs,
+    )
+
+
+def _stage_isolation_paths(isolation_root: Path, paths: list[str]) -> subprocess.CompletedProcess[str]:
+    """Stage only the path set that passed delivery scope and secret review."""
+    # ``-f`` is intentional: ignored files make it this far only when the task
+    # explicitly scoped their parent and passed policy/secret review. Without
+    # it, Git silently drops the exact work we audited.
+    return _run(["git", "add", "-f", "--", *paths], cwd=isolation_root)
 
 
 def _derive_commit_message(paths: list[str], turn_subject: str | None) -> str:
-    text = " ".join(str(turn_subject or "").split()).strip()
-    if text and len(text) <= 72 and not text.endswith("?") and text[:1].isupper():
-        return text
-    if text and 8 <= len(text) <= 90 and not text.endswith("?"):
-        cut = text[:71].rsplit(" ", 1)[0].rstrip(" ,.-")
-        return f"{cut}…" if len(text) > 72 and cut else text[:72]
+    text = " ".join(str(turn_subject or "").split()).strip().rstrip(". ")
+    lowered = text.lower()
+    path_blob = " ".join(paths).lower()
+    kind = "feat"
+    if any(token in lowered for token in ("fix", "repair", "resolve", "correct", "prevent")):
+        kind = "fix"
+    elif all(path.startswith(("docs/", "README", "CHANGELOG")) for path in paths):
+        kind = "docs"
+    elif all(path.startswith(("tests/", "test_")) for path in paths):
+        kind = "test"
+    elif any(path.startswith((".github/", "config/", "infra/")) for path in paths):
+        kind = "chore"
+
+    scope = ""
+    if any(path.startswith("website/") for path in paths):
+        scope = "website"
+    elif "services/control-plane/" in path_blob:
+        scope = "control-plane"
+    elif "services/axon-watch/" in path_blob:
+        scope = "watch"
+    elif "apps/console-web/" in path_blob:
+        scope = "console"
+    elif any(path.startswith(".github/") for path in paths):
+        scope = "ci"
+
+    if text and 8 <= len(text) <= 110 and not text.endswith("?"):
+        # Avoid `fix(website): Fix …` while retaining the meaningful task text.
+        detail = re.sub(
+            r"^(?:fix|repair|resolve|correct|prevent|add|create|update|document|test)\s+(?:the\s+)?",
+            "",
+            text,
+            flags=re.IGNORECASE,
+        ).strip()
+        if detail:
+            prefix = f"{kind}({scope})" if scope else kind
+            available = 72 - len(prefix) - 2
+            if len(detail) > available:
+                detail = detail[:available].rsplit(" ", 1)[0].rstrip(" ,.-") or detail[:available]
+            return f"{prefix}: {detail[:available]}"
     if not paths:
-        return "Worker delivery via Axon-X"
+        return "chore: worker delivery via Axon-X"
     basenames = [path.rsplit("/", 1)[-1] for path in paths[:2]]
     focus = ", ".join(basenames)
     if len(paths) > 2:
         focus = f"{focus} (+{len(paths) - 2} more)"
-    subject = f"Update {focus}"
+    prefix = f"{kind}({scope})" if scope else kind
+    subject = f"{prefix}: update {focus}"
     return subject[:72]
 
 
@@ -201,6 +238,29 @@ def _scan_secrets(isolation_root: Path, paths: list[str]) -> str | None:
     return None
 
 
+def _scan_private_company_material(paths: list[str]) -> str | None:
+    """Block every worker delivery touching a private path.
+
+    Repository migration is an operator-reviewed maintenance operation, not a
+    worker delivery. Blocking deletions also blocks a private-to-public rename
+    from evading the path gate.
+    """
+    findings = evaluate_changed_paths(
+        paths,
+        allowed_paths=[],
+        forbidden_path_globs=PRIVATE_COMPANY_PATH_GLOBS,
+        max_paths=120,
+    )
+    private_findings = [finding for finding in findings if finding.code == "forbidden_path"]
+    if not private_findings:
+        return None
+    first = private_findings[0]
+    return (
+        f"private_company_material: {first.path} must stay local/private and "
+        "cannot be staged, pushed, or included in a draft PR"
+    )
+
+
 def _ensure_not_protected(policy: WorkspaceDeliveryPolicy, branch: str) -> str | None:
     if is_protected_branch(policy, branch) or _PROTECTED_PUSH_RE.match(branch.strip()):
         return f"refusing to push protected branch {branch}"
@@ -286,6 +346,26 @@ def publish_worker_isolation(
     """Commit/push/draft-PR from a disposable worker isolation root."""
     policy = get_workspace_delivery_policy(workspace_id)
     if policy is None or not policy.enabled:
+        # Unconfigured delivery must never be reported as "no change" while the
+        # isolation holds real edits: that combination returned ok=True *and*
+        # cleanup_isolation=True, so the checkout was deleted and finished work
+        # was silently destroyed while the run reported completed. Keep the
+        # isolation whenever there is something in it to lose.
+        pending = list_isolation_changed_paths(isolation_root)
+        if pending:
+            return PublishResult(
+                ok=False,
+                stage="blocked",
+                delivery=None,
+                detail=(
+                    "workspace delivery is not configured for "
+                    f"{workspace_id}, so {len(pending)} changed path(s) cannot be "
+                    "published; the isolation checkout is preserved at "
+                    f"{isolation_root} — configure delivery, or collect the work "
+                    "from that checkout before it is cleaned up"
+                ),
+                cleanup_isolation=False,
+            )
         return PublishResult(
             ok=True,
             stage="no_change",
@@ -333,7 +413,11 @@ def publish_worker_isolation(
             cleanup_isolation=False,
         )
 
-    paths = list_isolation_changed_paths(isolation_root)
+    task_allowed_paths = _task_allowed_paths(task_id)
+    paths = list_isolation_changed_paths(
+        isolation_root,
+        include_ignored_pathspecs=task_allowed_paths,
+    )
     delivery = delivery_store.create_delivery(
         workspace_id=workspace_id,
         run_id=run_id,
@@ -343,7 +427,7 @@ def publish_worker_isolation(
         worker_branch=worker_branch,
         isolation_root=str(isolation_root),
         attempt_budget=policy.attempt_budget,
-        refs={"worker_branch": worker_branch, "baseline_sha": baseline_sha},
+        refs={"worker_branch": worker_branch, "baseline_sha": baseline_sha, **mission_refs_for_task(task_id)},
     )
     if not paths:
         emit_delivery_receipt(
@@ -366,6 +450,29 @@ def publish_worker_isolation(
         summary=f"{len(paths)} changed path(s) ready for delivery",
         refs=delivery_refs_from_record(delivery),
     )
+
+    private_material_hit = _scan_private_company_material(paths)
+    if private_material_hit:
+        delivery_store.update_delivery(
+            str(delivery["delivery_id"]),
+            stage="blocked",
+            blocker=private_material_hit,
+            refs={"blocker": private_material_hit},
+        )
+        emit_delivery_receipt(
+            run_id,
+            stage="blocked",
+            summary=private_material_hit,
+            success=False,
+            refs={"blocker": private_material_hit, "worker_branch": worker_branch},
+        )
+        return PublishResult(
+            ok=False,
+            stage="blocked",
+            delivery=delivery_store.get_delivery(str(delivery["delivery_id"])),
+            detail=private_material_hit,
+            cleanup_isolation=False,
+        )
 
     scope_hit = _scan_publish_scope(isolation_root, paths, task_id=task_id)
     if scope_hit:
@@ -414,7 +521,11 @@ def publish_worker_isolation(
         )
 
     message = _derive_commit_message(paths, turn_subject)
-    staged = _run(["git", "add", "-A"], cwd=isolation_root)
+    # A worker isolation is already single-run, but still stage the exact
+    # audited delta rather than relying on a blanket add. This keeps the
+    # delivery receipt, scope scan, and commit contents tied to the same list
+    # and makes accidental sidecar/runtime files impossible to sweep in.
+    staged = _stage_isolation_paths(isolation_root, paths)
     if staged.returncode != 0:
         detail = _combined(staged)
         delivery_store.update_delivery(

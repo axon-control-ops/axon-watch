@@ -8,10 +8,12 @@ import AgentDockSandboxConsent from './AgentDockSandboxConsent.vue';
 import AgentDockIdeVoiceHint from './AgentDockIdeVoiceHint.vue';
 import AgentDockPlanSwitchBanner from './AgentDockPlanSwitchBanner.vue';
 import AgentDockTeammateRouteBanner from './AgentDockTeammateRouteBanner.vue';
+import AgentDockWorkspaceScopeBanner from './AgentDockWorkspaceScopeBanner.vue';
 import type {
   PlanSoftSwitchNotice,
-  TeammateRouteNotice,
+  WorkspaceScopeNotice,
 } from '../../../composables/agent-dock/use-composer-actions';
+import type { TeammateRouteNotice } from '../../../lib/teammate-route-notice';
 import { PLAN_SOFT_SWITCH_REASON_LABEL } from '../../../composables/agent-dock/use-agent-dock-composer-toolbar-props';
 import type { DebugReproduceRequest } from '../../../lib/debug-reproduce-view';
 import type { ComposerClipboardImage } from '../../../lib/composer-clipboard-paste';
@@ -35,10 +37,12 @@ const props = defineProps<{
   commandMutationPending: boolean;
   agentStreamActive: boolean;
   showApprovalBanner: boolean;
+  approvalCurrentStep?: string | null;
   canApproveIdeAgentRun: boolean;
   runMutationPending: boolean;
   planSoftSwitchNotice: PlanSoftSwitchNotice | null;
   teammateRouteNotice: TeammateRouteNotice | null;
+  workspaceScopeNotice: WorkspaceScopeNotice | null;
 }>();
 
 const planSoftSwitchReasonLabel = computed(() => {
@@ -57,7 +61,7 @@ const emit = defineEmits<{
   confirmSandboxConsent: [];
   closeComposerImageLightbox: [];
   debugReproduceProceed: [messageId: string];
-  debugReproduceDismiss: [];
+  debugReproduceResolved: [messageId: string];
   approveRun: [];
   rejectRun: [];
   undoPlanSoftSwitch: [];
@@ -66,6 +70,8 @@ const emit = defineEmits<{
   declinePlanSoftSwitchOffer: [];
   undoTeammateRoute: [];
   dismissTeammateRoute: [];
+  switchWorkspaceScope: [];
+  dismissWorkspaceScope: [stayHere?: boolean];
 }>();
 </script>
 
@@ -95,11 +101,12 @@ const emit = defineEmits<{
     :request="debugReproduceRequest"
     :pending="commandMutationPending || agentStreamActive"
     @proceed="emit('debugReproduceProceed', debugReproduceRequest.messageId)"
-    @dismiss="emit('debugReproduceDismiss')"
+    @resolve="emit('debugReproduceResolved', debugReproduceRequest.messageId)"
   />
   <!-- Soft Attention actions live on IdeAgentReviewStrip; no copy-only banner under it. -->
   <AgentDockApprovalBanner
     :show="showApprovalBanner"
+    :current-step="approvalCurrentStep"
     :can-approve="canApproveIdeAgentRun"
     :reject-pending="runMutationPending"
     @approve="emit('approveRun')"
@@ -126,5 +133,12 @@ const emit = defineEmits<{
     :from-name="teammateRouteNotice?.fromName"
     @undo="emit('undoTeammateRoute')"
     @dismiss="emit('dismissTeammateRoute')"
+  />
+  <AgentDockWorkspaceScopeBanner
+    :show="Boolean(workspaceScopeNotice)"
+    :inferred-label="workspaceScopeNotice?.inferredLabel ?? ''"
+    :current-label="workspaceScopeNotice?.currentLabel ?? ''"
+    @switch-workspace="emit('switchWorkspaceScope')"
+    @dismiss="emit('dismissWorkspaceScope', $event)"
   />
 </template>

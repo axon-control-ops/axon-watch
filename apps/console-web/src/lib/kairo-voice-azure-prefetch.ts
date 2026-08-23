@@ -54,6 +54,7 @@ export async function speakAzureChunksWithPrefetch(
         rate: tuning.rate,
         pitch: tuning.pitch,
         voice: tuning.voice,
+        continuation: index > 0,
       }));
     prefetch = null;
     if (typeof response.first_byte_ms === 'number') {
@@ -72,6 +73,7 @@ export async function speakAzureChunksWithPrefetch(
         rate: tuning.rate,
         pitch: tuning.pitch,
         voice: tuning.voice,
+        continuation: true,
       }).then((payload) => ({ ...payload, prefetch: true }));
     }
     const azureReason =

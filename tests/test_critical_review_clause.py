@@ -64,7 +64,11 @@ class CriticalReviewClauseHelperTests(unittest.TestCase):
 
 
 class CriticalReviewPromptContractTests(unittest.TestCase):
-    def test_every_continuous_role_includes_exact_clause(self) -> None:
+    def test_routine_shift_omits_critical_review_ritual(self) -> None:
+        # Routine work (no task, or a task that isn't a review/verification
+        # job) keeps the standing accuracy contract but drops the mandatory
+        # "critically review, rewrite, Confidence: N/10" ritual — that ritual
+        # is reserved for genuine review-type work (see is_review_type_task).
         for role in ("frontend", "backend", "integrations", "watcher"):
             with self.subTest(role=role):
                 prompt = build_continuous_worker_prompt(
@@ -75,6 +79,28 @@ class CriticalReviewPromptContractTests(unittest.TestCase):
                         owns="in-scope work",
                         schedule="continuous",
                     ),
+                )
+                self.assertIn(AGENT_STANDING_ACCURACY_MARKER, prompt)
+                self.assertNotIn(CRITICAL_REVIEW_CLAUSE, prompt)
+                self.assertNotIn("Confidence: X/10", prompt)
+                self.assertIn("sole truth for this shift's scope", prompt)
+                self.assertIn("Voice (how you talk to Sir King):", prompt)
+
+    def test_review_type_task_includes_exact_clause(self) -> None:
+        for role in ("frontend", "backend", "integrations", "watcher"):
+            with self.subTest(role=role):
+                prompt = build_continuous_worker_prompt(
+                    workspace_id="workspace_axon_watch",
+                    employee=EmployeeConfig(
+                        name=f"Teammate {role}",
+                        role=role,
+                        owns="in-scope work",
+                        schedule="continuous",
+                    ),
+                    task={
+                        "task_id": "task-review-1",
+                        "goal": "Verification after Marco (backend): confirm the API fix.",
+                    },
                 )
                 self.assertIn(AGENT_STANDING_ACCURACY_MARKER, prompt)
                 self.assertIn(CRITICAL_REVIEW_CLAUSE, prompt)
@@ -105,6 +131,43 @@ class CriticalReviewFinalizeGateTests(unittest.TestCase):
             "Confidence: N/10",
             str(record.get("current_step") or record.get("detail") or ""),
         )
+
+    def test_routine_finalize_completes_without_confidence_when_not_required(self) -> None:
+        # A routine (non-review-type) shift passes require_critical_review=False
+        # — a short reply that omits Confidence: N/10 must not be hard-failed
+        # for skipping a ritual it was never asked to perform.
+        created = create_run(
+            workspace_id="workspace_alpha",
+            summary="agent shift",
+            mode="agent",
+        )
+        run_id = str(created["run_id"])
+        dispatched, record = finalize_lane_b_agent_run(
+            dispatch_run_id=run_id,
+            lane_b_result={"dispatched": True, "runtime_label": "Cursor CLI"},
+            reply_text="Removed Oats from the second menu. Nothing else changed.",
+            require_critical_review=False,
+        )
+        self.assertTrue(dispatched)
+        assert record is not None
+        self.assertNotEqual("failed", record["phase"])
+
+    def test_routine_finalize_still_records_confidence_if_agent_included_one(self) -> None:
+        created = create_run(
+            workspace_id="workspace_alpha",
+            summary="agent shift",
+            mode="agent",
+        )
+        run_id = str(created["run_id"])
+        dispatched, record = finalize_lane_b_agent_run(
+            dispatch_run_id=run_id,
+            lane_b_result={"dispatched": True, "runtime_label": "Cursor CLI"},
+            reply_text="Removed Oats from the second menu. Confidence: 9/10",
+            require_critical_review=False,
+        )
+        self.assertTrue(dispatched)
+        assert record is not None
+        self.assertNotEqual("failed", record["phase"])
 
     def test_agent_finalize_auto_recovers_substantive_reply_without_score(self) -> None:
         created = create_run(

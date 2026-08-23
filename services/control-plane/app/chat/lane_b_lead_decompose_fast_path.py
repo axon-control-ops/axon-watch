@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import threading
 from typing import Any, Callable
 
 from app.chat.lead_fan_out_transcript import format_lead_fan_out_agent_message
@@ -13,7 +12,9 @@ from app.workspace_agents.lead_plan_model import resolve_lead_task_plan
 from app.workspace_agents.lead_task_plan import (
     LeadPlanRosterMember,
     detect_fan_out_intent,
+    is_axon_x_mobile_companion_goal,
     is_employee_shift_retry_request,
+    should_execute_lead_fast_path,
     should_lead_decompose_dispatch,
 )
 
@@ -140,7 +141,11 @@ def maybe_post_lead_decompose_message(
 ) -> dict[str, object] | None:
     """When Lead hears a multi-domain implement ask, materialize decompose plan."""
     role = str(employee_role or "").strip().lower()
-    if composer_mode != "agent" or role != "lead":
+    executable = should_execute_lead_fast_path(composer_mode, content) or (
+        str(composer_mode or "").strip().lower() == "plan"
+        and is_axon_x_mobile_companion_goal(content, workspace_id)
+    )
+    if role != "lead" or not executable:
         return None
     if is_employee_shift_retry_request(content):
         return None
@@ -163,9 +168,10 @@ def maybe_post_lead_decompose_message(
         return None
 
     try:
+        materialize_goal = str(preview.goal or content).strip() or content
         materialize = materialize_lead_fan_out(
             workspace_id=workspace_id,
-            goal=content,
+            goal=materialize_goal,
             mode="decompose",
             create_runs=True,
             use_model=True,
@@ -175,17 +181,18 @@ def maybe_post_lead_decompose_message(
     except Exception:
         return None
 
-    # Background kick with elevated start budget when slots are free.
-    threading.Thread(
-        target=_kick_continuous_dispatch,
-        daemon=True,
-        name="lead-decompose-dispatch-kick",
-    ).start()
+    # Lead Send is an explicit operator handoff, so attempt the Lane B kick
+    # before rendering the receipt.  This is intentionally bounded: the kick
+    # only promotes queued handoff runs and starts worker threads; the worker's
+    # actual shift continues asynchronously.  Reporting the real kick count
+    # avoids the old "queued, trust me" card that could hide a restart/routing
+    # miss.
+    kick_started = _kick_continuous_dispatch()
 
     plan_id = str(materialize.get("plan_id") or "").strip()
     handoff_run = record_lead_handoff_run(
         workspace_id=workspace_id,
-        summary=content,
+        summary=materialize_goal,
         detail=(
             f"Lead decompose handoff completed"
             + (f" (plan {plan_id})" if plan_id else "")
@@ -197,7 +204,7 @@ def maybe_post_lead_decompose_message(
     agent_content = _format_decompose_reply(
         lead_name=lead_name.strip() or "Lead",
         materialize=materialize,
-        kick_started=0,
+        kick_started=kick_started,
     )
     operator_message = save_message(
         {

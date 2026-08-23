@@ -1,127 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
 import {
-  buildIdeAgentSidebarStub,
   buildIdeRunPanelConnectorNotice,
   buildIdeTerminalSidebarStub,
   ideSidebarStubActionAriaLabel,
   ideSidebarStubUsesLiveRegion,
 } from './ide-sidebar-stub-view';
-
-describe('buildIdeAgentSidebarStub', () => {
-  it('surfaces approval attention when the dock is collapsed', () => {
-    const panel = buildIdeAgentSidebarStub({
-      agentDockCollapsed: true,
-      streaming: false,
-      pendingApprovals: 2,
-      runPhase: null,
-    });
-
-    expect(panel.tone).toBe('attention');
-    expect(panel.lines[0]).toContain('2 approvals waiting');
-    expect(panel.actionLabel).toBe('Expand agent dock');
-  });
-
-  it('surfaces streaming guidance when the agent is responding', () => {
-    const panel = buildIdeAgentSidebarStub({
-      agentDockCollapsed: true,
-      streaming: true,
-      pendingApprovals: 0,
-      runPhase: 'executing',
-    });
-
-    expect(panel.tone).toBe('streaming');
-    expect(panel.lines[0]).toContain('responding');
-  });
-
-  it('offers collapse when the dock is already open', () => {
-    const panel = buildIdeAgentSidebarStub({
-      agentDockCollapsed: false,
-      streaming: true,
-      pendingApprovals: 1,
-      runPhase: null,
-    });
-
-    expect(panel.actionLabel).toBe('Collapse agent dock');
-  });
-
-  it('surfaces run phase guidance when the dock stays collapsed', () => {
-    const executing = buildIdeAgentSidebarStub({
-      agentDockCollapsed: true,
-      streaming: false,
-      pendingApprovals: 0,
-      runPhase: 'executing',
-    });
-    const reviewReady = buildIdeAgentSidebarStub({
-      agentDockCollapsed: true,
-      streaming: false,
-      pendingApprovals: 0,
-      runPhase: 'review_ready',
-    });
-
-    expect(executing.lines[0]).toContain('Run in progress');
-    expect(reviewReady.lines[0]).toContain('Review ready');
-  });
-
-  it('surfaces failed teammate shift guidance when the dock is collapsed', () => {
-    const failureLine = 'Last job failed: vitest assertion failed';
-    const panel = buildIdeAgentSidebarStub({
-      agentDockCollapsed: true,
-      streaming: false,
-      pendingApprovals: 0,
-      runPhase: null,
-      employeeFailureLine: failureLine,
-      employeeRetryActionLabel: 'Try again',
-    });
-
-    expect(panel.tone).toBe('failure');
-    expect(panel.lines[0]).toBe(failureLine);
-    expect(panel.lines.join(' ')).toContain('Try again');
-    expect(panel.lines.join(' ')).toMatch(/open Team/i);
-    expect(panel.lines.join(' ')).not.toContain('in the failure banner');
-    expect(panel.actionLabel).toBe('Expand agent dock');
-    expect(panel.secondaryActionLabel).toBe('Try again');
-  });
-
-  it('surfaces interrupted teammate shift guidance when the dock is collapsed', () => {
-    const panel = buildIdeAgentSidebarStub({
-      agentDockCollapsed: true,
-      streaming: false,
-      pendingApprovals: 0,
-      runPhase: null,
-      employeeFailureLine:
-        'Last job was interrupted before it could finish — tap Continue to pick up where they left off.',
-      employeeShiftInterrupted: true,
-      employeeRetryActionLabel: 'Continue',
-    });
-
-    expect(panel.tone).toBe('interrupted');
-    expect(panel.lines.join(' ')).toContain('Continue');
-    expect(panel.lines.join(' ')).not.toContain('Try again in the failure banner');
-    expect(panel.secondaryActionLabel).toBe('Continue');
-  });
-
-  it('keeps failure guidance below approvals and streaming', () => {
-    expect(
-      buildIdeAgentSidebarStub({
-        agentDockCollapsed: true,
-        streaming: false,
-        pendingApprovals: 1,
-        runPhase: null,
-        employeeFailureLine: 'Last job failed: timeout',
-      }).lines[0],
-    ).toContain('approval');
-    expect(
-      buildIdeAgentSidebarStub({
-        agentDockCollapsed: true,
-        streaming: true,
-        pendingApprovals: 0,
-        runPhase: null,
-        employeeFailureLine: 'Last job failed: timeout',
-      }).lines[0],
-    ).toContain('responding');
-  });
-});
 
 describe('buildIdeRunPanelConnectorNotice', () => {
   it('surfaces watch offline guidance before stale connector counts', () => {
@@ -172,14 +56,6 @@ describe('buildIdeRunPanelConnectorNotice', () => {
 });
 
 describe('ideSidebarStubUsesLiveRegion', () => {
-  it('announces agent attention, failure, interrupted, and streaming states', () => {
-    expect(ideSidebarStubUsesLiveRegion('neutral', 'agent')).toBe(false);
-    expect(ideSidebarStubUsesLiveRegion('attention', 'agent')).toBe(true);
-    expect(ideSidebarStubUsesLiveRegion('failure', 'agent')).toBe(true);
-    expect(ideSidebarStubUsesLiveRegion('interrupted', 'agent')).toBe(true);
-    expect(ideSidebarStubUsesLiveRegion('streaming', 'agent')).toBe(true);
-  });
-
   it('announces terminal attention only when a run needs shell output', () => {
     expect(ideSidebarStubUsesLiveRegion('neutral', 'terminal')).toBe(false);
     expect(ideSidebarStubUsesLiveRegion('attention', 'terminal')).toBe(true);
@@ -189,6 +65,7 @@ describe('ideSidebarStubUsesLiveRegion', () => {
 describe('ideSidebarStubActionAriaLabel', () => {
   it('expands agent and terminal stub button labels for screen readers', () => {
     expect(ideSidebarStubActionAriaLabel('Expand agent dock', 'agent')).toContain('right edge');
+    expect(ideSidebarStubActionAriaLabel('Open Team roster', 'agent')).toContain('left sidebar');
     expect(ideSidebarStubActionAriaLabel('Show terminal', 'terminal')).toContain('below the editor');
     expect(ideSidebarStubActionAriaLabel('Try again', 'agent')).toContain('agent dock composer');
     expect(ideSidebarStubActionAriaLabel('Continue', 'agent')).toContain('agent dock composer');

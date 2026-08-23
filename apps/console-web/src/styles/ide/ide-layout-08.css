@@ -333,27 +333,34 @@
   cursor: not-allowed;
 }
 
+.agent-dock-notice__primary:focus-visible,
+.agent-dock-notice__link:focus-visible {
+  outline: 2px solid var(--accent-brand, #00f2ff);
+  outline-offset: 2px;
+}
+
 .agent-dock-composer__approval-banner {
   border: 1px solid rgba(255, 196, 120, 0.35);
   background: rgba(255, 196, 120, 0.08);
 }
 
+/* An ask-block is a worker waiting on a specific answer, not a generic
+   tool-consent pause -- a distinct tone keeps the two from reading as the
+   same prompt with the same two buttons. */
+.agent-dock-composer__approval-banner--ask-block {
+  border-color: rgba(129, 212, 250, 0.4);
+  background: rgba(59, 130, 246, 0.08);
+}
+
+.agent-dock-composer__approval-hint {
+  margin: 0.2rem 0 0;
+  font-size: 0.56rem;
+  color: rgba(226, 236, 248, 0.72);
+}
+
 .agent-dock-composer__debug-reproduce-banner {
   border: 1px solid rgba(167, 139, 250, 0.4);
   background: rgba(46, 16, 101, 0.58);
-}
-
-.agent-dock-composer__debug-reproduce-copy {
-  margin: 0;
-  font-size: 0.62rem;
-  line-height: 1.4;
-  color: rgba(237, 233, 254, 0.95);
-}
-
-.agent-dock-composer__debug-reproduce-copy code {
-  font-family: var(--font-mono);
-  font-size: 0.58rem;
-  color: rgba(196, 181, 253, 0.98);
 }
 
 .agent-dock-composer__debug-reproduce-steps {
@@ -387,11 +394,11 @@
   color: rgba(237, 233, 254, 0.98);
 }
 
-.agent-dock-composer__debug-reproduce-btn--dismiss {
+.agent-dock-composer__debug-reproduce-btn--resolve {
   flex: 0 0 auto;
-  border-color: rgba(138, 154, 173, 0.28);
-  background: rgba(10, 14, 20, 0.55);
-  color: rgba(200, 214, 230, 0.9);
+  border-color: rgba(52, 211, 153, 0.45);
+  background: rgba(6, 78, 59, 0.45);
+  color: rgba(209, 250, 229, 0.96);
 }
 
 .agent-dock-composer__debug-reproduce-btn:disabled {
@@ -562,4 +569,29 @@
 .agent-dock-composer__activity-chip--terminal:focus-visible {
   outline: 2px solid rgba(56, 189, 248, 0.55);
   outline-offset: 2px;
+}
+
+/* Effort tier chip — Claude models only */
+.agent-dock-composer__model-effort {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.05rem 0.35rem;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 200, 80, 0.22);
+  background: rgba(255, 200, 60, 0.10);
+  color: rgba(255, 210, 100, 0.82);
+  font-size: 0.58rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+.agent-dock-composer__model-effort[data-effort="low"] {
+  border-color: rgba(100, 200, 150, 0.22);
+  background: rgba(100, 200, 150, 0.10);
+  color: rgba(130, 220, 170, 0.82);
+}
+.agent-dock-composer__model-effort[data-effort="max"] {
+  border-color: rgba(255, 100, 80, 0.24);
+  background: rgba(255, 100, 80, 0.10);
+  color: rgba(255, 140, 120, 0.88);
 }

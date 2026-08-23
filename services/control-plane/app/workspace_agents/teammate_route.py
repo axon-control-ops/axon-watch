@@ -168,7 +168,10 @@ def should_soft_route_to_teammate(
     if is_build_plan_implement_prompt(text):
         return TeammateRouteDecision(should_route=False, reason="build_plan_implement")
 
-    from app.workspace_agents.named_assign_route import match_named_assign_employee
+    from app.workspace_agents.named_assign_route import (
+        is_vague_named_assign,
+        match_named_assign_employee,
+    )
 
     named = match_named_assign_employee(text, employees)
     if named is not None:
@@ -179,6 +182,18 @@ def should_soft_route_to_teammate(
                 reason="already_owning",
                 employee=named,
                 routing_receipt="named_assign;already_owning",
+            )
+        if is_vague_named_assign(text, named.name):
+            return TeammateRouteDecision(
+                should_route=False,
+                reason="vague_named_assign",
+                employee=named,
+                from_employee_id=current_id or None,
+                from_name=(current_employee.name.strip() if current_employee else "") or None,
+                routing_receipt=(
+                    f"named_assign;vague;to={named.employee_id};"
+                    "action=request_concrete_scope"
+                ),
             )
         from_name = (
             (current_employee.name.strip() if current_employee else "")
@@ -444,9 +459,23 @@ def route_teammate_decision(
         current = next((row for row in roster if row.employee_id == cleaned_current), None)
 
     from app.workspace_agents.lead_task_plan import detect_fan_out_intent
-    from app.workspace_agents.named_assign_route import match_named_assign_employee
+    from app.workspace_agents.named_assign_route import count_named_roster_members, match_named_assign_employee
 
-    # Explicit "assign Cole / have Priya…" wins over fan-out and soft specialty scoring.
+    # Lead territory: naming 2+ teammates is orchestration, not a single assign.
+    if detect_fan_out_intent(prompt) or count_named_roster_members(prompt, roster) >= 2:
+        return TeammateRouteDecision(
+            should_route=False,
+            reason="lead_fan_out",
+            from_employee_id=current.employee_id if current else None,
+            from_name=current.name if current else None,
+            source="lead_planner",
+            routing_receipt=(
+                "Lead fan-out intent detected — use /api/workspaces/{id}/lead/fan-out "
+                "to open concurrent specialist tasks/runs"
+            ),
+        )
+
+    # Explicit "assign Cole / have Priya…" wins over soft specialty scoring.
     named = match_named_assign_employee(prompt, roster)
     if named is not None:
         cleaned_current = current.employee_id.strip() if current else ""
@@ -470,20 +499,6 @@ def route_teammate_decision(
             routing_receipt=(
                 f"named_assign;role={normalize_teammate_role(named.role)};"
                 f"to={named.employee_id}"
-            ),
-        )
-
-    # Fan-out is Lead planner territory — never collapse to a single specialty winner.
-    if detect_fan_out_intent(prompt):
-        return TeammateRouteDecision(
-            should_route=False,
-            reason="lead_fan_out",
-            from_employee_id=current.employee_id if current else None,
-            from_name=current.name if current else None,
-            source="lead_planner",
-            routing_receipt=(
-                "Lead fan-out intent detected — use /api/workspaces/{id}/lead/fan-out "
-                "to open concurrent specialist tasks/runs"
             ),
         )
 

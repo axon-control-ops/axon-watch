@@ -18,13 +18,16 @@ from app.runs.service import (
     prune_terminal_employee_runs,
     reap_abandoned_review_ready_runs,
     reap_stale_employee_runs,
+    reap_stale_interactive_runs,
+    reconcile_employee_runs_missing_tasks,
 )
 from app.runs.stale_reconcile import BUSY_EMPLOYEE_PHASES
+from app.workspace_agents.isolation_reaper import reap_abandoned_worker_isolations
 from app.workspace_agents.config_loader import EmployeeConfig, load_workspace_agent_configs
 from app.workspace_agents.scheduler_auto_start_gates import (
-    runtime_auth_blocks_auto_start,
-    usage_limit_blocks_auto_start,
+    continuous_auto_start_skip_reason,
 )
+from app.workspace_agents.scheduler_attention_scan import run_due_attention_scan_and_log
 from app.workspace_agents.scheduler_queued_fan_out import dispatch_queued_lead_fan_out_runs
 from app.workspace_agents.worker_dispatch import dispatch_continuous_worker_run, worker_dispatch_enabled
 
@@ -47,6 +50,29 @@ def env_scheduler_allowed() -> bool:
     """Hard emergency brake from process env (deployment.env / systemd)."""
     raw = os.environ.get("AXON_WATCH_WORKER_SCHEDULER", "1").strip().lower()
     return raw not in {"0", "false", "off", "no"}
+
+
+def env_observation_scheduler_allowed() -> bool:
+    """Hard brake for read-mostly watcher observation ticks.
+
+    Defaults on, independent from the worker/action scheduler. Set
+    AXON_WATCH_OBSERVATION_SCHEDULER=0 only when even polling/reconciliation
+    should stop.
+    """
+    raw = os.environ.get("AXON_WATCH_OBSERVATION_SCHEDULER", "1").strip().lower()
+    return raw not in {"0", "false", "off", "no"}
+
+
+def observation_scheduler_enabled() -> bool:
+    """Effective watcher enable: observation env brake AND SQLite UI overlay."""
+    if not env_observation_scheduler_allowed():
+        return False
+    return bool(
+        worker_scheduler_settings_store.load_settings().get(
+            "watcher_scheduler_enabled",
+            True,
+        )
+    )
 
 
 def scheduler_enabled() -> bool:
@@ -144,6 +170,77 @@ def _dispatch_failure_summary(exc: BaseException) -> str:
     return f"{role_hint} — open run history for receipts."
 
 
+def _trace_scheduler_lease_decision(
+    *,
+    task: dict[str, Any],
+    decision: str,
+    tier: str,
+    risk: str,
+    explanation: str,
+    run_id: str | None = None,
+) -> None:
+    """Best-effort constitution trace for scheduler lease decisions.
+
+    The task ledger and run history remain the source of truth. Constitution
+    indexing is deliberately non-blocking so the worker scheduler does not fail
+    closed because an executive/audit registry write failed.
+    """
+    task_id = str(task.get("task_id") or "").strip()
+    workspace_id = str(task.get("workspace_id") or "").strip()
+    if not task_id:
+        return
+    try:
+        from app.persistence import constitution_registry_store as registry
+
+        evidence = registry.index_evidence(
+            source_table="workspace_tasks",
+            source_id=task_id,
+            source_ref={
+                "task_id": task_id,
+                "owner_role": str(task.get("owner_role") or "").strip(),
+                "status": str(task.get("status") or "").strip(),
+            },
+            kind="scheduler_lease_decision",
+            summary=str(task.get("goal") or "Scheduler leased task").strip(),
+            workspace_id=workspace_id,
+            run_id=run_id,
+            task_id=task_id,
+            tags=["worker_scheduler", decision, tier, risk],
+        )
+        recorded = registry.record_decision(
+            actor="worker_scheduler",
+            capability_id="CAP-034",
+            decision=decision,
+            tier=tier,
+            risk=risk,
+            explanation=explanation,
+            confidence_note="deterministic scheduler lease policy",
+            task_id=task_id,
+            run_id=run_id,
+            source_table="workspace_tasks",
+            source_id=task_id,
+            evidence_ids=[str(evidence["evidence_id"])],
+        )
+        registry.index_evidence(
+            source_table="workspace_tasks",
+            source_id=task_id,
+            source_ref={
+                "task_id": task_id,
+                "owner_role": str(task.get("owner_role") or "").strip(),
+                "status": str(task.get("status") or "").strip(),
+            },
+            kind="scheduler_lease_decision",
+            summary=str(task.get("goal") or "Scheduler leased task").strip(),
+            workspace_id=workspace_id,
+            run_id=run_id,
+            task_id=task_id,
+            decision_id=str(recorded.get("decision_id") or ""),
+            tags=["worker_scheduler", decision, tier, risk],
+        )
+    except Exception:  # noqa: BLE001 — scheduler must not depend on registry writes
+        logger.exception("could not trace scheduler lease decision for task=%s", task_id)
+
+
 def _dispatch_worker_run(
     *,
     workspace_id: str,
@@ -236,16 +333,52 @@ def kick_lead_fan_out_dispatch(
     )
 
 
-def run_continuous_worker_tick(
-    *,
-    starts_bound_override: int | None = None,
-) -> list[dict[str, Any]]:
-    """Reconcile hung shifts, then start bounded role-tagged runs when enabled."""
+def run_observation_tick() -> dict[str, Any]:
+    """Run always-on watcher housekeeping without starting worker shifts."""
+    if not observation_scheduler_enabled():
+        return {"enabled": False, "sources": {}}
+    result: dict[str, Any] = {"enabled": True, "sources": {}}
     reaped = reap_stale_employee_runs()
+    result["reaped_count"] = len(reaped)
     if reaped:
         logger.info("continuous worker tick reaped %s stale run(s)", len(reaped))
 
+    # An operator composer thread has no employee_role, so the reaper above
+    # deliberately skips it -- correctly, a real turn can run long. But that
+    # left no periodic path back to a sane state for one actually abandoned
+    # (tab closed mid-turn); only a control-plane restart could resolve it.
+    reaped_interactive = reap_stale_interactive_runs()
+    result["reaped_interactive_count"] = len(reaped_interactive)
+    if reaped_interactive:
+        logger.info(
+            "continuous worker tick reaped %s abandoned interactive run(s)",
+            len(reaped_interactive),
+        )
+
+    # Regression guard for a real outage: preserve_isolation keeps a checkout on
+    # disk for operator recovery after a blocked/failed publish, but nothing
+    # ever swept those checkouts afterward. 77 accumulated (7.9G) on this host's
+    # 9.8G tmpfs /tmp and filled it to 100%, which then failed *every new*
+    # isolation with "refusing to write the bound project root" -- a
+    # platform-wide stall from disk pressure, not a code defect anywhere else.
+    reaped_isolations = reap_abandoned_worker_isolations()
+    result["reaped_isolation_count"] = len(reaped_isolations)
+    if reaped_isolations:
+        logger.info(
+            "continuous worker tick reaped %s abandoned isolation checkout(s)",
+            len(reaped_isolations),
+        )
+
+    missing_task_runs = reconcile_employee_runs_missing_tasks()
+    result["missing_task_reconciled_count"] = len(missing_task_runs)
+    if missing_task_runs:
+        logger.info(
+            "continuous worker tick cancelled %s active employee run(s) with missing tasks",
+            len(missing_task_runs),
+        )
+
     abandoned = reap_abandoned_review_ready_runs()
+    result["abandoned_count"] = len(abandoned)
     if abandoned:
         logger.info(
             "continuous worker tick completed %s abandoned review_ready run(s)",
@@ -253,6 +386,7 @@ def run_continuous_worker_tick(
         )
 
     pruned = prune_terminal_employee_runs()
+    result["pruned_count"] = len(pruned)
     if pruned:
         logger.info("continuous worker tick pruned %s terminal employee run(s)", len(pruned))
 
@@ -260,17 +394,21 @@ def run_continuous_worker_tick(
         from app.workspace_delivery.poll import poll_pending_deliveries
 
         timed_out = poll_pending_deliveries()
+        result["delivery_updates_count"] = len(timed_out)
         if timed_out:
             logger.info("workspace delivery poll updated %s delivery(ies)", len(timed_out))
     except Exception:  # noqa: BLE001 — never block scheduler on delivery poll
         logger.exception("workspace delivery poll failed")
+        result["delivery_poll_error"] = True
 
     work_source_result: dict[str, Any] = {}
     try:
         from app.workspace_agents.company_work_sources import run_scheduled_work_sources
 
-        work_source_result = run_scheduled_work_sources()
+        work_source_result = run_scheduled_work_sources(observation_only=True)
+        result["sources"] = work_source_result.get("sources") or {}
         recovered = work_source_result.get("recovered_leases") or []
+        result["recovered_leases_count"] = len(recovered)
         if recovered:
             logger.info(
                 "continuous worker tick recovered %s orphaned leased task(s)",
@@ -285,6 +423,33 @@ def run_continuous_worker_tick(
             )
     except Exception:  # noqa: BLE001 — never block scheduler on work sources
         logger.exception("scheduled company work sources failed")
+        result["work_sources_error"] = True
+    return result
+
+
+def run_continuous_worker_tick(
+    *,
+    starts_bound_override: int | None = None,
+) -> list[dict[str, Any]]:
+    """Run watcher observation, then start bounded role-tagged runs when enabled."""
+    run_observation_tick()
+
+    # Lead fan-out/decompose is an explicit operator handoff, not background
+    # auto-leasing.  If the control plane restarts after Dana queued a
+    # specialist run but before the one-shot dispatch kick succeeds, Manual/Semi
+    # mode used to leave Priya/Marco/etc. stranded in queued forever.  Keep this
+    # rescue before the scheduler_enabled gate so watcher ticks can self-heal
+    # only those already-approved handoff runs without enabling general worker
+    # autonomy.
+    try:
+        lead_fan_out_started = kick_lead_fan_out_dispatch(starts_bound=2)
+        if lead_fan_out_started:
+            logger.info(
+                "continuous worker tick rescued %s queued Lead handoff run(s)",
+                len(lead_fan_out_started),
+            )
+    except Exception:  # noqa: BLE001 — never block scheduler on handoff rescue
+        logger.exception("queued Lead handoff rescue failed")
 
     # Semi / Manual pause continuous specialist leasing, but Lead-owned board
     # tickets and soft-failed handoff autostarts still need operator_start + kick.
@@ -314,8 +479,39 @@ def run_continuous_worker_tick(
     except Exception:  # noqa: BLE001 — never block scheduler on handoff retry
         logger.exception("handoff autostart retry failed")
 
+    try:
+        from app.workspace_handoff_routing import notify_completed_handoffs
+
+        # A cross-workspace handoff previously stopped at one ack when routed;
+        # the source Lead never learned whether the target workspace actually
+        # finished the delegated work. Close that loop on the same tick that
+        # already retries stuck autostarts.
+        handoffs_closed = notify_completed_handoffs()
+        if handoffs_closed:
+            logger.info(
+                "continuous worker tick closed %s completed handoff(s)",
+                len(handoffs_closed),
+            )
+    except Exception:  # noqa: BLE001 — never block scheduler on handoff completion notice
+        logger.exception("handoff completion notice failed")
+
     if not scheduler_enabled():
         return []
+
+    try:
+        from app.workspace_agents.company_work_sources import run_scheduled_work_sources
+
+        action_sources = run_scheduled_work_sources(action_only=True)
+        action_created = (
+            (action_sources.get("sources") or {}).get("file_size_patrol") or {}
+        ).get("created_tasks") or []
+        if action_created:
+            logger.info(
+                "continuous worker tick enqueued %s action-source task(s)",
+                len(action_created),
+            )
+    except Exception:  # noqa: BLE001 — never block worker leasing on action sources
+        logger.exception("scheduled company action sources failed")
 
     _configs, _defaults, companies, _staffing = load_workspace_agent_configs()
     active_bound = max_active_executing()
@@ -364,19 +560,13 @@ def run_continuous_worker_tick(
                 continue
             if _active_role_run_exists(workspace_id, role):
                 continue
-            if usage_limit_blocks_auto_start(workspace_id, role):
+            skip_reason = continuous_auto_start_skip_reason(workspace_id, role)
+            if skip_reason:
                 logger.info(
-                    "continuous worker tick skipped role=%s workspace=%s: "
-                    "Cursor usage limits blocked this role's last shift",
+                    "continuous worker tick skipped role=%s workspace=%s: %s",
                     role,
                     workspace_id,
-                )
-                continue
-            if runtime_auth_blocks_auto_start(workspace_id, role):
-                logger.info(
-                    "continuous worker tick skipped role=%s workspace=%s: runtime auth blocked last shift",
-                    role,
-                    workspace_id,
+                    skip_reason,
                 )
                 continue
 
@@ -400,6 +590,13 @@ def run_continuous_worker_tick(
 
             lease_decision = task_allows_autonomous_lease(claimed)
             if lease_decision.tier != "auto_safe" or lease_decision.decision != "dispatch":
+                _trace_scheduler_lease_decision(
+                    task=claimed,
+                    decision="refuse",
+                    tier=lease_decision.tier,
+                    risk=lease_decision.risk,
+                    explanation=lease_decision.reason,
+                )
                 task_id = str(claimed.get("task_id") or "").strip()
                 logger.warning(
                     "continuous worker tick refused gated task=%s role=%s reason=%s",
@@ -454,6 +651,14 @@ def run_continuous_worker_tick(
                     logger.exception("could not reopen task after create_run refuse: %s", task_id)
                 continue
             started.append(record)
+            _trace_scheduler_lease_decision(
+                task=claimed,
+                decision="dispatch",
+                tier=lease_decision.tier,
+                risk=lease_decision.risk,
+                explanation=lease_decision.reason,
+                run_id=str(record.get("run_id") or "").strip() or None,
+            )
             if worker_dispatch_enabled():
                 threading.Thread(
                     target=_dispatch_worker_run,
@@ -474,6 +679,7 @@ async def _scheduler_loop() -> None:
     await asyncio.sleep(interval)
     while True:
         try:
+            await asyncio.to_thread(run_due_attention_scan_and_log)
             started = await asyncio.to_thread(run_continuous_worker_tick)
             if started:
                 logger.info("continuous worker tick started %s run(s)", len(started))

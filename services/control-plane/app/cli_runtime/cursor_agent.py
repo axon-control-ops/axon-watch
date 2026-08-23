@@ -9,7 +9,10 @@ from pathlib import Path
 import time
 
 from app.cli_runtime.cursor_stream_events import CursorStreamAssembler
-from app.cli_runtime.research_mcp import ensure_workspace_research_mcp
+from app.cli_runtime.research_mcp import (
+    ensure_workspace_research_mcp,
+    remove_workspace_research_mcp,
+)
 from app.research.availability import research_capability_snapshot
 from app.cli_runtime.subprocess_runner import (
     RuntimeProcessStoppedError,
@@ -17,6 +20,8 @@ from app.cli_runtime.subprocess_runner import (
     raise_if_operator_stopped,
     stream_registered_process,
 )
+from app.cli_runtime.agent_sandbox import AgentSandboxPolicy
+from app.cli_runtime.catalog_discovery import is_cursor_agent_binary
 
 logger = logging.getLogger(__name__)
 
@@ -60,24 +65,41 @@ def build_cursor_agent_command(
     research_available: bool | None = None,
 ) -> list[str]:
     """Build the Cursor CLI argv for operator vs continuous-worker trust policies."""
-    command = [
-        binary,
-        "agent",
-        "--print",
-        "--trust",
-        "--output-format",
-        "stream-json",
-        "--stream-partial-output",
-    ]
+    if is_cursor_agent_binary(binary):
+        command = [
+            binary,
+            "--print",
+            "--trust",
+            "--output-format",
+            "stream-json",
+            "--stream-partial-output",
+        ]
+    else:
+        command = [
+            binary,
+            "agent",
+            "--print",
+            "--trust",
+            "--output-format",
+            "stream-json",
+            "--stream-partial-output",
+        ]
     policy = str(trust_policy or "operator").strip().lower() or "operator"
     if research_available is None:
         research_available = bool(research_capability_snapshot().get("available"))
     if research_available and workspace_root:
         ensure_workspace_research_mcp(workspace_root)
+    # Shell/Edit need --force in headless Cursor even when Axon shows Full Access.
+    # Gate 2 still withholds --approve-mcps from continuous workers (MCP least-privilege).
+    executing = str(execution_tier or "").strip().lower() == "executing"
+    if executing:
+        command.append("--force")
     if policy != "worker" and research_available:
-        # Cursor CLI rejects audited MCP tools unless --force is set alongside
-        # --approve-mcps in headless dispatch (verified against cursor 3.10.x).
-        command.extend(["--force", "--approve-mcps"])
+        # Cursor CLI rejects audited MCP tools unless --approve-mcps is set
+        # alongside --force in headless operator dispatch (cursor 3.10.x).
+        if "--force" not in command:
+            command.append("--force")
+        command.append("--approve-mcps")
     mode_flag = _cursor_mode_flag(composer_mode, execution_tier)
     if mode_flag:
         command.extend(["--mode", mode_flag])
@@ -105,6 +127,7 @@ def run_cursor_local(
     on_chunk: Callable[[str, str], None] | None = None,
     trust_policy: str = "operator",
     research_available: bool | None = None,
+    sandbox_policy: AgentSandboxPolicy | None = None,
 ) -> CursorAgentReply:
     # stream-json is the only print format that reliably carries assistant text;
     # `--output-format text` returns an empty body for plan/tool-heavy replies.
@@ -124,6 +147,7 @@ def run_cursor_local(
         on_delta=on_chunk,
     )
     run_cwd = str(workspace_root.resolve()) if workspace_root else None
+    sandbox_kwargs = {"sandbox_policy": sandbox_policy} if sandbox_policy is not None else {}
 
     def handle_raw_chunk(_accumulated_raw: str, raw_line: str) -> None:
         assembler.feed_line(raw_line)
@@ -137,6 +161,7 @@ def run_cursor_local(
                 subprocess_env=subprocess_env,
                 on_chunk=handle_raw_chunk,
                 cwd=run_cwd,
+                **sandbox_kwargs,
             )
         else:
             stdout, stderr, returncode = communicate_registered_process(
@@ -145,6 +170,7 @@ def run_cursor_local(
                 timeout_seconds=timeout_seconds,
                 subprocess_env=subprocess_env,
                 cwd=run_cwd,
+                **sandbox_kwargs,
             )
             for line in stdout.splitlines():
                 assembler.feed_line(line)
@@ -184,6 +210,7 @@ def run_cursor_local_with_recursion_retry(
     run_id: str,
     on_chunk: Callable[[str, str], None] | None,
     trust_policy: str,
+    sandbox_policy: AgentSandboxPolicy | None = None,
 ) -> CursorAgentReply:
     """Run Cursor once, retrying recursion crashes without research MCP."""
     started = time.perf_counter()
@@ -199,6 +226,7 @@ def run_cursor_local_with_recursion_retry(
             run_id=run_id,
             on_chunk=on_chunk,
             trust_policy=trust_policy,
+            sandbox_policy=sandbox_policy,
         )
     except RuntimeError as exc:
         if isinstance(exc, RuntimeProcessStoppedError) or not is_recursion_depth_error(str(exc)):
@@ -211,6 +239,10 @@ def run_cursor_local_with_recursion_retry(
             workspace_id,
             (time.perf_counter() - started) * 1000,
         )
+        # research_available=False below only skips *writing* a fresh config —
+        # the crashing server's entry from the first attempt is still on disk
+        # and Cursor CLI would load it again from the project's own mcp.json.
+        remove_workspace_research_mcp(workspace_root)
         return run_cursor_local(
             binary=binary,
             prompt=prompt,
@@ -223,4 +255,5 @@ def run_cursor_local_with_recursion_retry(
             on_chunk=on_chunk,
             trust_policy=trust_policy,
             research_available=False,
+            sandbox_policy=sandbox_policy,
         )

@@ -23,7 +23,13 @@
     display: none;
   }
 
-  .console-shell--mockup[data-layout-mode='operator'],
+  .console-shell--mockup[data-layout-mode='operator'] {
+    grid-template-columns:
+      var(--shell-left-sidebar-width, 220px)
+      minmax(0, 1fr)
+      var(--shell-live-ops-width, 300px);
+  }
+
   .console-shell--mockup[data-layout-mode='ide'] {
     grid-template-columns:
       var(--shell-left-sidebar-width, 220px)
@@ -47,11 +53,20 @@
     --topbar-height: 3.125rem;
     --statusbar-height: 2.125rem;
     --shell-gutter: 0.42rem;
+  }
+
+  .console-shell--mockup:not(.console-shell--mobile) {
     min-width: 720px;
     overflow-x: auto;
   }
 
-  .console-shell--mockup[data-layout-mode='operator'],
+  .console-shell--mockup[data-layout-mode='operator'] {
+    grid-template-columns:
+      var(--shell-left-sidebar-width, 188px)
+      minmax(0, 1fr)
+      var(--shell-live-ops-width, 248px);
+  }
+
   .console-shell--mockup[data-layout-mode='ide'] {
     grid-template-columns:
       var(--shell-left-sidebar-width, 188px)

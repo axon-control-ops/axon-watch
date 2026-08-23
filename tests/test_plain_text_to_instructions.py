@@ -8,7 +8,11 @@ CONTROL_PLANE_ROOT = Path(__file__).resolve().parents[1] / "services" / "control
 sys.path.insert(0, str(CONTROL_PLANE_ROOT))
 
 from app.plain_text_to_instructions import (  # noqa: E402
+    build_instructions_markdown_from_source,
+    compose_instructions_markdown,
+    extract_instructions_markdown,
     instructions_block_git_actions,
+    instructions_markdown_is_complete,
     prompt_requests_git_actions,
 )
 
@@ -39,6 +43,91 @@ Plan CI handling.
     def test_explicit_commit_still_detected(self) -> None:
         self.assertTrue(prompt_requests_git_actions("commit these changes"))
         self.assertTrue(prompt_requests_git_actions("please commit and push"))
+
+    def test_extract_instructions_from_fenced_markdown(self) -> None:
+        raw = """Here is the brief:
+
+```markdown
+# Instructions
+
+## Goal
+Fix GIF rendering.
+
+## Source request
+Make GIFs look like WhatsApp.
+```"""
+        extracted = extract_instructions_markdown(raw)
+        self.assertIsNotNone(extracted)
+        self.assertTrue(extracted.startswith("# Instructions"))
+        self.assertIn("Fix GIF rendering.", extracted or "")
+
+    def test_extract_instructions_after_preamble(self) -> None:
+        raw = "Sure — converted below.\n\n# Instructions\n\n## Goal\nShip OTA safely.\n\n## In scope\n- OTA\n\n## Out of scope\n- Commit\n\n## Steps\n1. One\n2. Two\n3. Three\n\n## Constraints\n- Safe\n\n## Source request\nShip OTA safely.\n"
+        extracted = extract_instructions_markdown(raw)
+        self.assertTrue(extracted is not None and extracted.startswith("# Instructions"))
+
+    def test_build_instructions_from_long_source(self) -> None:
+        source = (
+            "Connect the Young Eagles workspace as Teacher-X in DashPro. "
+            "The team needs to know layout, features, screens, homework, assignments, grading, "
+            "reports, and official languages for preschool and K-12."
+        )
+        built = build_instructions_markdown_from_source(source)
+        self.assertTrue(instructions_markdown_is_complete(built))
+        self.assertIn("Teacher-X", built)
+        self.assertIn("## Source request", built)
+
+    def test_compose_instructions_fills_missing_model_sections(self) -> None:
+        source = "Fix GIF rendering on mobile before OTA."
+        model = "# Instructions\n\n## Source request\nFix GIF rendering on mobile before OTA.\n"
+        composed = compose_instructions_markdown(source, model)
+        self.assertTrue(instructions_markdown_is_complete(composed))
+        self.assertIn("## Steps", composed)
+
+    def test_model_output_complete_without_source_request(self) -> None:
+        model = (
+            "# Instructions\n\n"
+            "## Goal\nFix GIF rendering on mobile before OTA.\n\n"
+            "## In scope\n- Mobile GIF renderer\n\n"
+            "## Out of scope\n- Committing or releasing unless explicitly requested\n\n"
+            "## Steps\n1. One\n2. Two\n3. Three\n4. Four\n\n"
+            "## Constraints\n- Follow only the steps listed above\n"
+        )
+        self.assertTrue(instructions_markdown_is_complete(model))
+        composed = compose_instructions_markdown("Fix GIF rendering on mobile before OTA.", model)
+        self.assertNotIn("## Source request", composed)
+
+    def test_compose_preserves_model_assumptions(self) -> None:
+        source = "Fix GIF rendering on mobile before OTA."
+        model = (
+            "# Instructions\n\n"
+            "## Goal\nFix GIF rendering on mobile before OTA.\n\n"
+            "## In scope\n- Mobile GIF renderer\n\n"
+            "## Out of scope\n- Committing or releasing unless explicitly requested\n\n"
+            "## Steps\n1. One\n2. Two\n3. Three\n4. Four\n\n"
+            "## Constraints\n- Follow only the steps listed above\n\n"
+            "## Assumptions\n- Assuming the Android build path since none was named — confirm before merging\n"
+        )
+        composed = compose_instructions_markdown(source, model)
+        self.assertIn("## Assumptions", composed)
+        self.assertIn("Android build path", composed)
+
+    def test_fallback_omits_assumptions_when_model_silent(self) -> None:
+        source = "Fix GIF rendering on mobile before OTA."
+        composed = compose_instructions_markdown(source, None)
+        self.assertNotIn("## Assumptions", composed)
+
+    def test_commit_sha_reference_is_not_git_intent(self) -> None:
+        self.assertFalse(
+            prompt_requests_git_actions(
+                "Real DashPro fix commit: 2c0870708ddaa54550fb602c7fd3026c46e7ebb3"
+            )
+        )
+        self.assertFalse(
+            prompt_requests_git_actions(
+                "Publish the verified commit 2c0870708ddaa54550fb602c7fd3026c46e7ebb3 to canary"
+            )
+        )
 
 
 if __name__ == "__main__":

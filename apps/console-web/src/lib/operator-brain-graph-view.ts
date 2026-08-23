@@ -191,22 +191,67 @@ export function brainGraphHeadline(snapshot: BrainGraphSnapshot | null): string 
   return `${snapshot.node_count} nodes · ${attention} need attention`;
 }
 
-export type OperatorCenterView = 'grid' | 'graph';
+export type OperatorCenterView =
+  | 'mission'
+  | 'attention'
+  | 'dispatch'
+  | 'vaxon'
+  | 'email'
+  | 'graph';
+
+/** @deprecated Legacy session value — maps to `mission`. */
+export type LegacyOperatorCenterView = 'grid';
 
 const CENTER_VIEW_STORAGE_KEY = 'axon.operator.center-view';
 
-export function readStoredOperatorCenterView(): OperatorCenterView {
-  // Mission Control home is the fleet mosaic; Brain Graph is opt-in via the switch.
-  if (typeof sessionStorage === 'undefined') {
-    return 'grid';
+const OPERATOR_CENTER_VIEWS: ReadonlySet<OperatorCenterView> = new Set([
+  'mission',
+  'attention',
+  'dispatch',
+  'vaxon',
+  'email',
+  'graph',
+]);
+
+export function normalizeOperatorCenterView(raw: string | null | undefined): OperatorCenterView {
+  const value = String(raw ?? '').trim();
+  if (value === 'graph') {
+    return 'graph';
   }
-  const raw = sessionStorage.getItem(CENTER_VIEW_STORAGE_KEY);
-  return raw === 'graph' ? 'graph' : 'grid';
+  if (value === 'attention') {
+    return 'attention';
+  }
+  if (value === 'dispatch') {
+    return 'dispatch';
+  }
+  if (value === 'vaxon') {
+    return 'vaxon';
+  }
+  if (value === 'email') {
+    return 'email';
+  }
+  // `grid` and unknown values default to the Mission Control tab.
+  return 'mission';
+}
+
+export function isOperatorBrainGalaxyView(view: OperatorCenterView): boolean {
+  return view === 'graph';
+}
+
+export function readStoredOperatorCenterView(): OperatorCenterView {
+  if (typeof sessionStorage === 'undefined') {
+    return 'mission';
+  }
+  return normalizeOperatorCenterView(sessionStorage.getItem(CENTER_VIEW_STORAGE_KEY));
 }
 
 export function persistOperatorCenterView(view: OperatorCenterView): void {
   if (typeof sessionStorage === 'undefined') {
     return;
   }
-  sessionStorage.setItem(CENTER_VIEW_STORAGE_KEY, view);
+  const normalized = normalizeOperatorCenterView(view);
+  if (!OPERATOR_CENTER_VIEWS.has(normalized)) {
+    return;
+  }
+  sessionStorage.setItem(CENTER_VIEW_STORAGE_KEY, normalized);
 }

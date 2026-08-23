@@ -60,6 +60,24 @@ class AgentProcessScopeTests(unittest.TestCase):
         separator = wrapped.index("--")
         self.assertEqual(command, wrapped[separator + 1 :])
 
+    def test_wrap_command_suppresses_systemd_run_banner(self) -> None:
+        """Regression: without --quiet, systemd-run's own "Running scope as
+        unit: ...; invocation ID: ..." banner lands on stderr and — when the
+        wrapped CLI fails without emitting its own parseable error — gets
+        surfaced to the operator as if it were the failure reason, masking
+        whatever actually went wrong (e.g. a real Cursor/Codex/Claude error).
+        """
+        with patch.dict(
+            os.environ,
+            {"AXON_WATCH_AGENT_SYSTEMD_SCOPE": "1"},
+            clear=False,
+        ), patch(
+            "app.cli_runtime.agent_process_scope._systemd_user_available",
+            return_value=True,
+        ):
+            wrapped = wrap_command_in_agent_scope(["cursor-agent", "--print", "hello"])
+        self.assertIn("--quiet", wrapped)
+
     def test_unit_name_extracted_from_wrapped_command(self) -> None:
         wrapped = wrap_command_in_agent_scope(["cursor-agent", "--print", "hello"])
         unit = agent_scope_unit_from_wrapped_command(wrapped)

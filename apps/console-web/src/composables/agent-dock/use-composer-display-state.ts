@@ -1,4 +1,4 @@
-import { computed, nextTick, type Ref } from 'vue';
+import { computed, nextTick, ref, type Ref } from 'vue';
 
 import { resolveActiveIdeAgentMessage } from '../../lib/ide-agent-center-view';
 import {
@@ -7,7 +7,7 @@ import {
 } from '../../lib/ide-agent-activity-view';
 import { filterMcpToolsForComposerMode } from '../../lib/composer-mcp-tools-view';
 import { isToolCapableComposerMode } from '../../lib/composer-tool-modes';
-import { plainTextToInstructionsMarkdown } from '../../lib/plain-text-to-instructions';
+import { generateInstructions } from '../../api/chat-api';
 import {
   extractDebugReproduceRequest,
   shouldShowDebugReproduceBanner,
@@ -72,6 +72,7 @@ export function useComposerDisplayState(options: UseComposerDisplayStateOptions)
     }),
   );
 
+  /** Hide the sticky banner after Resolved/Proceed already submitted the follow-up. */
   function handleDebugReproduceDismiss(): void {
     dismissedDebugReproduceMessageId.value = debugReproduceRequest.value?.messageId ?? null;
   }
@@ -192,12 +193,39 @@ export function useComposerDisplayState(options: UseComposerDisplayStateOptions)
       shell.ideComposerDraft = value;
     },
   });
-  const canConvertInstructions = computed(() => Boolean(composerDraftModel.value.trim()));
+  const instructionsGenerating = ref(false);
+  const canConvertInstructions = computed(
+    () =>
+      Boolean(shell.currentWorkspace?.workspace_id) &&
+      Boolean(composerDraftModel.value.trim()) &&
+      !instructionsGenerating.value,
+  );
 
-  function convertDraftToInstructions(): void {
-    const next = plainTextToInstructionsMarkdown(composerDraftModel.value);
-    composerDraftModel.value = next;
-    void nextTick(syncComposerHeight);
+  async function convertDraftToInstructions(): Promise<void> {
+    const workspaceId = shell.currentWorkspace?.workspace_id;
+    const source = composerDraftModel.value.trim();
+    if (!workspaceId || !source || instructionsGenerating.value) return;
+    instructionsGenerating.value = true;
+    try {
+      const result = await generateInstructions({
+        workspace_id: workspaceId,
+        content: source,
+        runtime_target: shell.selectedRuntimeTargetId || null,
+        runtime_model: shell.selectedComposerModel || null,
+      });
+      const markdown = result.content.trim();
+      if (!markdown) {
+        throw new Error('Instruction generation returned empty markdown');
+      }
+      composerDraftModel.value = markdown.endsWith('\n') ? markdown : `${markdown}\n`;
+      await nextTick(syncComposerHeight);
+    } catch (error) {
+      shell.commandMutationError = error instanceof Error
+        ? error.message
+        : 'instruction generation failed';
+    } finally {
+      instructionsGenerating.value = false;
+    }
   }
 
   const canSubmitComposer = computed(() => {
@@ -244,6 +272,7 @@ export function useComposerDisplayState(options: UseComposerDisplayStateOptions)
     composerActivityChips,
     composerDraftModel,
     canConvertInstructions,
+    instructionsGenerating,
     convertDraftToInstructions,
     composerPlaceholder,
     composerQueueHint,

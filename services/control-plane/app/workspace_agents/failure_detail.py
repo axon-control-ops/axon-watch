@@ -9,7 +9,15 @@ _LANE_B_FALLBACK_NORMALIZE_RE = re.compile(
     re.IGNORECASE,
 )
 _DISPATCH_FAILURE_PREFIX = "continuous worker dispatch failed:"
-_FAILURE_NOISE_RE = re.compile(r"^(?:running as unit|invocation id|scope)[:\s]", re.IGNORECASE)
+# Strips just the noise substring (unit name / invocation id), not the whole
+# segment — systemd wraps these with no separator before the real error text
+# (e.g. "invocation ID: <hex> ActionRequiredError: ..."), so matching the
+# segment *prefix* and discarding the entire segment used to throw away real
+# error content along with the noise.
+_FAILURE_NOISE_STRIP_RE = re.compile(
+    r"(?:running as unit:\s*\S+|invocation id:\s*[0-9a-f-]{8,64}|^scope\b[:\s]*)",
+    re.IGNORECASE,
+)
 _RUNTIME_AUTH_MARKERS = (
     "not signed in",
     "cursor agent login",
@@ -29,19 +37,33 @@ _RUNTIME_AUTH_MARKERS = (
 )
 
 
+def _strip_failure_noise(text: str) -> str:
+    return " ".join(_FAILURE_NOISE_STRIP_RE.sub(" ", text).split())
+
+
 def _pick_primary_failure_cause(inner: str) -> str:
+    raw = str(inner or "")
+    # Cursor unpaid-invoice dumps use newlines between systemd noise and
+    # ActionRequiredError; also split on ';' for older semicolon-joined wrappers.
     parts = [
-        " ".join(part.split()).strip()
-        for part in str(inner or "").split(";")
-        if " ".join(part.split()).strip()
+        _strip_failure_noise(part)
+        for part in re.split(r"[;\n]+", raw)
     ]
-    parts = [part for part in parts if not _FAILURE_NOISE_RE.search(part)]
+    parts = [part for part in parts if part]
     if not parts:
-        return " ".join(str(inner or "").split()).strip()
+        # Genuinely nothing but noise segments — still strip them rather than
+        # falling back to the raw, unfiltered wrapper text.
+        return _strip_failure_noise(raw) or " ".join(raw.split()).strip()
 
     def rank(part: str) -> int:
         lowered = part.lower()
-        if "actionrequirederror" in lowered or "out of usage" in lowered or "increase limits" in lowered:
+        if (
+            "unpaid invoice" in lowered
+            or "pay your invoice" in lowered
+            or "actionrequirederror" in lowered
+            or "out of usage" in lowered
+            or "increase limits" in lowered
+        ):
             return 0
         if any(marker in lowered for marker in _RUNTIME_AUTH_MARKERS):
             return 1
@@ -86,10 +108,49 @@ def is_usage_limit_failure(detail: str | None) -> bool:
     return matched
 
 
+def is_billing_block_failure(detail: str | None) -> bool:
+    """True when Cursor blocked the agent runtime for an unpaid invoice / Stripe hold.
+
+    Distinct from usage limits: the account may still show Auto headroom, but
+    agent requests fail immediately until the invoice is paid in the dashboard.
+    """
+    hay = f"{detail or ''} {normalize_operator_failure_detail(detail)}".lower()
+    return (
+        "unpaid invoice" in hay
+        or "pay your invoice" in hay
+        or ("invoice" in hay and "stripe" in hay and "resume requests" in hay)
+    )
+
+
 def is_runtime_auth_failure(detail: str | None) -> bool:
     """True when the agent runtime could not authenticate (CLI login, vault, or auth probe)."""
     hay = f"{detail or ''} {normalize_operator_failure_detail(detail)}".lower()
     return any(marker in hay for marker in _RUNTIME_AUTH_MARKERS)
+
+
+_BILLING_FAILURE_MARKERS = (
+    "credit balance is too low",
+    "unpaid invoice",
+    "pay your invoice",
+    "insufficient credit",
+    "insufficient funds",
+    "payment required",
+    "billing issue",
+    "billing error",
+)
+
+
+def is_billing_failure(detail: str | None) -> bool:
+    """True when the runtime rejected the request for a billing/credits reason.
+
+    Distinct from is_usage_limit_failure: usage limits reset on their own and
+    are worth soft-open probing (see scheduler_auto_start_gates); a billing
+    block needs the account fixed, so retrying every scheduler tick just
+    burns time re-hitting the same wall. Not something the CLI auth probes
+    catch either (the CLI is authenticated — the account is broke).
+    """
+    hay = f"{detail or ''} {normalize_operator_failure_detail(detail)}".lower()
+    return any(marker in hay for marker in _BILLING_FAILURE_MARKERS)
 
 
 _RESTART_INTERRUPT_MARKERS = (

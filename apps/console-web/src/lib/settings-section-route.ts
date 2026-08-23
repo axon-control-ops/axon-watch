@@ -1,12 +1,13 @@
 import { appSurfacePath, normalizeAppPath } from './app-surface-route';
 
-export type SettingsSection = 'voice' | 'agents' | 'runtime' | 'email' | 'app';
+export type SettingsSection = 'voice' | 'agents' | 'runtime' | 'email' | 'constitution' | 'app';
 
 const SETTINGS_SECTIONS = new Set<SettingsSection>([
   'voice',
   'agents',
   'runtime',
   'email',
+  'constitution',
   'app',
 ]);
 

@@ -1,4 +1,4 @@
-import type { Ref } from 'vue';
+import { onScopeDispose, type Ref } from 'vue';
 
 import { acknowledgeInboxSignals, fetchInbox } from '../../../api/inbox-api';
 import type { InboxItem, OperatorBriefing, SignalView } from '../../../contracts/canonical';
@@ -7,6 +7,7 @@ import {
   canVerifyDismissHandoffSignal,
   writePendingHandoffDismissSignalId,
 } from '../../../lib/signal-handoff-dismiss';
+import { COMPANY_REFRESH_MS } from '../../../lib/ui-refresh-guardrails';
 import type { InboxLoadState } from '../types';
 
 interface CreateInboxSignalsSliceInput {
@@ -25,12 +26,22 @@ interface CreateInboxSignalsSliceInput {
 
 export function createInboxSignalsSlice(input: CreateInboxSignalsSliceInput) {
   let inflightInbox: Promise<void> | null = null;
+  let inflightForceInbox: Promise<void> | null = null;
+  let refreshTimer: ReturnType<typeof setInterval> | null = null;
 
-  async function loadInbox(options?: { background?: boolean }): Promise<void> {
+  async function loadInbox(options?: { background?: boolean; force?: boolean }): Promise<void> {
     const hasCached = input.inboxLoadState.value === 'loaded';
     const background = options?.background === true || hasCached;
+    const force = options?.force === true;
 
-    if (inflightInbox) {
+    // A forced refresh (operator clicked "Refresh") must reach real IMAP, so
+    // it gets its own single-flight lane rather than joining/being skipped by
+    // whatever passive background poll happens to be in flight already.
+    if (force) {
+      if (inflightForceInbox) {
+        return inflightForceInbox;
+      }
+    } else if (inflightInbox) {
       return inflightInbox;
     }
 
@@ -39,9 +50,9 @@ export function createInboxSignalsSlice(input: CreateInboxSignalsSliceInput) {
       input.inboxError.value = null;
     }
 
-    inflightInbox = (async () => {
+    const request = (async () => {
       try {
-        const inbox = await fetchInbox();
+        const inbox = await fetchInbox({ force });
         input.inboxItems.value = inbox.items;
         input.signalViews.value = inbox.items;
         input.inboxLoadState.value = 'loaded';
@@ -52,11 +63,20 @@ export function createInboxSignalsSlice(input: CreateInboxSignalsSliceInput) {
           input.inboxError.value = error instanceof Error ? error.message : 'inbox request failed';
         }
       } finally {
-        inflightInbox = null;
+        if (force) {
+          inflightForceInbox = null;
+        } else {
+          inflightInbox = null;
+        }
       }
     })();
 
-    return inflightInbox;
+    if (force) {
+      inflightForceInbox = request;
+    } else {
+      inflightInbox = request;
+    }
+    return request;
   }
 
   async function dismissInboxSignalIds(signalIds: string[]): Promise<void> {
@@ -138,6 +158,21 @@ export function createInboxSignalsSlice(input: CreateInboxSignalsSliceInput) {
       input.signalClearState.value = 'idle';
     }
   }
+
+  // Fleet-wide, not workspace-scoped, so it just runs for the store's whole
+  // lifetime rather than watching a workspace switch. Without this, a tab
+  // left open shows whatever inbox snapshot loaded at mount forever -- stale
+  // suggested-reply text and stale "unread" counts included -- until the
+  // operator happens to hit the manual Refresh button or reload the page.
+  refreshTimer = setInterval(() => {
+    void loadInbox({ background: true });
+  }, COMPANY_REFRESH_MS);
+  onScopeDispose(() => {
+    if (refreshTimer !== null) {
+      clearInterval(refreshTimer);
+      refreshTimer = null;
+    }
+  });
 
   return {
     loadInbox,

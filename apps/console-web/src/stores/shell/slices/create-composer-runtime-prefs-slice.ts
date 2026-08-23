@@ -1,15 +1,24 @@
 import { computed, type ComputedRef, type Ref } from 'vue';
 
 import type {
+  ClaudeRuntimeStatusSnapshot,
+  CodexRuntimeStatusSnapshot,
   CursorRuntimeStatusSnapshot,
   RuntimeStatusSnapshot,
 } from '../../../api/control-plane';
+import {
+  buildClaudeCatalogRows,
+  claudeRuntimeLabel,
+  resolveClaudeModel,
+  type ClaudeCatalogRow,
+} from '../../../lib/claude-catalog-view';
 import {
   buildCursorCatalogRows,
   cursorComposerRuntimeLabel,
   resolveCursorComposerModel,
   type CursorCatalogRow,
 } from '../../../lib/cursor-catalog-view';
+import { buildCodexCatalogRows, codexModelLabel } from '../../../lib/codex-catalog-view';
 import {
   readComposerRuntimePrefs,
   writeComposerRuntimePrefs,
@@ -18,13 +27,16 @@ import {
   readCursorPickerVisibleModelIds,
   toggleCursorPickerVisibleModel as toggleCursorPickerVisibleModelPref,
 } from '../../../lib/cursor-picker-prefs';
-import { saveWorkspaceComposerPrefs } from '../../../api/workspace-api';
 import type { WorkspaceRecord } from '../../../contracts/canonical';
 
 interface CreateComposerRuntimePrefsSliceInput {
   currentWorkspace: Ref<WorkspaceRecord | null>;
+  /** Active IDE conversation tab — model/runtime prefs are isolated per thread. */
+  activeIdeThreadId: Ref<string | null> | ComputedRef<string | null>;
   runtimeStatus: Ref<RuntimeStatusSnapshot | null>;
   cursorRuntimeStatus: Ref<CursorRuntimeStatusSnapshot | null>;
+  claudeRuntimeStatus: Ref<ClaudeRuntimeStatusSnapshot | null>;
+  codexRuntimeStatus: Ref<CodexRuntimeStatusSnapshot | null>;
   composerRuntimePrefsRevision: Ref<number>;
   cursorPickerVisibleRevision: Ref<number>;
 }
@@ -32,7 +44,10 @@ interface CreateComposerRuntimePrefsSliceInput {
 export function createComposerRuntimePrefsSlice(input: CreateComposerRuntimePrefsSliceInput) {
   const composerRuntimePrefs = computed(() => {
     input.composerRuntimePrefsRevision.value;
-    return readComposerRuntimePrefs(input.currentWorkspace.value?.workspace_id ?? null);
+    return readComposerRuntimePrefs(
+      input.currentWorkspace.value?.workspace_id ?? null,
+      input.activeIdeThreadId.value,
+    );
   });
 
   const selectedRuntimeTargetId = computed(() => {
@@ -45,6 +60,13 @@ export function createComposerRuntimePrefsSlice(input: CreateComposerRuntimePref
 
   const cursorCatalogRows: ComputedRef<CursorCatalogRow[]> = computed(() =>
     buildCursorCatalogRows(input.cursorRuntimeStatus.value),
+  );
+  const codexCatalogRows: ComputedRef<CursorCatalogRow[]> = computed(() =>
+    buildCodexCatalogRows(input.codexRuntimeStatus.value),
+  );
+
+  const claudeCatalogRows: ComputedRef<ClaudeCatalogRow[]> = computed(() =>
+    buildClaudeCatalogRows(input.claudeRuntimeStatus.value),
   );
 
   const selectedComposerModel = computed(() => {
@@ -60,10 +82,18 @@ export function createComposerRuntimePrefsSlice(input: CreateComposerRuntimePref
     ].find((record) => record.id === target);
     const family = targetRecord?.family ?? 'cursor';
     if (family === 'codex') {
-      return prefs.codex_cli_model?.trim() || 'auto';
+      const stored = prefs.codex_cli_model?.trim();
+      if (stored && stored !== 'auto') {
+        return stored;
+      }
+      return codexCatalogRows.value.find((row) => row.available)?.id ?? '';
     }
     if (family === 'claude') {
-      return prefs.claude_cli_model?.trim() || 'auto';
+      const stored = prefs.claude_cli_model?.trim();
+      if (!stored || stored === 'auto') {
+        return stored || 'auto';
+      }
+      return resolveClaudeModel(stored, claudeCatalogRows.value);
     }
     const stored = prefs.cursor_cli_model?.trim();
     if (!stored || stored === 'auto') {
@@ -82,19 +112,27 @@ export function createComposerRuntimePrefsSlice(input: CreateComposerRuntimePref
       ...(input.runtimeStatus.value?.local ?? []),
       ...(input.runtimeStatus.value?.cloud ?? []),
     ].find((record) => record.id === selectedRuntimeTargetId.value);
-    const scope = target?.target_type === 'cloud' ? 'cloud' : 'local';
     const family = target?.family ?? 'runtime';
     if (family === 'cursor') {
       return cursorComposerRuntimeLabel({
-        family,
-        scope,
+        family: target?.label || 'Cursor',
+        scope: target?.target_type === 'cloud' ? 'cloud' : '',
         modelId: selectedComposerModel.value,
         rows: cursorCatalogRows.value,
       });
     }
+    if (family === 'claude') {
+      return claudeRuntimeLabel({
+        family,
+        modelId: selectedComposerModel.value,
+        rows: claudeCatalogRows.value,
+      });
+    }
     const model = selectedComposerModel.value;
-    const modelLabel = model === 'auto' ? 'Auto' : model;
-    return `${family} ${scope} · ${modelLabel}`;
+    const modelLabel = family === 'codex'
+      ? codexModelLabel(model, codexCatalogRows.value)
+      : model === 'auto' ? 'Auto' : model;
+    return `${target?.label || family} · ${modelLabel}`;
   });
 
   function setSelectedRuntimeTarget(runtimeTarget: string): void {
@@ -102,8 +140,11 @@ export function createComposerRuntimePrefsSlice(input: CreateComposerRuntimePref
     if (!workspaceId) {
       return;
     }
-    writeComposerRuntimePrefs(workspaceId, { runtime_target: runtimeTarget });
+    const threadId = input.activeIdeThreadId.value;
+    writeComposerRuntimePrefs(workspaceId, { runtime_target: runtimeTarget }, threadId);
     input.composerRuntimePrefsRevision.value += 1;
+    // Interactive PC selection is thread-local. Fleet/headless runtime policy
+    // is configured independently in Workspace Runtime Policy.
   }
 
   function setSelectedComposerModel(modelId: string): void {
@@ -111,6 +152,7 @@ export function createComposerRuntimePrefsSlice(input: CreateComposerRuntimePref
     if (!workspaceId) {
       return;
     }
+    const threadId = input.activeIdeThreadId.value;
     const target = selectedRuntimeTargetId.value;
     const targetRecord = [
       ...(input.runtimeStatus.value?.local ?? []),
@@ -119,15 +161,15 @@ export function createComposerRuntimePrefsSlice(input: CreateComposerRuntimePref
     const family = targetRecord?.family ?? 'cursor';
     const normalized = modelId.trim() || 'auto';
     if (family === 'codex') {
-      writeComposerRuntimePrefs(workspaceId, { codex_cli_model: normalized });
-    } else if (family === 'claude') {
-      writeComposerRuntimePrefs(workspaceId, { claude_cli_model: normalized });
-    } else {
-      writeComposerRuntimePrefs(workspaceId, { cursor_cli_model: normalized });
-      // Server-side pin so continuous workers honor Auto/Composer vs explicit API.
-      void saveWorkspaceComposerPrefs(workspaceId, { cursor_cli_model: normalized }).catch(
-        () => undefined,
+      writeComposerRuntimePrefs(
+        workspaceId,
+        { codex_cli_model: normalized === 'auto' ? '' : normalized },
+        threadId,
       );
+    } else if (family === 'claude') {
+      writeComposerRuntimePrefs(workspaceId, { claude_cli_model: normalized }, threadId);
+    } else {
+      writeComposerRuntimePrefs(workspaceId, { cursor_cli_model: normalized }, threadId);
     }
     input.composerRuntimePrefsRevision.value += 1;
   }
@@ -142,6 +184,8 @@ export function createComposerRuntimePrefsSlice(input: CreateComposerRuntimePref
     selectedRuntimeTargetId,
     selectedComposerModel,
     cursorCatalogRows,
+    claudeCatalogRows,
+    codexCatalogRows,
     cursorPickerVisibleModelIds,
     composerRuntimeLabel,
     setSelectedRuntimeTarget,

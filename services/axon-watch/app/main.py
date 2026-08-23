@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from contextlib import asynccontextmanager
 import os
 import threading
 from pathlib import Path
@@ -17,15 +18,17 @@ from app.delivery.store import delivery_summary, list_receipts
 from app.events.store import list_events
 from app.events.stream import watch_events_stream_response
 from app.internal_auth import InternalServiceTokenMiddleware
+from app.signals.email_folders import fetch_role_messages, list_account_folders
+from app.signals.email_imap_poll import load_operator_email_projection
 from app.signals.inbox_assembly import include_summary_degraded_signal
 from app.signals.store import get_inbox_snapshot
 from app.tunnel.tunnel_control import (
     TunnelControlError,
-    attempt_tunnel_autostart,
     tunnel_start,
     tunnel_status,
     tunnel_stop,
 )
+from app.tunnel.tunnel_supervisor import start_tunnel_supervisor
 from app.vault.api import (
     VaultExportBody,
     VaultMonitorImportBody,
@@ -99,20 +102,11 @@ class SentryAttendBody(BaseModel):
     workspace_id: str = "workspace_dashpro"
 
 
-app = FastAPI(
-    title="Axon-X Watch Service",
-    version="0.1.0",
-    docs_url=None,
-    redoc_url=None,
-)
-app.add_middleware(InternalServiceTokenMiddleware)
-
-
-@app.on_event("startup")
 def vault_startup_auto_unlock() -> None:
-    # Vault first so named-tunnel tokens from unlock are available to autostart.
+    # Vault first so named-tunnel tokens from unlock are available to the supervisor.
     attempt_auto_unlock()
-    attempt_tunnel_autostart()
+    # Supervisor, not a one-shot start: cloudflared that dies later must come back.
+    start_tunnel_supervisor()
     # Warm connector/monitor caches off the request path so post-revive inbox
     # polls do not all stampede a cold Sentry/IMAP probe and 503 at the CP.
     def _warm_probe_caches() -> None:
@@ -131,6 +125,22 @@ def vault_startup_auto_unlock() -> None:
         name="axon-watch-probe-cache-warm",
         daemon=True,
     ).start()
+
+
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    vault_startup_auto_unlock()
+    yield
+
+
+app = FastAPI(
+    title="Axon-X Watch Service",
+    version="0.1.0",
+    docs_url=None,
+    redoc_url=None,
+    lifespan=lifespan,
+)
+app.add_middleware(InternalServiceTokenMiddleware)
 
 
 @app.get("/internal/watch/health")
@@ -240,8 +250,36 @@ def sentry_probe_write() -> dict[str, object]:
 
 
 @app.get("/internal/watch/inbox")
-def inbox() -> dict[str, object]:
-    return get_inbox_snapshot(connector_records=probe_all_connectors())
+def inbox(force: bool = False) -> dict[str, object]:
+    return get_inbox_snapshot(
+        connector_records=probe_all_connectors(),
+        force_email_refresh=force,
+    )
+
+
+def _find_account(account_id: str) -> dict[str, object] | None:
+    projection = load_operator_email_projection()
+    for account in projection.get("accounts") or []:
+        if isinstance(account, dict) and str(account.get("account_id") or "") == account_id:
+            return account
+    return None
+
+
+@app.get("/internal/watch/email/folders")
+def email_folders(account_id: str) -> dict[str, object]:
+    account = _find_account(account_id)
+    if account is None:
+        raise HTTPException(status_code=404, detail=f"unknown account_id: {account_id}")
+    return {"account_id": account_id, "folders": list_account_folders(account)}
+
+
+@app.get("/internal/watch/email/messages")
+def email_messages(account_id: str, role: str = "inbox", limit: int = 25) -> dict[str, object]:
+    account = _find_account(account_id)
+    if account is None:
+        raise HTTPException(status_code=404, detail=f"unknown account_id: {account_id}")
+    messages = fetch_role_messages(account, role, limit=limit)
+    return {"account_id": account_id, "role": role, "items": messages, "count": len(messages)}
 
 
 @app.get("/internal/watch/vault/status")

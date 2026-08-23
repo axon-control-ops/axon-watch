@@ -58,13 +58,11 @@ class ControlPlaneWorkspacesTests(unittest.TestCase):
     def test_workspaces_show_returns_known_workspace(self) -> None:
         response = self.client.get("/api/workspaces/workspace_alpha")
         self.assertEqual(200, response.status_code)
-        self.assertEqual(
-            {
-                "workspace_id": "workspace_alpha",
-                "connection_kind": "isolated_root",
-            },
-            response.json(),
-        )
+        body = response.json()
+        self.assertEqual("workspace_alpha", body["workspace_id"])
+        self.assertEqual("isolated_root", body["connection_kind"])
+        # workspace_alpha has no configured company (config/workspace-agents.json)
+        self.assertFalse(body["has_active_team"])
 
     def test_workspaces_show_returns_404_for_unknown_workspace(self) -> None:
         response = self.client.get("/api/workspaces/workspace_missing")

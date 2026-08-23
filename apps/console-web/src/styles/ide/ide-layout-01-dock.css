@@ -1,3 +1,29 @@
+.console-shell--mockup .left-sidebar-mockup--ide.left-sidebar-mockup--ide-team-full {
+  grid-template-rows: minmax(0, 1fr);
+}
+
+.console-shell--mockup .left-sidebar-mockup--ide.left-sidebar-mockup--ide-team-popup {
+  /* Talking card owns the bottom rail — give it room to scale with viewport. */
+  grid-template-rows: minmax(0, 1fr) clamp(14rem, 38vh, 34rem);
+}
+
+.ide-vaxon-talk-panel {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  height: 100%;
+}
+
+.console-shell--mockup .left-sidebar-mockup--ide.left-sidebar-mockup--ide-team-popup
+  .left-sidebar-mockup__status-anchor--ide {
+  padding: 0.45rem 0.35rem 0.35rem;
+}
+
+.console-shell--mockup .left-sidebar-mockup--ide.left-sidebar-mockup--ide-team-popup
+  .ide-kairo-panel-resize-handle {
+  display: none;
+}
+
 /* IDE left rail: upper panel (team/explorer) + resizable bottom agent card */
 .console-shell--mockup .left-sidebar-mockup--ide {
   display: grid !important;
