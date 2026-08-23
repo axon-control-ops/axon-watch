@@ -60,6 +60,31 @@ _GIT_POLICY_ROUTE_RE = re.compile(
 _ROOT_GITIGNORE_RE = re.compile(r"(?<![/\w.-])\.gitignore(?![\w.-])", re.I)
 _PROJECT_AXON_RE = re.compile(r"(?<![/\w.-])project\.axon\.yaml(?![\w.-])", re.I)
 _EXPORTS_GITIGNORE_RE = re.compile(r"(?<![\w.-])data/exports/\.gitignore(?![\w.-])", re.I)
+_AXON_X_MOBILE_COMPANION_RE = re.compile(
+    r"\b(?:axon[- ]?x\s+)?(?:mobile\s+(?:app|control[- ]?plane|companion)|"
+    r"console[- ]?mobile|companion\s+app|expo\s+native\s+(?:app|companion)|"
+    r"native\s+companion|apps/console-mobile|axon[- ]?x\s+companion)\b",
+    re.I,
+)
+_DASHPRO_MOBILE_HINT_RE = re.compile(
+    r"\b(?:dashpro|teacher|teachers|parent|parents|student|students|learner|learners|"
+    r"android\s+release|play\s+store|eas\s+update|ota)\b",
+    re.I,
+)
+AXON_X_MOBILE_COMPANION_PATHS = [
+    "apps/console-mobile",
+    "package.json",
+    "package-lock.json",
+    "README.md",
+]
+AXON_X_MOBILE_COMPANION_ACCEPTANCE = (
+    "Receipts prove Axon-X mobile companion readiness: "
+    "`npm run typecheck -w @axon-watch/console-mobile`; "
+    "`npm exec -w @axon-watch/console-mobile -- expo config --json`; "
+    "control-plane read probes for /api/health, /api/runtime/summary, "
+    "/api/briefing, /api/runs, and /api/inbox; and a note that physical phones "
+    "must use a LAN host or read-only tunnel instead of 127.0.0.1."
+)
 
 _ROLE_FOCUS: dict[str, str] = {
     "frontend": "UI/screen/component",
@@ -69,7 +94,8 @@ _ROLE_FOCUS: dict[str, str] = {
 }
 
 _IMPLEMENT_RE = re.compile(
-    r"\b(?:fix(?:es|ed|ing)?|wire|implement|build|repair|ship|patch|update|add|remove|migrate|improve|polish|revise|clarify)\b"
+    r"\b(?:fix(?:es|ed|ing)?|wire|implement|build|repair|ship|patch|update|add|remove|migrate|improve|polish|revise|clarify|scaffold|execute|apply|clear|clean\s*up|prune|upgrade)\b"
+    r"|\b(?:start|continue)\b.{0,48}\b(?:work(?:ing)?|implementation|build|scaffold)\b"
     r"|make\s+(?:it|this|that|the\s+(?:screen|flow|page|dashboard|copy|ux|ui))\s+make\s+sense",
     re.I,
 )
@@ -141,6 +167,69 @@ def detect_fan_out_intent(goal: str) -> bool:
 
 def detect_implement_intent(goal: str) -> bool:
     return bool(_IMPLEMENT_RE.search(goal or ""))
+
+
+def should_execute_lead_fast_path(composer_mode: str, goal: str) -> bool:
+    """Whether Lead should materialize tasks instead of returning a plan essay.
+
+    Agent mode remains executable. Plan mode becomes executable only for
+    concrete implementation language, which keeps review/planning questions
+    consultative while preventing "continue working/build/scaffold" handoffs
+    from stalling in a non-executing Lead reply.
+    """
+    mode = str(composer_mode or "").strip().lower()
+    if mode == "agent":
+        return True
+    if mode != "plan":
+        return False
+    if is_employee_shift_retry_request(goal):
+        return False
+    return detect_implement_intent(goal)
+
+
+def is_axon_x_mobile_companion_goal(goal: str, workspace_id: str | None = None) -> bool:
+    """True when a mobile-app phrase means this repo's Axon-X Expo companion."""
+    workspace = str(workspace_id or "").strip()
+    if workspace and workspace != "workspace_axon_watch":
+        return False
+    text = str(goal or "").strip()
+    if not text:
+        return False
+    if "apps/console-mobile" in text.lower():
+        return True
+    if _DASHPRO_MOBILE_HINT_RE.search(text):
+        return False
+    return bool(_AXON_X_MOBILE_COMPANION_RE.search(text))
+
+
+def axon_x_mobile_companion_goal(goal: str) -> str:
+    cleaned = " ".join(str(goal or "").split()).strip()
+    suffix = f" Operator ask: {cleaned}" if cleaned else ""
+    return (
+        "Axon-X mobile companion: work only on the Expo native companion in "
+        "`apps/console-mobile` for `workspace_axon_watch`. Do not route this to "
+        "DashPro, Priya/Dana, or the responsive web mobile viewport. Keep it "
+        "read-only unless the operator explicitly approves phone-side mutations. "
+        "Required acceptance: typecheck the mobile workspace, validate Expo "
+        "config, prove the five read-only control-plane endpoints answer, and "
+        "document the phone connectivity rule (`127.0.0.1` is host/simulator "
+        "only; physical devices need LAN IP or a read-only tunnel)."
+        f"{suffix}"
+    )
+
+
+def axon_x_mobile_companion_item(goal: str) -> LeadTaskPlanItem:
+    normalized = axon_x_mobile_companion_goal(goal)
+    return LeadTaskPlanItem(
+        plan_key="plan-01-frontend",
+        goal=normalized,
+        owner_role="frontend",
+        acceptance_criteria=AXON_X_MOBILE_COMPANION_ACCEPTANCE,
+        dependencies=[],
+        risk="normal",
+        exclusive_paths=list(AXON_X_MOBILE_COMPANION_PATHS),
+        allowed_paths=list(AXON_X_MOBILE_COMPANION_PATHS),
+    )
 
 
 def extract_exclusive_paths(text: str) -> list[str]:
@@ -431,6 +520,7 @@ def build_lead_task_plan(
     goal: str,
     roster: list[LeadPlanRosterMember] | list[dict[str, Any]],
     mode: PlanMode = "auto",
+    workspace_id: str | None = None,
 ) -> LeadTaskPlan:
     cleaned_goal = " ".join((goal or "").split()).strip()
     if not cleaned_goal:
@@ -438,6 +528,18 @@ def build_lead_task_plan(
 
     members = normalize_roster(roster)
     specialists = available_specialists(members)
+    if (
+        is_axon_x_mobile_companion_goal(cleaned_goal, workspace_id)
+        and any(member.role == "frontend" for member in specialists)
+    ):
+        item = axon_x_mobile_companion_item(cleaned_goal)
+        return LeadTaskPlan(
+            goal=item.goal,
+            mode="fan_out" if mode == "fan_out" else "decompose",
+            items=[item],
+            ordered_keys=[item.plan_key],
+            ambiguous=False,
+        )
     resolved_mode: PlanMode = mode
     if mode == "auto":
         resolved_mode = "fan_out" if detect_fan_out_intent(cleaned_goal) else "decompose"
@@ -466,11 +568,24 @@ def fallback_single_owner_plan(
     *,
     goal: str,
     roster: list[LeadPlanRosterMember] | list[dict[str, Any]],
+    workspace_id: str | None = None,
 ) -> LeadTaskPlan:
     """Fail-open single specialist when decompose/model yields nothing usable."""
     cleaned_goal = " ".join((goal or "").split()).strip()
     members = normalize_roster(roster)
     specialists = available_specialists(members)
+    if (
+        is_axon_x_mobile_companion_goal(cleaned_goal, workspace_id)
+        and any(member.role == "frontend" for member in specialists)
+    ):
+        item = axon_x_mobile_companion_item(cleaned_goal)
+        return LeadTaskPlan(
+            goal=item.goal,
+            mode="decompose",
+            items=[item],
+            ordered_keys=[item.plan_key],
+            ambiguous=False,
+        )
     owner = _best_owner_role(cleaned_goal, specialists)
     scoped = extract_exclusive_paths(cleaned_goal)
     item = LeadTaskPlanItem(
@@ -502,6 +617,8 @@ def should_lead_decompose_dispatch(plan: LeadTaskPlan) -> bool:
         return False
     if len(plan.items) >= 2:
         return True
+    if is_axon_x_mobile_companion_goal(plan.goal):
+        return True
     return detect_implement_intent(plan.goal) or detect_specialist_query_intent(plan.goal)
 
 
@@ -516,10 +633,14 @@ __all__ = [
     "extract_exclusive_paths",
     "fallback_single_owner_plan",
     "is_employee_shift_retry_request",
+    "should_execute_lead_fast_path",
     "should_lead_decompose_dispatch",
     # Shared with lead_plan_model (stable helpers).
     "acceptance_for",
+    "axon_x_mobile_companion_goal",
+    "axon_x_mobile_companion_item",
     "available_specialists",
+    "is_axon_x_mobile_companion_goal",
     "normalize_roster",
     "serialize_overlapping_paths",
     "topo_order",

@@ -36,6 +36,34 @@ class LeadDispatchMechanismTests(unittest.TestCase):
             with self.subTest(role=role):
                 self.assertNotIn("axon-assign", self._prompt(role))
 
+    def test_axon_x_mobile_companion_prompt_forbids_root_dev_command(self) -> None:
+        from app.workspace_agents.config_loader import EmployeeConfig
+        from app.workspace_agents.worker_prompt import build_continuous_worker_prompt
+
+        prompt = build_continuous_worker_prompt(
+            workspace_id="workspace_axon_watch",
+            employee=EmployeeConfig(name="Jules", role="frontend", owns="console UI"),
+            task={
+                "task_id": "task-mobile",
+                "goal": (
+                    "Axon-X mobile companion: work only on the Expo native companion "
+                    "in `apps/console-mobile` for `workspace_axon_watch`."
+                ),
+                "acceptance_criteria": (
+                    "Receipts prove Axon-X mobile companion readiness: "
+                    "`npm run typecheck -w @axon-watch/console-mobile`; "
+                    "`npm exec -w @axon-watch/console-mobile -- expo config --json`."
+                ),
+                "allowed_paths": ["apps/console-mobile", "package.json", "package-lock.json", "README.md"],
+                "exclusive_paths": ["apps/console-mobile"],
+            },
+        )
+
+        self.assertIn("Never run root `npm run dev`", prompt)
+        self.assertIn("interpret that as `npm run dev:console-mobile`", prompt)
+        self.assertIn("apps/console-mobile", prompt)
+        self.assertIn("127.0.0.1", prompt)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -105,6 +105,14 @@ class CommandExecutorTests(unittest.TestCase):
         self.assertFalse(result.success)
         self.assertIn("workspace_dashpro", result.output)
 
+    def test_axon_watch_root_dev_command_points_to_mobile_companion_script(self) -> None:
+        result = execute_command(workspace_id="workspace_axon_watch", content="run npm run dev")
+
+        self.assertFalse(result.success)
+        self.assertEqual("shell_command", result.intent)
+        self.assertIn("not the Expo mobile companion", result.output)
+        self.assertIn("run npm run dev:console-mobile", result.output)
+
     def test_dashpro_ota_shortcut_dispatches_canary_command(self) -> None:
         with patch(
             "app.chat.command_executor.execute_shell_command",

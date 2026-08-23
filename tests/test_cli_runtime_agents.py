@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import json
+import subprocess
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import patch
@@ -25,6 +27,31 @@ def _stream_json_stdout(text: str) -> str:
         '[{"type":"text","text":"' + text + '"}]},"session_id":"s1"}\n'
         '{"type":"result","subtype":"success","is_error":false,"result":"' + text + '"}\n'
     )
+
+
+def _git_workspace() -> tempfile.TemporaryDirectory[str]:
+    temp = tempfile.TemporaryDirectory()
+    root = Path(temp.name)
+    subprocess.run(["git", "init"], cwd=root, check=True, capture_output=True, text=True)
+    (root / "README.md").write_text("old\n", encoding="utf-8")
+    subprocess.run(["git", "add", "README.md"], cwd=root, check=True, capture_output=True, text=True)
+    subprocess.run(
+        [
+            "git",
+            "-c",
+            "user.name=Axon Test",
+            "-c",
+            "user.email=axon-test@example.test",
+            "commit",
+            "-m",
+            "baseline",
+        ],
+        cwd=root,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    return temp
 
 
 class CliRuntimeAgentTests(unittest.TestCase):
@@ -208,6 +235,72 @@ class CliRuntimeAgentTests(unittest.TestCase):
         self.assertIn("+new", transcript)
         self.assertTrue(transcript.endswith("Done."))
 
+    def test_codex_derives_diff_for_path_only_file_change(self) -> None:
+        with _git_workspace() as workspace:
+            root = Path(workspace)
+            created = root / "src/new-card.ts"
+            created.parent.mkdir(parents=True, exist_ok=True)
+            created.write_text("one\ntwo\n", encoding="utf-8")
+            stream = "\n".join(
+                [
+                    json.dumps(
+                        {
+                            "type": "item.completed",
+                            "item": {
+                                "type": "file_change",
+                                "path": str(created),
+                            },
+                        }
+                    ),
+                    json.dumps(
+                        {
+                            "type": "item.completed",
+                            "item": {"type": "agent_message", "text": "Done."},
+                        }
+                    ),
+                ]
+            )
+            transcript = _extract_codex_text(stream, root)
+        self.assertIn(":::edit src/new-card.ts +2 -0", transcript)
+        self.assertIn("--- /dev/null", transcript)
+        self.assertIn("+one", transcript)
+        self.assertTrue(transcript.endswith("Done."))
+
+    def test_codex_derives_diff_for_path_only_modified_file_change(self) -> None:
+        with _git_workspace() as workspace:
+            root = Path(workspace)
+            readme = root / "README.md"
+            readme.write_text("new\n", encoding="utf-8")
+            stream = json.dumps(
+                {
+                    "type": "item.completed",
+                    "item": {
+                        "type": "file_change",
+                        "changes": [{"path": "README.md"}],
+                    },
+                }
+            )
+            transcript = _extract_codex_text(stream, root)
+        self.assertIn(":::edit README.md +1 -1", transcript)
+        self.assertIn("-old", transcript)
+        self.assertIn("+new", transcript)
+
+    def test_codex_does_not_render_path_only_unchanged_file_as_checked_edit(self) -> None:
+        with _git_workspace() as workspace:
+            root = Path(workspace)
+            stream = json.dumps(
+                {
+                    "type": "item.completed",
+                    "item": {
+                        "type": "file_change",
+                        "changes": [{"path": "README.md"}],
+                    },
+                }
+            )
+            transcript = _extract_codex_text(stream, root)
+        self.assertNotIn(":::edit README.md +0 -0", transcript)
+        self.assertIn(":::tool File change", transcript)
+
     def test_codex_shows_an_open_terminal_card_while_command_is_running(self) -> None:
         stream = (
             '{"type":"item.started","item":{"id":"cmd-1","type":"command_execution",'
@@ -297,6 +390,61 @@ class CliRuntimeAgentTests(unittest.TestCase):
         self.assertIn("PASS", transcript)
         self.assertIn(":::edit src/card.ts +1 -1", transcript)
         self.assertTrue(transcript.endswith("Done."))
+
+    def test_claude_write_edit_block_contains_empty_old_hunk_for_created_file_label(self) -> None:
+        stream = "\n".join([
+            json.dumps({"type": "assistant", "message": {"content": [
+                {"type": "tool_use", "id": "write-1", "name": "Write", "input": {"file_path": "/tmp/ws/src/new-card.ts", "content": "one\ntwo\n"}},
+            ]}}),
+            json.dumps({"type": "result", "is_error": False, "result": "Done."}),
+        ])
+        transcript, error = _extract_claude_text(stream, Path("/tmp/ws"))
+        self.assertEqual("", error)
+        self.assertIn(":::edit src/new-card.ts +2 -0", transcript)
+        self.assertIn("@@ -0,0 +1,2 @@", transcript)
+
+    def test_claude_multiedit_renders_as_edit_block(self) -> None:
+        stream = "\n".join([
+            json.dumps({"type": "assistant", "message": {"content": [
+                {
+                    "type": "tool_use",
+                    "id": "multi-1",
+                    "name": "MultiEdit",
+                    "input": {
+                        "file_path": "/tmp/ws/src/card.ts",
+                        "edits": [
+                            {"old_string": "old title", "new_string": "new title"},
+                            {"old_string": "old body", "new_string": "new body"},
+                        ],
+                    },
+                },
+            ]}}),
+            json.dumps({"type": "result", "is_error": False, "result": "Done."}),
+        ])
+        transcript, error = _extract_claude_text(stream, Path("/tmp/ws"))
+        self.assertEqual("", error)
+        self.assertIn(":::edit src/card.ts +2 -2", transcript)
+        self.assertIn("-old title", transcript)
+        self.assertIn("+new body", transcript)
+
+    def test_claude_collapses_a_glued_duplicate_final_reply(self) -> None:
+        """Regression: a watcher's "blocked on evidence" sentence was rendered
+        twice back-to-back with no separator ("...precise plan.I'm blocked...").
+        The Cursor stream path already collapses this via collapse_echo_text;
+        the Claude path built final_text with no equivalent guard."""
+        sentence = (
+            "I'm blocked on evidence: this checkout does not contain any file "
+            "mentioning run_ae244d217fb4, acceptance_evidence, diff_budget, or "
+            "review_ready/complete, so I need one authoritative pointer to "
+            "continue with a precise plan."
+        )
+        glued = sentence + sentence
+        stream = "\n".join([
+            json.dumps({"type": "result", "is_error": False, "result": glued}),
+        ])
+        transcript, error = _extract_claude_text(stream, Path("/tmp/ws"))
+        self.assertEqual("", error)
+        self.assertEqual(1, transcript.count("I'm blocked on evidence"))
 
     @patch("app.cli_runtime.claude_agent.communicate_registered_process")
     def test_claude_timeout_is_normalized_to_runtime_error(self, mock_communicate) -> None:

@@ -138,6 +138,112 @@ class AgentSandboxTests(unittest.TestCase):
         self.assertNotIn(str(workspace_wrapper), source)
         self.assertNotIn("compromised", source)
 
+    def test_axon_assign_is_materialized_not_proxied_to_an_unmounted_path(self) -> None:
+        """axon-assign is installed via a ~/.local/bin symlink back into the
+        live repo checkout (bin/axon-assign -> .../axon-watch/bin/axon-assign),
+        a path that lives outside both $HOME and the sandboxed workspace and
+        is never bind-mounted. Resolving it through PATH like an ordinary
+        trusted wrapper leaves a dangling symlink inside Bubblewrap, and the
+        Lead's shell reports "axon-assign: not found" despite the wrapper
+        being genuinely installed on the host. It must be materialized from
+        the control-plane package instead, exactly like axon-agent-terminal-job.
+        """
+        outside_home_target = self.temp_root / "repo-checkout" / "bin" / "axon-assign"
+        outside_home_target.parent.mkdir(parents=True)
+        outside_home_target.write_text("#!/bin/sh\necho should-not-be-used\n", encoding="utf-8")
+        outside_home_target.chmod(0o755)
+        policy = self._policy(approved_wrappers=("axon-assign",))
+
+        with patch(
+            "app.cli_runtime.agent_sandbox.shutil.which",
+            return_value=str(outside_home_target),
+        ):
+            material = self._material(policy)
+
+        wrapper = material.root / "bin" / "axon-assign"
+        self.assertTrue(wrapper.is_file())
+        self.assertEqual(0o555, stat.S_IMODE(wrapper.stat().st_mode))
+        source = wrapper.read_text(encoding="utf-8")
+        # Not a proxy pointing at the (unmounted) resolved PATH target.
+        self.assertNotIn(str(outside_home_target), source)
+        self.assertNotIn("should-not-be-used", source)
+        # It is the real, self-contained fan-out client.
+        self.assertIn("lead/fan-out", source)
+        self.assertTrue(source.startswith("#!/usr/bin/env bash"))
+
+        command = build_bwrap_command(
+            ["axon-assign", "--workspace", "w", "--", "goal"],
+            policy=policy,
+            workspace_root=self.workspace,
+            hook_material=material,
+            bwrap_path="/usr/bin/bwrap",
+            user_home=self.home,
+        )
+        # /run/axon-agent-policy/bin (where the materialized wrapper lives) is
+        # first on PATH, so `axon-assign` resolves there instead of a dangling
+        # ~/.local/bin symlink.
+        path_index = command.index("PATH")
+        self.assertTrue(command[path_index + 1].startswith("/run/axon-agent-policy/bin:"))
+        # The unmounted external target must never be bind-mounted in either.
+        self.assertNotIn(str(outside_home_target), command)
+
+    def test_axon_runlog_is_materialized_and_curls_the_run_history_api(self) -> None:
+        policy = self._policy(approved_wrappers=("axon-runlog",))
+        material = self._material(policy)
+
+        wrapper = material.root / "bin" / "axon-runlog"
+        self.assertTrue(wrapper.is_file())
+        self.assertEqual(0o555, stat.S_IMODE(wrapper.stat().st_mode))
+        source = wrapper.read_text(encoding="utf-8")
+        self.assertIn("/api/runs/", source)
+        self.assertIn("/history", source)
+        self.assertTrue(source.startswith("#!/usr/bin/env bash"))
+
+        command = build_bwrap_command(
+            ["axon-runlog", "run_abc123"],
+            policy=policy,
+            workspace_root=self.workspace,
+            hook_material=material,
+            bwrap_path="/usr/bin/bwrap",
+            user_home=self.home,
+        )
+        path_index = command.index("PATH")
+        self.assertTrue(command[path_index + 1].startswith("/run/axon-agent-policy/bin:"))
+
+    def test_axonhealth_is_materialized_not_resolved_from_workspace(self) -> None:
+        workspace_wrapper = self.workspace / "bin" / "axonhealth"
+        workspace_wrapper.parent.mkdir(exist_ok=True)
+        workspace_wrapper.write_text("#!/bin/sh\necho compromised\n", encoding="utf-8")
+        workspace_wrapper.chmod(0o755)
+        policy = self._policy(approved_wrappers=("axonhealth",))
+
+        with patch(
+            "app.cli_runtime.agent_sandbox.shutil.which",
+            return_value=str(workspace_wrapper),
+        ):
+            material = self._material(policy)
+
+        wrapper = material.root / "bin" / "axonhealth"
+        self.assertTrue(wrapper.is_file())
+        self.assertEqual(0o555, stat.S_IMODE(wrapper.stat().st_mode))
+        source = wrapper.read_text(encoding="utf-8")
+        self.assertNotIn(str(workspace_wrapper), source)
+        self.assertNotIn("compromised", source)
+        self.assertIn("Axon-X sandbox health", source)
+        self.assertIn("AXON_WATCH_CONTROL_PLANE_PORT", source)
+
+        command = build_bwrap_command(
+            ["axonhealth"],
+            policy=policy,
+            workspace_root=self.workspace,
+            hook_material=material,
+            bwrap_path="/usr/bin/bwrap",
+            user_home=self.home,
+        )
+        path_index = command.index("PATH")
+        self.assertTrue(command[path_index + 1].startswith("/run/axon-agent-policy/bin:"))
+        self.assertNotIn(str(workspace_wrapper), command)
+
     def test_workspace_agents_scratch_is_private_and_mountable(self) -> None:
         material = self._material()
         command = build_bwrap_command(

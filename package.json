@@ -21,6 +21,7 @@
     "dev:console-web": "npm run dev -w @axon-watch/console-web -- --host 127.0.0.1 --port ${AXON_WATCH_CONSOLE_WEB_PORT:-4173} --strictPort",
     "dev:control-plane": "cd services/control-plane && ../../scripts/dev/python.sh -m uvicorn app.main:app --host 127.0.0.1 --port ${AXON_WATCH_CONTROL_PLANE_PORT:-8787}",
     "dev:axon-watch": "cd services/axon-watch && ../../scripts/dev/python.sh -m uvicorn app.main:app --host 127.0.0.1 --port ${AXON_WATCH_WATCH_SERVICE_PORT:-8788}",
+    "dev:console-mobile": "npm run start -w @axon-watch/console-mobile",
     "verify:shared-types": "npm run verify -w @contracts/shared-types",
     "verify:file-sizes": "./scripts/dev/python.sh scripts/guardrails/check_file_sizes.py",
     "verify:css-imports": "./scripts/dev/python.sh scripts/guardrails/check_css_import_order.py",
@@ -88,5 +89,9 @@
     "verify:host-context": "./scripts/dev/python.sh -m unittest tests.test_host_context tests.test_host_reminders tests.test_host_policy_parity",
     "docs:handbook-pdf": "./scripts/docs/build-howto-handbook-pdf.sh",
     "verify": "npm run verify:contracts && npm run verify:console-web && ./scripts/dev/python.sh scripts/verify/all.py --runtime-payload packages/shared-types/fixtures/runtime-summary.example.json --watch-payload packages/shared-types/fixtures/watch-summary.example.json --shell-boot-report scripts/verify/fixtures/shell-boot-report.dev.json --runtime-latency-samples scripts/verify/fixtures/runtime-summary-latency.ci.json --watch-latency-samples scripts/verify/fixtures/watch-summary-latency.ci.json"
+  },
+  "dependencies": {
+    "react-dom": "19.2.3",
+    "react-native-web": "^0.21.2"
   }
 }

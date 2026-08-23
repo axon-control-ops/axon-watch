@@ -45,6 +45,8 @@ VALIDATION_PREFIXES: tuple[tuple[str, ...], ...] = (
     ("npm", "run", "test"),
     ("npm", "run", "lint"),
     ("npm", "run", "typecheck"),
+    ("npm", "run", "dev:console-mobile"),
+    ("npm", "exec", "-w", "@axon-watch/console-mobile", "--", "expo", "config", "--json"),
     ("npx", "--no-install", "jest"),
     ("npx", "--no-install", "tsc"),
     ("npx", "--no-install", "tsx"),
@@ -72,10 +74,18 @@ COMMON_AUDITED_WRAPPERS: tuple[str, ...] = (
 # actually dispatched, which reads as "the fleet did nothing".
 LEAD_DISPATCH_WRAPPERS: tuple[str, ...] = ("axon-assign",)
 
+# Watcher-only: look up another agent's run status/history (phase, receipts,
+# acceptance_evidence). This evidence lives only in the control-plane's run
+# store, never as files in the workspace checkout a watcher can read — without
+# this a recovery-diagnosis watcher can only ask the operator for a pointer it
+# has no way to resolve itself, and stalls out consultative-only.
+WATCHER_RUNLOG_WRAPPERS: tuple[str, ...] = ("axon-runlog",)
+
 
 __all__ = [
     "COMMON_AUDITED_WRAPPERS",
     "LEAD_DISPATCH_WRAPPERS",
+    "WATCHER_RUNLOG_WRAPPERS",
     "COMMON_READ_PREFIXES",
     "DOCUMENT_PREFIXES",
     "GH_READ_PREFIXES",

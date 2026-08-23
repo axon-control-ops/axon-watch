@@ -7,7 +7,8 @@ from collections.abc import Callable
 from pathlib import Path
 
 from app.cli_runtime.agent_sandbox import AgentSandboxPolicy
-from app.cli_runtime.stream_blocks.terminal_blocks import _relative_path, terminal_block
+from app.cli_runtime.stream_blocks.edit_blocks import render_edit_block_for_path
+from app.cli_runtime.stream_blocks.terminal_blocks import terminal_block
 from app.cli_runtime.subprocess_runner import (
     RuntimeProcessStoppedError,
     communicate_registered_process,
@@ -69,12 +70,6 @@ def _iter_codex_payloads(stream_text: str) -> list[dict[str, object]]:
     return payloads
 
 
-def _diff_counts(diff: str) -> tuple[int, int]:
-    added = sum(1 for line in diff.splitlines() if line.startswith("+") and not line.startswith("+++"))
-    removed = sum(1 for line in diff.splitlines() if line.startswith("-") and not line.startswith("---"))
-    return added, removed
-
-
 def _codex_item_block(item: dict[str, object], workspace_root: Path) -> str:
     """Translate Codex JSON items into the transcript grammar used by every UI.
 
@@ -99,15 +94,19 @@ def _codex_item_block(item: dict[str, object], workspace_root: Path) -> str:
     if item_type == "file_change":
         changes = item.get("changes")
         if not isinstance(changes, list):
-            return ":::tool File change\n"
+            changes = [item] if str(item.get("path") or "").strip() else []
         blocks: list[str] = []
         for change in changes:
             if not isinstance(change, dict):
                 continue
-            path = _relative_path(str(change.get("path") or ""), str(workspace_root)) or "changed file"
             diff = str(change.get("diff") or change.get("patch") or "").strip()
-            added, removed = _diff_counts(diff)
-            blocks.append(f"\n:::edit {path} +{added} -{removed}\n{diff}\n:::\n")
+            block = render_edit_block_for_path(
+                workspace_root=workspace_root,
+                path=str(change.get("path") or ""),
+                diff=diff,
+            )
+            if block:
+                blocks.append(block)
         return "".join(blocks) or ":::tool File change\n"
     if item_type == "error":
         detail = str(item.get("message") or "Codex reported an unspecified runtime error.").strip()

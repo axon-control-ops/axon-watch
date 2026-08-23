@@ -14,6 +14,7 @@ from app.workspace_agents.lead_task_plan import (
     available_specialists,
     extract_exclusive_paths,
     fallback_single_owner_plan,
+    is_axon_x_mobile_companion_goal,
     normalize_roster,
     serialize_overlapping_paths,
     topo_order,
@@ -203,7 +204,14 @@ def resolve_lead_task_plan(
     else:
         typed_mode = "auto"
 
-    plan = build_lead_task_plan(goal=goal, roster=roster, mode=typed_mode)
+    plan = build_lead_task_plan(
+        goal=goal,
+        roster=roster,
+        mode=typed_mode,
+        workspace_id=workspace_id,
+    )
+    if is_axon_x_mobile_companion_goal(goal, workspace_id):
+        return plan
     needs_model = (not plan.items) or plan.ambiguous
     if needs_model and use_model and workspace_id and plan.mode == "decompose":
         modeled = apply_model_lead_plan(
@@ -215,7 +223,7 @@ def resolve_lead_task_plan(
         if modeled is not None and modeled.items:
             return modeled
     if not plan.items:
-        return fallback_single_owner_plan(goal=goal, roster=roster)
+        return fallback_single_owner_plan(goal=goal, roster=roster, workspace_id=workspace_id)
     if (
         plan.mode == "decompose"
         and plan.ambiguous
@@ -225,7 +233,7 @@ def resolve_lead_task_plan(
         # and the deterministic pass only produced an unconfident multi-role
         # fan-out (see _owners_for_clause). Fail safe to one confident owner
         # rather than dispatching mismatched specialists on a keyword tie.
-        return fallback_single_owner_plan(goal=goal, roster=roster)
+        return fallback_single_owner_plan(goal=goal, roster=roster, workspace_id=workspace_id)
     return plan
 
 

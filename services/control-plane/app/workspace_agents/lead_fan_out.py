@@ -569,6 +569,7 @@ def materialize_lead_fan_out(
     except ValueError as exc:
         raise LeadFanOutError(str(exc)) from exc
 
+    effective_goal = str(plan.goal or cleaned_goal).strip() or cleaned_goal
     persisted = persist_lead_task_plan(
         workspace_id=workspace,
         plan=plan,
@@ -600,7 +601,7 @@ def materialize_lead_fan_out(
                 plan_key=str(row.get("plan_key") or ""),
                 owner_role=owner_role,
                 mode=plan.mode,
-                cleaned_goal=cleaned_goal,
+                cleaned_goal=effective_goal,
             )
             if task is not None:
                 tasks_by_id[task_id] = task
@@ -626,7 +627,7 @@ def materialize_lead_fan_out(
     return {
         "plan_id": plan_id,
         "workspace_id": workspace,
-        "goal": cleaned_goal,
+        "goal": effective_goal,
         "fan_out_intent": detect_fan_out_intent(cleaned_goal) or plan.mode == "fan_out",
         "mode": plan.mode,
         "plan": persisted["plan"],

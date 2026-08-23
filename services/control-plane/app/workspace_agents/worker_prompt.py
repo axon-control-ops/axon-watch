@@ -114,6 +114,29 @@ def _auto_mode_ask_clause() -> str:
     )
 
 
+def _axon_x_mobile_companion_clause(*, workspace_id: str, goal: str, acceptance: str) -> str:
+    if str(workspace_id or "").strip() != "workspace_axon_watch":
+        return ""
+    blob = f"{goal} {acceptance}".lower()
+    if "apps/console-mobile" not in blob and "mobile companion" not in blob:
+        return ""
+    return (
+        " Axon-X mobile companion command contract: this task targets "
+        "`apps/console-mobile`, not the root Axon-X platform dev stack. "
+        "Never run root `npm run dev` for this task — it starts/rewires the "
+        "control-plane + console-web stack and can leave stale tunnel/proxy runs. "
+        "If the operator says `npm run dev` while this task packet is active, "
+        "interpret that as `npm run dev:console-mobile` and say so in the receipt. "
+        "Use these exact receipts instead: "
+        "`npm run typecheck -w @axon-watch/console-mobile`; "
+        "`npm exec -w @axon-watch/console-mobile -- expo config --json`; "
+        "and, only for a live Expo smoke, "
+        "`axon-agent-terminal-job --workspace workspace_axon_watch -- npm run dev:console-mobile`. "
+        "For physical phones, do not use `127.0.0.1`; report the LAN IP or "
+        "read-only tunnel URL the phone should open."
+    )
+
+
 def _role_tools_clause(role: str) -> str:
     """Tell specialists which tools they should use — Full Access means Shell/Edit/Read."""
     cleaned = str(role or "").strip().lower()
@@ -134,6 +157,11 @@ def _role_tools_clause(role: str) -> str:
             shared
             + "Watcher focus: health probes, signal receipts, and CI/gate status checks "
             "via short shell/read — not product feature builds. "
+            "Acceptance evidence, diff_budget findings, and phase transitions (e.g. "
+            "review_ready/complete) for another agent's run are never files in this "
+            "checkout — they live only in the control-plane's run store. Use "
+            "`axon-runlog <run_id>` to fetch that run's status and history directly "
+            "instead of asking the operator for a pointer you can resolve yourself. "
         )
     if cleaned == "integrations":
         return (
@@ -463,6 +491,11 @@ def build_continuous_worker_prompt(
         )
         memory_clause += dashpro_supabase_self_heal_clause()
         memory_clause += dashpro_homework_submit_triage_clause()
+    mobile_companion_clause = _axon_x_mobile_companion_clause(
+        workspace_id=workspace_id,
+        goal=goal,
+        acceptance=acceptance,
+    )
     prior_failure = "" if task_payload else _prior_failure_clause(workspace_id=workspace_id, role=role)
     task_packet = _current_task_packet(
         workspace_id=workspace_id,
@@ -552,6 +585,7 @@ def build_continuous_worker_prompt(
         f"{delivery_clause}"
         f"{tools_clause}"
         f"{ci_clause}"
+        f"{mobile_companion_clause}"
         f"{memory_clause}"
         f"{_auto_mode_ask_clause()}"
         " If a step fails, say what failed and why (command, assertion, import, CI step) — "

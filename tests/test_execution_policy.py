@@ -25,12 +25,20 @@ from app.workspace_agents.execution_policy import (  # noqa: E402
 from app.workspace_agents.execution_policy_runtime import (  # noqa: E402
     resolve_worker_execution_policy,
 )
-from app.workspace_agents.execution_policy_prefixes import COMMON_READ_PREFIXES  # noqa: E402
+from app.workspace_agents.execution_policy_prefixes import COMMON_READ_PREFIXES, VALIDATION_PREFIXES  # noqa: E402
 
 
 class RoleExecutionPolicyTests(unittest.TestCase):
     def test_git_grep_is_approved_read_prefix(self) -> None:
         self.assertIn(("git", "grep"), COMMON_READ_PREFIXES)
+
+    def test_mobile_companion_commands_are_narrowly_approved(self) -> None:
+        self.assertIn(("npm", "run", "dev:console-mobile"), VALIDATION_PREFIXES)
+        self.assertIn(
+            ("npm", "exec", "-w", "@axon-watch/console-mobile", "--", "expo", "config", "--json"),
+            VALIDATION_PREFIXES,
+        )
+        self.assertNotIn(("npm", "run", "dev"), VALIDATION_PREFIXES)
 
     def test_role_defaults_are_immutable_and_conservative(self) -> None:
         lead = role_execution_policy("lead")
@@ -412,6 +420,14 @@ class LeadDispatchWrapperTests(unittest.TestCase):
                     "deny",
                     self._permission(role, "axon-assign --workspace workspace_dashpro -- x"),
                 )
+
+    def test_watcher_can_look_up_run_evidence(self) -> None:
+        self.assertEqual("allow", self._permission("watcher", "axon-runlog run_abc123"))
+
+    def test_only_watcher_can_use_runlog(self) -> None:
+        for role in ("lead", "backend", "frontend", "integrations"):
+            with self.subTest(role=role):
+                self.assertEqual("deny", self._permission(role, "axon-runlog run_abc123"))
 
 
 if __name__ == "__main__":

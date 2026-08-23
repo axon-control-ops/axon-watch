@@ -14,6 +14,8 @@ from app.workspace_agents.lead_task_plan import (  # noqa: E402
     detect_fan_out_intent,
     detect_implement_intent,
     extract_exclusive_paths,
+    is_axon_x_mobile_companion_goal,
+    should_execute_lead_fast_path,
     should_lead_decompose_dispatch,
 )
 from app.workspace_agents.lead_query_intent import detect_specialist_query_intent  # noqa: E402
@@ -200,6 +202,59 @@ class LeadTaskPlanTests(unittest.TestCase):
         self.assertTrue(detect_implement_intent(goal))
         self.assertTrue(should_lead_decompose_dispatch(plan))
         self.assertEqual(["frontend"], [item.owner_role for item in plan.items])
+
+    def test_axon_x_expo_companion_prompt_is_implementation_intent(self) -> None:
+        goal = (
+            "I found the mobile UI; now I want Mira and her team to continue "
+            "working on it in an Expo native app, fix Mira's plan, clear old "
+            "stale runs, and upgrade the agents where possible."
+        )
+
+        plan = build_lead_task_plan(goal=goal, roster=DASHPRO_ROSTER, mode="decompose")
+
+        self.assertTrue(detect_implement_intent(goal))
+        self.assertTrue(should_execute_lead_fast_path("plan", goal))
+        self.assertTrue(should_lead_decompose_dispatch(plan))
+        self.assertIn("frontend", [item.owner_role for item in plan.items])
+
+    def test_axon_x_mobile_companion_short_correction_gets_exact_app_contract(self) -> None:
+        goal = "I meant the mobile app -"
+
+        plan = build_lead_task_plan(
+            goal=goal,
+            roster=DASHPRO_ROSTER,
+            mode="decompose",
+            workspace_id="workspace_axon_watch",
+        )
+
+        self.assertTrue(is_axon_x_mobile_companion_goal(goal, "workspace_axon_watch"))
+        self.assertFalse(is_axon_x_mobile_companion_goal(goal, "workspace_dashpro"))
+        self.assertFalse(plan.ambiguous)
+        self.assertTrue(should_lead_decompose_dispatch(plan))
+        self.assertEqual(["frontend"], [item.owner_role for item in plan.items])
+        self.assertIn("apps/console-mobile", plan.goal)
+        self.assertIn("workspace_axon_watch", plan.goal)
+        self.assertIn("DashPro", plan.goal)
+        self.assertIn("127.0.0.1", plan.goal)
+        self.assertEqual(
+            ["apps/console-mobile", "package.json", "package-lock.json", "README.md"],
+            plan.items[0].allowed_paths,
+        )
+        self.assertIn(
+            "npm run typecheck -w @axon-watch/console-mobile",
+            plan.items[0].acceptance_criteria,
+        )
+        self.assertIn(
+            "expo config --json",
+            plan.items[0].acceptance_criteria,
+        )
+
+    def test_plan_mode_review_language_stays_consultative(self) -> None:
+        goal = "Before I run this prompt, check Mira's plan and advice on that"
+
+        self.assertFalse(detect_implement_intent(goal))
+        self.assertFalse(should_execute_lead_fast_path("plan", goal))
+        self.assertTrue(should_execute_lead_fast_path("agent", goal))
 
     def test_git_privacy_policy_routes_to_integrations_with_root_scope(self) -> None:
         plan = build_lead_task_plan(

@@ -9,6 +9,7 @@ from typing import Any, Iterable, Mapping
 
 from app.workspace_agents.execution_policy_prefixes import (
     COMMON_AUDITED_WRAPPERS as _COMMON_AUDITED_WRAPPERS, LEAD_DISPATCH_WRAPPERS as _LEAD_DISPATCH_WRAPPERS,
+    WATCHER_RUNLOG_WRAPPERS as _WATCHER_RUNLOG_WRAPPERS,
     COMMON_READ_PREFIXES as _COMMON_READ_PREFIXES,
     DOCUMENT_PREFIXES as _DOCUMENT_PREFIXES,
     GH_READ_PREFIXES as _GH_READ_PREFIXES,
@@ -92,7 +93,12 @@ _ROLE_DEFAULTS: dict[str, AgentExecutionPolicy] = {
         read_paths=(".",),
         write_paths=(),
         forbidden_path_globs=(),
-        approved_wrapper_names=(*_COMMON_AUDITED_WRAPPERS, "axonhealth", "watch-fast-gate.sh"),
+        approved_wrapper_names=(
+            *_COMMON_AUDITED_WRAPPERS,
+            *_WATCHER_RUNLOG_WRAPPERS,
+            "axonhealth",
+            "watch-fast-gate.sh",
+        ),
         approved_command_prefixes=_COMMON_READ_PREFIXES,
         audited_capabilities=("ci_read", "health", "workspace_read"),
         network_mode="audited",
