@@ -46,11 +46,9 @@ export function useAgentDockComposerSetup() {
   const menus = useComposerMenus(shell, { composerMode });
   const {
     activeMode,
-    cancelFullAccessConsent,
-    cancelSandboxConsent,
+    cancelFullAccessConsent, cancelSandboxConsent,
     closeMenus,
-    confirmFullAccessConsent,
-    confirmSandboxConsent,
+    confirmFullAccessConsent, confirmSandboxConsent,
     disableSandboxSessionAccess, discardSandboxSessionChanges,
     executionAccessHint,
     fullAccessConsentChecked,

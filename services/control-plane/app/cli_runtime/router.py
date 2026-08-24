@@ -56,10 +56,7 @@ from app.kairo_ask_prompt import build_ask_system_prompt
 from app.cli_runtime.long_running_shell_prompt import LONG_RUNNING_SHELL_CLAUSE
 from app.instructions_engine import build_instructions_system_prompt
 from app.specialist_roles import SpecialistContext
-from app.cli_runtime.plan_system_prompt import (
-    ask_fence_instruction,
-    build_plan_system_prompt,
-)
+from app.cli_runtime.plan_system_prompt import ask_fence_instruction, build_plan_system_prompt
 from app.workspace_agents.critical_review_clause import append_critical_review_clause
 from app.workspace_agents.execution_policy import AgentExecutionPolicy
 from app.research.availability import format_capability_line, research_capability_snapshot
@@ -628,12 +625,10 @@ def route_ide_composer(
     user_prompt: str,
     context_block: str,
 ) -> str:
-    return str(
-        dispatch_ide_composer(
-            workspace_id=workspace_id,
-            composer_mode=composer_mode,
-            user_prompt=user_prompt,
-            context_block=context_block,
-        ).get("content")
-        or ""
+    reply = dispatch_ide_composer(
+        workspace_id=workspace_id,
+        composer_mode=composer_mode,
+        user_prompt=user_prompt,
+        context_block=context_block,
     )
+    return str(reply.get("content") or "")
