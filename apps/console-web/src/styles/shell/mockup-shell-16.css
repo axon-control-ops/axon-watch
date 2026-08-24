@@ -77,10 +77,14 @@
   gap: 0.65rem;
 }
 
-.operator-mobile-shell__voice .brain-galaxy-stage__jarvis-float {
-  position: relative;
-  inset: auto;
-  margin: 0 auto;
+.operator-mobile-shell__voice-orb {
+  display: flex;
+  justify-content: center;
+  padding: 0.25rem 0 0.15rem;
+}
+
+.operator-mobile-shell__voice-orb .kairo-galaxy-orb__cinematic {
+  width: min(100%, 20rem);
 }
 
 .operator-mobile-shell__tunnel-actions {
@@ -377,4 +381,3 @@
   background: rgba(20, 14, 4, 0.78);
   backdrop-filter: blur(8px);
 }
-

@@ -36,6 +36,14 @@ class PlanSystemPromptTests(unittest.TestCase):
         self.assertIn("Selected option", line)
         self.assertIn("do not re-ask what the options were", line)
 
+    def test_ask_fence_instruction_also_forbids_create_plan(self) -> None:
+        """Regression: Agent-mode prompts only warned against AskQuestion, not
+        CreatePlan — a watcher run called CreatePlan anyway and it hung, leaving
+        an empty tool block (":::") instead of the agent's actual findings."""
+        line = ask_fence_instruction()
+        self.assertIn("CreatePlan", line)
+        self.assertIn("hang", line)
+
 
 if __name__ == "__main__":
     unittest.main()

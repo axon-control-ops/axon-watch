@@ -3,6 +3,7 @@ import {
   agentContentHasTranscriptBlocks,
   parseAgentTranscriptBlocks,
 } from '../agent-transcript-blocks';
+import { agentEditEventLabel } from '../agent-edit-operation';
 
 export function truncatePanelCopy(value: string, maxLength = 96): string {
   const trimmed = value.trim().replace(/\s+/g, ' ');
@@ -64,7 +65,14 @@ export function firstMeaningfulLine(content: string | null | undefined): string 
         }
       }
       if (segment.kind === 'edit') {
-        return truncatePanelCopy(`Edited ${segment.path}`);
+        return truncatePanelCopy(
+          agentEditEventLabel({
+            path: segment.path,
+            added: segment.added,
+            removed: segment.removed,
+            diff: segment.diff,
+          }),
+        );
       }
     }
   }

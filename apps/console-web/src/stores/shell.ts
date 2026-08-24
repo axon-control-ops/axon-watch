@@ -154,6 +154,7 @@ import {
 import { resolveComposerContextPayload } from '../lib/ide-composer-context-tokens';
 import {
   appendIdeComposerQueueEntry,
+  ideComposerQueueScopeKey,
   ideComposerQueueLabel as buildIdeComposerQueueLabel,
   removeIdeComposerQueueEntry,
   shiftIdeComposerQueue,
@@ -457,7 +458,7 @@ export const useShellStore = defineStore('shell', () => {
   const kairoSpeechQueueActive = ref(false);
   const kairoVoiceEngineActive = ref(false);
   const kairoVoicePaused = ref(false);
-  const ideComposerQueueByWorkspaceId = ref<Record<string, IdeComposerQueuedMessage[]>>({});
+  const ideComposerQueueByScopeKey = ref<Record<string, IdeComposerQueuedMessage[]>>({});
   let flushingIdeComposerQueue = false;
   const autoRunRecoveryInFlight = { value: false };
   const agentExecutionAccess = ref<AgentExecutionAccess>(resolveAgentExecutionAccess());
@@ -725,10 +726,11 @@ export const useShellStore = defineStore('shell', () => {
 
   const ideComposerQueue = computed(() => {
     const workspaceId = currentWorkspace.value?.workspace_id;
-    if (!workspaceId) {
+    const scopeKey = ideComposerQueueScopeKey(workspaceId, activeIdeThreadId.value);
+    if (!scopeKey) {
       return [];
     }
-    return ideComposerQueueByWorkspaceId.value[workspaceId] ?? [];
+    return ideComposerQueueByScopeKey.value[scopeKey] ?? [];
   });
 
   const ideComposerQueueSummary = computed(() =>
@@ -998,6 +1000,9 @@ export const useShellStore = defineStore('shell', () => {
       ideStreamFocusThreadId.value = threadId;
       if (threadId) {
         applyWorkspaceStreamUiToGlobals(threadId);
+        queueMicrotask(() => {
+          void flushIdeComposerQueueIfIdle();
+        });
       }
     },
     { immediate: true },
@@ -2477,8 +2482,10 @@ export const useShellStore = defineStore('shell', () => {
     content: string,
   ): void {
     const workspaceId = currentWorkspace.value?.workspace_id;
+    const threadId = activeIdeThreadId.value;
+    const scopeKey = ideComposerQueueScopeKey(workspaceId, threadId);
     const trimmed = content.trim();
-    if (!workspaceId || !trimmed) {
+    if (!scopeKey || !trimmed) {
       return;
     }
 
@@ -2487,11 +2494,12 @@ export const useShellStore = defineStore('shell', () => {
       content: trimmed,
       composerMode,
       createdAt: new Date().toISOString(),
+      threadId,
     };
-    ideComposerQueueByWorkspaceId.value = {
-      ...ideComposerQueueByWorkspaceId.value,
-      [workspaceId]: appendIdeComposerQueueEntry(
-        ideComposerQueueByWorkspaceId.value[workspaceId] ?? [],
+    ideComposerQueueByScopeKey.value = {
+      ...ideComposerQueueByScopeKey.value,
+      [scopeKey]: appendIdeComposerQueueEntry(
+        ideComposerQueueByScopeKey.value[scopeKey] ?? [],
         entry,
       ),
     };
@@ -2499,13 +2507,14 @@ export const useShellStore = defineStore('shell', () => {
 
   function removeIdeComposerQueuedMessage(messageId: string): void {
     const workspaceId = currentWorkspace.value?.workspace_id;
-    if (!workspaceId) {
+    const scopeKey = ideComposerQueueScopeKey(workspaceId, activeIdeThreadId.value);
+    if (!scopeKey) {
       return;
     }
-    ideComposerQueueByWorkspaceId.value = {
-      ...ideComposerQueueByWorkspaceId.value,
-      [workspaceId]: removeIdeComposerQueueEntry(
-        ideComposerQueueByWorkspaceId.value[workspaceId] ?? [],
+    ideComposerQueueByScopeKey.value = {
+      ...ideComposerQueueByScopeKey.value,
+      [scopeKey]: removeIdeComposerQueueEntry(
+        ideComposerQueueByScopeKey.value[scopeKey] ?? [],
         messageId,
       ),
     };
@@ -2520,25 +2529,27 @@ export const useShellStore = defineStore('shell', () => {
     }
 
     const workspaceId = currentWorkspace.value?.workspace_id;
-    if (!workspaceId) {
+    const scopeKey = ideComposerQueueScopeKey(workspaceId, activeIdeThreadId.value);
+    if (!scopeKey) {
       return;
     }
 
-    const queue = ideComposerQueueByWorkspaceId.value[workspaceId] ?? [];
+    const queue = ideComposerQueueByScopeKey.value[scopeKey] ?? [];
     const { next, remaining } = shiftIdeComposerQueue(queue);
     if (!next) {
       return;
     }
 
     flushingIdeComposerQueue = true;
-    ideComposerQueueByWorkspaceId.value = {
-      ...ideComposerQueueByWorkspaceId.value,
-      [workspaceId]: remaining,
+    ideComposerQueueByScopeKey.value = {
+      ...ideComposerQueueByScopeKey.value,
+      [scopeKey]: remaining,
     };
 
     try {
       await dispatchIdeComposerMessage(next.composerMode, {
         contentOverride: next.content,
+        threadIdOverride: next.threadId,
       });
     } finally {
       flushingIdeComposerQueue = false;
@@ -2564,19 +2575,20 @@ export const useShellStore = defineStore('shell', () => {
 
   async function steerQueuedIdeComposerMessage(messageId: string): Promise<void> {
     const workspaceId = currentWorkspace.value?.workspace_id;
-    if (!workspaceId) {
+    const scopeKey = ideComposerQueueScopeKey(workspaceId, activeIdeThreadId.value);
+    if (!scopeKey) {
       return;
     }
 
-    const queue = ideComposerQueueByWorkspaceId.value[workspaceId] ?? [];
+    const queue = ideComposerQueueByScopeKey.value[scopeKey] ?? [];
     const entry = queue.find((item) => item.id === messageId);
     if (!entry) {
       return;
     }
 
-    ideComposerQueueByWorkspaceId.value = {
-      ...ideComposerQueueByWorkspaceId.value,
-      [workspaceId]: removeIdeComposerQueueEntry(queue, messageId),
+    ideComposerQueueByScopeKey.value = {
+      ...ideComposerQueueByScopeKey.value,
+      [scopeKey]: removeIdeComposerQueueEntry(queue, messageId),
     };
 
     if (composerAgentBusy.value) {
@@ -2585,13 +2597,14 @@ export const useShellStore = defineStore('shell', () => {
 
     await dispatchIdeComposerMessage(entry.composerMode, {
       contentOverride: entry.content,
+      threadIdOverride: entry.threadId,
     });
   }
 
   async function submitIdeComposer(
     composerMode: IdeComposerMode,
     options: { attachmentFiles?: File[]; contentOverride?: string } = {},
-  ): Promise<boolean> {
+  ): Promise<boolean | 'queued'> {
     const content = (options.contentOverride ?? ideComposerDraft.value).trim();
     const blockedReason = composerSubmitBlockReason(currentWorkspace.value?.workspace_id, content);
     if (blockedReason) {
@@ -2614,7 +2627,10 @@ export const useShellStore = defineStore('shell', () => {
         activeIdeThreadId.value || null,
       );
       commandMutationError.value = null;
-      return true;
+      // Distinct from a true dispatch: callers that need to know whether the
+      // agent actually received the message yet (e.g. an answered ask card)
+      // must not treat "queued behind the current stream" as "delivered".
+      return 'queued';
     }
 
     return dispatchIdeComposerMessage(composerMode, options);

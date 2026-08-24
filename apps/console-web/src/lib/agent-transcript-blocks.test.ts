@@ -8,6 +8,7 @@ import {
   normalizeEditedFilePath,
   parseAgentTranscriptBlocks,
   prepareAgentTranscriptSegmentsForDisplay,
+  readToolBlockPath,
   thinkingPreview,
 } from './agent-transcript-blocks';
 
@@ -423,6 +424,22 @@ describe('normalizeEditedFilePath', () => {
     expect(
       normalizeEditedFilePath('/home/edp/.cursor/projects/foo/README.md'),
     ).toBe('README.md');
+  });
+});
+
+describe('readToolBlockPath', () => {
+  it('extracts the path from a Read tool label', () => {
+    expect(readToolBlockPath('Read README.md')).toBe('README.md');
+    expect(readToolBlockPath('Read docs/ops/company-profile.md')).toBe(
+      'docs/ops/company-profile.md',
+    );
+  });
+
+  it('returns null for tool labels with no single-file target', () => {
+    expect(readToolBlockPath('Glob apps/*/package.json')).toBeNull();
+    expect(readToolBlockPath('Grep .axon-si')).toBeNull();
+    expect(readToolBlockPath('Ask Question')).toBeNull();
+    expect(readToolBlockPath('')).toBeNull();
   });
 });
 

@@ -433,16 +433,52 @@ def evaluate_post_publish_completion_gate(
     )
 
 
+def _changed_expected_overlap_note(result: CompletionGateResult) -> str:
+    """Flag when changed_files and expected_files share nothing in common.
+
+    A receipt-backed ops/coordination pass legitimately has no product diff,
+    so this is advisory, not a gate — but a completely disjoint changed/expected
+    set on an otherwise-passing receipt is exactly the shape that let a blocked
+    private-material delivery's changed_files (assets/TPS-PACK.zip, ...) sit
+    next to an unrelated expected_files scope (docs/ops, docs/planning, ...)
+    and still read as a clean pass to anyone skimming the receipt.
+    """
+    if not result.passed or not result.changed_paths or not result.expected_files:
+        return ""
+    changed = {path.strip().lstrip("./") for path in result.changed_paths if path.strip()}
+    expected_roots = {path.strip().lstrip("./") for path in result.expected_files if path.strip()}
+    overlaps = any(
+        changed_path == root or changed_path.startswith(f"{root.rstrip('/')}/")
+        for changed_path in changed
+        for root in expected_roots
+    )
+    if overlaps:
+        return ""
+    return " · note=changed_files did not overlap expected_files"
+
+
 def record_completion_gate_receipt(
     run_id: str,
     result: CompletionGateResult,
     *,
     actor: str = "workspace_scheduler",
+    final: bool = False,
 ) -> dict[str, Any]:
+    """Record a completion-gate receipt.
+
+    ``final=False`` (the default) is used for the receipt recorded before
+    ``publish_worker_isolation`` runs (see ``run_worker_delivery_gate``) — the
+    delivery can still be blocked after this point (e.g. a private-material
+    path gate), so it is labelled ``preflight`` rather than ``completion`` to
+    avoid reading as the run's terminal verdict. Only the receipt recorded
+    after a successful publish (``final=True``) uses ``completion=``.
+    """
     status = "pass" if result.passed else "fail"
+    label = "completion" if final else "preflight"
     paths = ", ".join(result.changed_paths[:8]) if result.changed_paths else "none"
     expected = ", ".join(result.expected_files[:8]) if result.expected_files else "task/role scope"
     commit = result.commit_sha or "pending"
+    overlap_note = _changed_expected_overlap_note(result)
     return append_run_execution_receipt(
         run_id,
         receipt_type="completion_gate",
@@ -450,9 +486,9 @@ def record_completion_gate_receipt(
         success=result.passed,
         intent="worker_completion_gate",
         receipt_summary=(
-            f"completion={status} · reason={result.reason} · changed_files={paths} · "
+            f"{label}={status} · reason={result.reason} · changed_files={paths} · "
             f"expected_files={expected} · validation={result.validation_status} · "
-            f"commit={commit}"
+            f"commit={commit}{overlap_note}"
         ),
     )
 
@@ -492,7 +528,7 @@ def run_worker_delivery_gate(
         isolation_root=isolation_root,
         reply_text=reply_text,
     )
-    record_completion_gate_receipt(run_id, preflight)
+    record_completion_gate_receipt(run_id, preflight, final=False)
     if not preflight.passed:
         return WorkerDeliveryGateOutcome(
             False,
@@ -513,7 +549,7 @@ def run_worker_delivery_gate(
             delivery=publish.delivery,
             preflight=preflight,
         )
-        record_completion_gate_receipt(run_id, final)
+        record_completion_gate_receipt(run_id, final, final=True)
         if not final.passed:
             return WorkerDeliveryGateOutcome(
                 False,

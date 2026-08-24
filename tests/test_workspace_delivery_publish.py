@@ -48,6 +48,13 @@ class WorkspaceDeliveryPublishTests(unittest.TestCase):
         )
         self.assertIn("private_company_material", str(detail))
         self.assertIn("docs/rfq/customer-submission.pdf", str(detail))
+        # Regression: the message used to just say "must stay local/private
+        # and cannot be staged, pushed, or included in a draft PR" -- true,
+        # but gave no indication this is expected/working-as-intended rather
+        # than a failure to retry, nor what an operator should actually do
+        # about it.
+        self.assertIn("working-as-intended", str(detail))
+        self.assertIn("operator must remove or relocate", str(detail))
 
     def test_private_path_deletion_or_rename_still_blocks_worker_delivery(self) -> None:
         detail = publish._scan_private_company_material(

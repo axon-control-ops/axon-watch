@@ -102,6 +102,19 @@ def workspaces_register(body: RegisterWorkspaceBindingRequest) -> dict[str, Any]
     return {"workspace": record, "created": True}
 
 
+@router.get("/api/workspaces/project-root-suggestions")
+def workspaces_project_root_suggestions(query: str = "") -> dict[str, Any]:
+    """Candidate project_root paths for the Add Workspace form.
+
+    Must be registered before /api/workspaces/{workspace_id} so this literal
+    path is not swallowed as a workspace_id.
+    """
+    from app.workspace_project_root_suggestions import suggest_project_roots
+
+    items = suggest_project_roots(query)
+    return {"items": items, "count": len(items)}
+
+
 @router.get("/api/workspaces/{workspace_id}")
 def workspaces_show(workspace_id: str) -> dict[str, Any]:
     try:

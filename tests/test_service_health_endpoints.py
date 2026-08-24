@@ -1,23 +1,27 @@
 from __future__ import annotations
 
+import os
 import sys
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 from fastapi.testclient import TestClient
 
 from tests.support.watch_app_loader import load_watch_app, restore_app_modules
+from tests.support.control_plane_app_loader import load_control_plane_app
 
 CONTROL_PLANE_ROOT = Path(__file__).resolve().parents[1] / "services" / "control-plane"
 
 
 class ControlPlaneHealthEndpointTests(unittest.TestCase):
     def setUp(self) -> None:
-        sys.path.insert(0, str(CONTROL_PLANE_ROOT))
-        from app.main import app  # noqa: WPS433
-
+        self._env = patch.dict(os.environ, {}, clear=True)
+        self._env.start()
+        app = load_control_plane_app()
         self.client = TestClient(app)
         self.addCleanup(self.client.close)
+        self.addCleanup(self._env.stop)
 
     def test_health_endpoint_reports_ok(self) -> None:
         response = self.client.get("/api/health")
@@ -37,6 +41,37 @@ class ControlPlaneHealthEndpointTests(unittest.TestCase):
         self.assertIn("watch_base_url", payload)
         self.assertIn("state_dir", payload)
         self.assertIn("mode", payload)
+
+    def test_health_endpoint_allows_local_web_origin_via_cors(self) -> None:
+        response = self.client.get(
+            "/api/health",
+            headers={"Origin": "http://localhost:8081"},
+        )
+
+        self.assertEqual(200, response.status_code)
+        self.assertEqual(
+            "http://localhost:8081",
+            response.headers.get("access-control-allow-origin"),
+        )
+
+    def test_health_endpoint_allows_credentialed_local_web_origin_via_cors(self) -> None:
+        response = self.client.options(
+            "/api/health",
+            headers={
+                "Origin": "http://127.0.0.1:8081",
+                "Access-Control-Request-Method": "GET",
+            },
+        )
+
+        self.assertEqual(200, response.status_code)
+        self.assertEqual(
+            "http://127.0.0.1:8081",
+            response.headers.get("access-control-allow-origin"),
+        )
+        self.assertEqual(
+            "true",
+            response.headers.get("access-control-allow-credentials"),
+        )
 
 
 class WatchHealthEndpointTests(unittest.TestCase):

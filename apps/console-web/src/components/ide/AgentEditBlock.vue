@@ -10,6 +10,7 @@ import {
 } from '../../lib/ide-agent-edit-review';
 import { diffLineTone, normalizeEditedFilePath } from '../../lib/agent-transcript-blocks';
 import { agentEditOperation, agentEditOperationLabel } from '../../lib/agent-edit-operation';
+import { AGENT_EDIT_BLOCK_DEFAULT_EXPANDED } from '../../lib/agent-edit-block-view';
 import { handleMarkdownContainerClick } from '../../lib/markdown-link-click';
 import { resolveThreadImageUrl } from '../../lib/thread-image-url';
 import { isImageFilePath, isPdfFilePath } from '../../lib/workspace-file-language';
@@ -25,13 +26,9 @@ const props = defineProps<{
 }>();
 
 const shell = useShellStore();
-// Collapsed by default: expanded markdown/diff previews are expensive, and a
-// long agent turn can otherwise freeze the main thread while streaming.
-// `pinned` is the click-toggled, persistent expand state; `hovered` is a
-// transient preview shown only while the pointer is over the block (matches
-// Codex/Cursor: hover previews, click pins, and only the explicit Open
-// action ever navigates to the editor).
-const pinned = ref(false);
+// Cursor-style default: show the edit/diff body as soon as a streaming edit
+// block appears. The operator can still collapse noisy blocks explicitly.
+const pinned = ref(AGENT_EDIT_BLOCK_DEFAULT_EXPANDED);
 const hovered = ref(false);
 const expanded = computed(() => pinned.value || hovered.value);
 const lightboxOpen = ref(false);

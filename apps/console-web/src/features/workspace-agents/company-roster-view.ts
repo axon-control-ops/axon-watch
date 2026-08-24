@@ -57,6 +57,7 @@ export {
   employeeFailurePeekKey,
   employeeFailureRetryActionLabel,
   employeeFailureBlocksAutoRetry,
+  employeeFailureBlocksRetry,
   employeeShiftNeedsContinuation,
   employeeDockReceiptDetail,
   type CompanyRosterAlertBadge,

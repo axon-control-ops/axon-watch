@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from app.delivery.service import enrich_inbox_with_delivery
 from app.signals.bootstrap_signal import bootstrap_inbox_item
+from app.signals.branch_staleness_signal import branch_staleness_inbox_items
 from app.signals.connector_signal import connector_inbox_items
 from app.signals.email_signal import email_inbox_items
 from app.signals.inbox_filters import should_emit_bootstrap_signal
@@ -38,6 +39,7 @@ def get_inbox_snapshot(
     items.extend(monitor_items)
     email_items = email_inbox_items(force=force_email_refresh)
     items.extend(email_items)
+    items.extend(branch_staleness_inbox_items())
     if should_emit_bootstrap_signal(monitor_items, connector_items, email_items):
         items.insert(0, bootstrap_inbox_item())
 

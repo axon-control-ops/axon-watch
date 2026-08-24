@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 import subprocess
 import tempfile
@@ -137,6 +138,55 @@ class SandboxCheckoutIsolationGapTests(unittest.TestCase):
         (self.bound / "node_modules" / "jest").mkdir(parents=True)
         ensure_preview_dependencies(self.checkout, self.bound)
         self.assertTrue((self.checkout / "node_modules" / "jest").is_dir())
+
+    def test_workspace_scripts_receive_root_bin_shims(self) -> None:
+        (self.checkout / "package.json").write_text(
+            json.dumps({"workspaces": ["apps/*"]}),
+            encoding="utf-8",
+        )
+        (self.checkout / "apps" / "console-web").mkdir(parents=True)
+        (self.checkout / "apps" / "console-web" / "package.json").write_text(
+            json.dumps({"scripts": {"test": "vitest run"}}),
+            encoding="utf-8",
+        )
+        (self.bound / "node_modules" / ".bin").mkdir(parents=True)
+        (self.bound / "node_modules" / "vitest").mkdir(parents=True)
+        (self.bound / "node_modules" / "vitest" / "vitest.mjs").write_text(
+            "#!/usr/bin/env node\n",
+            encoding="utf-8",
+        )
+        (self.bound / "node_modules" / ".bin" / "vitest").symlink_to(
+            "../vitest/vitest.mjs"
+        )
+
+        ensure_preview_dependencies(self.checkout, self.bound)
+
+        root_bin = self.checkout / "node_modules" / ".bin"
+        app_bin = self.checkout / "apps" / "console-web" / "node_modules" / ".bin"
+        self.assertFalse(root_bin.is_symlink())
+        self.assertTrue((root_bin / "vitest").is_symlink())
+        self.assertTrue((app_bin / "vitest").is_symlink())
+        self.assertTrue((app_bin / "vitest").exists())
+        self.assertIn("node_modules/.bin/vitest", os.readlink(app_bin / "vitest"))
+
+    def test_stale_root_bin_symlink_is_replaced_with_real_directory(self) -> None:
+        (self.bound / "node_modules" / ".bin").mkdir(parents=True)
+        (self.bound / "node_modules" / ".bin" / "vitest").write_text(
+            "#!/bin/sh\n",
+            encoding="utf-8",
+        )
+        (self.checkout / "node_modules").mkdir()
+        (self.checkout / "node_modules" / ".bin").symlink_to(
+            self.bound / "node_modules" / ".bin",
+            target_is_directory=True,
+        )
+
+        ensure_preview_dependencies(self.checkout, self.bound)
+
+        checkout_bin = self.checkout / "node_modules" / ".bin"
+        self.assertTrue(checkout_bin.is_dir())
+        self.assertFalse(checkout_bin.is_symlink())
+        self.assertTrue((checkout_bin / "vitest").exists())
 
     def test_missing_dependencies_everywhere_is_an_actionable_error(self) -> None:
         with self.assertRaises(SandboxPreviewError) as caught:

@@ -5,6 +5,8 @@ import { normalizeEditedFilePath } from './agent-transcript-blocks';
 const MAX_MARKDOWN_PREVIEW_CHARS = 1200;
 const MAX_DIFF_PREVIEW_LINES = 24;
 
+export const AGENT_EDIT_BLOCK_DEFAULT_EXPANDED = true;
+
 export type AgentEditDiffLine = {
   text: string;
   tone: 'add' | 'remove' | 'meta' | 'context';

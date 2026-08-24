@@ -220,6 +220,100 @@ class WorkerCompletionGateTests(unittest.TestCase):
             str(receipt.get("summary") or ""),
         )
 
+    def _latest_completion_gate_summary(self, run_id: str) -> str:
+        run = run_store.get_run(run_id)
+        history = run_store.list_history(str((run or {}).get("history_ref") or ""))
+        receipt = next(
+            item.get("receipt") for item in history
+            if (item.get("receipt") or {}).get("type") == "completion_gate"
+        )
+        return str(receipt.get("summary") or "")
+
+    def test_preflight_receipt_is_labelled_preflight_not_completion(self) -> None:
+        """The receipt recorded before publish must not read as the final verdict.
+
+        Regression: a private-material publish block still left an earlier
+        ``completion=pass`` receipt in run history from this pre-publish call —
+        anyone (agent or operator) reading only that receipt saw a false pass
+        for a run that was later failed by the publish gate.
+        """
+        task = self._leased_backend_task(goal="receipt-backed ops task")
+        run_id = self._run_for_task(task)
+        result = CompletionGateResult(
+            passed=True,
+            reason="receipt-backed ops task",
+            changed_paths=[],
+            expected_files=[],
+            validation_status="deferred to delivery receipt",
+        )
+        record_completion_gate_receipt(run_id, result, final=False)
+        summary = self._latest_completion_gate_summary(run_id)
+        self.assertTrue(summary.startswith("preflight=pass"), summary)
+        self.assertNotIn("completion=", summary)
+
+    def test_post_publish_receipt_is_labelled_completion(self) -> None:
+        task = self._leased_backend_task(goal="receipt-backed ops task")
+        run_id = self._run_for_task(task)
+        result = CompletionGateResult(
+            passed=True,
+            reason="completion gate passed",
+            changed_paths=["supabase/migrations/0001_init.sql"],
+            expected_files=["supabase"],
+            validation_status="passed",
+            commit_sha="abc123",
+        )
+        record_completion_gate_receipt(run_id, result, final=True)
+        summary = self._latest_completion_gate_summary(run_id)
+        self.assertTrue(summary.startswith("completion=pass"), summary)
+
+    def test_overlap_note_flags_disjoint_changed_and_expected_files(self) -> None:
+        """A receipt-backed pass whose changed files share nothing with the
+        task's expected scope is exactly the shape that let a blocked
+        private-material delivery (assets/TPS-PACK.zip, ...) sit next to an
+        unrelated expected scope (docs/ops, docs/planning, ...) and still
+        read as a clean pass."""
+        task = self._leased_backend_task(goal="receipt-backed ops task")
+        run_id = self._run_for_task(task)
+        result = CompletionGateResult(
+            passed=True,
+            reason="receipt-backed ops task",
+            changed_paths=["assets/TPS-PACK.zip", "assets/_extracted/pack/photo.jpeg"],
+            expected_files=["node_modules", "docs/planning", "docs/ops", "plans"],
+            validation_status="deferred to delivery receipt",
+        )
+        record_completion_gate_receipt(run_id, result, final=False)
+        summary = self._latest_completion_gate_summary(run_id)
+        self.assertIn("note=changed_files did not overlap expected_files", summary)
+
+    def test_overlap_note_absent_when_changed_files_are_in_scope(self) -> None:
+        task = self._leased_backend_task(goal="receipt-backed ops task")
+        run_id = self._run_for_task(task)
+        result = CompletionGateResult(
+            passed=True,
+            reason="receipt-backed ops task",
+            changed_paths=["docs/ops/rollup.md"],
+            expected_files=["docs/ops", "docs/planning"],
+            validation_status="deferred to delivery receipt",
+        )
+        record_completion_gate_receipt(run_id, result, final=False)
+        summary = self._latest_completion_gate_summary(run_id)
+        self.assertNotIn("note=", summary)
+
+    def test_overlap_note_absent_on_failed_result(self) -> None:
+        """Advisory only on a pass — a failure receipt already says why."""
+        task = self._leased_backend_task(goal="receipt-backed ops task")
+        run_id = self._run_for_task(task)
+        result = CompletionGateResult(
+            passed=False,
+            reason="Workspace delivery blocked: private_company_material: assets/x.zip",
+            changed_paths=["assets/x.zip"],
+            expected_files=["docs/ops"],
+            validation_status="not checked",
+        )
+        record_completion_gate_receipt(run_id, result, final=False)
+        summary = self._latest_completion_gate_summary(run_id)
+        self.assertNotIn("note=", summary)
+
     def test_verification_refusal_without_command_receipts_cannot_pass(self) -> None:
         opened = task_store.create_task(
             workspace_id="workspace_dashpro",

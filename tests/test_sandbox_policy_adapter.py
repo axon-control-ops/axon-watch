@@ -145,14 +145,15 @@ class SandboxPolicyAdapterTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             binary = Path(directory) / "codex"
             binary.write_text("#!/bin/sh\n", encoding="utf-8")
-            env, sandbox = prepare_execution_sandbox(
-                role_execution_policy("lead"),
-                family="codex",
-                runtime_binary=str(binary),
-                env={"CODEX_HOME": str(Path(directory) / "missing-profile")},
-                workspace_id="workspace_demo",
-                run_id="run_demo",
-            )
+            with patch("app.cli_runtime.agent_dispatch_preflight.shutil.which", return_value="/usr/bin/tool"):
+                env, sandbox = prepare_execution_sandbox(
+                    role_execution_policy("lead"),
+                    family="codex",
+                    runtime_binary=str(binary),
+                    env={"CODEX_HOME": str(Path(directory) / "missing-profile")},
+                    workspace_id="workspace_demo",
+                    run_id="run_demo",
+                )
 
         self.assertEqual("/run/axon-agent-home/.codex", env["CODEX_HOME"])
         self.assertIsNotNone(sandbox)

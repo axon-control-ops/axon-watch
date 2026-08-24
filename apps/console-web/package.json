@@ -5,8 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vue-tsc --noEmit && vite build",
-    "typecheck": "vue-tsc --noEmit",
+    "build": "node ./scripts/run-local-vue-tsc.mjs --noEmit && vite build",
+    "typecheck": "node ./scripts/run-local-vue-tsc.mjs --noEmit",
     "test": "vitest run",
     "preview": "vite preview"
   },
@@ -26,9 +26,9 @@
     "@types/three": "^0.185.0",
     "@vitejs/plugin-vue": "latest",
     "playwright": "^1.62.1",
-    "typescript": "latest",
+    "typescript": "5.9.2",
     "vite": "latest",
     "vitest": "latest",
-    "vue-tsc": "latest"
+    "vue-tsc": "3.3.6"
   }
 }

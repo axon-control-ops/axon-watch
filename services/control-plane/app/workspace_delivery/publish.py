@@ -256,8 +256,12 @@ def _scan_private_company_material(paths: list[str]) -> str | None:
         return None
     first = private_findings[0]
     return (
-        f"private_company_material: {first.path} must stay local/private and "
-        "cannot be staged, pushed, or included in a draft PR"
+        f"private_company_material: {first.path} matches a private-document rule "
+        "(financial records, RFQ packs, exports, and office-document formats never "
+        "leave a workspace automatically) -- this is expected, working-as-intended "
+        "behavior, not an error to retry. To actually deliver this run's other "
+        "changes, an operator must remove or relocate this file from the task's "
+        "working tree first; the file itself was never staged or pushed."
     )
 
 

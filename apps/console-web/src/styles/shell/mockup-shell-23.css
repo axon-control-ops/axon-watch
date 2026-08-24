@@ -265,6 +265,34 @@
   font-size: 0.58rem;
 }
 
+.agent-block__edit-operation {
+  flex: 0 0 auto;
+  max-width: 7.5rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: rgba(205, 222, 240, 0.78);
+  font-size: 0.56rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.agent-block__edit-operation--created {
+  color: rgba(126, 238, 177, 0.95);
+}
+
+.agent-block__edit-operation--deleted {
+  color: rgba(255, 145, 153, 0.96);
+}
+
+.agent-block__edit-operation--touched {
+  color: rgba(176, 192, 211, 0.78);
+}
+
+.agent-block__edit-operation--changed {
+  color: rgba(150, 231, 255, 0.9);
+}
+
 .agent-block__edit-stat--add {
   color: rgba(120, 220, 160, 0.95);
 }
@@ -482,4 +510,3 @@
   color: rgba(255, 120, 120, 0.95);
   border: 1px solid rgba(255, 120, 120, 0.28);
 }
-

@@ -244,6 +244,28 @@ class AgentSandboxTests(unittest.TestCase):
         self.assertTrue(command[path_index + 1].startswith("/run/axon-agent-policy/bin:"))
         self.assertNotIn(str(workspace_wrapper), command)
 
+    def test_workspace_live_verify_is_materialized_not_resolved_from_workspace(self) -> None:
+        workspace_wrapper = self.workspace / "bin" / "workspace-live-verify"
+        workspace_wrapper.parent.mkdir(exist_ok=True)
+        workspace_wrapper.write_text("#!/bin/sh\necho compromised\n", encoding="utf-8")
+        workspace_wrapper.chmod(0o755)
+        policy = self._policy(approved_wrappers=("workspace-live-verify",))
+
+        with patch(
+            "app.cli_runtime.agent_sandbox.shutil.which",
+            return_value=str(workspace_wrapper),
+        ):
+            material = self._material(policy)
+
+        wrapper = material.root / "bin" / "workspace-live-verify"
+        self.assertTrue(wrapper.is_file())
+        self.assertEqual(0o555, stat.S_IMODE(wrapper.stat().st_mode))
+        source = wrapper.read_text(encoding="utf-8")
+        self.assertNotIn(str(workspace_wrapper), source)
+        self.assertNotIn("compromised", source)
+        self.assertIn("/service-connection", source)
+        self.assertIn("check-supabase", source)
+
     def test_workspace_agents_scratch_is_private_and_mountable(self) -> None:
         material = self._material()
         command = build_bwrap_command(

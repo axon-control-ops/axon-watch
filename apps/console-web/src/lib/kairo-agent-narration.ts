@@ -8,6 +8,7 @@ import {
 import { personaThreadPrefix } from './operator-persona-name';
 import { cleanAgentReplyText } from './sanitize-spoken-reply';
 import { toolMilestoneSpeakLine } from './kairo-tool-milestone';
+import { agentEditEventLabel } from './agent-edit-operation';
 
 const COMPLETION_SUMMARY_MAX = 280;
 
@@ -139,7 +140,11 @@ export function narrationMilestonesForDelta(
     const [, path, added, removed] = edits[index];
     milestones.push({
       key: `edit:${index}`,
-      message: `${path} +${added} -${removed}`,
+      message: agentEditEventLabel({
+        path,
+        added: Number(added),
+        removed: Number(removed),
+      }),
       editPath: path,
     });
   }

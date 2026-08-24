@@ -168,6 +168,8 @@ def _builtin_wrapper_source(wrapper: str) -> bytes | None:
         return Path(__file__).with_name("agent_runlog_wrapper.sh").read_bytes()
     if wrapper == "axonhealth":
         return _AXONHEALTH_WRAPPER
+    if wrapper == "workspace-live-verify":
+        return _WORKSPACE_LIVE_VERIFY_WRAPPER
     return None
 
 
@@ -211,6 +213,54 @@ fi
 echo "Health OK."
 """
 
+_WORKSPACE_LIVE_VERIFY_WRAPPER = b"""#!/usr/bin/env bash
+set -euo pipefail
+
+WORKSPACE_ID="${AXON_WATCH_WORKSPACE_ID:-${AXON_AGENT_SOURCE_WORKSPACE_ID:-}}"
+if [[ -z "${WORKSPACE_ID}" ]]; then
+  echo "workspace-live-verify: AXON_WATCH_WORKSPACE_ID is required" >&2
+  exit 1
+fi
+
+python3 - "${WORKSPACE_ID}" "$@" <<'PY'
+import json
+import os
+import subprocess
+import sys
+import urllib.request
+from pathlib import Path
+
+control_plane = os.environ.get("AXON_WATCH_CONTROL_PLANE_URL", "http://127.0.0.1:8787").rstrip("/")
+workspace_id = sys.argv[1]
+command = sys.argv[2:] if len(sys.argv) > 2 else ["check-supabase"]
+
+try:
+    with urllib.request.urlopen(
+        f"{control_plane}/api/workspaces/{workspace_id}/service-connection",
+        timeout=15,
+    ) as response:
+        posture = json.loads(response.read().decode("utf-8"))
+except OSError as exc:
+    print(f"workspace-live-verify: unable to read service connection posture: {exc}", file=sys.stderr)
+    raise SystemExit(1)
+
+if not posture.get("ready"):
+    print(posture.get("hint") or "workspace service connection is not ready", file=sys.stderr)
+    raise SystemExit(1)
+
+project_root = Path(str(posture.get("project_root") or "")).expanduser()
+if command[0] == "check-supabase":
+    argv = ["npm", "run", "check-supabase"]
+elif command[0] == "graduation-counts":
+    argv = ["npm", "run", "graduation:card-pop-counts"]
+else:
+    argv = list(command)
+
+completed = subprocess.run(argv, cwd=project_root, check=False)
+raise SystemExit(completed.returncode)
+PY
+"""
+
 
 def _seed_cursor_writable_state(*, user_home: Path, cursor_dir: Path) -> None:
     """Copy host Cursor state into the per-run sandbox HOME as writable files."""
@@ -230,7 +280,13 @@ def _trusted_wrapper_sources(
 ) -> dict[str, Path]:
     sources: dict[str, Path] = {}
     for wrapper in policy.approved_wrappers:
-        if wrapper in {"axon-agent-terminal-job", "axon-assign", "axon-runlog", "axonhealth"}:
+        if wrapper in {
+            "axon-agent-terminal-job",
+            "axon-assign",
+            "axon-runlog",
+            "axonhealth",
+            "workspace-live-verify",
+        }:
             continue
         installed = shutil.which(wrapper)
         if not installed:

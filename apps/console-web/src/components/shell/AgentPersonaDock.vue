@@ -13,6 +13,7 @@ import {
   employeeDockReceiptRunId,
   employeeDockReceiptRunLabel,
   employeeFailureBeatAriaLabel,
+  employeeFailureBlocksRetry,
   employeeFailureDetailTooltip,
   employeeFailureLine,
   employeeMetaLine,
@@ -70,6 +71,9 @@ const failure = computed(() =>
 );
 const interruptedShift = computed(() =>
   Boolean(failure.value) && employeeShiftNeedsContinuation(props.employee),
+);
+const retryBlocked = computed(
+  () => Boolean(failure.value) && employeeFailureBlocksRetry(props.employee),
 );
 const failureDetailTooltip = computed(() => employeeFailureDetailTooltip(props.employee));
 const failureBeatAriaLabel = computed(() => employeeFailureBeatAriaLabel(props.employee));
@@ -153,9 +157,12 @@ const pendingDecisionOptions = computed(() =>
 const hasRecoveryDecisionOption = computed(() =>
   pendingDecisionOptions.value.some((option) => option.id === APPROVE_PENDING_RECOVERY_ID),
 );
-const retryActionLabel = computed(
-  () => displayActions.value.find((action) => action.id === 'retry')?.label ?? 'Try again',
-);
+const retryActionLabel = computed(() => {
+  if (retryBlocked.value) {
+    return 'Talk to resolve';
+  }
+  return displayActions.value.find((action) => action.id === 'retry')?.label ?? 'Try again';
+});
 
 const transcriptRef = ref<HTMLElement | null>(null);
 

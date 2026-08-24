@@ -128,6 +128,39 @@ class NamedAssignRouteTests(unittest.TestCase):
         self.assertIn("routed a concrete Lead handoff to Cole", agent["content"])
         self.assertIn("Lesego login table", agent["content"])
 
+    def test_plan_mode_materializes_concrete_named_assign(self) -> None:
+        roster = _roster()
+
+        with patch(
+            "app.chat.lane_b_lead_named_assign_fast_path.build_company_roster",
+            return_value={"employees": [row.__dict__ for row in roster]},
+        ), patch(
+            "app.chat.lane_b_lead_named_assign_fast_path._create_named_handoff_task",
+            return_value={
+                "task": {"task_id": "task-ui"},
+                "run": {"run_id": "run-ui", "phase": "executing"},
+                "started": True,
+            },
+        ):
+            response = maybe_post_lead_named_assign_message(
+                workspace_id="workspace_test",
+                content="Assign Lila to build the Expo companion mobile shell",
+                thread_id="thread_lead",
+                employee_role="lead",
+                lead_name="Imani",
+                composer_mode="plan",
+                created_at="2026-08-23T21:00:00Z",
+                save_message=lambda payload: payload,
+                new_message_id=lambda prefix: f"{prefix}_1",
+                bind_attachments=lambda _message_id: [],
+            )
+
+        self.assertIsNotNone(response)
+        assert response is not None
+        self.assertTrue(response["dispatched"])
+        self.assertEqual("run-ui", response["run_id"])
+        self.assertEqual("task-ui", response["named_assign"]["task_id"])
+
     def test_lead_fast_path_does_not_recover_stale_operator_ask(self) -> None:
         roster = _roster()
         saved: list[dict] = []
@@ -216,6 +249,32 @@ class NamedAssignRouteTests(unittest.TestCase):
                 bind_attachments=lambda _message_id: [],
             )
         self.assertIsNone(response)
+
+    def test_lead_fast_path_does_not_misroute_build_plan_body(self) -> None:
+        roster = _roster()
+        with patch(
+            "app.chat.lane_b_lead_named_assign_fast_path.build_company_roster",
+            return_value={"employees": [row.__dict__ for row in roster]},
+        ) as build_roster:
+            response = maybe_post_lead_named_assign_message(
+                workspace_id="workspace_test",
+                content=(
+                    "Build this plan (plan_e3cb12ffced1): Production SEO\n\n"
+                    "Implement the plan steps in order.\n\n"
+                    "1. Lila — update the public pages.\n"
+                    "2. Cole — verify the backend endpoint."
+                ),
+                thread_id="thread_lead",
+                employee_role="lead",
+                lead_name="Imani",
+                composer_mode="agent",
+                created_at="2026-08-22T15:28:30Z",
+                save_message=Mock(),
+                new_message_id=lambda prefix: f"{prefix}_1",
+                bind_attachments=lambda _message_id: [],
+            )
+        self.assertIsNone(response)
+        build_roster.assert_not_called()
 
 
 if __name__ == "__main__":

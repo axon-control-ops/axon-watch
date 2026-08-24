@@ -38,6 +38,27 @@ describe('submitQuestionAnswer', () => {
     expect(isQuestionMarkedAnswered(messageId, prompt)).toBe(true);
   });
 
+  it('does not mark a question answered when the send is only queued', async () => {
+    const prompt = 'Which validation should run after the current turn?';
+    const messageId = 'msg_submit_queued';
+
+    const result = await submitQuestionAnswer(
+      {
+        openIdeComposerWithDraft: () => undefined,
+        submitIdeComposer: async () => 'queued',
+      },
+      {
+        workspaceId: 'workspace_test',
+        messageId,
+        prompt,
+        option: { id: '4', label: 'All of the above' },
+      },
+    );
+
+    expect(result).toBe('queued');
+    expect(isQuestionMarkedAnswered(messageId, prompt)).toBe(false);
+  });
+
   it('keeps the card unanswered when the send is blocked', async () => {
     const prompt = 'Which validation should run after failure?';
     const messageId = 'msg_submit_failure';

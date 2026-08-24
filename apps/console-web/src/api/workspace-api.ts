@@ -155,6 +155,29 @@ export async function registerWorkspaceBinding(
   );
 }
 
+export interface WorkspaceProjectRootSuggestion {
+  project_root: string;
+  label: string;
+  parent: string;
+}
+
+export interface WorkspaceProjectRootSuggestionSnapshot {
+  items: WorkspaceProjectRootSuggestion[];
+  count: number;
+}
+
+export async function fetchWorkspaceProjectRootSuggestions(
+  query: string,
+): Promise<WorkspaceProjectRootSuggestionSnapshot> {
+  const trimmed = query.trim();
+  const search = trimmed ? `?query=${encodeURIComponent(trimmed)}` : '';
+  return fetchJson<WorkspaceProjectRootSuggestionSnapshot>(
+    `/api/workspaces/project-root-suggestions${search}`,
+    {},
+    'workspace project root suggestions request failed',
+  );
+}
+
 export async function fetchWorkspace(workspaceId: string): Promise<WorkspaceRecord> {
   return fetchJson<WorkspaceRecord>(
     `/api/workspaces/${workspaceId}`,

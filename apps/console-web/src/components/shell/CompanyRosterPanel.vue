@@ -17,6 +17,7 @@ import {
   companyFailedEmployeesHintTooltip,
   companyHasFailedEmployees,
   COMPANY_ROSTER_DOCK_ID,
+  employeeFailureBlocksRetry,
   employeeFailureLine,
   employeeIsActivelyBusy,
   employeeSpeakLine,
@@ -481,7 +482,10 @@ async function recoverSelectedEmployeeFailure(): Promise<void> {
   if (!target || !employeeFailureLine(target)) {
     return;
   }
-  await startChat(target, 'retry');
+  // A working-as-intended policy block fails identically on every retry — route
+  // to Talk so the operator resolves it (e.g. moves the file) instead of
+  // silently re-queuing a doomed retry.
+  await startChat(target, employeeFailureBlocksRetry(target) ? 'talk' : 'retry');
 }
 
 async function onPresenceSelect(employee: CompanyEmployeeRecord): Promise<void> {

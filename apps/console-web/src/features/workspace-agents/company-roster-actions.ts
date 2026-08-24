@@ -8,6 +8,7 @@ import {
 } from '../../lib/verification-handoff';
 import {
   employeeDockReceiptRunId,
+  employeeFailureBlocksRetry,
   employeeFailureLine,
   employeeFailureRetryActionLabel,
   isRuntimeAuthFailure,
@@ -285,10 +286,13 @@ export function employeeQuickActions(
     chatKind: 'receipts',
     composerMode: 'ask',
   };
+  // Working-as-intended policy blocks (e.g. private-document paths) fail the
+  // same way on every retry — offering "Try again" here just burns a shift.
+  const blocksRetry = failed && employeeFailureBlocksRetry(employee);
   const actions: TeamMemberQuickAction[] = [
     ...(failed
       ? [
-          retryAction,
+          ...(blocksRetry ? [] : [retryAction]),
           ...(employeeDockReceiptRunId(employee) ? [receiptsAction] : []),
           talkAction,
         ]

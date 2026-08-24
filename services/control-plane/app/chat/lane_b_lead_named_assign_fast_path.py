@@ -5,12 +5,19 @@ from __future__ import annotations
 from typing import Any, Callable
 
 from app.workspace_agents import build_company_roster
-from app.workspace_agents.lead_task_plan import detect_fan_out_intent
+from app.workspace_agents.lead_task_plan import (
+    detect_fan_out_intent,
+    should_execute_lead_fast_path,
+)
 from app.workspace_agents.named_assign_route import (
     match_named_assign_employee,
     named_assign_action_body,
 )
-from app.workspace_agents.teammate_route import normalize_teammate_role, roster_employees_from_company
+from app.workspace_agents.teammate_route import (
+    is_build_plan_implement_prompt,
+    normalize_teammate_role,
+    roster_employees_from_company,
+)
 
 
 def _create_named_handoff_task(
@@ -61,7 +68,9 @@ def maybe_post_lead_named_assign_message(
 ) -> dict[str, object] | None:
     """When Lead is told to assign a named teammate, ack-and-stop (no Lane B essay)."""
     role = str(employee_role or "").strip().lower()
-    if composer_mode != "agent" or role != "lead":
+    if role != "lead" or not should_execute_lead_fast_path(composer_mode, content):
+        return None
+    if is_build_plan_implement_prompt(content):
         return None
     if detect_fan_out_intent(content):
         return None

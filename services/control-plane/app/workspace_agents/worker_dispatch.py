@@ -469,7 +469,13 @@ def dispatch_continuous_worker_run(
                         finalized = fail_worker_run(
                             run_id,
                             receipt_summary=(
-                                f"Workspace delivery blocked at {publish.stage}: {publish.detail}"
+                                # publish.stage is always the literal string
+                                # "blocked" on this path (it only carries a
+                                # distinct value -- "no_change" -- on the
+                                # success side, checked above); including it
+                                # here just produced "blocked at blocked".
+                                # The real reason always lives in .detail.
+                                f"Workspace delivery blocked: {publish.detail}"
                             ),
                         )
                         dispatched = False

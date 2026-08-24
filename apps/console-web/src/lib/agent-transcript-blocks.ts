@@ -175,6 +175,15 @@ export function thinkingPreview(text: string, maxLength = 90): string {
   return `${flattened.slice(0, maxLength - 1).trimEnd()}…`;
 }
 
+const READ_TOOL_LABEL_RE = /^Read\s+(.+)$/;
+
+/** Path a "Read <path>" tool-block label points at, or null for any other tool (Glob, Grep, ...). */
+export function readToolBlockPath(label: string): string | null {
+  const match = READ_TOOL_LABEL_RE.exec(label.trim());
+  const path = match?.[1]?.trim();
+  return path || null;
+}
+
 export function normalizeEditedFilePath(path: string): string {
   const normalized = path.trim().replace(/\\/g, '/');
   if (!normalized || normalized.startsWith('/')) {

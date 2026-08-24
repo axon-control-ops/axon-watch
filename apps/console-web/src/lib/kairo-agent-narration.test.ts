@@ -61,6 +61,7 @@ describe('narrationMilestonesForDelta', () => {
 
     const third = narrationMilestonesForDelta(STAGE_2, STAGE_3);
     expect(third[0]).toMatchObject({ key: 'edit:0', editPath: 'README.md' });
+    expect(third[0]?.message).toBe('File change: README.md');
   });
 });
 

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
+import { AGENT_EDIT_BLOCK_DEFAULT_EXPANDED } from './agent-edit-block-view';
 import {
   agentEditEventLabel,
   agentEditOperation,
@@ -7,6 +8,10 @@ import {
 } from './agent-edit-operation';
 
 describe('agent edit operation labels', () => {
+  it('keeps streaming edit blocks expanded by default', () => {
+    expect(AGENT_EDIT_BLOCK_DEFAULT_EXPANDED).toBe(true);
+  });
+
   it('detects created files from unified diff metadata', () => {
     expect(
       agentEditOperation({

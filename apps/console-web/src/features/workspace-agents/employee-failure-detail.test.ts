@@ -7,6 +7,7 @@ import {
   failureSpeakDetail,
   isAgentRuntimeFallbackFailure,
   isAgentSessionInterruptedFailure,
+  isNonRetriableWorkspaceBlockFailure,
   isOperatorStoppedFailure,
   isRestartInterruptedFailure,
   isRuntimeAuthFailure,
@@ -137,5 +138,19 @@ describe('employee-failure-detail', () => {
     expect(looksLikeSuccessfulOutcomeDetail('succeeded')).toBe(true);
     expect(looksLikeSuccessfulOutcomeDetail('vitest: assertion failed')).toBe(false);
     expect(looksLikeSuccessfulOutcomeDetail('')).toBe(false);
+  });
+
+  it('recognizes working-as-intended private-material blocks as non-retriable', () => {
+    expect(
+      isNonRetriableWorkspaceBlockFailure(
+        'Workspace delivery blocked: private_company_material: assets/TPS-PACK.zip matches ' +
+          'a private-document rule (financial records, RFQ packs, exports, and office-document ' +
+          'formats never leave a workspace automatically) -- this is expected, working-as-intended ' +
+          'behavior, not an error to retry.',
+      ),
+    ).toBe(true);
+    expect(isNonRetriableWorkspaceBlockFailure('Cursor CLI exited with status 143.')).toBe(false);
+    expect(isNonRetriableWorkspaceBlockFailure(null)).toBe(false);
+    expect(isNonRetriableWorkspaceBlockFailure('')).toBe(false);
   });
 });

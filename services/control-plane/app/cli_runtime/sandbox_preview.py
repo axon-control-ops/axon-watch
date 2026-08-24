@@ -124,8 +124,15 @@ def ensure_preview_dependencies(checkout: Path, bound_root: Path) -> str:
         raise SandboxPreviewError(f"could not create {target}: {exc}") from exc
 
     linked = 0
+    bin_links = 0
     for entry in source.iterdir():
         destination = target / entry.name
+        if entry.name == ".bin" and entry.is_dir():
+            try:
+                bin_links += _link_bin_directory(entry, destination)
+            except OSError:
+                pass
+            continue
         if destination.exists() or destination.is_symlink():
             continue
         try:
@@ -138,9 +145,84 @@ def ensure_preview_dependencies(checkout: Path, bound_root: Path) -> str:
         for entry in source.iterdir()
     ):
         raise SandboxPreviewError(f"could not link any dependencies into {target}")
-    if linked == 0:
+    workspace_bin_links = _link_workspace_bin_shims(checkout)
+    if linked == 0 and bin_links == 0 and workspace_bin_links == 0:
         return "checkout already has dependencies"
-    return f"linked {linked} packages into {target}"
+    notes = [f"linked {linked} packages into {target}"]
+    if bin_links:
+        notes.append(f"{bin_links} root bin shims")
+    if workspace_bin_links:
+        notes.append(f"{workspace_bin_links} workspace bin shims")
+    return "; ".join(notes)
+
+
+def _link_bin_directory(source_bin: Path, target_bin: Path) -> int:
+    """Create a real checkout-local .bin dir instead of an escaping dir symlink."""
+    if target_bin.is_symlink():
+        target_bin.unlink()
+    target_bin.mkdir(parents=True, exist_ok=True)
+    linked = 0
+    for source in source_bin.iterdir():
+        destination = target_bin / source.name
+        if destination.exists() or destination.is_symlink():
+            continue
+        try:
+            if source.is_symlink():
+                destination.symlink_to(os.readlink(source))
+            else:
+                destination.symlink_to(source, target_is_directory=source.is_dir())
+            linked += 1
+        except OSError:
+            continue
+    return linked
+
+
+def _workspace_package_roots(root: Path) -> list[Path]:
+    package_json = root / "package.json"
+    try:
+        package = json.loads(package_json.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return []
+    raw = package.get("workspaces") if isinstance(package, dict) else None
+    patterns: list[str] = []
+    if isinstance(raw, list):
+        patterns = [str(item) for item in raw if isinstance(item, str)]
+    elif isinstance(raw, dict) and isinstance(raw.get("packages"), list):
+        patterns = [str(item) for item in raw["packages"] if isinstance(item, str)]
+    roots: list[Path] = []
+    for pattern in patterns:
+        if pattern.startswith("!") or ".." in Path(pattern).parts:
+            continue
+        for candidate in root.glob(pattern):
+            if (candidate / "package.json").is_file():
+                roots.append(candidate)
+    return sorted(set(roots))
+
+
+def _link_workspace_bin_shims(root: Path) -> int:
+    root_bin = root / "node_modules" / ".bin"
+    if not root_bin.is_dir():
+        return 0
+    linked = 0
+    for workspace_root in _workspace_package_roots(root):
+        bin_dir = workspace_root / "node_modules" / ".bin"
+        if bin_dir.is_symlink():
+            continue
+        try:
+            bin_dir.mkdir(parents=True, exist_ok=True)
+        except OSError:
+            continue
+        for source in root_bin.iterdir():
+            destination = bin_dir / source.name
+            if destination.exists() or destination.is_symlink():
+                continue
+            try:
+                relative = os.path.relpath(source, bin_dir)
+                destination.symlink_to(relative, target_is_directory=source.is_dir())
+                linked += 1
+            except OSError:
+                continue
+    return linked
 
 
 # Git worktrees omit untracked deliverables (PDFs, filled forms, generated output).

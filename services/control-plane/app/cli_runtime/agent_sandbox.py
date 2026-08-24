@@ -156,7 +156,13 @@ def _trusted_wrapper_sources(
         sources[wrapper] = source
     return sources
 _BUILTIN_MATERIALIZED_WRAPPERS = frozenset(
-    {"axon-agent-terminal-job", "axon-assign", "axon-runlog", "axonhealth"}
+    {
+        "axon-agent-terminal-job",
+        "axon-assign",
+        "axon-runlog",
+        "axonhealth",
+        "workspace-live-verify",
+    }
 )
 def _prepare_workspace_scratch(workspace: Path, target: Path, name: str) -> None:
     """Reserve an empty mount point for agent-owned ephemeral state.

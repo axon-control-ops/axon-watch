@@ -13,7 +13,11 @@ import {
   threadMessageSpeakerLabel,
   threadMessageSpeakerStyle,
 } from '../../lib/thread-message-view';
-import { thinkingPreview, agentContentHasTranscriptBlocks } from '../../lib/agent-transcript-blocks';
+import {
+  thinkingPreview,
+  agentContentHasTranscriptBlocks,
+  readToolBlockPath,
+} from '../../lib/agent-transcript-blocks';
 import {
   isMarkdownFileAgentResponse,
   shouldHideAgentReportInThread,
@@ -374,6 +378,16 @@ const onCancelAgentTerminalJob = (jobId: string): void => void cancelAgentTermin
         </p>
       </div>
 
+      <button
+        v-else-if="segment.kind === 'tool' && readToolBlockPath(segment.label)"
+        type="button"
+        class="agent-block agent-block--tool agent-block--tool-link"
+        :title="`Open ${readToolBlockPath(segment.label)}`"
+        @click="shell.openWorkspaceFile(readToolBlockPath(segment.label)!)"
+      >
+        <span class="agent-block__tool-dot" aria-hidden="true" />
+        <span>{{ segment.label }}</span>
+      </button>
       <div v-else-if="segment.kind === 'tool'" class="agent-block agent-block--tool">
         <span class="agent-block__tool-dot" aria-hidden="true" />
         <span>{{ segment.label }}</span>

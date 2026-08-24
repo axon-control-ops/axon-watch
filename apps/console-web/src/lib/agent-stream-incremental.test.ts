@@ -49,6 +49,14 @@ describe('createAgentStreamIncrementalState', () => {
     }
   });
 
+  it('labels edit milestones as file operations', () => {
+    const state = createAgentStreamIncrementalState();
+    const milestones = state.consumeFullContent(STAGE_3);
+    expect(milestones.find((milestone) => milestone.key === 'edit:0')?.message).toBe(
+      'File change: README.md',
+    );
+  });
+
   it('matches streaming activity from the legacy resolver', () => {
     const state = feedIncrementalDeltas(STAGE_1_LONG);
     expect(state.toStreamingActivityView()).toEqual(resolveStreamingActivity(STAGE_1_LONG));

@@ -171,6 +171,14 @@
   overflow-wrap: anywhere;
 }
 
+.agent-block__question-queued-notice {
+  margin: 0;
+  font-size: 0.62rem;
+  font-weight: 550;
+  color: rgba(253, 230, 138, 0.86);
+  line-height: 1.4;
+}
+
 .agent-block__question-kicker {
   margin: 0;
   font-size: 0.55rem;

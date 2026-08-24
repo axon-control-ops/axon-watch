@@ -5,6 +5,7 @@ import {
   parseAgentTranscriptBlocks,
   thinkingPreview,
 } from './agent-transcript-blocks';
+import { agentEditEventLabel } from './agent-edit-operation';
 import { resolveActiveIdeAgentMessage } from './ide-agent-center-view';
 
 export type SidebarTranscriptLineKind =
@@ -62,7 +63,12 @@ export function buildSidebarAgentTranscriptLines(
       lines.push({
         id: `edit-${index}`,
         kind: 'edit',
-        text: `${path} +${segment.added} -${segment.removed}`,
+        text: agentEditEventLabel({
+          path,
+          added: segment.added,
+          removed: segment.removed,
+          diff: segment.diff,
+        }),
         live: streaming && segment.open,
       });
       return;

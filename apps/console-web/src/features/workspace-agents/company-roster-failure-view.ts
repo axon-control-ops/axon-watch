@@ -12,6 +12,7 @@ import {
   isRestartInterruptedFailure,
   isRuntimeAuthFailure,
   isCompletionGateFailure,
+  isNonRetriableWorkspaceBlockFailure,
   isRuntimeAuthProbeFailure,
   isShiftContinuationFailure,
   isUsageLimitFailure,
@@ -110,6 +111,12 @@ export function employeeFailureLine(
       return (
         'Last job produced no file changes in the worker isolation checkout — ' +
         'not Composer Sandbox. Tap Try again with a narrower task, or reassign as report-only audit.'
+      );
+    }
+    if (isNonRetriableWorkspaceBlockFailure(employee.last_outcome_detail)) {
+      return (
+        `Last job blocked (working as intended): ${truncateFailureDetail(detail)} ` +
+        'Retrying will fail the same way — an operator must remove or relocate the file first.'
       );
     }
     return `Last job failed: ${truncateFailureDetail(detail)}`;
@@ -262,6 +269,19 @@ export function employeeFailureRetryActionLabel(employee: CompanyEmployeeRecord)
 export function employeeFailureBlocksAutoRetry(employee: CompanyEmployeeRecord): boolean {
   return (
     Boolean(employeeFailureLine(employee)) && isUsageLimitFailure(employee.last_outcome_detail)
+  );
+}
+
+/**
+ * True when the last failure is a working-as-intended policy block (e.g. a
+ * private-document path never leaves the workspace automatically). Retrying
+ * re-runs the same task against the same working tree and fails identically
+ * every time, so the "Try again" action must not be offered here.
+ */
+export function employeeFailureBlocksRetry(employee: CompanyEmployeeRecord): boolean {
+  return (
+    Boolean(employeeFailureLine(employee)) &&
+    isNonRetriableWorkspaceBlockFailure(employee.last_outcome_detail)
   );
 }
 

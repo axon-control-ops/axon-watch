@@ -202,10 +202,25 @@ def tool_block_from_event(
     for key, value in tool_call.items():
         if not key.endswith("ToolCall") or not isinstance(value, dict):
             continue
-        label = key[: -len("ToolCall")].replace("_", " ").capitalize()
+        # str.capitalize() lowercases the rest of the string, so a camelCase key
+        # like "askQuestionToolCall" rendered as "Askquestion" instead of
+        # "Ask Question" — split on the case boundary first, then title-case.
+        raw_label = re.sub(r"(?<!^)(?=[A-Z])", " ", key[: -len("ToolCall")])
+        label = raw_label.replace("_", " ").title()
         args = value.get("args") if isinstance(value.get("args"), dict) else {}
         target = str(args.get("path") or args.get("command") or "").strip()
         target = _relative_path(target, workspace_root)
+        if not target:
+            # Tools like AskQuestion/CreatePlan carry their real payload (the
+            # question/plan text) under a tool-specific key rather than
+            # path/command — surface the first plain string arg we find so the
+            # block isn't a bare, contentless header. The model is instructed
+            # not to call these tools at all (see ask_fence_instruction); this
+            # is a fallback for when it does anyway.
+            for arg_value in args.values():
+                if isinstance(arg_value, str) and arg_value.strip():
+                    target = arg_value.strip()
+                    break
         suffix = f" {target}" if target else ""
         return f"\n:::tool {label}{suffix}\n"
     return ""

@@ -3,7 +3,7 @@ import { computed, onMounted, ref } from 'vue';
 
 import { fetchTunnelStatus } from '../../api/control-plane';
 import KairoConversationBar from '../../features/kairo-conversation/KairoConversationBar.vue';
-import KairoGalaxyOrb from '../../features/brain-galaxy/KairoGalaxyOrb.vue';
+import KairoGalaxyOrbSvg from '../../features/brain-galaxy/KairoGalaxyOrbSvg.vue';
 import { navigateToAppSurface } from '../../lib/app-surface-route';
 import { mobileTunnelActionState } from '../../lib/mobile-tunnel-view';
 import { useShellStore } from '../../stores/shell';
@@ -94,7 +94,9 @@ const tunnelActions = computed(() =>
     </section>
 
     <section class="operator-mobile-shell__voice">
-      <KairoGalaxyOrb placement-mode="embedded" />
+      <div class="operator-mobile-shell__voice-orb" aria-hidden="true">
+        <KairoGalaxyOrbSvg />
+      </div>
       <KairoConversationBar />
     </section>
 

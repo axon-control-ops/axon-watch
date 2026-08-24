@@ -1,6 +1,10 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue';
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 
+import {
+  fetchWorkspaceProjectRootSuggestions,
+  type WorkspaceProjectRootSuggestion,
+} from '../../api/workspace-api';
 import { useShellStore } from '../../stores/shell';
 
 const emit = defineEmits<{
@@ -14,6 +18,67 @@ const projectRoot = ref('');
 const displayName = ref('');
 const busy = ref(false);
 const error = ref('');
+
+// Suggests a project_root from sibling directories of already-registered
+// workspaces, ranked against the workspace id as the operator types — the
+// operator can still always override by typing their own path directly.
+const suggestions = ref<WorkspaceProjectRootSuggestion[]>([]);
+const suggestionsLoading = ref(false);
+const projectRootTouchedByOperator = ref(false);
+let suggestionRequestId = 0;
+let suggestionDebounce: ReturnType<typeof setTimeout> | null = null;
+
+async function loadSuggestions(query: string): Promise<void> {
+  const requestId = ++suggestionRequestId;
+  suggestionsLoading.value = true;
+  try {
+    const snapshot = await fetchWorkspaceProjectRootSuggestions(query);
+    if (requestId !== suggestionRequestId) {
+      return;
+    }
+    suggestions.value = snapshot.items;
+  } catch {
+    if (requestId === suggestionRequestId) {
+      suggestions.value = [];
+    }
+  } finally {
+    if (requestId === suggestionRequestId) {
+      suggestionsLoading.value = false;
+    }
+  }
+}
+
+function scheduleSuggestions(query: string): void {
+  if (suggestionDebounce) {
+    clearTimeout(suggestionDebounce);
+  }
+  suggestionDebounce = setTimeout(() => {
+    void loadSuggestions(query);
+  }, 220);
+}
+
+function applySuggestion(suggestion: WorkspaceProjectRootSuggestion): void {
+  projectRoot.value = suggestion.project_root;
+  projectRootTouchedByOperator.value = true;
+  if (!displayName.value.trim()) {
+    displayName.value = suggestion.label;
+  }
+  suggestions.value = [];
+}
+
+watch(workspaceId, (value) => {
+  scheduleSuggestions(value);
+});
+
+onMounted(() => {
+  scheduleSuggestions('');
+});
+
+onUnmounted(() => {
+  if (suggestionDebounce) {
+    clearTimeout(suggestionDebounce);
+  }
+});
 
 const canSubmit = computed(
   () =>
@@ -68,8 +133,28 @@ async function submit(): Promise<void> {
         autocomplete="off"
         placeholder="/run/media/vaxon/axon-data/path/to/repo"
         required
+        @input="projectRootTouchedByOperator = true"
       />
     </label>
+    <div
+      v-if="!projectRootTouchedByOperator && (suggestions.length || suggestionsLoading)"
+      class="workspace-add-form__suggestions"
+    >
+      <p class="workspace-add-form__suggestions-label">
+        {{ suggestionsLoading ? 'Looking for a matching project…' : 'Suggested project root' }}
+      </p>
+      <button
+        v-for="suggestion in suggestions"
+        :key="suggestion.project_root"
+        type="button"
+        class="workspace-add-form__suggestion"
+        :title="suggestion.project_root"
+        @click="applySuggestion(suggestion)"
+      >
+        <span class="workspace-add-form__suggestion-label">{{ suggestion.label }}</span>
+        <span class="workspace-add-form__suggestion-parent">{{ suggestion.parent }}</span>
+      </button>
+    </div>
     <label class="workspace-add-form__field">
       <span>Display name (optional)</span>
       <input
