@@ -15,7 +15,9 @@ from app.workspace_agents.specialist_task_scope import (  # noqa: E402
     try_lease_open_specialist_task,
 )
 from app.workspace_agents.workspace_runtime_bootstrap import (  # noqa: E402
+    check_host_runtime_tools,
     ensure_project_contract,
+    ensure_workspace_runtime_ready,
     provision_workspace_runtime,
 )
 
@@ -41,6 +43,48 @@ class WorkspaceRuntimeBootstrapTests(unittest.TestCase):
                 install_npm=True,
             )
             self.assertEqual("skipped", report["npm"]["status"])
+
+    def test_missing_ripgrep_is_advisory_for_runtime_bootstrap(self) -> None:
+        def fake_which(tool: str) -> str | None:
+            return None if tool == "rg" else f"/usr/bin/{tool}"
+
+        with patch("app.workspace_agents.workspace_runtime_bootstrap.shutil.which", fake_which):
+            report = check_host_runtime_tools()
+
+        self.assertTrue(report["ok"])
+        self.assertEqual([], report["missing"])
+        self.assertIn("rg", report["advisory_tools_missing"])
+
+    def test_advisory_ripgrep_does_not_block_runtime_ready(self) -> None:
+        with patch(
+            "app.workspace_agents.workspace_runtime_bootstrap.provision_workspace_runtime",
+            return_value={
+                "host_tools": {
+                    "ok": True,
+                    "missing": [],
+                    "advisory_tools_missing": ["rg"],
+                },
+                "npm": {"status": "skipped"},
+                "python": {"status": "skipped"},
+            },
+        ):
+            ensure_workspace_runtime_ready("workspace_demo")
+
+    def test_missing_core_host_tool_still_blocks_runtime_ready(self) -> None:
+        with patch(
+            "app.workspace_agents.workspace_runtime_bootstrap.provision_workspace_runtime",
+            return_value={
+                "host_tools": {
+                    "ok": False,
+                    "missing": ["git"],
+                    "advisory_tools_missing": [],
+                },
+                "npm": {"status": "skipped"},
+                "python": {"status": "skipped"},
+            },
+        ):
+            with self.assertRaisesRegex(Exception, "git"):
+                ensure_workspace_runtime_ready("workspace_demo")
 
 
 class SpecialistTaskScopeTests(unittest.TestCase):

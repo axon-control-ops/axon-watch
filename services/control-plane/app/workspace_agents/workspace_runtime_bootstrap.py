@@ -21,9 +21,12 @@ _HOST_RUNTIME_TOOLS = (
     "node",
     "npm",
     "python3",
-    "rg",
     "bash",
     "sh",
+)
+
+_HOST_ADVISORY_TOOLS = (
+    "rg",
 )
 
 # Optional but recommended for PDF/document workflows; missing tools degrade, not block.
@@ -225,12 +228,16 @@ def ensure_project_contract(
 def check_host_runtime_tools() -> dict[str, Any]:
     """Report missing host utilities agents expect (awk, git, node, …)."""
     missing = [tool for tool in _HOST_RUNTIME_TOOLS if shutil.which(tool) is None]
+    missing_advisory = [
+        tool for tool in _HOST_ADVISORY_TOOLS if shutil.which(tool) is None
+    ]
     missing_document = [
         tool for tool in _HOST_DOCUMENT_TOOLS if shutil.which(tool) is None
     ]
     return {
         "ok": not missing,
         "missing": missing,
+        "advisory_tools_missing": missing_advisory,
         "document_tools_missing": missing_document,
     }
 
