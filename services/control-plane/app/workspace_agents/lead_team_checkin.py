@@ -347,7 +347,9 @@ def _open_assignment_tasks(workspace_id: str) -> list[dict[str, Any]]:
 
 
 def _already_tracked(dedupe_key: str, existing: list[dict[str, Any]]) -> bool:
-    needle = dedupe_key.lower()
+    needle = dedupe_key.strip().lower()
+    if not needle:
+        return False
     for row in existing:
         goal = str(row.get("goal") or "").lower()
         criteria = str(row.get("acceptance_criteria") or "").lower()
@@ -426,6 +428,7 @@ def escalate_operator_blockers_to_vaxon(
         return []
 
     escalated: list[dict[str, Any]] = []
+    existing = _open_assignment_tasks(workspace)
     for finding in findings:
         if len(escalated) >= max(1, int(max_escalations)):
             break
@@ -433,6 +436,15 @@ def escalate_operator_blockers_to_vaxon(
             continue
         dedupe_key = finding.dedupe_key
         try:
+            # Operator approval resolves the Needs-you receipt and creates a
+            # bounded VAXON/attend task that carries the same dedupe key. The
+            # receipt cooldown is intentionally short, but an open recovery
+            # task is durable evidence that the failure is already being
+            # handled. Without this guard, lead/runtime failures can reappear
+            # as the same card every cooldown window while the approved
+            # recovery task is still open or leased.
+            if _already_tracked(dedupe_key, existing):
+                continue
             if autonomous_attention_store.has_recent_dedupe_key(dedupe_key):
                 continue
             receipt = autonomous_attention_store.append_receipt(
