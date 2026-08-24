@@ -55,6 +55,7 @@ from app.debug_prompt import build_debug_system_prompt
 from app.kairo_ask_prompt import build_ask_system_prompt
 from app.cli_runtime.long_running_shell_prompt import LONG_RUNNING_SHELL_CLAUSE
 from app.instructions_engine import build_instructions_system_prompt
+from app.specialist_roles import SpecialistContext
 from app.cli_runtime.plan_system_prompt import (
     ask_fence_instruction,
     build_plan_system_prompt,
@@ -112,13 +113,14 @@ def _system_prompt(
     *,
     persona_enabled: bool | None = None,
     research_snapshot: dict[str, object] | None = None,
+    instructions_context: SpecialistContext | None = None,
 ) -> str:
     research_line = format_capability_line(research_snapshot or research_capability_snapshot())
     if composer_mode == "ask":
         enabled = persona_enabled if persona_enabled is not None else _operator_persona_enabled()
         return f"{build_ask_system_prompt(persona_enabled=enabled)} {research_line}"
     if composer_mode == "instructions":
-        return build_instructions_system_prompt()
+        return build_instructions_system_prompt(instructions_context)
     if composer_mode == "plan":
         offline_clause = (
             "Ground the plan in the local repo and provided context. "
@@ -249,6 +251,7 @@ def dispatch_ide_composer(
     execution_policy: AgentExecutionPolicy | None = None,
     fallback_runtime_families: tuple[str, ...] = (),
     respect_cached_usage_limit: bool = False,
+    instructions_context: SpecialistContext | None = None,
 ) -> dict[str, object]:
     def _finish(payload: dict[str, object]) -> dict[str, object]:
         return _attach_dispatch_metadata(payload, composer_mode=composer_mode)
@@ -301,6 +304,7 @@ def dispatch_ide_composer(
         research_snapshot=research_snapshot,
         write_scope_hint=write_scope_hint,
         workspace_id=workspace_id,
+        instructions_context=instructions_context,
     )
     approval_notice = consultative_only_notice(
         composer_mode=composer_mode,

@@ -18,6 +18,7 @@ def build_agent_prompt(
     research_snapshot: dict[str, object] | None = None,
     write_scope_hint: str = "",
     workspace_id: str = "",
+    instructions_context: object | None = None,
 ) -> str:
     from app.workspace_agents.employee_persona_prompt import (
         adapt_lane_b_system_prompt_for_employee,
@@ -30,7 +31,12 @@ def build_agent_prompt(
     workbook_policy = assignment_workbook_policy_appendix(user_prompt, context_block)
     policy_block = f"\n\n{workbook_policy}" if workbook_policy else ""
     system = adapt_lane_b_system_prompt_for_employee(
-        _system_prompt(composer_mode, execution_tier, research_snapshot=snapshot),
+        _system_prompt(
+            composer_mode,
+            execution_tier,
+            research_snapshot=snapshot,
+            instructions_context=instructions_context,
+        ),
         context_block,
     )
     persona_block, remainder_context = split_employee_persona_from_context(context_block)

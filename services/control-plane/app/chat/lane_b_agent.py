@@ -13,6 +13,7 @@ from app.terminal.workspace_roots import WorkspaceRootError, resolve_workspace_r
 from app.workspace_agents.execution_policy import AgentExecutionPolicy
 from app.workspace_catalog import WorkspaceNotFoundError
 from app.workspace_files import WorkspaceFileError, list_workspace_files
+from app.specialist_roles import SpecialistContext
 
 
 @dataclass(frozen=True)
@@ -27,6 +28,7 @@ class EditorSelectionContext:
 class LaneBContext:
     workspace_id: str
     composer_mode: str
+    instructions_context: SpecialistContext | None = None
     active_file_path: str | None = None
     editor_selection: EditorSelectionContext | None = None
     terminal_snippet: str | None = None
@@ -191,6 +193,7 @@ def generate_lane_b_result(
                 execution_policy=execution_policy,
                 fallback_runtime_families=fallback_runtime_families,
                 respect_cached_usage_limit=respect_cached_usage_limit,
+                instructions_context=context.instructions_context,
             )
         except RuntimeError as exc:
             return {
@@ -235,6 +238,7 @@ def generate_lane_b_result(
             execution_policy=execution_policy,
             fallback_runtime_families=fallback_runtime_families,
             respect_cached_usage_limit=respect_cached_usage_limit,
+            instructions_context=context.instructions_context,
         )
     except RuntimeError as exc:
         return {

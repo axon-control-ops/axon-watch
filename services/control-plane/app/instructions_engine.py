@@ -2,24 +2,91 @@
 
 from __future__ import annotations
 
+from app.specialist_roles import (
+    GENERAL_ROLE_ID,
+    SpecialistContext,
+    specialist_context_to_prompt_block,
+)
 
-def build_instructions_system_prompt() -> str:
+
+def _role_prompt_clause(context: SpecialistContext | None) -> str:
+    ctx = context or SpecialistContext(role=GENERAL_ROLE_ID)
+    profile = ctx.profile
+    responsibilities = "\n".join(f"- {item}" for item in profile.primary_responsibilities)
+    boundaries = "\n".join(f"- {item}" for item in profile.ownership_boundaries)
+    restricted = "\n".join(f"- {item}" for item in profile.restricted_actions)
+    evidence = "\n".join(f"- {item}" for item in profile.required_evidence)
+    validation = "\n".join(f"- {item}" for item in profile.validation_expectations)
+    handoffs = "\n".join(f"- {item}" for item in profile.handoff_rules)
+    general_warning = (
+        "\nNo specialist role was supplied. Confirm ownership before implementation."
+        if ctx.role == GENERAL_ROLE_ID
+        else ""
+    )
+    return (
+        f"{specialist_context_to_prompt_block(ctx)}{general_warning}\n\n"
+        f"Role mission: {profile.mission}\n"
+        "Primary responsibilities:\n"
+        f"{responsibilities}\n"
+        "Ownership boundaries:\n"
+        f"{boundaries}\n"
+        "Restricted actions:\n"
+        f"{restricted}\n"
+        "Required evidence:\n"
+        f"{evidence}\n"
+        "Validation expectations:\n"
+        f"{validation}\n"
+        "Handoff rules:\n"
+        f"{handoffs}\n"
+    )
+
+
+def build_instructions_system_prompt(context: SpecialistContext | None = None) -> str:
+    ctx = context or SpecialistContext(role=GENERAL_ROLE_ID)
+    specialist_required = ctx.role != GENERAL_ROLE_ID
+    specialist_sections = (
+        "For recognized specialists, the reply MUST include `## Assigned specialist`, "
+        "`## Role mandate`, and `## Ownership boundaries` before `## Goal`. "
+        "The assigned specialist role in the Markdown must match the selected specialist; "
+        "do not generate instructions for a different role. "
+        if specialist_required
+        else "Use the general profile and include this sentence: "
+        "`No specialist role was supplied. Confirm ownership before implementation.` "
+    )
     return (
         "You are Axon-X Instructions engine. Your only job is to convert the operator's "
         "source request into binding Instructions markdown. "
         "Do not inspect files, run commands, edit code, or claim work was implemented, "
         "tested, or verified. "
+        "Write for the selected specialist only. Respect that specialist's ownership "
+        "boundaries, generate role-specific steps, require role-specific evidence, and "
+        "create handoffs for unauthorized work instead of assigning it to the wrong role. "
         "Return markdown only — no preamble, no :::thinking fences, no commentary. "
-        "The reply MUST begin with `# Instructions` and MUST include every section below, "
-        "in this order, each with a non-empty body:\n"
+        "The reply MUST begin with `# Instructions`. "
+        f"{specialist_sections}"
+        "The reply MUST include every section below, in this order, each with a non-empty body:\n"
+        "## Assigned specialist (recognized specialists only)\n"
+        "## Role mandate (recognized specialists only)\n"
+        "## Ownership boundaries (recognized specialists only)\n"
         "## Goal\n"
+        "## Context\n"
+        "## Delivery mode\n"
         "## In scope\n"
         "## Out of scope\n"
         "## Steps\n"
+        "## Acceptance criteria\n"
+        "## Validation\n"
         "## Constraints\n"
         "Goal is 1-2 sentences stating the outcome only — no bullets, no step sequencing, "
         "and it must stand on its own without relying on the source request text. "
-        "Use bullet lists for In scope, Out of scope, and Constraints. "
+        "Context explains why the task exists, including any observed failure pattern, without "
+        "claiming that files were already changed. "
+        "Delivery mode must say whether the work should be a scoped workspace-delivery task, "
+        "an investigation/report, or a consultative answer. If code or file changes are needed, "
+        "explicitly require a real workspace-delivery run with the relevant paths in scope; do "
+        "not accept a direct chat-only answer as implementation evidence. "
+        "Use bullet lists for Delivery mode, In scope, Out of scope, Acceptance criteria, "
+        "Validation, and Constraints. "
         "Use numbered steps (at least 4), each a distinct, independently verifiable action — "
         "do not restate In scope bullets as Steps. "
         "Steps must carry the work through to what the source request actually asked for: if "
@@ -32,6 +99,9 @@ def build_instructions_system_prompt() -> str:
         "unless asked, regardless of the request) go in Constraints. Do not restate or "
         "rephrase an Out of scope bullet inside Constraints, or vice versa — each fact appears "
         "once, in its one correct section. "
+        "Acceptance criteria must describe the concrete receipts or visible outcomes that prove "
+        "the task landed. Validation must name the narrow local checks or manual smoke checks "
+        "needed before completion. "
         "Out of scope must explicitly exclude commit, push, merge, and release unless the "
         "source request explicitly asks for them — state this only in Out of scope. "
         "Constraints must explicitly exclude deploy, publish, and notifying external parties "
@@ -43,17 +113,45 @@ def build_instructions_system_prompt() -> str:
         "After that, add an optional ## Source request section only when the request contains "
         "exact identifiers, thresholds, or quoted text that must survive verbatim, or the "
         "operator asked for traceability — otherwise omit it. When included, reproduce the "
-        "source text unmodified and unparaphrased."
+        "source text unmodified and unparaphrased.\n\n"
+        f"{_role_prompt_clause(ctx)}"
     )
 
 
-_INSTRUCTION_ENGINE_USER_PROMPT = """Expand the source request below into complete Instructions markdown.
+_INSTRUCTION_ENGINE_USER_PROMPT = """Expand the source request below into complete Instructions markdown for the selected specialist.
+
+Specialist contract:
+{specialist_context}
 
 Required output shape:
 # Instructions
 
+## Assigned specialist
+- Role: selected role display name
+- Agent: selected agent name, or Unspecified
+- Workspace: selected workspace label or ID
+- Delivery mode: selected specialist delivery mode
+
+## Role mandate
+Concise explanation of this specialist's purpose in the current task.
+
+## Ownership boundaries
+### Owned by this specialist
+- Work that belongs to the selected specialist
+
+### Requires handoff
+- Work belonging to other specialists and the required recipient
+
 ## Goal
 One or two precise outcome sentences. Must be understandable without the source request.
+
+## Context
+Why this task exists, including any observed failure pattern. Do not claim implementation.
+
+## Delivery mode
+- How the assignee should execute the work. If code or file changes are needed, require a
+  scoped workspace-delivery task with relevant writable paths in scope, not a direct chat-only
+  answer.
 
 ## In scope
 - Concrete deliverables inferred from the request
@@ -67,6 +165,12 @@ One or two precise outcome sentences. Must be understandable without the source 
 (At least 4 numbered, actionable, independently verifiable steps — do not restate In scope.
 If the request asks for something to be built/fixed/redesigned, Steps must reach
 implementation and verification, not stop at analysis or recommendations.)
+
+## Acceptance criteria
+- Visible outcomes or receipts that prove the task landed
+
+## Validation
+- Narrow local tests, checks, or manual smoke checks required before completion
 
 ## Constraints
 - Standing guardrails: exclude deploy/publish/notify unless requested, forbid unverified
@@ -86,5 +190,14 @@ Source request:
 """
 
 
-def build_instruction_engine_user_prompt(source: str) -> str:
-    return f"{_INSTRUCTION_ENGINE_USER_PROMPT}{source.strip()}\n"
+def build_instruction_engine_user_prompt(
+    source: str,
+    context: SpecialistContext | None = None,
+) -> str:
+    return (
+        _INSTRUCTION_ENGINE_USER_PROMPT.format(
+            specialist_context=specialist_context_to_prompt_block(context),
+        )
+        + source.strip()
+        + "\n"
+    )

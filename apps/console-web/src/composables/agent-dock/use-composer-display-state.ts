@@ -15,6 +15,10 @@ import {
 import { OPERATOR_PERSONA_NAME } from '../../lib/operator-persona-name';
 import { runContinueActionLabel } from '../../lib/run-lifecycle-ui';
 import {
+  buildInstructionsSpecialistContext,
+  instructionsSpecialistLabel as formatInstructionsSpecialistLabel,
+} from '../../lib/instructions-specialist-context';
+import {
   composerAccessBannerCopy,
   composerAccessTone,
 } from '../../lib/sandbox-session-view';
@@ -194,6 +198,9 @@ export function useComposerDisplayState(options: UseComposerDisplayStateOptions)
     },
   });
   const instructionsGenerating = ref(false);
+  const instructionsSpecialistLabel = computed(() => {
+    return formatInstructionsSpecialistLabel(shell.activeIdeEmployeeRecord);
+  });
   const canConvertInstructions = computed(
     () =>
       Boolean(shell.currentWorkspace?.workspace_id) &&
@@ -202,7 +209,8 @@ export function useComposerDisplayState(options: UseComposerDisplayStateOptions)
   );
 
   async function convertDraftToInstructions(): Promise<void> {
-    const workspaceId = shell.currentWorkspace?.workspace_id;
+    const workspace = shell.currentWorkspace;
+    const workspaceId = workspace?.workspace_id;
     const source = composerDraftModel.value.trim();
     if (!workspaceId || !source || instructionsGenerating.value) return;
     instructionsGenerating.value = true;
@@ -210,6 +218,11 @@ export function useComposerDisplayState(options: UseComposerDisplayStateOptions)
       const result = await generateInstructions({
         workspace_id: workspaceId,
         content: source,
+        specialist_context: buildInstructionsSpecialistContext({
+          workspace,
+          employee: shell.activeIdeEmployeeRecord,
+          composerMode: composerMode.value,
+        }),
         runtime_target: shell.selectedRuntimeTargetId || null,
         runtime_model: shell.selectedComposerModel || null,
       });
@@ -273,6 +286,7 @@ export function useComposerDisplayState(options: UseComposerDisplayStateOptions)
     composerDraftModel,
     canConvertInstructions,
     instructionsGenerating,
+    instructionsSpecialistLabel,
     convertDraftToInstructions,
     composerPlaceholder,
     composerQueueHint,

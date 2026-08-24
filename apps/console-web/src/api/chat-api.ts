@@ -73,6 +73,20 @@ export interface PostChatMessageResponse {
 export interface GenerateInstructionsRequest {
   workspace_id: string;
   content: string;
+  specialist_context?: {
+    role?: string | null;
+    agent_name?: string | null;
+    employee_id?: string | null;
+    workspace_id?: string | null;
+    workspace_label?: string | null;
+    composer_mode?: string | null;
+    requested_delivery_mode?: string | null;
+    allowed_paths?: string[] | null;
+    read_scope?: string[] | null;
+    write_scope?: string[] | null;
+    delivery_capabilities?: string[] | null;
+    owns?: string | null;
+  } | null;
   runtime_target?: string | null;
   runtime_model?: string | null;
 }

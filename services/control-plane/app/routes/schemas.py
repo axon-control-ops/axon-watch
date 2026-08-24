@@ -66,6 +66,7 @@ class GenerateInstructionsRequest(BaseModel):
 
     workspace_id: str
     content: str
+    specialist_context: dict[str, Any] | None = None
     runtime_target: str | None = None
     runtime_model: str | None = None
 

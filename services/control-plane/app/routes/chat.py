@@ -28,6 +28,7 @@ from app.routes.schemas import (
     PostChatMessageRequest,
     SyncThreadExecutionAccessRequest,
 )
+from app.specialist_roles import validate_specialist_context
 
 router = APIRouter()
 
@@ -37,11 +38,22 @@ def composer_instructions_generate(body: GenerateInstructionsRequest) -> dict[st
     source = body.content.strip()
     if not source:
         raise HTTPException(status_code=400, detail="A source request is required")
+    try:
+        specialist_context = validate_specialist_context(
+            workspace_id=body.workspace_id,
+            supplied=body.specialist_context,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
-    fallback = compose_instructions_markdown(source, None)
+    fallback = compose_instructions_markdown(source, None, specialist_context)
     result = generate_lane_b_result(
-        context=LaneBContext(workspace_id=body.workspace_id, composer_mode="instructions"),
-        user_prompt=build_instruction_engine_user_prompt(source),
+        context=LaneBContext(
+            workspace_id=body.workspace_id,
+            composer_mode="instructions",
+            instructions_context=specialist_context,
+        ),
+        user_prompt=build_instruction_engine_user_prompt(source, specialist_context),
         runtime_target=body.runtime_target,
         runtime_model=body.runtime_model,
         execution_access="consultative",
@@ -57,10 +69,11 @@ def composer_instructions_generate(body: GenerateInstructionsRequest) -> dict[st
                 "runtime_label": str(result.get("runtime_label") or "deterministic"),
                 "fallback": True,
                 "reason": reason,
+                "specialist_role": specialist_context.role,
             }
         raise HTTPException(status_code=503, detail=reason)
 
-    content = compose_instructions_markdown(source, raw_content)
+    content = compose_instructions_markdown(source, raw_content, specialist_context)
     if not content:
         raise HTTPException(
             status_code=503,
@@ -71,6 +84,7 @@ def composer_instructions_generate(body: GenerateInstructionsRequest) -> dict[st
         "runtime_id": str(result.get("runtime_id") or ""),
         "runtime_label": str(result.get("runtime_label") or ""),
         "fallback": content == fallback,
+        "specialist_role": specialist_context.role,
     }
 
 

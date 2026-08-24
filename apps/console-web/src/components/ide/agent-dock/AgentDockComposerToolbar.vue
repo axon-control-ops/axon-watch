@@ -73,6 +73,7 @@ defineProps<{
   runtimeHint: string;
   canConvertInstructions?: boolean;
   instructionsGenerating?: boolean;
+  instructionsSpecialistLabel?: string;
 }>();
 
 const emit = defineEmits<{
@@ -200,15 +201,15 @@ function runtimeStatusLine(record: AgentDockComposerRuntimeTarget): string {
         type="button"
         class="agent-dock-composer__tool"
         :class="{ 'is-thinking': instructionsGenerating }"
-        :title="instructionsGenerating ? 'Turning this request into structured Instructions' : 'Turn this request into structured Instructions'"
-        :aria-label="instructionsGenerating ? 'Generating instructions' : 'Convert draft to instructions'"
+        :title="instructionsGenerating ? `Creating ${instructionsSpecialistLabel || 'detailed Markdown instructions'}…` : `Create ${instructionsSpecialistLabel || 'detailed Markdown instructions'}`"
+        :aria-label="instructionsGenerating ? `Creating ${instructionsSpecialistLabel || 'detailed Markdown instructions'}` : `Create ${instructionsSpecialistLabel || 'detailed Markdown instructions'}`"
         :aria-busy="instructionsGenerating ? 'true' : 'false'"
         :disabled="!canConvertInstructions"
         @click="emit('convert-to-instructions')"
       >
         <span v-if="instructionsGenerating" class="agent-dock-composer__tool-spinner" aria-hidden="true" />
         <span v-else class="agent-dock-composer__tool-icon" aria-hidden="true">≡</span>
-        <span>{{ instructionsGenerating ? 'Thinking…' : 'Instructions' }}</span>
+        <span>{{ instructionsGenerating ? 'Creating…' : 'Instructions' }}</span>
       </button>
     </div>
 
