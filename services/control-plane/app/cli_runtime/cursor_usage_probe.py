@@ -110,7 +110,11 @@ def _empty_usage(*, ok: bool, message: str, source: str = "unavailable") -> Stat
         "auto_display_message": None,
         "api_display_message": None,
         "message": message,
-        "allows_agent_retry": True,
+        # An unreadable pool still fails open, but must not advertise headroom
+        # the CLI just told us we do not have. Codex's probe already reports
+        # its observed limit hit this way; cursor hardcoded True, so callers
+        # reading this payload disagreed with the scheduler's own gate.
+        "allows_agent_retry": not cursor_usage_limit_hit_is_fresh(),
     }
 
 

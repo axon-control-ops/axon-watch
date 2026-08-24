@@ -67,6 +67,25 @@ class CursorUsageLimitBreakerTests(unittest.TestCase):
             )
         )
 
+    def test_unavailable_payload_reports_the_breaker_to_callers(self) -> None:
+        """The emitted payload must agree with the scheduler's own gate.
+
+        Codex's probe already reports its observed limit hit via
+        allows_agent_retry; cursor hardcoded True, so an API/UI caller reading
+        an unavailable-pool payload saw "retries fine" while the auto-start
+        gate was correctly refusing to dispatch.
+        """
+        from app.cli_runtime.cursor_usage_probe import _empty_usage
+
+        before = _empty_usage(ok=False, message="probe unavailable")
+        self.assertTrue(before["allows_agent_retry"])
+
+        record_cursor_usage_limit_hit(OUT_OF_USAGE)
+        after = _empty_usage(ok=False, message="probe unavailable")
+        self.assertFalse(after["allows_agent_retry"])
+        # And it still agrees with the predicate the scheduler consults.
+        self.assertFalse(cursor_usage_allows_agent_retry(after))
+
     def test_reset_clears_the_breaker(self) -> None:
         record_cursor_usage_limit_hit(OUT_OF_USAGE)
         reset_cursor_usage_limit_state_for_tests()
