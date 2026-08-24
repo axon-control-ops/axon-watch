@@ -52,9 +52,25 @@ export interface EmailMessagesResult {
   count: number;
 }
 
-export async function fetchEmailFolders(workspaceId: string): Promise<EmailFoldersResult> {
+export type EmailMailboxScope = {
+  workspaceId?: string;
+  accountId?: string;
+};
+
+function emailMailboxScopeParams(scope: EmailMailboxScope): URLSearchParams {
+  const params = new URLSearchParams();
+  if (scope.accountId) {
+    params.set('account_id', scope.accountId);
+  } else if (scope.workspaceId) {
+    params.set('workspace_id', scope.workspaceId);
+  }
+  return params;
+}
+
+export async function fetchEmailFolders(scope: EmailMailboxScope): Promise<EmailFoldersResult> {
+  const params = emailMailboxScopeParams(scope);
   return fetchJson<EmailFoldersResult>(
-    `/api/email/folders?workspace_id=${encodeURIComponent(workspaceId)}`,
+    `/api/email/folders?${params.toString()}`,
     {},
     'email folders request failed',
     INBOX_FETCH_TIMEOUT_MS,
@@ -62,11 +78,12 @@ export async function fetchEmailFolders(workspaceId: string): Promise<EmailFolde
 }
 
 export async function fetchEmailMessages(
-  workspaceId: string,
+  scope: EmailMailboxScope,
   role: EmailFolderRole,
   options?: { limit?: number },
 ): Promise<EmailMessagesResult> {
-  const params = new URLSearchParams({ workspace_id: workspaceId, role });
+  const params = emailMailboxScopeParams(scope);
+  params.set('role', role);
   if (options?.limit) {
     params.set('limit', String(options.limit));
   }

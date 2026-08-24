@@ -36,7 +36,6 @@ def _safe_emit(
         )
     except Exception:  # noqa: BLE001 — CI status tracking must not fail closed on missing runs
         logger.exception("delivery receipt emit failed for %s stage=%s", run_id, stage)
-        return
     _post_delivery_update_to_agent_thread(
         workspace_id=workspace_id,
         run_id=run_id,
@@ -135,42 +134,6 @@ def _post_delivery_update_to_agent_thread(
         )
     except Exception:  # noqa: BLE001 — delivery persistence must never fail closed on chat UX
         logger.exception("delivery thread update failed for %s stage=%s", run_id, stage)
-
-
-def _queue_lead_after_ci_green(
-    *,
-    workspace_id: str,
-    run_id: str,
-    task_id: str | None,
-    workflow_name: str,
-    head_branch: str,
-    html_url: str,
-) -> None:
-    """Give the workspace Lead the verified post-green handoff automatically."""
-    try:
-        from app.workspace_agents.lead_takeover_followup import enqueue_lead_follow_up_task
-
-        follow_up = enqueue_lead_follow_up_task(
-            workspace_id=workspace_id,
-            employee_name="CI",
-            employee_role="watcher",
-            lead_next=(
-                f"{workflow_name or 'CI'} is green on {head_branch or 'the delivery branch'}. "
-                "Verify the PR/merge state and advance the next safe plan step."
-            ),
-            run_id=run_id,
-            phase="completed",
-            task_id=task_id,
-        )
-        if follow_up is not None:
-            logger.info(
-                "queued Lead CI-green follow-up workspace=%s delivery_run=%s task=%s",
-                workspace_id,
-                run_id,
-                follow_up.get("task_id"),
-            )
-    except Exception:  # noqa: BLE001 — delivery state must not depend on handoff UX
-        logger.exception("CI-green Lead handoff failed for %s", run_id)
 
 
 def _queue_lead_after_ci_green(

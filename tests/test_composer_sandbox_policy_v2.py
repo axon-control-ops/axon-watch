@@ -104,11 +104,14 @@ class ComposerSandboxPolicyV2Tests(unittest.TestCase):
             policy = resolve_composer_execution_policy(root, "", "agent")
             self.assertEqual(policy and policy.write_paths, (".",))
             lead_scoped = resolve_composer_execution_policy(root, "lead", "agent", "consultative")
-            self.assertNotEqual(lead_scoped and lead_scoped.write_paths, (".",))
+            self.assertEqual(
+                lead_scoped and lead_scoped.write_paths,
+                ("node_modules", "docs", "output", "plans"),
+            )
             lead_full = resolve_composer_execution_policy(root, "lead", "agent", "full")
             self.assertEqual(lead_full and lead_full.write_paths, (".",))
             watcher_full = resolve_composer_execution_policy(root, "watcher", "agent", "full")
-            self.assertEqual(watcher_full and watcher_full.write_paths, ())
+            self.assertEqual(watcher_full and watcher_full.write_paths, (".",))
             composer_sandbox.discard_sandbox("ws-access")
 
     def test_review_exposes_checkout_preview_and_root_dirty_state(self) -> None:

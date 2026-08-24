@@ -2,27 +2,24 @@
 
 Three failure modes this closes, all observed in real shifts:
 
-1. Agents reach for `node -e` / `python -c` / `bash -c` to do file I/O. Those
-   are categorical interpreter escapes in the shell hook and are denied no
-   matter what the execution policy grants, so the write silently never lands.
+1. Agents reach for `node -e` / `python -c` / `bash -c` to do routine file I/O.
+   Full role access can run those tools, but reviewable Write/Edit patches are
+   safer and produce clearer receipts.
 2. Agents infer a receipt's file extension from neighbouring files rather than
    naming what they actually wrote. ``docs/ops/agent-reports/`` holds machine
    ``*.json`` watcher receipts next to human ``*.md`` shift reports, so a
    markdown report gets declared as ``.json`` and fails path verification.
-3. Agents wrap an approved wrapper in a shell (``zsh -lc "<wrapper> ..."``).
-   The shell is an interpreter escape, so the whole command is denied, and the
-   agent reports the wrapper as missing rather than as wrongly invoked.
+3. Agents wrap an approved wrapper in an unnecessary shell
+   (``zsh -lc "<wrapper> ..."``), obscuring the command and its receipt.
 """
 
 from __future__ import annotations
 
 WRITE_CONTRACT_CLAUSE = (
-    " File writes: use your Write/Edit tools, never a shell interpreter. "
-    "`node -e`, `python -c`, `bash -c`, and `sh -c` are denied by the sandbox "
-    "as interpreter escapes regardless of what your policy otherwise allows — "
-    "a write attempted that way never lands, even though the turn may look "
-    "like it succeeded. If a write is refused, report the refusal; do not "
-    "reach for an interpreter to work around it. "
+    " File writes: prefer Write/Edit tools for reviewable patches. Full Access "
+    "also permits project runtimes and scripts in the sandbox; use shell-based "
+    "file generation only when the task genuinely requires it, then inspect the "
+    "result before claiming success. If a write is refused, report the exact refusal. "
     "Receipts: when you declare an edit receipt path, name the exact file you "
     "wrote — same directory and same extension. Do not copy the extension from "
     "neighbouring files: `docs/ops/agent-reports/` holds machine `*.json` "
@@ -30,14 +27,13 @@ WRITE_CONTRACT_CLAUSE = (
     "report declared as `.json` fails verification and your completion claim "
     "is marked unverified. "
     "Invoking approved wrappers: call them directly, e.g. "
-    "`axon-agent-terminal-job --workspace <id> -- <command>`. Never wrap one in "
-    "`zsh -lc`, `bash -c`, or `sh -c`: the shell is an interpreter escape, so the "
-    "whole command is denied and the wrapper looks missing when it is simply "
-    "mis-invoked. On a headless shift, route shell work through "
-    "`axon-agent-terminal-job --workspace <id> -- <command>`, where the inner "
-    "command must itself be approved (for example `npx --no-install jest <path>`, "
-    "`npm test -- <path>`, `npx --no-install tsc --noEmit`). A denial means wrong form or wrong "
-    "role for your policy — never that the tool does not exist. Quote the exact "
+    "`axon-agent-terminal-job --workspace <id> -- <command>`. Direct invocation "
+    "is preferred because it preserves an unambiguous audit receipt. On a headless "
+    "shift, route shell work through that wrapper. Full role access permits the "
+    "normal project toolchain inside the role-owned filesystem surface, while "
+    "privilege escalation, destructive Git, cross-workspace mutation, publication, "
+    "deployment, and secret access retain separate gates. A denial does not prove "
+    "that the tool is absent. Quote the exact "
     "denial text rather than concluding the tool is unavailable. "
     "Publication: company documents, customer records, RFQ/requisition packs, "
     "internal profiles, generated exports, evidence bundles, and office files "

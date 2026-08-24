@@ -57,6 +57,35 @@
       ],
       "live_roles": ["backend", "integrations", "watcher"],
       "network_mode_for_live_roles": "audited"
+    },
+    "MoveIT": {
+      "display_name": "move-it",
+      "product": "moveit",
+      "dashpro_tenant_id": null,
+      "required_services": [
+        "github",
+        "sentry",
+        "supabase"
+      ],
+      "env_keys": [
+        "GITHUB_TOKEN",
+        "GH_TOKEN",
+        "SENTRY_AUTH_TOKEN",
+        "SENTRY_ORG",
+        "SENTRY_PROJECT",
+        "SENTRY_DSN",
+        "SUPABASE_URL",
+        "SUPABASE_SERVICE_ROLE_KEY",
+        "SUPABASE_ANON_KEY",
+        "SUPABASE_ACCESS_TOKEN"
+      ],
+      "live_verify_command_prefixes": [
+        ["gh", "auth", "status"],
+        ["npx", "sentry-cli", "info"],
+        ["npx", "supabase", "projects", "list"]
+      ],
+      "live_roles": ["backend", "integrations", "watcher", "lead"],
+      "network_mode_for_live_roles": "audited"
     }
   }
 }

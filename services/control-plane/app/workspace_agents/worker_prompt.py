@@ -16,6 +16,7 @@ from app.workspace_agents.critical_review_clause import (
     is_review_type_task,
 )
 from app.workspace_agents.employee_persona_prompt import build_employee_identity_line
+from app.workspace_agents.frontend_ux_doctrine import axon_x_frontend_ux_clause
 from app.workspace_agents.lead_text import truncate_text as _truncate
 from app.workspace_agents.prior_shift_evidence import (
     looks_like_review_or_retry,
@@ -137,11 +138,59 @@ def _axon_x_mobile_companion_clause(*, workspace_id: str, goal: str, acceptance:
     )
 
 
+_DOCUMENT_ARTIFACT_RE = re.compile(
+    r"\b(pdf|printable|register|renderer?|rendered|document|letter|worksheet|"
+    r"workbook|evidence pack|export|daily register|sign-in|sign-out)\b",
+    re.IGNORECASE,
+)
+
+
+def _document_artifact_quality_clause(
+    *,
+    goal: str,
+    acceptance: str,
+    role: str,
+    owns: str,
+) -> str:
+    blob = f"{goal} {acceptance} {role} {owns}"
+    if not _DOCUMENT_ARTIFACT_RE.search(blob):
+        return ""
+    return (
+        " Document/PDF artifact quality contract "
+        "(see `config/agent-rules/assignment-document-quality.md`): "
+        "when the task touches a PDF, printable pack, register, letter, worksheet, "
+        "workbook, document export, or visual artifact, the rendered artifact is the "
+        "product. First identify the exact command/script that produces it and whether "
+        "the live path uses an optional dependency or fallback. Do not treat a missing "
+        "optional package, package-network outage, or rich renderer dependency as a "
+        "final blocker until you have inspected any active fallback path and tried to "
+        "patch the fallback to preserve the requested layout. Treat an operator-named "
+        "screenshot, IDE PDF, or reference file as authoritative: inspect or render "
+        "the current output using a PDF viewer, `pdftoppm`, `mutool`, `convert`, or "
+        "an equivalent preview; compare page size, page count, first-page layout, "
+        "colors, headers, tables, and text readability before reporting. If the "
+        "output does not match, patch the renderer/source and regenerate the files, "
+        "not just filenames. Add or update a targeted regression test; if fallback "
+        "rendering was involved, force the fallback in the test. Final receipt must "
+        "list generated file paths plus page count/size and visual parity evidence. "
+        "Never claim complete from source checks alone."
+    )
+
+
 def _role_tools_clause(role: str) -> str:
     """Tell specialists which tools they should use — Full Access means Shell/Edit/Read."""
     cleaned = str(role or "").strip().lower()
     shared = (
         " Tools: this shift has Full Access for project Shell, Read, Edit, and Grep. "
+        "You have the contract-bounded write surface for your professional role and may use ordinary "
+        "project tools exposed by the isolated checkout or registered workspace terminal. The "
+        "isolated checkout enforces role write mounts; registered terminal commands remain audited "
+        "and should be used for scoped verification or approved operational jobs. If another role "
+        "must contribute, assign it directly to "
+        "that colleague with `axon-assign --workspace <current_workspace_id> --role "
+        "<frontend|backend|integrations|watcher|lead> -- <goal>`; do not mutate another "
+        "workspace or another colleague's lane. Cross-workspace or cross-company work "
+        "needs operator approval and an explicit handoff. "
         "Use them to verify — do not invent counts or claim done without a command receipt. "
         "If Shell fails once, retry once with a shorter command; then report the exact error. "
         "Do not make one missing optional documentation/playbook path a user-facing stop: "
@@ -187,15 +236,14 @@ def _role_tools_clause(role: str) -> str:
         )
     if cleaned == "lead":
         return (
-            " Tools: prefer Read/ Grep for receipts and specialist reports; "
-            "delegate Shell-heavy verification to specialists unless you must confirm a gate. "
+            shared
+            + "Lead focus: coordinate the objective, while using Shell/Edit/Read directly "
+            "when that is the fastest verified path to completion. "
             "You can actually dispatch teammates — `axon-assign --workspace <workspace_id> "
-            "-- <goal>` fans a goal out into role-scoped tasks and starts their runs. "
+            "-- <goal>` fans a goal out into role-scoped tasks and starts their runs; use "
+            "`--role <role>` for one explicit colleague. "
             "Use it instead of describing a handoff in a document: a document dispatches "
-            "nobody. Report the task ids it returns. Only dispatch inside your own "
-            "workspace; work owned by another workspace's lead needs operator approval "
-            "first — name that lead and ask, do not fan out across tenants yourself. "
-            + WRITE_CONTRACT_CLAUSE
+            "nobody. Report the task ids it returns. "
         )
     return shared
 
@@ -496,6 +544,20 @@ def build_continuous_worker_prompt(
         goal=goal,
         acceptance=acceptance,
     )
+    document_artifact_clause = _document_artifact_quality_clause(
+        goal=goal,
+        acceptance=acceptance,
+        role=role,
+        owns=owns,
+    )
+    ux_clause = axon_x_frontend_ux_clause(
+        workspace_id=workspace_id,
+        name=name,
+        role=role,
+        owns=owns,
+        goal=goal,
+        acceptance=acceptance,
+    )
     prior_failure = "" if task_payload else _prior_failure_clause(workspace_id=workspace_id, role=role)
     task_packet = _current_task_packet(
         workspace_id=workspace_id,
@@ -556,8 +618,9 @@ def build_continuous_worker_prompt(
         "you actually ran. Do not run `git add -A`, commit, push, merge, force-push, or "
         "touch a protected branch yourself. The delivery service independently checks scope "
         "and secrets, stages only your verified changed paths, then creates the worker-branch "
-        "commit and draft PR. If any changed path is outside the leased task, stop and report "
-        "it as a blocker instead of trying to include or discard it."
+        "commit and draft PR. Task path lists are starting hints, but every changed path must "
+        "remain inside your role-owned write surface and directly serve the leased objective. "
+        "Assign work outside that role surface to the colleague who owns it."
     )
     tools_clause = _role_tools_clause(role)
     from app.workspace_agents.lead_verification_handoff import (
@@ -584,6 +647,8 @@ def build_continuous_worker_prompt(
         f"{lead_clause}"
         f"{delivery_clause}"
         f"{tools_clause}"
+        f"{document_artifact_clause}"
+        f"{ux_clause}"
         f"{ci_clause}"
         f"{mobile_companion_clause}"
         f"{memory_clause}"

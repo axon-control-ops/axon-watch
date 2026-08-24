@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import shlex
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import PurePosixPath
 from typing import Any, Iterable, Mapping
 
@@ -35,6 +35,11 @@ class AgentExecutionPolicy:
     timeout_seconds: int
     trust_policy: str
     execution_access: str
+    # Removes the ordinary executable allowlist. The hook still evaluates its
+    # explicit privilege, Git, and publication checks, while the filesystem
+    # sandbox remains the hard local-write boundary. This is not a general
+    # external-service authorization boundary.
+    allow_all_tools: bool = False
 
     @property
     def read_roots(self) -> tuple[str, ...]:
@@ -71,109 +76,116 @@ class AgentExecutionPolicyOverride:
     execution_access: str | None = None
 
 
+_ALL_AGENT_WRAPPERS = tuple(dict.fromkeys((
+    *_COMMON_AUDITED_WRAPPERS,
+    *_LEAD_DISPATCH_WRAPPERS,
+    *_WATCHER_RUNLOG_WRAPPERS,
+    "axonhealth",
+    "console-web.sh",
+    "run_contract_unit_tests.sh",
+    "watch-fast-gate.sh",
+)))
+_ALL_AGENT_PREFIXES = tuple(dict.fromkeys((
+    *_COMMON_READ_PREFIXES,
+    *_VALIDATION_PREFIXES,
+    *_GH_READ_PREFIXES,
+    *_DOCUMENT_PREFIXES,
+)))
+_SECRET_PATH_GLOBS = (
+    ".env",
+    ".env.*",
+    "**/.env",
+    "**/.env.*",
+    "**/.secrets/**",
+    "**/secrets/**",
+    "**/credentials/**",
+    "**/*credentials.json",
+    "**/id_rsa",
+)
+
+
+def _full_role_policy(
+    write_paths: tuple[str, ...], capabilities: tuple[str, ...]
+) -> AgentExecutionPolicy:
+    return AgentExecutionPolicy(
+        read_paths=(".",),
+        write_paths=write_paths,
+        forbidden_path_globs=_SECRET_PATH_GLOBS,
+        approved_wrapper_names=_ALL_AGENT_WRAPPERS,
+        approved_command_prefixes=_ALL_AGENT_PREFIXES,
+        audited_capabilities=capabilities,
+        network_mode="unrestricted",
+        timeout_seconds=1200,
+        trust_policy="worker",
+        execution_access="full",
+        allow_all_tools=True,
+    )
+
+
+# Every colleague has the complete toolchain and filesystem surface for their
+# professional lane. axon-assign and axon-runlog are shared so specialists can
+# hand work directly to one another without routing everything through Lead.
 _ROLE_DEFAULTS: dict[str, AgentExecutionPolicy] = {
-    "lead": AgentExecutionPolicy(
-        read_paths=(".",),
-        write_paths=("node_modules", "docs/planning", "docs/ops", "docs", "output", "plans"),
-        forbidden_path_globs=(),
-        approved_wrapper_names=(*_COMMON_AUDITED_WRAPPERS, *_LEAD_DISPATCH_WRAPPERS, "run_contract_unit_tests.sh"),
-        approved_command_prefixes=(
-            *_COMMON_READ_PREFIXES,
-            *_VALIDATION_PREFIXES,
-            *_GH_READ_PREFIXES,
-            *_DOCUMENT_PREFIXES,
-        ),
-        audited_capabilities=("planning_write", "test", "workspace_read", "ci_read", "dispatch"),
-        network_mode="audited",
-        timeout_seconds=900,
-        trust_policy="worker",
-        execution_access="full",
+    "lead": _full_role_policy(
+        ("node_modules", "docs", "output", "plans"),
+        ("planning_write", "test", "workspace_read", "workspace_write", "ci_read", "dispatch"),
     ),
-    "watcher": AgentExecutionPolicy(
-        read_paths=(".",),
-        write_paths=(),
-        forbidden_path_globs=(),
-        approved_wrapper_names=(
-            *_COMMON_AUDITED_WRAPPERS,
-            *_WATCHER_RUNLOG_WRAPPERS,
-            "axonhealth",
-            "watch-fast-gate.sh",
-        ),
-        approved_command_prefixes=_COMMON_READ_PREFIXES,
-        audited_capabilities=("ci_read", "health", "workspace_read"),
-        network_mode="audited",
-        timeout_seconds=600,
-        trust_policy="worker",
-        execution_access="consultative",
+    "watcher": _full_role_policy(
+        ("docs/ops", "logs", "output", "scripts/guardrails"),
+        ("ci_read", "health", "workspace_read", "workspace_write", "dispatch"),
     ),
-    "frontend": AgentExecutionPolicy(
-        read_paths=(".",),
-        write_paths=(
-            "node_modules",
-            "apps",
-            "app",
-            "src",
-            "website",
-            "website/documents",
-            "assets",
-            "docs",
-            "output",
-            "scripts",
-            "components",
-            "features",
-            "screens",
-            "hooks",
-            "packages",
-            "tests",
+    "frontend": _full_role_policy(
+        (
+            "node_modules", "package.json", "package-lock.json", "apps", "app", "src",
+            "website", "assets", "docs", "output", "scripts", "components", "features",
+            "screens", "hooks", "packages", "tests", "__tests__", "locales",
+        ),
+        ("build", "test", "workspace_read", "workspace_write", "dispatch"),
+    ),
+    "backend": _full_role_policy(
+        (
+            "node_modules", "package.json", "package-lock.json", "services", "server", "api",
+            "lib", "supabase", "db", "migrations", "scripts", "config", "packages", "tests",
             "__tests__",
-            "locales",
         ),
-        forbidden_path_globs=(),
-        approved_wrapper_names=(*_COMMON_AUDITED_WRAPPERS, "console-web.sh"),
-        approved_command_prefixes=(*_COMMON_READ_PREFIXES, *_VALIDATION_PREFIXES, *_DOCUMENT_PREFIXES),
-        audited_capabilities=("build", "test", "workspace_read"),
-        network_mode="none",
-        timeout_seconds=1200,
-        trust_policy="worker",
-        execution_access="full",
+        ("build", "test", "workspace_read", "workspace_write", "dispatch"),
     ),
-    "backend": AgentExecutionPolicy(
-        read_paths=(".",),
-        write_paths=("node_modules", "services", "server", "api", "lib", "supabase", "packages", "tests"),
-        forbidden_path_globs=(),
-        approved_wrapper_names=(*_COMMON_AUDITED_WRAPPERS, "run_contract_unit_tests.sh"),
-        approved_command_prefixes=(*_COMMON_READ_PREFIXES, *_VALIDATION_PREFIXES, *_DOCUMENT_PREFIXES),
-        audited_capabilities=("build", "test", "workspace_read"),
-        network_mode="none",
-        timeout_seconds=1200,
-        trust_policy="worker",
-        execution_access="full",
-    ),
-    "integrations": AgentExecutionPolicy(
-        read_paths=(".",),
-        write_paths=(
-            "node_modules",
-            ".github",
-            "config",
-            "scripts",
-            ".gitignore",
-            "project.axon.yaml",
+    "integrations": _full_role_policy(
+        (
+            "node_modules", "package.json", "package-lock.json", ".github", "config", "docs/ops",
+            "scripts", "infra", "deploy", "tests", "__tests__", ".gitignore", "project.axon.yaml",
         ),
-        forbidden_path_globs=(),
-        approved_wrapper_names=(*_COMMON_AUDITED_WRAPPERS, "axonhealth", "watch-fast-gate.sh"),
-        approved_command_prefixes=(*_COMMON_READ_PREFIXES, *_VALIDATION_PREFIXES, *_GH_READ_PREFIXES),
-        audited_capabilities=("ci_read", "health", "test", "workspace_read"),
-        network_mode="audited",
-        timeout_seconds=900,
-        trust_policy="worker",
-        execution_access="full",
+        ("build", "ci_read", "health", "test", "workspace_read", "workspace_write", "dispatch"),
+    ),
+}
+
+# Additional roots used by non-standard repositories. They are granted only
+# when the workspace contract declares the path, so Cole can work in an
+# operations repository (`data/live`, `docs/ops`) without granting every
+# Backend agent Frontend or Integrations ownership.
+_ROLE_CONTRACT_EXPANSIONS: dict[str, tuple[str, ...]] = {
+    "lead": ("README.md", "docs", "docs/planning", "docs/ops", "output", "plans"),
+    "watcher": ("docs/ops", "logs", "output", "scripts/guardrails"),
+    "frontend": (
+        "app", "apps", "assets", "command-centre", "components", "desktop",
+        "features", "hooks", "locales", "output", "screens", "src", "website",
+    ),
+    "backend": (
+        "api", "config", "data/live", "data/runtime", "data/templates", "db",
+        "docs/ops", "lib", "migrations", "packages", "scripts", "server",
+        "services", "supabase", "tests", "__tests__",
+    ),
+    "integrations": (
+        ".github", ".gitignore", "build", "config", "data/exports", "deploy",
+        "desktop", "docs/ops", "infra", "project.axon.yaml", "scripts", "tests",
+        "__tests__",
     ),
 }
 
 _FALLBACK_POLICY = AgentExecutionPolicy(
     read_paths=(".",),
     write_paths=(),
-    forbidden_path_globs=(),
+    forbidden_path_globs=_SECRET_PATH_GLOBS,
     approved_wrapper_names=(),
     approved_command_prefixes=_COMMON_READ_PREFIXES,
     audited_capabilities=("workspace_read",),
@@ -181,42 +193,12 @@ _FALLBACK_POLICY = AgentExecutionPolicy(
     timeout_seconds=600,
     trust_policy="worker",
     execution_access="consultative",
+    allow_all_tools=False,
 )
 
 _NETWORK_RANK = {"none": 0, "audited": 1, "unrestricted": 2}
 _TRUST_RANK = {"worker": 0, "operator": 1}
 _ACCESS_RANK = {"consultative": 0, "full": 1}
-_FRONTEND_UI_SCOPE_MARKERS = frozenset(
-    {"apps", "app", "src", "components", "features", "screens", "locales"}
-)
-_ROLE_SAFE_TASK_SCOPE_EXPANSIONS: dict[str, tuple[tuple[str, frozenset[str]], ...]] = {
-    # Frontend hooks are part of the UI implementation surface in React/Expo
-    # apps.  Older task rows often leased app/components but omitted hooks,
-    # which made normal hook edits look like a read-only checkout failure.  The
-    # expansion stays bounded by the role baseline and workspace contract below.
-    "frontend": (("hooks", _FRONTEND_UI_SCOPE_MARKERS),),
-}
-# Node/Express ops workspaces (Young Eagles command centre) store UI under
-# command-centre/ and printable assets under output/, not apps/src/components.
-_OPS_FRONTEND_WRITE_ROOTS = frozenset({"command-centre", "output"})
-
-
-def _ops_frontend_write_paths_for_workspace(
-    workspace_allowed_paths: Iterable[str] | None,
-) -> tuple[str, ...]:
-    """Grant Frontend write scope for ops-dashboard trees when the contract uses them."""
-    if not workspace_allowed_paths:
-        return ()
-    workspace_scope = _normalize_paths(workspace_allowed_paths)
-    workspace_roots = {
-        path if path == "." else path.split("/", 1)[0] for path in workspace_scope
-    }
-    if "command-centre" not in workspace_roots:
-        return ()
-    candidates = _normalize_paths(tuple(sorted(_OPS_FRONTEND_WRITE_ROOTS)))
-    return _intersect_path_scopes(candidates, workspace_scope)
-
-
 def role_execution_policy(role: str) -> AgentExecutionPolicy:
     """Return an immutable conservative baseline for an employee role."""
 
@@ -224,53 +206,9 @@ def role_execution_policy(role: str) -> AgentExecutionPolicy:
 
 
 def default_write_scope_for_role(role: str) -> list[str]:
-    """Write scope for a task that declared none — the role's own boundary.
-
-    Returns the role's own write boundary as the fallback scope when a task
-    declares no allowed_paths.  resolve_effective_policy treats task_allowed_paths=None
-    as "no restriction", so passing these paths gives the task the role ceiling
-    without granting anything beyond it.  A role that is read-only by design
-    (watcher) still resolves to no write access.
-    """
+    """Default path hints recorded on an otherwise unscoped role task."""
 
     return [str(path).strip() for path in role_execution_policy(role).write_paths if str(path).strip()]
-
-
-def safe_task_write_scope_for_role(
-    role: str,
-    task_allowed_paths: Iterable[str],
-) -> tuple[str, ...]:
-    """Return a role-bounded task scope with safe conventional siblings restored.
-
-    A task scope is still an authority boundary; this helper does not widen a
-    run beyond the role baseline or workspace contract.  It only prevents stale
-    leased scopes from excluding standard role-owned roots that are commonly
-    required by the same implementation slice (for example React UI hooks).
-    """
-
-    normalized = _normalize_paths(task_allowed_paths)
-    if not normalized:
-        return normalized
-
-    role_name = _normalize_name(role)
-    additions = _ROLE_SAFE_TASK_SCOPE_EXPANSIONS.get(role_name, ())
-    if not additions:
-        return normalized
-
-    role_roots = set(role_execution_policy(role_name).write_paths)
-    present_roots = {
-        path if path == "." else path.split("/", 1)[0]
-        for path in normalized
-    }
-    expanded = list(normalized)
-    for candidate, markers in additions:
-        if candidate not in role_roots or candidate in present_roots:
-            continue
-        if present_roots & markers:
-            expanded.append(candidate)
-            present_roots.add(candidate)
-    return _normalize_paths(expanded)
-
 
 def parse_execution_policy_override(raw: Any) -> AgentExecutionPolicyOverride | None:
     """Parse an employee override while preserving omitted-versus-empty fields."""
@@ -322,88 +260,90 @@ def resolve_effective_policy(
     workspace_forbidden_path_globs: Iterable[str] | None = None,
     task_allowed_paths: Iterable[str] | None,
 ) -> AgentExecutionPolicy:
-    """Intersect every authority source at a worker enforcement boundary.
+    """Return the role policy bounded by explicit employee and project policy.
 
-    task_allowed_paths=None means "no task-level restriction" — the role's
-    write_paths are used as-is after workspace intersection.  An explicit empty
-    list still collapses write access to nothing (fail-closed).
+    Task paths are routing hints and do not narrow the professional lane. The
+    operator-maintained employee override and repository contract remain hard
+    authority ceilings; silently ignoring either would turn a convenience
+    change into an unreviewed privilege expansion.
     """
 
     baseline = role_execution_policy(role)
-    override = employee_override
-
+    role_name = _normalize_name(role)
+    contract_scope = _normalize_paths(workspace_allowed_paths or ())
+    additions = _intersect_path_scopes(
+        _ROLE_CONTRACT_EXPANSIONS.get(role_name, ()),
+        contract_scope,
+    )
     read_paths = baseline.read_paths
-    write_paths = baseline.write_paths
+    write_paths = _ordered_union(baseline.write_paths, additions)
     wrappers = baseline.approved_wrapper_names
     command_prefixes = baseline.approved_command_prefixes
     capabilities = baseline.audited_capabilities
-    forbidden = baseline.forbidden_path_globs
     network_mode = baseline.network_mode
     timeout_seconds = baseline.timeout_seconds
     trust_policy = baseline.trust_policy
     execution_access = baseline.execution_access
+    allow_all_tools = baseline.allow_all_tools
 
-    if override is not None:
-        if override.read_paths is not None:
-            read_paths = _intersect_path_scopes(read_paths, override.read_paths)
-        if override.write_paths is not None:
-            write_paths = _intersect_path_scopes(write_paths, override.write_paths)
-        if override.approved_wrapper_names is not None:
-            wrappers = _intersect_exact(wrappers, override.approved_wrapper_names)
-        if override.approved_command_prefixes is not None:
+    if employee_override is not None:
+        if employee_override.read_paths is not None:
+            read_paths = _intersect_path_scopes(
+                read_paths, employee_override.read_paths
+            )
+        if employee_override.write_paths is not None:
+            write_paths = _intersect_path_scopes(
+                write_paths, employee_override.write_paths
+            )
+        if employee_override.approved_wrapper_names is not None:
+            wrappers = _intersect_exact(
+                wrappers, employee_override.approved_wrapper_names
+            )
+            allow_all_tools = False
+        if employee_override.approved_command_prefixes is not None:
             command_prefixes = _intersect_command_prefixes(
-                command_prefixes, override.approved_command_prefixes
+                command_prefixes, employee_override.approved_command_prefixes
             )
-        if override.audited_capabilities is not None:
+            allow_all_tools = False
+        if employee_override.audited_capabilities is not None:
             capabilities = _intersect_exact(
-                capabilities, override.audited_capabilities
+                capabilities, employee_override.audited_capabilities
             )
-        if override.forbidden_path_globs is not None:
-            forbidden = _ordered_union(forbidden, override.forbidden_path_globs)
-        if override.network_mode is not None:
+        if employee_override.network_mode is not None:
             network_mode = _stricter_mode(
-                network_mode, override.network_mode, _NETWORK_RANK
+                network_mode, employee_override.network_mode, _NETWORK_RANK
             )
-        if override.timeout_seconds is not None:
-            timeout_seconds = min(timeout_seconds, override.timeout_seconds)
-        if override.trust_policy is not None:
+            if network_mode != "unrestricted":
+                allow_all_tools = False
+        if employee_override.timeout_seconds is not None:
+            timeout_seconds = min(timeout_seconds, employee_override.timeout_seconds)
+        if employee_override.trust_policy is not None:
             trust_policy = _stricter_mode(
-                trust_policy, override.trust_policy, _TRUST_RANK
+                trust_policy, employee_override.trust_policy, _TRUST_RANK
             )
-        if override.execution_access is not None:
+        if employee_override.execution_access is not None:
             execution_access = _stricter_mode(
-                execution_access, override.execution_access, _ACCESS_RANK
+                execution_access,
+                employee_override.execution_access,
+                _ACCESS_RANK,
             )
+            if execution_access != "full":
+                allow_all_tools = False
 
-    workspace_scope = _normalize_paths(workspace_allowed_paths or ())
-    read_paths = _intersect_path_scopes(read_paths, workspace_scope)
-    write_paths = _intersect_path_scopes(write_paths, workspace_scope)
-    if task_allowed_paths is not None:
-        task_scope = safe_task_write_scope_for_role(role, task_allowed_paths)
-        write_paths = _intersect_path_scopes(write_paths, task_scope)
+    # A missing/invalid project contract grants no write mounts. A valid
+    # contract intersects the role lane; it never adds arbitrary role paths.
+    write_paths = _intersect_path_scopes(write_paths, contract_scope)
     forbidden = _ordered_union(
-        forbidden, _normalize_strings(workspace_forbidden_path_globs or ())
+        baseline.forbidden_path_globs,
+        workspace_forbidden_path_globs or (),
     )
-
-    if _normalize_name(role) == "frontend":
-        # Additive, not a fallback: a broadened frontend baseline (docs/output/
-        # scripts, for cross-workspace document access) now legitimately
-        # intersects some ops-dashboard contracts even before command-centre is
-        # considered, so write_paths is no longer reliably empty here. Gating
-        # on emptiness silently dropped command-centre access for any contract
-        # where the rest of the baseline already matched something -- union it
-        # in instead so the two write-scope sources never compete.
-        ops_paths = _ops_frontend_write_paths_for_workspace(workspace_allowed_paths)
-        if ops_paths:
-            write_paths = _ordered_union(write_paths, ops_paths)
-
-    if not write_paths:
-        execution_access = "consultative"
-
-    return AgentExecutionPolicy(
+    if employee_override and employee_override.forbidden_path_globs is not None:
+        forbidden = _ordered_union(forbidden, employee_override.forbidden_path_globs)
+    del task_allowed_paths
+    return replace(
+        baseline,
         read_paths=read_paths,
         write_paths=write_paths,
-        forbidden_path_globs=forbidden,
         approved_wrapper_names=wrappers,
         approved_command_prefixes=command_prefixes,
         audited_capabilities=capabilities,
@@ -411,6 +351,8 @@ def resolve_effective_policy(
         timeout_seconds=timeout_seconds,
         trust_policy=trust_policy,
         execution_access=execution_access,
+        allow_all_tools=allow_all_tools,
+        forbidden_path_globs=forbidden,
     )
 
 
@@ -606,5 +548,4 @@ __all__ = [
     "parse_execution_policy_override",
     "resolve_effective_policy",
     "role_execution_policy",
-    "safe_task_write_scope_for_role",
 ]

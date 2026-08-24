@@ -22,7 +22,9 @@ from app.workspace_agents.lead_task_plan import (
     LeadTaskPlanItem,
     LeadPlanRosterMember,
     PlanMode,
+    acceptance_for,
     detect_fan_out_intent,
+    extract_exclusive_paths,
     topo_order,
 )
 from app.workspace_agents.lead_plan_model import resolve_lead_task_plan
@@ -55,6 +57,7 @@ def supersede_stale_queue_for_new_lead_goal(
     workspace_id: str,
     goal: str,
     exclude_task_ids: set[str] | None = None,
+    owner_role: str | None = None,
 ) -> list[dict[str, Any]]:
     """Cancel older open/leased specialist tasks that overlap this Lead ask.
 
@@ -73,10 +76,16 @@ def supersede_stale_queue_for_new_lead_goal(
         for task_id in (exclude_task_ids or set())
         if str(task_id).strip()
     }
+    filtered_role = str(owner_role or "").strip().lower()
     cancelled: list[dict[str, Any]] = []
     for record in task_store.list_tasks(workspace_id=workspace, limit=500):
         status = str(record.get("status") or "").strip().lower()
         if status not in {"open", "leased"}:
+            continue
+        if (
+            filtered_role
+            and str(record.get("owner_role") or "").strip().lower() != filtered_role
+        ):
             continue
         other_goal = str(record.get("goal") or "")
         if not goals_overlap(goal, other_goal, threshold=0.45):
@@ -514,6 +523,7 @@ def materialize_lead_fan_out(
     create_runs: bool = True,
     supersedes_plan_id: str | None = None,
     use_model: bool = True,
+    target_role: str | None = None,
 ) -> dict[str, Any]:
     """Build plan, persist tasks, and open leased runs for dependency-ready items.
 
@@ -531,8 +541,23 @@ def materialize_lead_fan_out(
         raise LeadFanOutError(scope_blocker)
     if blocker := isolated_worker_task_blocker(goal=cleaned_goal): raise LeadFanOutError(blocker)
 
+    direct_role = str(target_role or "").strip().lower()
+    roster = _roster_from_company(workspace)
+    if not roster:
+        raise LeadFanOutError(f"no company roster for workspace {workspace}")
+    if direct_role:
+        roster_roles = {member.role.strip().lower() for member in roster}
+        if direct_role not in roster_roles:
+            raise LeadFanOutError(
+                f"role {direct_role!r} is not staffed in workspace {workspace}"
+            )
+
     explicit_task_ids = _extract_task_ids(cleaned_goal)
     if explicit_task_ids:
+        if direct_role:
+            raise LeadFanOutError(
+                "target_role cannot be combined with explicit existing task IDs"
+            )
         return _materialize_existing_task_ids(
             workspace_id=workspace,
             goal=cleaned_goal,
@@ -544,6 +569,7 @@ def materialize_lead_fan_out(
     superseded = supersede_stale_queue_for_new_lead_goal(
         workspace_id=workspace,
         goal=cleaned_goal,
+        owner_role=direct_role or None,
     )
     try:
         from app.workspace_agents.task_duplicate_cleanup import (
@@ -554,20 +580,34 @@ def materialize_lead_fan_out(
     except Exception:  # noqa: BLE001 — never block Lead materialize on cleanup
         pass
 
-    roster = _roster_from_company(workspace)
-    if not roster:
-        raise LeadFanOutError(f"no company roster for workspace {workspace}")
-
-    try:
-        plan = resolve_lead_task_plan(
+    if direct_role:
+        scoped_paths = extract_exclusive_paths(cleaned_goal)
+        item = LeadTaskPlanItem(
+            plan_key=f"plan-01-{direct_role}",
             goal=cleaned_goal,
-            roster=roster,
-            mode=mode,
-            workspace_id=workspace,
-            use_model=use_model,
+            owner_role=direct_role,
+            acceptance_criteria=acceptance_for(cleaned_goal, direct_role),
+            exclusive_paths=list(scoped_paths),
+            allowed_paths=list(scoped_paths),
         )
-    except ValueError as exc:
-        raise LeadFanOutError(str(exc)) from exc
+        plan = LeadTaskPlan(
+            goal=cleaned_goal,
+            mode="decompose",
+            items=[item],
+            ordered_keys=[item.plan_key],
+            ambiguous=False,
+        )
+    else:
+        try:
+            plan = resolve_lead_task_plan(
+                goal=cleaned_goal,
+                roster=roster,
+                mode=mode,
+                workspace_id=workspace,
+                use_model=use_model,
+            )
+        except ValueError as exc:
+            raise LeadFanOutError(str(exc)) from exc
 
     effective_goal = str(plan.goal or cleaned_goal).strip() or cleaned_goal
     persisted = persist_lead_task_plan(
@@ -628,6 +668,7 @@ def materialize_lead_fan_out(
         "plan_id": plan_id,
         "workspace_id": workspace,
         "goal": effective_goal,
+        "target_role": direct_role or None,
         "fan_out_intent": detect_fan_out_intent(cleaned_goal) or plan.mode == "fan_out",
         "mode": plan.mode,
         "plan": persisted["plan"],

@@ -48,6 +48,10 @@ class AgentSandboxPolicy:
     forbidden_path_globs: tuple[str, ...] = ()
     # Whitelisted service-bridge keys materialized with --setenv (never logged).
     injected_env: tuple[tuple[str, str], ...] = ()
+    # Full Access workers may invoke any normal executable available inside the
+    # sandbox. Host privilege escalation and destructive Git remain separate
+    # guards; this flag removes the role-specific command allowlist only.
+    allow_all_tools: bool = False
 
 
 @dataclass(frozen=True)
@@ -92,8 +96,27 @@ _ROLE_WRITE_SCOPE_HINTS: dict[str, list[str]] = {
         "tests/",
         "__tests__/",
     ],
-    "backend": ["services/", "server/", "api/", "lib/", "supabase/", "packages/", "tests/"],
-    "integrations": [".github/", "config/", "scripts/"],
+    "backend": [
+        "package.json",
+        "package-lock.json",
+        "services/",
+        "server/",
+        "api/",
+        "lib/",
+        "supabase/",
+        "packages/",
+        "tests/",
+        "__tests__/",
+    ],
+    "integrations": [
+        "package.json",
+        "package-lock.json",
+        ".github/",
+        "config/",
+        "docs/ops/",
+        "scripts/",
+        "__tests__/",
+    ],
     "lead": ["docs/planning/", "docs/ops/", "plans/"],
 }
 
@@ -112,8 +135,8 @@ def _write_scope_specialist_hint(writable_roots: tuple[str, ...]) -> str:
         f"This agent can only write within: {roots_str}. "
         "For paths outside this scope, dispatch the appropriate specialist: "
         "frontend (app/components/features/screens/hooks), "
-        "backend (services/api/lib/supabase), "
-        "integrations (scripts/config/.github). "
+        "backend (services/api/lib/supabase/tests/package scripts), "
+        "integrations (scripts/config/.github/docs/ops/tests/package scripts). "
         "Do NOT ask the operator to remount the filesystem — use dispatch instead."
     )
 
@@ -129,6 +152,7 @@ def _policy_document(policy: AgentSandboxPolicy) -> dict[str, object]:
         "forbidden_path_globs": sorted(set(policy.forbidden_path_globs)),
         "writable_roots": sorted(set(policy.writable_roots)),
         "write_scope_hint": _write_scope_specialist_hint(policy.writable_roots),
+        "allow_all_tools": policy.allow_all_tools,
     }
 
 

@@ -14,6 +14,7 @@ import {
   persistTerminalScrollback,
   restoreTerminalScrollback,
 } from './terminal-scrollback';
+import { attachTerminalWheelContainment } from './terminal-wheel-containment';
 
 export interface TerminalContext {
   primarySignalId: string | null;
@@ -113,6 +114,7 @@ export async function createXtermSession(
   terminal.loadAddon(fitAddon);
   terminal.open(container);
   fitAddon.fit();
+  const detachTerminalWheelContainment = attachTerminalWheelContainment(container);
 
   let attachedWorkspaceId: string | null = null;
   let attachedSessionId = 'terminal-operator';
@@ -387,6 +389,7 @@ export async function createXtermSession(
     clearScreen,
     dispose() {
       persistAttachedScrollback();
+      detachTerminalWheelContainment();
       window.removeEventListener('resize', onResize);
       resizeObserver.disconnect();
       disposeSocket();

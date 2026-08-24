@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from typing import Any
 
-from app.cli_runtime.long_running_shell import is_long_running_ship_shell
 from app.cli_runtime.agent_shell_hook import evaluate_hook_payload
 from app.persistence import run_store, task_store
 from app.runs.service import (
@@ -107,7 +106,10 @@ def assert_agent_terminal_job_allowed(
     if not clean_run:
         raise AgentTerminalPolicyError("agent terminal jobs require a trusted run_id")
     if source != workspace_id:
-        raise AgentTerminalPolicyError("agent terminal jobs cannot target another workspace")
+        raise AgentTerminalPolicyError(
+            "agent terminal jobs cannot target another workspace; "
+            "create an explicit cross-workspace handoff instead"
+        )
     try:
         run = get_run(clean_run)
     except RunNotFoundError as exc:
@@ -128,11 +130,7 @@ def assert_agent_terminal_job_allowed(
         raise AgentTerminalPolicyError(str(exc)) from exc
     if task is None:
         policy = role_execution_policy(role)
-        if (
-            policy.execution_access != "full"
-            or role not in {"lead", "integrations"}
-            or not is_long_running_ship_shell(command)
-        ):
+        if policy.execution_access != "full":
             from app.workspace_agents.capability_routing import try_route_on_terminal_denial
 
             routed = try_route_on_terminal_denial(
@@ -148,10 +146,27 @@ def assert_agent_terminal_job_allowed(
                     f"({routed.get('target_role')}); retry via assignment board"
                 )
             raise AgentTerminalPolicyError("agent terminal run has no scoped task")
+        decision = evaluate_hook_payload(
+            {"hook_event_name": "beforeShellExecution", "command": command},
+            approved_wrappers=frozenset(policy.approved_wrapper_names),
+            approved_command_prefixes=policy.approved_command_prefixes,
+            allow_all_tools=policy.allow_all_tools,
+        )
+        if decision.get("permission") != "allow":
+            reason = str(decision.get("agent_message") or "command denied")
+            append_run_execution_receipt(
+                clean_run,
+                receipt_type="agent_terminal_denied",
+                receipt_summary=reason,
+                actor="agent_terminal_policy",
+                success=False,
+                intent="terminal_command",
+            )
+            raise AgentTerminalPolicyError(reason)
         append_run_execution_receipt(
             clean_run,
             receipt_type="agent_terminal_allowed",
-            receipt_summary="Approved no-task ship terminal command accepted",
+            receipt_summary="Approved no-task terminal command accepted",
             actor="agent_terminal_policy",
             success=True,
             intent="terminal_command",
@@ -167,6 +182,7 @@ def assert_agent_terminal_job_allowed(
         {"hook_event_name": "beforeShellExecution", "command": command},
         approved_wrappers=frozenset(policy.approved_wrapper_names),
         approved_command_prefixes=policy.approved_command_prefixes,
+        allow_all_tools=policy.allow_all_tools,
     )
     if decision.get("permission") != "allow":
         reason = str(decision.get("agent_message") or "command denied")

@@ -169,6 +169,9 @@ class AgentSandboxTests(unittest.TestCase):
         self.assertNotIn("should-not-be-used", source)
         # It is the real, self-contained fan-out client.
         self.assertIn("lead/fan-out", source)
+        self.assertIn("--role", source)
+        self.assertIn("current workspace", source)
+        self.assertIn("target_role", source)
         self.assertTrue(source.startswith("#!/usr/bin/env bash"))
 
         command = build_bwrap_command(
@@ -186,6 +189,32 @@ class AgentSandboxTests(unittest.TestCase):
         self.assertTrue(command[path_index + 1].startswith("/run/axon-agent-policy/bin:"))
         # The unmounted external target must never be bind-mounted in either.
         self.assertNotIn(str(outside_home_target), command)
+
+    def test_axon_assign_rejects_cross_workspace_agent_dispatch_before_network(self) -> None:
+        wrapper = (
+            CONTROL_PLANE_ROOT
+            / "app"
+            / "cli_runtime"
+            / "agent_assign_wrapper.sh"
+        )
+        result = subprocess.run(
+            [
+                "bash",
+                str(wrapper),
+                "--workspace",
+                "workspace_other",
+                "--role",
+                "backend",
+                "--",
+                "Fix persistence",
+            ],
+            env={**os.environ, "AXON_WATCH_WORKSPACE_ID": "workspace_demo"},
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        self.assertEqual(1, result.returncode)
+        self.assertIn("only inside their current workspace", result.stderr)
 
     def test_axon_runlog_is_materialized_and_curls_the_run_history_api(self) -> None:
         policy = self._policy(approved_wrappers=("axon-runlog",))

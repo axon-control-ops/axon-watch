@@ -43,35 +43,39 @@ class ControlPlaneHealthEndpointTests(unittest.TestCase):
         self.assertIn("mode", payload)
 
     def test_health_endpoint_allows_local_web_origin_via_cors(self) -> None:
-        response = self.client.get(
-            "/api/health",
-            headers={"Origin": "http://localhost:8081"},
-        )
+        for origin in ("http://localhost:8081", "http://localhost:19006"):
+            with self.subTest(origin=origin):
+                response = self.client.get(
+                    "/api/health",
+                    headers={"Origin": origin},
+                )
 
-        self.assertEqual(200, response.status_code)
-        self.assertEqual(
-            "http://localhost:8081",
-            response.headers.get("access-control-allow-origin"),
-        )
+                self.assertEqual(200, response.status_code)
+                self.assertEqual(
+                    origin,
+                    response.headers.get("access-control-allow-origin"),
+                )
 
     def test_health_endpoint_allows_credentialed_local_web_origin_via_cors(self) -> None:
-        response = self.client.options(
-            "/api/health",
-            headers={
-                "Origin": "http://127.0.0.1:8081",
-                "Access-Control-Request-Method": "GET",
-            },
-        )
+        for origin in ("http://127.0.0.1:8081", "http://127.0.0.1:19006"):
+            with self.subTest(origin=origin):
+                response = self.client.options(
+                    "/api/health",
+                    headers={
+                        "Origin": origin,
+                        "Access-Control-Request-Method": "GET",
+                    },
+                )
 
-        self.assertEqual(200, response.status_code)
-        self.assertEqual(
-            "http://127.0.0.1:8081",
-            response.headers.get("access-control-allow-origin"),
-        )
-        self.assertEqual(
-            "true",
-            response.headers.get("access-control-allow-credentials"),
-        )
+                self.assertEqual(200, response.status_code)
+                self.assertEqual(
+                    origin,
+                    response.headers.get("access-control-allow-origin"),
+                )
+                self.assertEqual(
+                    "true",
+                    response.headers.get("access-control-allow-credentials"),
+                )
 
 
 class WatchHealthEndpointTests(unittest.TestCase):

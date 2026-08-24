@@ -82,6 +82,7 @@ def adapt_execution_policy(
         cursor_readonly_paths=_runtime_paths(runtime_binary, family=family),
         codex_auth_path=_codex_profile_auth_path(env or {}) if family == "codex" else "",
         injected_env=injected_env,
+        allow_all_tools=policy.allow_all_tools,
     )
 
 

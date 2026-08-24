@@ -18,6 +18,7 @@ from app.platform_recovery.projection import build_recovery_center
 from app.platform_recovery.reconcile_artifacts import execute_reconcile, preview_reconcile
 from app.platform_recovery.restart import preview_restart_impact
 from app.platform_recovery.store import acknowledge_recovery
+from app.platform_recovery.workspace_reset import reset_workspace_recovery_state
 from app.runs.service import RunLifecycleError, RunNotFoundError, resume_run
 
 router = APIRouter(tags=["platform-recovery"])
@@ -42,6 +43,10 @@ class LessonRequest(BaseModel):
 class ReconcileRequest(BaseModel):
     execute: bool = False
     approve_worktree_delete: bool = False
+
+
+class WorkspaceRecoveryResetRequest(BaseModel):
+    execute: bool = False
 
 
 @router.get("/api/recovery/center")
@@ -91,6 +96,17 @@ def recovery_acknowledge(recovery_id: str) -> dict[str, Any]:
     if record is None:
         raise HTTPException(status_code=404, detail="recovery record not found")
     return record
+
+
+@router.post("/api/recovery/workspaces/{workspace_id}/clear-stale")
+def recovery_clear_workspace_stale(
+    workspace_id: str,
+    body: WorkspaceRecoveryResetRequest,
+) -> dict[str, Any]:
+    try:
+        return reset_workspace_recovery_state(workspace_id, execute=body.execute)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
 @router.post("/api/recovery/runs/{run_id}/resume")

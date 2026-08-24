@@ -11,7 +11,7 @@ sys.path.insert(0, str(CONTROL_PLANE_ROOT))
 
 
 class LeadDispatchMechanismTests(unittest.TestCase):
-    """Granting the wrapper is not enough — the Lead must know it exists."""
+    """Every colleague must know the audited direct-assignment mechanism."""
 
     def _prompt(self, role: str) -> str:
         from app.workspace_agents.config_loader import EmployeeConfig
@@ -31,10 +31,13 @@ class LeadDispatchMechanismTests(unittest.TestCase):
     def test_lead_is_told_not_to_fan_out_across_tenants(self) -> None:
         self.assertIn("needs operator approval", self._prompt("lead"))
 
-    def test_specialists_are_not_offered_dispatch(self) -> None:
+    def test_specialists_can_assign_the_colleague_who_owns_a_dependency(self) -> None:
         for role in ("backend", "frontend", "integrations", "watcher"):
             with self.subTest(role=role):
-                self.assertNotIn("axon-assign", self._prompt(role))
+                prompt = self._prompt(role)
+                self.assertIn("axon-assign", prompt)
+                self.assertIn("--role", prompt)
+                self.assertIn("current_workspace_id", prompt)
 
     def test_axon_x_mobile_companion_prompt_forbids_root_dev_command(self) -> None:
         from app.workspace_agents.config_loader import EmployeeConfig

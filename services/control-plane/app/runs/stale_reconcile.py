@@ -671,33 +671,45 @@ def reap_stale_employee_runs(
             and not _run_has_receipt_type(record, "worker_dispatch_started")
             and age >= undispatch_cutoff
         ):
-            from app.persistence import task_store
+            from app.workspace_agents.worker_dispatch_support import is_worker_dispatch_active
 
-            try:
-                fail_run(
-                    run_id,
-                    receipt_summary=(
-                        "Continuous worker run never received worker_dispatch_started "
-                        f"({int(age)}s > {int(undispatch_cutoff)}s)"
-                    ),
-                    actor="workspace_scheduler",
+            # Both dispatch producers (scheduler.py's continuous tick via create_run's
+            # auto-execute, and scheduler_queued_fan_out.py's begin_execution) persist
+            # phase="executing"/"starting" — starting this age clock — synchronously,
+            # then spawn the dispatch thread afterward. That thread still has to clear
+            # claim + task/lease I/O before it can post worker_dispatch_started, and
+            # under load that can outrun 90s while the thread is alive and fine. Only
+            # treat this as a zombie when nothing actually claimed the run; fall through
+            # otherwise — the general stale-run cutoff further down still catches a
+            # claim that hangs forever.
+            if not is_worker_dispatch_active(run_id):
+                from app.persistence import task_store
+
+                try:
+                    fail_run(
+                        run_id,
+                        receipt_summary=(
+                            "Continuous worker run never received worker_dispatch_started "
+                            f"({int(age)}s > {int(undispatch_cutoff)}s)"
+                        ),
+                        actor="workspace_scheduler",
+                    )
+                except (RunLifecycleError, RunNotFoundError):
+                    logger.exception("undispatched employee-run reap skipped for %s", run_id)
+                    continue
+                task_store.reopen_orphaned_leased_tasks(
+                    terminal_run_ids=[run_id],
+                    terminal_outcome="run failed without worker dispatch; task reopened",
+                    refund_attempts=True,
                 )
-            except (RunLifecycleError, RunNotFoundError):
-                logger.exception("undispatched employee-run reap skipped for %s", run_id)
+                reaped.append(run_id)
+                logger.warning(
+                    "reaped undispatched employee run %s role=%s idle_s=%.0f",
+                    run_id,
+                    role,
+                    age,
+                )
                 continue
-            task_store.reopen_orphaned_leased_tasks(
-                terminal_run_ids=[run_id],
-                terminal_outcome="run failed without worker dispatch; task reopened",
-                refund_attempts=True,
-            )
-            reaped.append(run_id)
-            logger.warning(
-                "reaped undispatched employee run %s role=%s idle_s=%.0f",
-                run_id,
-                role,
-                age,
-            )
-            continue
 
         ghost_cutoff = ghost_dispatch_seconds()
         if (

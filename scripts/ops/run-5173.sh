@@ -86,4 +86,12 @@ else
   echo "run-5173: stability mode — HMR disabled; refresh manually to load source edits."
 fi
 echo "run-5173: daily driver stays on http://127.0.0.1:4173/ (same API :8787)"
-exec npm run dev -w @axon-watch/console-web -- --host "$HOST" --port "$PORT" --strictPort
+vite_bin="${ROOT}/node_modules/.bin/vite"
+if [[ ! -x "$vite_bin" ]]; then
+  echo "run-5173: Vite is not installed in ${ROOT}/node_modules." >&2
+  echo "Install repo dependencies first: npm install" >&2
+  exit 127
+fi
+
+cd "${ROOT}/apps/console-web"
+exec "$vite_bin" --host "$HOST" --port "$PORT" --strictPort

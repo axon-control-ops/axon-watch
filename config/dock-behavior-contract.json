@@ -19,7 +19,7 @@
     "apps/console-web/src/features/voice-deck/use-voice-cockpit-presence.ts"
   ],
   "operator_mode_markers": {
-    "right_dock_components": ["MissionControlLiveOpsPanel"],
+    "right_dock_components": ["OperatorLiveOpsGlance"],
     "thread_seam_collapsible": false,
     "layout_mode_attr": "data-layout-mode"
   },

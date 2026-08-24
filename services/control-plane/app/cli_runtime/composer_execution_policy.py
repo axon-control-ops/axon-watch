@@ -41,6 +41,7 @@ def operator_composer_sandbox_policy(workspace_root: Path) -> AgentExecutionPoli
         timeout_seconds=1200,
         trust_policy="operator",
         execution_access="full",
+        allow_all_tools=True,
     )
 
 

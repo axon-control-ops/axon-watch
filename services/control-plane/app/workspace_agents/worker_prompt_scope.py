@@ -44,8 +44,12 @@ def task_scope_clause(
     if paths:
         joined = ", ".join(f"`{path}`" for path in paths[:12])
         anchor_clause = (
-            f" Explicit allowed write paths for this leased task: {joined}. "
-            "Do not modify any path outside that allowlist."
+            f" Starting path hints for this leased task: {joined}. "
+            "You have the contract-bounded write surface for your professional role. You may inspect "
+            "or modify another path inside that role-owned surface when it is necessary to "
+            "complete the objective, and explain that dependency in the receipt. If the work "
+            "belongs to another role, assign it directly to that colleague instead of editing "
+            "their lane."
         )
     elif anchors:
         joined = ", ".join(f"`{anchor}`" for anchor in anchors)

@@ -11,6 +11,10 @@ import {
   type EmailFolderRole,
   type EmailFoldersResult,
 } from '../../api/inbox-api';
+import {
+  fetchEmailSettings,
+  type EmailMailboxAccount,
+} from '../../api/email-settings-api';
 import EmailComposeModal from './EmailComposeModal.vue';
 
 const shell = useShellStore();
@@ -36,16 +40,85 @@ const folderMessages = ref<EmailFolderMessage[]>([]);
 const folderLoading = ref(false);
 const folderError = ref<string | null>(null);
 const selectedFolderMessageUid = ref<string | null>(null);
+const mailboxAccounts = ref<EmailMailboxAccount[]>([]);
+const selectedMailboxId = ref<string>('__all__');
+const mailboxError = ref<string | null>(null);
+const selectedEmailFullBody = ref('');
+const selectedEmailBodyLoading = ref(false);
+const selectedEmailBodyError = ref<string | null>(null);
+const selectedEmailBodySignalId = ref<string | null>(null);
 
 const currentWorkspaceId = computed(() => shell.currentWorkspace?.workspace_id ?? '');
+const selectedMailboxAccount = computed(
+  () =>
+    mailboxAccounts.value.find((account) => account.account_id === selectedMailboxId.value) ??
+    null,
+);
+
+function mailboxLabel(account: EmailMailboxAccount): string {
+  const displayName = account.display_name?.trim();
+  const email = account.email_address?.trim();
+  if (displayName && email && displayName !== email) {
+    return `${displayName} · ${email}`;
+  }
+  return displayName || email || account.account_id;
+}
+
+async function loadMailboxAccounts(): Promise<void> {
+  mailboxError.value = null;
+  try {
+    const result = await fetchEmailSettings();
+    mailboxAccounts.value = result.settings.accounts;
+    if (
+      selectedMailboxId.value !== '__all__' &&
+      !mailboxAccounts.value.some((account) => account.account_id === selectedMailboxId.value)
+    ) {
+      selectedMailboxId.value = '__all__';
+    }
+  } catch (error) {
+    mailboxAccounts.value = [];
+    mailboxError.value = error instanceof Error ? error.message : 'Failed to load mailboxes';
+  }
+}
+
+function selectedMailboxScope(): { accountId?: string; workspaceId?: string } | null {
+  const account = selectedMailboxAccount.value;
+  if (account?.account_id) {
+    return { accountId: account.account_id };
+  }
+  if (selectedMailboxId.value === '__all__') {
+    return null;
+  }
+  return currentWorkspaceId.value ? { workspaceId: currentWorkspaceId.value } : null;
+}
+
+function itemAccountId(item: InboxItem): string {
+  return String(item.meta?.email_account_id ?? '').trim();
+}
+
+function itemAccountAddress(item: InboxItem): string {
+  return String(item.meta?.email_account_address ?? '').trim().toLowerCase();
+}
+
+function itemBelongsToSelectedMailbox(item: InboxItem): boolean {
+  const account = selectedMailboxAccount.value;
+  if (!account) {
+    return true;
+  }
+  return (
+    itemAccountId(item) === account.account_id ||
+    itemAccountAddress(item) === account.email_address.trim().toLowerCase()
+  );
+}
 
 async function loadFolderTabAvailability(): Promise<void> {
-  if (!currentWorkspaceId.value) {
+  const scope = selectedMailboxScope();
+  if (!scope) {
     availableFolders.value = {};
     return;
   }
   try {
-    const result = await fetchEmailFolders(currentWorkspaceId.value);
+    const result = await fetchEmailFolders(scope);
     availableFolders.value = result.folders;
   } catch {
     // No mailbox configured for this workspace, or watch unreachable --
@@ -55,7 +128,8 @@ async function loadFolderTabAvailability(): Promise<void> {
 }
 
 async function loadFolderMessages(role: EmailFolderRole): Promise<void> {
-  if (role === 'inbox' || !currentWorkspaceId.value) {
+  const scope = selectedMailboxScope();
+  if (role === 'inbox' || !scope) {
     return;
   }
   folderLoading.value = true;
@@ -64,7 +138,7 @@ async function loadFolderMessages(role: EmailFolderRole): Promise<void> {
     // A real live IMAP fetch is uncached per-message (~2-3s per message on
     // shared hosting) -- keep the cold-cache latency tolerable even though
     // the backend now caches this for 60s after the first fetch.
-    const result = await fetchEmailMessages(currentWorkspaceId.value, role, { limit: 10 });
+    const result = await fetchEmailMessages(scope, role, { limit: 25 });
     folderMessages.value = result.items;
     selectedFolderMessageUid.value = result.items[0]?.uid ?? null;
   } catch (error) {
@@ -98,10 +172,17 @@ function folderMessageSenderName(message: EmailFolderMessage): string {
   return (match ? match[1].trim() : raw) || 'Unknown sender';
 }
 
-watch(currentWorkspaceId, () => {
+watch([currentWorkspaceId, selectedMailboxId], () => {
   void loadFolderTabAvailability();
   if (activeFolder.value !== 'inbox') {
-    void loadFolderMessages(activeFolder.value);
+    const scope = selectedMailboxScope();
+    if (scope) {
+      void loadFolderMessages(activeFolder.value);
+    } else {
+      activeFolder.value = 'inbox';
+      folderMessages.value = [];
+      selectedFolderMessageUid.value = null;
+    }
   }
 });
 
@@ -119,6 +200,7 @@ async function refreshInbox(): Promise<void> {
 const emailItems = computed<InboxItem[]>(() =>
   [...shell.inboxItems]
     .filter((item) => item.source === 'email')
+    .filter(itemBelongsToSelectedMailbox)
     .sort((a, b) => Date.parse(b.updated_at) - Date.parse(a.updated_at)),
 );
 
@@ -130,15 +212,48 @@ const selectedItem = computed(
   () => emailItems.value.find((item) => item.signal_id === selectedSignalId.value) ?? null,
 );
 
+const mailboxScopeLabel = computed(() => {
+  const account = selectedMailboxAccount.value;
+  return account ? mailboxLabel(account) : 'Unified inbox';
+});
+
+const selectedItemBody = computed(() => {
+  if (
+    selectedItem.value &&
+    selectedEmailBodySignalId.value === selectedItem.value.signal_id &&
+    selectedEmailFullBody.value.trim()
+  ) {
+    return selectedEmailFullBody.value.trim();
+  }
+  return selectedItem.value ? body(selectedItem.value) : '';
+});
+
 watch(
   emailItems,
   (items) => {
-    if (selectedSignalId.value === null && items.length > 0) {
+    if (
+      (selectedSignalId.value === null ||
+        !items.some((item) => item.signal_id === selectedSignalId.value)) &&
+      items.length > 0
+    ) {
       selectItem(items[0]);
+    } else if (items.length === 0) {
+      selectedSignalId.value = null;
     }
   },
   { immediate: true },
 );
+
+watch(selectedItem, (item) => {
+  if (item) {
+    void loadSelectedEmailFullBody(item);
+  } else {
+    selectedEmailFullBody.value = '';
+    selectedEmailBodySignalId.value = null;
+    selectedEmailBodyError.value = null;
+    selectedEmailBodyLoading.value = false;
+  }
+});
 
 function workspaceLabel(workspaceId: string): string {
   const record = shell.workspaces.find((ws) => ws.workspace_id === workspaceId);
@@ -175,6 +290,47 @@ function body(item: InboxItem): string {
     String(item.summary ?? '').trim() ||
     'No message body captured for this signal.'
   );
+}
+
+async function loadSelectedEmailFullBody(item: InboxItem): Promise<void> {
+  const accountId = itemAccountId(item);
+  const messageId = String(item.meta?.message_id ?? '').trim();
+  if (!accountId) {
+    selectedEmailFullBody.value = '';
+    selectedEmailBodySignalId.value = item.signal_id;
+    selectedEmailBodyError.value = null;
+    selectedEmailBodyLoading.value = false;
+    return;
+  }
+
+  const requestedSignalId = item.signal_id;
+  selectedEmailBodySignalId.value = requestedSignalId;
+  selectedEmailBodyLoading.value = true;
+  selectedEmailBodyError.value = null;
+  try {
+    const result = await fetchEmailMessages({ accountId }, 'inbox', { limit: 50 });
+    if (selectedSignalId.value !== requestedSignalId) {
+      return;
+    }
+    const selectedSubject = subject(item).trim();
+    const message =
+      result.items.find((candidate) => candidate.message_id && candidate.message_id === messageId) ??
+      result.items.find((candidate) => candidate.uid && requestedSignalId.includes(candidate.uid)) ??
+      result.items.find((candidate) => candidate.subject.trim() === selectedSubject) ??
+      null;
+    selectedEmailFullBody.value = String(message?.text ?? '').trim();
+  } catch (error) {
+    if (selectedSignalId.value !== requestedSignalId) {
+      return;
+    }
+    selectedEmailFullBody.value = '';
+    selectedEmailBodyError.value =
+      error instanceof Error ? error.message : 'Failed to load the full message body';
+  } finally {
+    if (selectedSignalId.value === requestedSignalId) {
+      selectedEmailBodyLoading.value = false;
+    }
+  }
 }
 
 function initial(item: InboxItem): string {
@@ -215,6 +371,7 @@ onMounted(() => {
   if (shell.inboxLoadState === 'idle' || shell.inboxLoadState === 'error') {
     void shell.loadInbox({ background: true });
   }
+  void loadMailboxAccounts();
   void loadFolderTabAvailability();
 });
 </script>
@@ -223,7 +380,7 @@ onMounted(() => {
   <section class="email-client" aria-label="Fleet email inbox">
     <header class="email-client__head">
       <div>
-        <p class="email-client__eyebrow">Fleet-wide inbox</p>
+        <p class="email-client__eyebrow">{{ mailboxScopeLabel }}</p>
         <p class="email-client__scope">
           {{ emailItems.length }} email{{ emailItems.length === 1 ? '' : 's' }}
           <template v-if="unreadEmailCount > 0"> · {{ unreadEmailCount }} unread</template>
@@ -245,6 +402,33 @@ onMounted(() => {
       </div>
     </header>
 
+    <div class="email-client__mailbox-bar" aria-label="Mailbox view controls">
+      <label class="email-client__mailbox-select">
+        <span>Mailbox</span>
+        <select v-model="selectedMailboxId">
+          <option value="__all__">Unified inbox — all mailboxes</option>
+          <option
+            v-for="account in mailboxAccounts"
+            :key="account.account_id"
+            :value="account.account_id"
+          >
+            {{ mailboxLabel(account) }}
+          </option>
+        </select>
+      </label>
+      <p v-if="mailboxError" class="email-client__mailbox-error" role="alert">
+        {{ mailboxError }}
+      </p>
+      <p v-else class="email-client__mailbox-note">
+        <template v-if="selectedMailboxId === '__all__'">
+          Showing triaged mail from all configured accounts.
+        </template>
+        <template v-else>
+          Showing one mailbox. Sent, Junk, and Archive tabs use this account directly.
+        </template>
+      </p>
+    </div>
+
     <div class="email-client__folder-tabs" role="tablist" aria-label="Mail folders">
       <button
         v-for="tab in FOLDER_TABS"
@@ -254,7 +438,7 @@ onMounted(() => {
         class="email-client__folder-tab"
         :class="{ 'email-client__folder-tab--active': activeFolder === tab.role }"
         :aria-selected="activeFolder === tab.role"
-        :disabled="tab.role !== 'inbox' && !availableFolders[tab.role]"
+        :disabled="tab.role !== 'inbox' && (selectedMailboxId === '__all__' || !availableFolders[tab.role])"
         @click="selectFolder(tab.role)"
       >
         {{ tab.label }}
@@ -323,7 +507,13 @@ onMounted(() => {
             </div>
           </header>
 
-          <div class="email-client__reading-body">{{ body(selectedItem) }}</div>
+          <p v-if="selectedEmailBodyLoading" class="email-client__status">
+            Loading full message…
+          </p>
+          <p v-if="selectedEmailBodyError" class="email-client__error" role="alert">
+            {{ selectedEmailBodyError }} — showing the captured preview below.
+          </p>
+          <div class="email-client__reading-body">{{ selectedItemBody }}</div>
 
           <p
             v-if="String(selectedItem.meta?.suggested_reply_body ?? '').trim()"
@@ -407,7 +597,7 @@ onMounted(() => {
 <style scoped>
 .email-client {
   display: grid;
-  grid-template-rows: auto auto minmax(0, 1fr);
+  grid-template-rows: auto auto auto minmax(0, 1fr);
   align-content: start;
   gap: 0.6rem;
   min-height: 0;
@@ -433,6 +623,53 @@ onMounted(() => {
   margin: 0.15rem 0 0;
   color: var(--text-secondary);
   font-size: 0.75rem;
+}
+
+.email-client__mailbox-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.7rem;
+  border: 1px solid rgba(0, 210, 255, 0.14);
+  border-radius: 0.35rem;
+  background: rgba(0, 20, 32, 0.32);
+  padding: 0.45rem 0.55rem;
+}
+
+.email-client__mailbox-select {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  min-width: min(100%, 28rem);
+  color: var(--text-secondary);
+  font-size: 0.68rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.email-client__mailbox-select select {
+  min-width: 0;
+  width: min(21rem, 52vw);
+  border: 1px solid rgba(0, 210, 255, 0.28);
+  border-radius: 0.25rem;
+  background: rgba(0, 12, 20, 0.72);
+  color: var(--text-primary);
+  padding: 0.35rem 0.45rem;
+  font: inherit;
+  letter-spacing: normal;
+  text-transform: none;
+}
+
+.email-client__mailbox-note,
+.email-client__mailbox-error {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 0.68rem;
+  text-align: right;
+}
+
+.email-client__mailbox-error {
+  color: var(--state-critical);
 }
 
 .email-client__folder-tabs {

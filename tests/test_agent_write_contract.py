@@ -26,20 +26,21 @@ class WriteContractPromptTests(unittest.TestCase):
             task={"task_id": "task-probe", "goal": "Write a shift receipt"},
         )
 
-    def test_every_role_is_told_not_to_write_via_an_interpreter(self) -> None:
-        # The lead branch returns its own tools string rather than the shared
-        # one, and the lead is the role that actually hit this in production.
+    def test_every_role_is_told_it_has_full_tools_in_its_professional_lane(self) -> None:
         for role in ROLES:
             with self.subTest(role=role):
-                self.assertIn("never a shell interpreter", self._prompt(role))
+                prompt = self._prompt(role)
+                self.assertIn("contract-bounded write surface for your professional role", prompt)
+                self.assertIn("Full Access also permits project runtimes", prompt)
+                self.assertIn("assign it directly to that colleague", prompt)
 
     def test_every_role_is_told_to_call_wrappers_directly(self) -> None:
         for role in ROLES:
             with self.subTest(role=role):
                 prompt = self._prompt(role)
-                self.assertIn("Never wrap one in", prompt)
+                self.assertIn("Direct invocation is preferred", prompt)
                 self.assertIn("route shell work through", prompt)
-                self.assertIn("never that the tool does not exist", prompt)
+                self.assertIn("does not prove that the tool is absent", prompt)
 
     def test_every_role_is_told_to_name_the_exact_receipt_path(self) -> None:
         for role in ROLES:
@@ -49,24 +50,23 @@ class WriteContractPromptTests(unittest.TestCase):
                 self.assertIn("docs/ops/agent-reports/", prompt)
 
 
-class InterpreterWritesAreActuallyDeniedTests(unittest.TestCase):
+class FullRoleToolchainTests(unittest.TestCase):
     """The prompt claim must match what the hook really does."""
 
     def _permission(self, role: str, command: str) -> str:
         policy = resolve_effective_policy(
-            role=role, workspace_allowed_paths=(), task_allowed_paths=None
+            role=role, workspace_allowed_paths=(".",), task_allowed_paths=None
         )
         return evaluate_hook_payload(
             {"hook_event_name": "beforeShellExecution", "command": command},
             approved_wrappers=frozenset(policy.approved_wrappers),
             approved_command_prefixes=policy.approved_command_prefixes,
+            allow_all_tools=policy.allow_all_tools,
         )["permission"]
 
-    def test_wrapping_an_approved_wrapper_in_a_shell_is_denied(self) -> None:
-        # Regression: a Lead ran zsh -lc "axon-assign ...", got denied, and
-        # reported axon-assign as missing rather than as mis-invoked.
+    def test_full_access_allows_shell_runtimes(self) -> None:
         self.assertEqual(
-            "deny",
+            "allow",
             self._permission("lead", '/usr/bin/zsh -lc "axon-assign --workspace w -- goal"'),
         )
         self.assertEqual(
@@ -84,7 +84,7 @@ class InterpreterWritesAreActuallyDeniedTests(unittest.TestCase):
             with self.subTest(command=command):
                 self.assertEqual("allow", self._permission("frontend", command))
 
-    def test_interpreter_file_writes_are_denied_for_every_role(self) -> None:
+    def test_interpreter_tools_are_available_for_every_role(self) -> None:
         commands = (
             'node -e "require(\'fs\').writeFileSync(\'x\',\'y\')"',
             'python3 -c "open(\'x\',\'w\')"',
@@ -94,7 +94,7 @@ class InterpreterWritesAreActuallyDeniedTests(unittest.TestCase):
         for role in ROLES:
             for command in commands:
                 with self.subTest(role=role, command=command):
-                    self.assertEqual("deny", self._permission(role, command))
+                    self.assertEqual("allow", self._permission(role, command))
 
 
 if __name__ == "__main__":

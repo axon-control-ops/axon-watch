@@ -178,6 +178,11 @@
   padding: 0.35rem 0.45rem;
 }
 
+.workspace-add-form__hint {
+  color: rgba(120, 220, 255, 0.78);
+  font-size: 0.64rem;
+}
+
 .workspace-add-form__error {
   margin: 0;
   color: rgba(255, 140, 140, 0.92);

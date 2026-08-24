@@ -166,6 +166,36 @@ class EmployeePersonaPromptTests(unittest.TestCase):
         self.assertIn("Priya is planning", appendix)
         self.assertIn("I am planning activities and assignments", appendix)
 
+    def test_axon_x_jules_appendix_includes_advanced_ux_doctrine(self) -> None:
+        roster_row = {
+            "employee_id": "employee-workspace_axon_watch-frontend-2",
+            "name": "Jules",
+            "role": "frontend",
+            "role_label": "Frontend",
+            "owns": "Axon-X mobile VAXON control-plane cockpit and console UI/UX",
+        }
+        with patch(
+            "app.workspace_agents.employee_persona_prompt.find_roster_employee",
+            return_value=roster_row,
+        ), patch(
+            "app.workspace_agents.employee_persona_prompt.build_team_roster_context",
+            return_value="",
+        ):
+            appendix = build_employee_persona_appendix(
+                workspace_id="workspace_axon_watch",
+                employee_id="employee-workspace_axon_watch-frontend-2",
+                employee_role="frontend",
+            )
+        assert appendix is not None
+        self.assertIn("Axon-X/Jules advanced UI/UX doctrine", appendix)
+        self.assertIn("Observe (health, signals, fleet, live run state)", appendix)
+        self.assertIn("VAXON command surface", appendix)
+        self.assertIn("Overview, Command, Fleet, and Data", appendix)
+        self.assertIn("Do not collapse the mobile control-plane into one long tab", appendix)
+        self.assertIn("never let a poster-like background carry the product", appendix)
+        self.assertIn("glass-morphism panels", appendix)
+        self.assertIn("do not call it implemented", appendix)
+
     def test_appendix_fallback_when_roster_misses(self) -> None:
         with patch(
             "app.workspace_agents.employee_persona_prompt.find_roster_employee",

@@ -35,6 +35,10 @@ def operator_token() -> str:
     return os.environ.get("AXON_WATCH_OPERATOR_TOKEN", "").strip()
 
 
+def operator_password() -> str:
+    return os.environ.get("AXON_WATCH_OPERATOR_PASSWORD", "").strip()
+
+
 def allow_loopback_bypass() -> bool:
     # Remote surfaces must not accept anonymous loopback clients.
     if is_remotely_reachable():

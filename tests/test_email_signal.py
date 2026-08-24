@@ -249,6 +249,38 @@ class EmailTriageTests(unittest.TestCase):
         self.assertEqual("workspace_dashpro", items[0]["workspace_id"])
         self.assertEqual("superadmin@example.com", items[0]["meta"]["email_account_address"])
 
+    def test_email_inbox_items_scope_signal_ids_by_mailbox(self) -> None:
+        with patch(
+            "app.signals.email_signal.fetch_native_email_messages",
+            return_value=[
+                {
+                    "message_id": "<shared-message@example.com>",
+                    "account_id": "acct-ops",
+                    "account_email": "ops@example.com",
+                    "from": "Client <client@example.com>",
+                    "subject": "Urgent: please confirm today",
+                    "text": "Please confirm this today. We cannot wait.",
+                    "snippet": "Please confirm this today. We cannot wait.",
+                },
+                {
+                    "message_id": "<shared-message@example.com>",
+                    "account_id": "acct-sales",
+                    "account_email": "sales@example.com",
+                    "from": "Client <client@example.com>",
+                    "subject": "Urgent: please confirm today",
+                    "text": "Please confirm this today. We cannot wait.",
+                    "snippet": "Please confirm this today. We cannot wait.",
+                },
+            ],
+        ), patch("app.signals.email_signal._messages_from_live_bridge", return_value=None):
+            items = self.email_inbox_items()
+
+        self.assertEqual(2, len(items))
+        signal_ids = {str(item["signal_id"]) for item in items}
+        self.assertEqual(2, len(signal_ids))
+        self.assertTrue(any("acct-ops" in signal_id for signal_id in signal_ids))
+        self.assertTrue(any("acct-sales" in signal_id for signal_id in signal_ids))
+
     def test_resolve_email_workspace_id_from_hints(self) -> None:
         resolve_email_workspace_id = self.email_signal.resolve_email_workspace_id
 

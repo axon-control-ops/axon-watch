@@ -99,6 +99,18 @@ def _service_root_for_importing_test() -> Path | None:
     return None
 
 
+def _service_root_for_explicit_loader() -> Path | None:
+    frame = sys._getframe(2)
+    while frame is not None:
+        path = Path(frame.f_code.co_filename)
+        if path.name == "watch_app_loader.py":
+            return WATCH_SERVICE_ROOT
+        if path.name == "control_plane_app_loader.py":
+            return CONTROL_PLANE_ROOT
+        frame = frame.f_back
+    return None
+
+
 def _cached_app_root() -> Path | None:
     app_module = sys.modules.get("app")
     module_file = getattr(app_module, "__file__", None)
@@ -128,7 +140,7 @@ def _service_app_import_guard(name, globals=None, locals=None, fromlist=(), leve
             return _ORIGINAL_IMPORT(name, globals, locals, fromlist, level)
         _IMPORT_GUARD_ACTIVE = True
         try:
-            desired = _service_root_for_importing_test() or _active_service_root()
+            desired = _service_root_for_explicit_loader() or _service_root_for_importing_test() or _active_service_root()
             cached = _cached_app_root()
             if desired is not None:
                 if cached is not None and cached != desired:

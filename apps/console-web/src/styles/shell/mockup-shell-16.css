@@ -89,8 +89,14 @@
 
 .operator-mobile-shell__tunnel-actions {
   display: flex;
+  flex-wrap: wrap;
   gap: 0.35rem;
   margin-top: 0.45rem;
+}
+
+.operator-mobile-shell__tunnel-actions > * {
+  flex: 1 1 10rem;
+  min-width: 0;
 }
 
 .console-shell--mobile .topbar-mockup,

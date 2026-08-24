@@ -75,7 +75,7 @@ class AgentTerminalPolicyTests(unittest.TestCase):
     @patch("app.terminal.agent_job_access.resolve_workspace_root")
     @patch("app.terminal.agent_job_access.task_store.get_task")
     @patch("app.terminal.agent_job_access.get_run")
-    def test_integrations_lane_b_without_task_can_enqueue_vercel_deploy(
+    def test_integrations_lane_b_without_task_still_gates_production_deploy(
         self,
         get_run,
         get_task,
@@ -90,21 +90,22 @@ class AgentTerminalPolicyTests(unittest.TestCase):
         get_task.return_value = None
         resolve_root.return_value = Path("/tmp/workspace_dashpro")
 
-        role = assert_agent_terminal_job_allowed(
-            workspace_id="workspace_dashpro",
-            source_workspace_id="workspace_dashpro",
-            run_id="run_direct_soren",
-            command="vercel deploy --prod --yes",
-        )
-
-        self.assertEqual("integrations", role)
+        with self.assertRaisesRegex(AgentTerminalPolicyError, "publication gate"):
+            assert_agent_terminal_job_allowed(
+                workspace_id="workspace_dashpro",
+                source_workspace_id="workspace_dashpro",
+                run_id="run_direct_soren",
+                command="vercel deploy --prod --yes",
+            )
         append_receipt.assert_called()
 
     @patch("app.terminal.agent_job_access.resolve_workspace_root")
     @patch("app.terminal.agent_job_access.task_store.get_task")
     @patch("app.terminal.agent_job_access.get_run")
-    def test_no_task_agent_terminal_still_denies_non_ship_commands(
+    @patch("app.terminal.agent_job_access.append_run_execution_receipt")
+    def test_no_task_full_role_can_run_normal_role_tools(
         self,
+        append_receipt,
         get_run,
         get_task,
         resolve_root,
@@ -117,13 +118,14 @@ class AgentTerminalPolicyTests(unittest.TestCase):
         get_task.return_value = None
         resolve_root.return_value = Path("/tmp/workspace_dashpro")
 
-        with self.assertRaisesRegex(AgentTerminalPolicyError, "no scoped task"):
-            assert_agent_terminal_job_allowed(
-                workspace_id="workspace_dashpro",
-                source_workspace_id="workspace_dashpro",
-                run_id="run_direct_soren",
-                command="npm install",
-            )
+        role = assert_agent_terminal_job_allowed(
+            workspace_id="workspace_dashpro",
+            source_workspace_id="workspace_dashpro",
+            run_id="run_direct_soren",
+            command="npm install",
+        )
+        self.assertEqual("integrations", role)
+        append_receipt.assert_called_once()
 
     @patch("app.terminal.agent_job_access.append_run_execution_receipt")
     @patch("app.terminal.agent_job_access.resolve_worker_execution_policy")
@@ -156,13 +158,13 @@ class AgentTerminalPolicyTests(unittest.TestCase):
         self.assertEqual("watcher", role)
         self.assertTrue(append_receipt.called)
 
-        with self.assertRaises(AgentTerminalPolicyError):
-            assert_agent_terminal_job_allowed(
-                workspace_id="workspace_demo",
-                source_workspace_id="workspace_demo",
-                run_id="run_demo",
-                command="curl https://example.invalid",
-            )
+        role = assert_agent_terminal_job_allowed(
+            workspace_id="workspace_demo",
+            source_workspace_id="workspace_demo",
+            run_id="run_demo",
+            command="curl https://example.invalid",
+        )
+        self.assertEqual("watcher", role)
 
     @patch("app.terminal.agent_job_access.append_run_execution_receipt")
     @patch("app.terminal.agent_job_access.resolve_worker_execution_policy")

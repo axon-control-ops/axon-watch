@@ -266,6 +266,12 @@ def email_inbox_item(
     snippet = str(analysis.get("snippet") or "").strip()
     account_id = str(analysis.get("account_id") or "").strip()
     account_email = str(analysis.get("account_email") or "").strip()
+    account_token = account_id or account_email
+    signal_token = (
+        f"{_safe_signal_token(account_token)}_{_safe_signal_token(message_id)}"
+        if account_token
+        else _safe_signal_token(message_id)
+    )
     now = utc_now_iso()
     # A no-reply sender cannot receive a reply at all (it bounces or is
     # discarded server-side), so no draft is generated -- previously this ran
@@ -280,7 +286,7 @@ def email_inbox_item(
     suggestion = {} if no_reply_sender else suggest_email_reply(analysis)
 
     return {
-        "signal_id": f"signal_email_{_safe_signal_token(message_id)}",
+        "signal_id": f"signal_email_{signal_token}",
         "workspace_id": workspace_id,
         "title": f"Email needs follow-up: {subject}",
         "summary": f"{sender} — {recommended_detail}".strip(" —"),
@@ -293,6 +299,7 @@ def email_inbox_item(
         "delivery_state": "pending",
         "meta": {
             "signal_family": "email_triage",
+            "message_id": message_id,
             "sender": sender,
             "subject": subject,
             "snippet": snippet,

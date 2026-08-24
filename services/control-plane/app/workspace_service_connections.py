@@ -33,6 +33,7 @@ class WorkspaceServiceConnection:
     product: str
     dashpro_tenant_id: str | None
     env_keys: tuple[str, ...]
+    required_services: tuple[str, ...]
     live_verify_command_prefixes: tuple[tuple[str, ...], ...]
     live_roles: frozenset[str]
     network_mode_for_live_roles: str
@@ -77,6 +78,23 @@ def _parse_connection(workspace_id: str, entry: dict[str, Any]) -> WorkspaceServ
         for role in (entry.get("live_roles") or ("backend", "integrations", "watcher"))
         if str(role).strip()
     )
+    required_services = tuple(
+        dict.fromkeys(
+            str(service).strip().lower()
+            for service in (entry.get("required_services") or [])
+            if str(service).strip()
+        )
+    )
+    if not required_services:
+        lowered_keys = {key.lower() for key in env_keys}
+        inferred: list[str] = []
+        if any("supabase" in key for key in lowered_keys):
+            inferred.append("supabase")
+        if any(key in {"github_token", "gh_token"} for key in lowered_keys):
+            inferred.append("github")
+        if any(key.startswith("sentry_") for key in lowered_keys):
+            inferred.append("sentry")
+        required_services = tuple(inferred)
     network_mode = str(entry.get("network_mode_for_live_roles") or "audited").strip().lower()
     if network_mode not in {"audited", "unrestricted"}:
         network_mode = "audited"
@@ -88,6 +106,7 @@ def _parse_connection(workspace_id: str, entry: dict[str, Any]) -> WorkspaceServ
         product=str(entry.get("product") or "edudash").strip(),
         dashpro_tenant_id=tenant_id,
         env_keys=env_keys,
+        required_services=required_services,
         live_verify_command_prefixes=tuple(prefixes),
         live_roles=live_roles,
         network_mode_for_live_roles=network_mode,
@@ -201,9 +220,9 @@ def apply_live_service_policy(
     """Widen command prefixes and network for configured live-service workspaces."""
     from dataclasses import replace
 
-    from app.workspace_agents.execution_policy import AgentExecutionPolicy
-
-    if not isinstance(policy, AgentExecutionPolicy):
+    approved_prefixes = getattr(policy, "approved_command_prefixes", None)
+    policy_network_mode = getattr(policy, "network_mode", None)
+    if approved_prefixes is None or policy_network_mode is None:
         return policy
     connection = get_workspace_service_connection(workspace_id)
     if connection is None:
@@ -212,15 +231,15 @@ def apply_live_service_policy(
     if normalized_role not in connection.live_roles:
         return policy
     extra_prefixes = connection.live_verify_command_prefixes
-    if not extra_prefixes and policy.network_mode != "none":
+    if not extra_prefixes and policy_network_mode != "none":
         return policy
     merged_prefixes = tuple(
-        dict.fromkeys((*policy.approved_command_prefixes, *extra_prefixes))
+        dict.fromkeys((*approved_prefixes, *extra_prefixes))
     )
-    network_mode = policy.network_mode
-    if policy.network_mode == "none" and extra_prefixes:
+    network_mode = policy_network_mode
+    if policy_network_mode == "none" and extra_prefixes:
         network_mode = connection.network_mode_for_live_roles
-    if merged_prefixes == policy.approved_command_prefixes and network_mode == policy.network_mode:
+    if merged_prefixes == approved_prefixes and network_mode == policy_network_mode:
         return policy
     return replace(
         policy,
@@ -248,18 +267,32 @@ def workspace_service_connection_posture(workspace_id: str) -> dict[str, object]
         key: key in resolved
         for key in connection.env_keys
     }
-    has_supabase = any(resolved.get(key) for key in connection.env_keys if "SUPABASE" in key)
-    ready = dotenv_present and has_supabase
-    hint = "Live DashPro bridge ready — fleet may run configured verify commands."
+    service_key_predicates = {
+        "github": lambda key: key in {"GITHUB_TOKEN", "GH_TOKEN"},
+        "sentry": lambda key: key.startswith("SENTRY_"),
+        "supabase": lambda key: "SUPABASE" in key,
+    }
+    service_status = {
+        service: any(
+            resolved.get(key)
+            for key in connection.env_keys
+            if service_key_predicates.get(service, lambda _key: False)(key)
+        )
+        for service in connection.required_services
+    }
+    services_ready = all(service_status.values()) if service_status else True
+    ready = dotenv_present and services_ready
+    hint = "Live service bridge ready — fleet may run configured verify commands."
     if not binding:
         ready = False
         hint = "Bind a project_root in workspace-project-bindings.json first."
     elif not dotenv_present:
         ready = False
         hint = "Materialize operator .env from .env.example on the bound project root."
-    elif not has_supabase:
+    elif not services_ready:
         ready = False
-        hint = "Add Supabase keys to operator .env or unlock /vault with matching keys."
+        missing = ", ".join(service for service, ok in service_status.items() if not ok)
+        hint = f"Add {missing} keys to operator .env or unlock /vault with matching keys."
     return {
         "workspace_id": workspace_id,
         "configured": True,
@@ -272,6 +305,8 @@ def workspace_service_connection_posture(workspace_id: str) -> dict[str, object]
         "operator_dotenv_present": dotenv_present,
         "env_keys": list(connection.env_keys),
         "env_keys_resolved": key_status,
+        "required_services": list(connection.required_services),
+        "services_resolved": service_status,
         "live_verify_commands": [list(prefix) for prefix in connection.live_verify_command_prefixes],
         "live_roles": sorted(connection.live_roles),
         "network_mode_for_live_roles": connection.network_mode_for_live_roles,

@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted } from 'vue';
+import { computed, onMounted, onUnmounted, ref } from 'vue';
 
 import {
   acknowledgeRecovery,
+  clearWorkspaceStaleRecovery,
   reconcilePlatform,
   resumeRecoveredRun,
   type RecoveryCenterItem,
@@ -25,6 +26,8 @@ const loading = recoveryCenterLoading;
 const error = recoveryCenterError;
 const items = recoveryCenterItems;
 const attention = recoveryAttentionCount;
+const clearing = ref(false);
+const clearResult = ref<string | null>(null);
 
 const grouped = computed(() => groupRecoveryItems(items.value));
 const buckets = computed(() =>
@@ -60,6 +63,37 @@ async function onAction(item: RecoveryCenterItem, action: string): Promise<void>
   await refresh();
 }
 
+async function clearWorkspaceStaleState(): Promise<void> {
+  const workspaceId = String(shell.currentWorkspace?.workspace_id || '').trim();
+  if (!workspaceId || clearing.value) return;
+  clearing.value = true;
+  clearResult.value = null;
+  try {
+    const preview = await clearWorkspaceStaleRecovery(workspaceId, false);
+    if (!preview.candidate_count) {
+      clearResult.value = 'No failed or stale workspace state remains.';
+      await refresh();
+      return;
+    }
+    const confirmed = window.confirm(
+      `Clear ${preview.candidate_count} failed/stale recovery item(s) for this workspace? ` +
+        `This cancels ${preview.task_ids.length} linked active task(s), stops matching live runs, ` +
+        'and keeps run history, evidence, checkpoints, and worktrees.',
+    );
+    if (!confirmed) return;
+    const result = await clearWorkspaceStaleRecovery(workspaceId, true);
+    clearResult.value = result.errors.length
+      ? `Reset completed with ${result.errors.length} item(s) needing inspection.`
+      : `Workspace reset: ${result.acknowledged_recoveries.length} recovery item(s) cleared and ` +
+        `${result.cancelled_tasks.length} task(s) cancelled.`;
+    await refresh();
+  } catch (clearError) {
+    clearResult.value = clearError instanceof Error ? clearError.message : 'Workspace reset failed.';
+  } finally {
+    clearing.value = false;
+  }
+}
+
 onMounted(() => window.addEventListener('keydown', onKeydown));
 onUnmounted(() => window.removeEventListener('keydown', onKeydown));
 </script>
@@ -84,8 +118,19 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown));
             Reconcile, resume, retry, or cancel. Clearing never deletes historical evidence.
           </p>
         </div>
-        <button type="button" class="recovery-center__dismiss" @click="dismiss">Done</button>
+        <div class="recovery-center__header-actions">
+          <button
+            type="button"
+            class="recovery-center__clear"
+            :disabled="clearing"
+            @click="clearWorkspaceStaleState"
+          >
+            {{ clearing ? 'Clearing…' : 'Clear stale state' }}
+          </button>
+          <button type="button" class="recovery-center__dismiss" @click="dismiss">Done</button>
+        </div>
       </header>
+      <p v-if="clearResult" class="recovery-center__result" role="status">{{ clearResult }}</p>
       <p v-if="loading">Loading authoritative recovery state…</p>
       <p v-else-if="error">{{ error }}</p>
       <div v-else class="recovery-center__body">

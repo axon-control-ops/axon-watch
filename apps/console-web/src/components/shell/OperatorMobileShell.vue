@@ -15,6 +15,7 @@ const tunnelActionError = ref<string | null>(null);
 
 async function refreshTunnelStatus(): Promise<void> {
   tunnelLoadState.value = 'loading';
+  tunnelActionError.value = null;
   try {
     const status = await fetchTunnelStatus();
     tunnelUrl.value = status.url?.trim() || null;

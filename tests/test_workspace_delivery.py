@@ -7,8 +7,9 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
+from app.workspace_delivery import ci_status as ci_status_module
 from app.workspace_delivery import store as delivery_store
-from app.workspace_delivery.ci_status import apply_ci_status_to_delivery, classify_workflow_status
+from app.workspace_delivery.ci_status import classify_workflow_status
 from app.workspace_delivery.config import (
     clear_config_cache_for_tests,
     get_workspace_delivery_policy,
@@ -36,6 +37,16 @@ class WorkspaceDeliveryTests(unittest.TestCase):
         self.assertEqual(policy.push_policy, "draft_pr")
         self.assertTrue(is_protected_branch(policy, "dev"))
         self.assertFalse(is_protected_branch(policy, "worker/run_abc"))
+
+    def test_loads_young_eagles_integrations_delivery_policy(self) -> None:
+        policy = get_workspace_delivery_policy("workspace_young_eagles_day_care")
+        self.assertIsNotNone(policy)
+        assert policy is not None
+        self.assertTrue(policy.enabled)
+        self.assertEqual("main", policy.base_branch)
+        self.assertEqual("axon-control-ops", policy.github_owner)
+        self.assertEqual("young-eagles-day-care", policy.github_repo)
+        self.assertEqual(("Desktop Release",), policy.workflow_names)
 
     def test_create_and_update_delivery(self) -> None:
         created = delivery_store.create_delivery(
@@ -71,7 +82,7 @@ class WorkspaceDeliveryTests(unittest.TestCase):
             attempt_budget=2,
         )
         delivery_store.update_delivery(str(created["delivery_id"]), commit_sha="sha2")
-        apply_ci_status_to_delivery(
+        ci_status_module.apply_ci_status_to_delivery(
             workspace_id="workspace_axon_watch",
             head_branch="worker/run_2",
             head_sha="sha2",
@@ -82,7 +93,7 @@ class WorkspaceDeliveryTests(unittest.TestCase):
         mid = delivery_store.get_delivery(str(created["delivery_id"]))
         assert mid is not None
         self.assertEqual(mid["stage"], "ci_red")
-        apply_ci_status_to_delivery(
+        ci_status_module.apply_ci_status_to_delivery(
             workspace_id="workspace_axon_watch",
             head_branch="worker/run_2",
             head_sha="sha2",
@@ -142,11 +153,11 @@ class WorkspaceDeliveryTests(unittest.TestCase):
             draft_pr_url="https://example.com/pr/42",
         )
         with (
-            patch("app.workspace_delivery.ci_status.emit_delivery_receipt"),
-            patch("app.workspace_delivery.ci_status._post_delivery_update_to_agent_thread") as post,
+            patch.object(ci_status_module, "emit_delivery_receipt"),
+            patch.object(ci_status_module, "_post_delivery_update_to_agent_thread") as post,
             patch("app.live_events.broadcast_material_change"),
         ):
-            apply_ci_status_to_delivery(
+            ci_status_module.apply_ci_status_to_delivery(
                 workspace_id="workspace_axon_watch",
                 head_branch="worker/run_thread_update",
                 head_sha="head",
@@ -178,12 +189,12 @@ class WorkspaceDeliveryTests(unittest.TestCase):
         )
         delivery_store.update_delivery(str(created["delivery_id"]), commit_sha="head")
         with (
-            patch("app.workspace_delivery.ci_status.emit_delivery_receipt"),
-            patch("app.workspace_delivery.ci_status._post_delivery_update_to_agent_thread"),
-            patch("app.workspace_delivery.ci_status._queue_lead_after_ci_green") as handoff,
+            patch.object(ci_status_module, "emit_delivery_receipt"),
+            patch.object(ci_status_module, "_post_delivery_update_to_agent_thread"),
+            patch.object(ci_status_module, "_queue_lead_after_ci_green") as handoff,
             patch("app.live_events.broadcast_material_change"),
         ):
-            apply_ci_status_to_delivery(
+            ci_status_module.apply_ci_status_to_delivery(
                 workspace_id="workspace_axon_watch",
                 head_branch="worker/run_green_handoff",
                 head_sha="head",

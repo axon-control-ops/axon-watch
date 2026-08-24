@@ -81,6 +81,24 @@ _DESTRUCTIVE_GIT_SUBCOMMANDS = frozenset(
         "tag",
     }
 )
+_MUTATING_GH_PREFIXES = (
+    ("pr", "merge"),
+    ("pr", "close"),
+    ("release", "create"),
+    ("release", "delete"),
+    ("release", "upload"),
+    ("repo", "delete"),
+    ("run", "cancel"),
+    ("run", "delete"),
+    ("run", "rerun"),
+    ("secret", "delete"),
+    ("secret", "set"),
+    ("variable", "delete"),
+    ("variable", "set"),
+    ("workflow", "run"),
+)
+_MUTATING_NPM_SUBCOMMANDS = frozenset({"publish", "unpublish", "deprecate"})
+_MUTATING_NPM_SCRIPTS = frozenset({"deploy", "publish", "release", "ota:production"})
 _GENERIC_ESCAPE_ARGUMENTS = frozenset(
     {
         "-exec",
@@ -161,7 +179,7 @@ def _string_tuple(value: Any) -> tuple[str, ...]:
 
 def _load_policy(
     policy_path: Path,
-) -> tuple[frozenset[str], tuple[tuple[str, ...], ...], str]:
+) -> tuple[frozenset[str], tuple[tuple[str, ...], ...], str, bool]:
     with policy_path.open("r", encoding="utf-8") as handle:
         document = json.load(handle)
     if not isinstance(document, Mapping) or document.get("version") != 1:
@@ -173,7 +191,7 @@ def _load_policy(
         raise ValueError("approved command prefixes are malformed")
     prefixes = tuple(_string_tuple(prefix) for prefix in prefixes_raw)
     write_scope_hint = str(document.get("write_scope_hint") or "")
-    return wrappers, prefixes, write_scope_hint
+    return wrappers, prefixes, write_scope_hint, bool(document.get("allow_all_tools", False))
 
 
 def _extract_shell_command(payload: Mapping[str, Any]) -> str:
@@ -214,6 +232,40 @@ def _git_is_destructive(tokens: Sequence[str]) -> bool:
     if any(token in _GENERIC_ESCAPE_ARGUMENTS or token == "-c" for token in lowered):
         return True
     return any(token in _DESTRUCTIVE_GIT_SUBCOMMANDS for token in lowered)
+
+
+def _gh_is_mutating(tokens: Sequence[str]) -> bool:
+    if os.path.basename(tokens[0]).lower() != "gh":
+        return False
+    lowered = tuple(token.lower() for token in tokens[1:])
+    if lowered and lowered[0] == "api":
+        return any(
+            token in {"-x", "--method"}
+            and index + 1 < len(lowered)
+            and lowered[index + 1] not in {"get", "head"}
+            for index, token in enumerate(lowered)
+        )
+    return any(lowered[: len(prefix)] == prefix for prefix in _MUTATING_GH_PREFIXES)
+
+
+def _external_publish_is_mutating(tokens: Sequence[str]) -> bool:
+    executable = os.path.basename(tokens[0]).lower()
+    lowered = tuple(token.lower() for token in tokens[1:])
+    if executable == "npm" and lowered:
+        if lowered[0] in _MUTATING_NPM_SUBCOMMANDS:
+            return True
+        return (
+            len(lowered) >= 2
+            and lowered[0] in {"run", "run-script"}
+            and lowered[1] in _MUTATING_NPM_SCRIPTS
+        )
+    if executable == "vercel":
+        return "--prod" in lowered or "--target=production" in lowered
+    if executable == "eas":
+        return bool(lowered and lowered[0] in {"submit"})
+    if executable == "supabase":
+        return lowered[:2] in {("db", "push"), ("db", "reset")}
+    return False
 
 
 def _matches_prefix(tokens: Sequence[str], prefix: Sequence[str]) -> bool:
@@ -257,6 +309,7 @@ def evaluate_hook_payload(
     approved_wrappers: frozenset[str],
     approved_command_prefixes: tuple[tuple[str, ...], ...],
     write_scope_hint: str = "",
+    allow_all_tools: bool = False,
 ) -> dict[str, str]:
     """Return a Cursor hook permission response; malformed input always denies."""
     try:
@@ -298,22 +351,28 @@ def evaluate_hook_payload(
     if executable in _PRIVILEGE_TOOLS:
         hint = f" {write_scope_hint}" if write_scope_hint else ""
         return _deny(f"privilege escalation is not allowed — never use sudo/su to work around filesystem restrictions.{hint}")
-    if executable in _RAW_NETWORK_TOOLS and not narrowly_approved:
+    if executable in _RAW_NETWORK_TOOLS and not narrowly_approved and not allow_all_tools:
         return _deny("raw network tools are not allowed")
     if executable in _INTERPRETER_ESCAPES and not _interpreter_prefix_approved(
         executable, tokens, approved_command_prefixes
-    ):
+    ) and not allow_all_tools:
         return _deny("shell and interpreter escapes are not allowed")
-    if executable == "npx" and "--no-install" not in tokens[1:]:
+    if executable == "npx" and "--no-install" not in tokens[1:] and not allow_all_tools:
         return _deny("npx must include --no-install to prevent implicit package downloads")
     if _git_is_destructive(tokens):
         return _deny("destructive or networked Git operations are not allowed")
+    if _gh_is_mutating(tokens):
+        return _deny("mutating GitHub operations require the separate publication gate")
+    if _external_publish_is_mutating(tokens):
+        return _deny("production or package publication requires the separate publication gate")
     if any(token.lower() in _GENERIC_ESCAPE_ARGUMENTS for token in tokens[1:]):
         return _deny("command execution escape arguments are not allowed")
 
     if executable != "git" and executable_token == executable and executable in approved_wrappers:
         return _allow()
     if prefix_match is not None:
+        return _allow()
+    if allow_all_tools:
         return _allow()
     return _deny("command does not match an approved wrapper or command prefix")
 
@@ -324,12 +383,13 @@ def run_hook(policy_path: Path, raw_input: str) -> dict[str, str]:
         payload = json.loads(raw_input)
         if not isinstance(payload, Mapping):
             raise ValueError("hook input must be a JSON object")
-        wrappers, prefixes, write_scope_hint = _load_policy(policy_path)
+        wrappers, prefixes, write_scope_hint, allow_all_tools = _load_policy(policy_path)
         return evaluate_hook_payload(
             payload,
             approved_wrappers=wrappers,
             approved_command_prefixes=prefixes,
             write_scope_hint=write_scope_hint,
+            allow_all_tools=allow_all_tools,
         )
     except Exception as exc:  # Hook boundaries must fail closed, including I/O errors.
         return _deny(f"hook policy unavailable: {type(exc).__name__}")

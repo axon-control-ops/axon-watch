@@ -23,6 +23,7 @@ from app.auth.settings import (
     allow_loopback_bypass,
     auth_mode,
     client_is_loopback,
+    operator_password,
     operator_token,
 )
 
@@ -36,7 +37,9 @@ class DesktopBootstrapRequest(BaseModel):
 
 
 class OperatorSessionRequest(BaseModel):
-    operator_token: str = Field(min_length=1)
+    operator_token: str | None = Field(default=None, min_length=1)
+    operator_password: str | None = Field(default=None, min_length=1)
+    return_session_token: bool = False
 
 
 def console_dist_dir() -> Path | None:
@@ -54,6 +57,15 @@ def _token_matches(presented: str) -> bool:
     return bool(expected and presented and secrets.compare_digest(presented, expected))
 
 
+def _password_matches(presented: str) -> bool:
+    expected = (operator_password() or "").strip()
+    return bool(expected and presented and secrets.compare_digest(presented, expected))
+
+
+def _operator_credentials_configured() -> bool:
+    return bool(operator_token() or operator_password())
+
+
 def _request_bearer(request: Request) -> str:
     header = request.headers.get("authorization") or ""
     parts = header.split(None, 1)
@@ -67,6 +79,8 @@ def _session_meta() -> dict[str, object]:
         "auth_mode": auth_mode(),
         "loopback_bypass": allow_loopback_bypass(),
         "cookie_max_age_seconds": SESSION_COOKIE_MAX_AGE_SECONDS,
+        "password_enabled": bool(operator_password()),
+        "token_enabled": bool(operator_token()),
     }
 
 
@@ -90,16 +104,18 @@ def _request_is_secure(request: Request) -> bool:
     return forwarded == "https" or request.url.scheme == "https"
 
 
-def _set_session_cookie(response: Response, *, secure: bool, same_site: str) -> None:
+def _set_session_cookie(response: Response, *, secure: bool, same_site: str) -> str:
+    session_token = issue_session_token()
     response.set_cookie(
         key=SESSION_COOKIE,
-        value=issue_session_token(),
+        value=session_token,
         httponly=True,
         samesite=same_site,
         secure=secure,
         max_age=SESSION_COOKIE_MAX_AGE_SECONDS,
         path="/",
     )
+    return session_token
 
 
 @router.get("/api/auth/session")
@@ -114,18 +130,22 @@ def operator_session_login(
     request: Request,
     response: Response,
 ) -> dict[str, object]:
-    """Exchange the deployment operator token for an HttpOnly browser session."""
-    if not operator_token():
-        raise HTTPException(status_code=503, detail="operator token is not configured")
-    if not _token_matches(body.operator_token.strip()):
-        raise HTTPException(status_code=401, detail="invalid operator token")
-    _set_session_cookie(
+    """Exchange an operator token or password for a browser/mobile session."""
+    if not _operator_credentials_configured():
+        raise HTTPException(status_code=503, detail="operator credentials are not configured")
+    presented_token = (body.operator_token or "").strip()
+    presented_password = (body.operator_password or "").strip()
+    if not (_token_matches(presented_token) or _password_matches(presented_password)):
+        raise HTTPException(status_code=401, detail="invalid operator credentials")
+    session_token = _set_session_cookie(
         response,
         secure=_request_is_secure(request),
         same_site="strict",
     )
     status = _session_status(request)
     status.update({"authenticated": True, "auth_required": True, "identity": "session"})
+    if body.return_session_token:
+        status["session_token"] = session_token
     return status
 
 

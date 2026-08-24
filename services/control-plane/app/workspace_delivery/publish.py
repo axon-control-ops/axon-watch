@@ -13,9 +13,9 @@ from app.safe_improvement.isolated_executor import read_baseline_metadata
 from app.workspace_agents.diff_policy import (
     PRIVATE_COMPANY_PATH_GLOBS,
     evaluate_changed_paths,
-    resolve_effective_allowed_paths,
     scan_text_for_secrets,
 )
+from app.workspace_agents.execution_policy import resolve_effective_policy
 from app.workspace_delivery.config import (
     WorkspaceDeliveryPolicy,
     get_workspace_delivery_policy,
@@ -72,6 +72,27 @@ def list_isolation_changed_paths(
         run=_run,
         include_ignored_pathspecs=include_ignored_pathspecs,
     )
+
+
+def _task_allowed_paths(task_id: str | None) -> list[str] | None:
+    task_key = str(task_id or "").strip()
+    if not task_key:
+        return None
+    try:
+        from app.persistence import task_store
+
+        task = task_store.get_task(task_key)
+    except Exception:  # noqa: BLE001 — delivery can still inspect ordinary git changes
+        logger.exception("unable to resolve task allowed paths for delivery task_id=%s", task_key)
+        return None
+    if not task:
+        return None
+    paths = [
+        str(item).strip()
+        for item in (task.get("allowed_paths") or [])
+        if str(item).strip()
+    ]
+    return paths or None
 
 
 def _stage_isolation_paths(isolation_root: Path, paths: list[str]) -> subprocess.CompletedProcess[str]:
@@ -133,24 +154,6 @@ def _derive_commit_message(paths: list[str], turn_subject: str | None) -> str:
     return subject[:72]
 
 
-def _task_allowed_paths(task_id: str | None) -> list[str]:
-    key = str(task_id or "").strip()
-    if not key:
-        return []
-    try:
-        from app.persistence import task_store
-
-        task = task_store.get_task(key)
-    except Exception:  # noqa: BLE001 — publish must not crash on ledger read
-        return []
-    if not isinstance(task, dict):
-        return []
-    raw = task.get("allowed_paths")
-    if not isinstance(raw, list):
-        return []
-    return [str(item).strip() for item in raw if str(item).strip()]
-
-
 def _contract_scope(isolation_root: Path) -> tuple[list[str], list[str]]:
     try:
         from app.workspace_agents.verifier_checks import load_repo_contract
@@ -193,10 +196,30 @@ def _scan_publish_scope(
 ) -> str | None:
     """Mirror Gate 6 path policy so publish cannot be looser than acceptance."""
     contract_allowed, forbidden = _contract_scope(isolation_root)
-    effective = resolve_effective_allowed_paths(
-        contract_allowed_paths=contract_allowed,
-        task_allowed_paths=_task_allowed_paths(task_id),
-    )
+    effective = contract_allowed
+    if task_id:
+        from app.persistence import task_store
+
+        task = task_store.get_task(task_id)
+        if task is None:
+            return f"task_scope_missing: {task_id} (delivery task was not found)"
+        owner_role = str(task.get("owner_role") or "").strip().lower()
+        effective = list(
+            resolve_effective_policy(
+                role=owner_role,
+                workspace_allowed_paths=contract_allowed,
+                workspace_forbidden_path_globs=forbidden,
+                task_allowed_paths=None,
+            ).write_paths
+        )
+        if not effective:
+            return (
+                f"role_scope_missing: {owner_role or 'unknown'} "
+                "(delivery role has no writable project surface)"
+            )
+    # Task paths are starting hints, so workers may publish adjacent files in
+    # their professional lane. The role surface remains a hard publication
+    # boundary, alongside forbidden/private/secret/protected-branch gates.
     findings = evaluate_changed_paths(
         paths,
         allowed_paths=effective,

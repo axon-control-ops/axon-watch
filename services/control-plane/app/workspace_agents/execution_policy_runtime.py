@@ -27,7 +27,7 @@ def resolve_worker_execution_policy(
     workspace_root: Path,
     workspace_id: str | None = None,
 ) -> AgentExecutionPolicy:
-    """Resolve role, employee, contract, and leased-task scope fail closed.
+    """Resolve role, employee, and repository authority fail closed.
 
     The contract is read from the **bound workspace root** when one is known,
     falling back to ``workspace_root`` (usually the disposable checkout).
@@ -63,9 +63,10 @@ def resolve_worker_execution_policy(
         contract = load_repo_contract(str(contract_source))
     except (OSError, ProjectContractError, ValueError) as exc:
         # An invalid contract silently becomes an empty workspace scope, which
-        # intersects every role's write paths down to nothing and drops the run
-        # to read-only "consultative". That looked like an agent refusing to
-        # work rather than a broken project.axon.yaml, so say so out loud.
+        # intersects every role's write paths down to nothing. The ordinary
+        # tool policy remains available for diagnosis, but the checkout gets no
+        # role write mounts. Say that out loud instead of silently pretending
+        # the task itself was the blocker.
         logger.warning(
             "project contract failed to load for %s (%s: %s); "
             "workspace scope is empty, so this run will be read-only",
@@ -75,15 +76,9 @@ def resolve_worker_execution_policy(
         )
         contract = {}
     task_paths = task_payload.get("allowed_paths")
-    # Older task rows (and rows created before task_store began applying role
-    # defaults) serialize an omitted scope as ``[]``.  The ledger cannot
-    # distinguish that representation from an explicit empty list, so treating
-    # it as an authority restriction here permanently strands those already
-    # queued specialist tasks in a read-only sandbox.  New task creation
-    # persists the role-bounded default; for legacy empty rows, use that same
-    # bounded fallback.  Direct policy callers can still pass an explicit empty
-    # scope to resolve_effective_policy when a deliberately read-only run is
-    # required.
+    # Task paths are retained as routing/receipt metadata. They do not grant or
+    # remove authority; role, explicit employee policy, and repository contract
+    # are the enforcement inputs.
     task_scope = task_paths if isinstance(task_paths, list) and task_paths else None
     policy = resolve_effective_policy(
         role=employee.role,
@@ -153,6 +148,7 @@ def execution_policy_payload(policy: AgentExecutionPolicy) -> dict[str, Any]:
         "timeout_seconds": policy.timeout_seconds,
         "trust_policy": policy.trust_policy,
         "execution_access": policy.execution_access,
+        "allow_all_tools": policy.allow_all_tools,
     }
 
 

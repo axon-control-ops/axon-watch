@@ -23,6 +23,8 @@ class ControlPlaneConfigTests(unittest.TestCase):
         self.assertIn("http://localhost:4173", origins)
         self.assertIn("http://127.0.0.1:8081", origins)
         self.assertIn("http://localhost:8081", origins)
+        self.assertIn("http://127.0.0.1:19006", origins)
+        self.assertIn("http://localhost:19006", origins)
 
     def test_env_cors_origins_extend_default_local_origins(self) -> None:
         with patch.dict(

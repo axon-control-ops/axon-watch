@@ -57,6 +57,19 @@
       "attempt_budget": 3,
       "push_policy": "draft_pr",
       "notes": "Worker delivery opens private draft PRs into master. TPS currently has no configured CI workflows; verification receipts remain mandatory before publication."
+    },
+    {
+      "workspace_id": "workspace_young_eagles_day_care",
+      "enabled": true,
+      "base_branch": "main",
+      "github_owner": "axon-control-ops",
+      "github_repo": "young-eagles-day-care",
+      "workflow_names": [
+        "Desktop Release"
+      ],
+      "attempt_budget": 3,
+      "push_policy": "draft_pr",
+      "notes": "Worker delivery opens draft PRs into main. Parent app and Expo work remain owned by DashPro; this repository contains the private centre operations workspace and desktop command centre."
     }
   ]
 }

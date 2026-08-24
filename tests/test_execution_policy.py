@@ -40,33 +40,27 @@ class RoleExecutionPolicyTests(unittest.TestCase):
         )
         self.assertNotIn(("npm", "run", "dev"), VALIDATION_PREFIXES)
 
-    def test_role_defaults_are_immutable_and_conservative(self) -> None:
-        lead = role_execution_policy("lead")
-        watcher = role_execution_policy("watcher")
-        frontend = role_execution_policy("frontend")
-        backend = role_execution_policy("backend")
-        integrations = role_execution_policy("integrations")
-
-        self.assertIn("docs/ops", lead.write_paths)
-        self.assertEqual((), watcher.write_paths)
-        self.assertEqual("consultative", watcher.execution_access)
-        self.assertIn("components", frontend.write_paths)
-        self.assertIn("hooks", frontend.write_paths)
-        self.assertIn("services", backend.write_paths)
-        self.assertNotIn("apps", integrations.write_paths)
+    def test_every_role_has_full_tools_and_a_role_owned_write_surface(self) -> None:
+        roles = ("lead", "watcher", "frontend", "backend", "integrations")
+        policies = [role_execution_policy(role) for role in roles]
+        self.assertTrue(all(policy.read_paths == (".",) for policy in policies))
+        self.assertTrue(all(policy.write_paths for policy in policies))
+        self.assertTrue(all(policy.write_paths != (".",) for policy in policies))
+        self.assertTrue(all(policy.execution_access == "full" for policy in policies))
+        self.assertTrue(all(policy.allow_all_tools for policy in policies))
+        self.assertTrue(all(policy.network_mode == "unrestricted" for policy in policies))
+        self.assertTrue(all("axon-assign" in policy.approved_wrappers for policy in policies))
+        self.assertIn("services", role_execution_policy("backend").write_paths)
+        self.assertNotIn("apps", role_execution_policy("backend").write_paths)
+        self.assertIn("apps", role_execution_policy("frontend").write_paths)
+        self.assertNotIn("services", role_execution_policy("frontend").write_paths)
         self.assertTrue(
-            all(policy.trust_policy == "worker" for policy in (
-                lead,
-                watcher,
-                frontend,
-                backend,
-                integrations,
-            ))
+            all(policy.trust_policy == "worker" for policy in policies)
         )
         with self.assertRaises(FrozenInstanceError):
-            backend.timeout_seconds = 1  # type: ignore[misc]
+            policies[0].timeout_seconds = 1  # type: ignore[misc]
 
-    def test_unknown_role_falls_back_to_read_only(self) -> None:
+    def test_unknown_role_fails_closed(self) -> None:
         policy = role_execution_policy("custom")
         self.assertEqual((), policy.write_paths)
         self.assertEqual("consultative", policy.execution_access)
@@ -74,146 +68,30 @@ class RoleExecutionPolicyTests(unittest.TestCase):
 
 
 class EffectiveExecutionPolicyTests(unittest.TestCase):
-    def test_scope_is_narrowest_prefix_across_every_authority(self) -> None:
+    def test_task_is_a_hint_but_employee_and_contract_restrictions_win(self) -> None:
         override = AgentExecutionPolicyOverride(
-            read_paths=("services/control-plane", "tests"),
-            write_paths=("services/control-plane", "tests"),
+            read_paths=("services",),
+            write_paths=(),
+            network_mode="none",
+            execution_access="consultative",
+            forbidden_path_globs=("**/.env",),
         )
         policy = resolve_effective_policy(
             role="backend",
             employee_override=override,
-            workspace_allowed_paths=("services", "tests", "config"),
-            workspace_forbidden_path_globs=("**/.env",),
-            task_allowed_paths=("services/control-plane/app/workspace_agents",),
-        )
-
-        self.assertEqual(("services/control-plane", "tests"), policy.read_paths)
-        self.assertEqual(
-            ("services/control-plane/app/workspace_agents",),
-            policy.write_paths,
-        )
-        self.assertEqual(("**/.env",), policy.forbidden_path_globs)
-        self.assertEqual("full", policy.execution_access)
-
-    def test_empty_task_scope_means_no_writes(self) -> None:
-        policy = resolve_effective_policy(
-            role="backend",
-            workspace_allowed_paths=("services", "tests"),
-            task_allowed_paths=[],
-        )
-
-        self.assertEqual((), policy.write_paths)
-        self.assertEqual("consultative", policy.execution_access)
-
-    def test_missing_task_scope_uses_the_role_ceiling(self) -> None:
-        policy = resolve_effective_policy(
-            role="backend",
-            workspace_allowed_paths=("services", "tests"),
-            task_allowed_paths=None,
-        )
-
-        self.assertEqual(("services", "tests"), policy.write_paths)
-        self.assertEqual("full", policy.execution_access)
-
-    def test_frontend_ui_task_scope_restores_safe_hooks_root(self) -> None:
-        policy = resolve_effective_policy(
-            role="frontend",
-            workspace_allowed_paths=("app", "components", "hooks", "tests"),
-            task_allowed_paths=("app", "components", "tests"),
-        )
-
-        self.assertIn("hooks", policy.write_paths)
-        self.assertEqual("full", policy.execution_access)
-
-    def test_safe_scope_expansion_stays_role_and_contract_bounded(self) -> None:
-        backend = resolve_effective_policy(
-            role="backend",
-            workspace_allowed_paths=("services", "hooks", "tests"),
-            task_allowed_paths=("services",),
-        )
-        missing_contract = resolve_effective_policy(
-            role="frontend",
-            workspace_allowed_paths=("app", "components", "tests"),
-            task_allowed_paths=("app", "components", "tests"),
-        )
-
-        self.assertNotIn("hooks", backend.write_paths)
-        self.assertNotIn("hooks", missing_contract.write_paths)
-
-    def test_missing_or_disjoint_scope_fails_closed(self) -> None:
-        missing_contract = resolve_effective_policy(
-            role="frontend",
-            workspace_allowed_paths=None,
-            task_allowed_paths=("apps",),
-        )
-        disjoint_task = resolve_effective_policy(
-            role="frontend",
             workspace_allowed_paths=("apps",),
+            workspace_forbidden_path_globs=("**/.env",),
             task_allowed_paths=("services",),
         )
-
-        self.assertEqual((), missing_contract.read_paths)
-        self.assertEqual((), missing_contract.write_paths)
-        self.assertEqual((), disjoint_task.write_paths)
-
-    def test_ops_dashboard_contract_grants_frontend_command_centre_writes(self) -> None:
-        allowed = (
-            "package.json",
-            "scripts/",
-            "server/",
-            "command-centre/",
-            "data/live/",
-            "data/exports/",
-            "docs/ops/",
-            "output/homework/",
-            "output/poems/",
-        )
-        policy = resolve_effective_policy(
-            role="frontend",
-            workspace_allowed_paths=allowed,
-            task_allowed_paths=None,
-        )
-
-        self.assertIn("command-centre", policy.write_paths)
-        self.assertTrue(any(path.startswith("output/") for path in policy.write_paths))
-        self.assertEqual("full", policy.execution_access)
-
-    def test_employee_override_can_only_reduce_authority(self) -> None:
-        override = AgentExecutionPolicyOverride(
-            approved_wrapper_names=("console-web.sh", "curl"),
-            approved_command_prefixes=(
-                ("git", "status", "--short"),
-                ("curl",),
-            ),
-            audited_capabilities=("test", "secrets_write"),
-            network_mode="unrestricted",
-            timeout_seconds=2400,
-            trust_policy="operator",
-            execution_access="full",
-            forbidden_path_globs=("private/**",),
-        )
-        policy = resolve_effective_policy(
-            role="frontend",
-            employee_override=override,
-            workspace_allowed_paths=("apps", "tests"),
-            workspace_forbidden_path_globs=("**/.env",),
-            task_allowed_paths=("apps/console-web",),
-        )
-
-        self.assertEqual(("console-web.sh",), policy.approved_wrapper_names)
-        self.assertEqual(
-            (("git", "status", "--short"),),
-            policy.approved_command_prefixes,
-        )
-        self.assertEqual(("test",), policy.audited_capabilities)
+        self.assertEqual(("services",), policy.read_paths)
+        self.assertEqual((), policy.write_paths)
+        self.assertNotIn("apps", policy.write_paths)
+        self.assertIn("**/.env", policy.forbidden_path_globs)
+        self.assertEqual("consultative", policy.execution_access)
         self.assertEqual("none", policy.network_mode)
-        self.assertEqual(1200, policy.timeout_seconds)
-        self.assertEqual("worker", policy.trust_policy)
-        self.assertEqual(("private/**", "**/.env"), policy.forbidden_path_globs)
+        self.assertFalse(policy.allow_all_tools)
 
-    def test_legacy_empty_task_scope_is_recovered_at_the_worker_boundary(self) -> None:
-        # Pre-default task rows persisted an omitted allowed_paths as [], which
-        # would otherwise make every queued specialist task consultative.
+    def test_worker_boundary_keeps_full_access_for_legacy_empty_scope(self) -> None:
         employee = EmployeeConfig(role="backend")
         with patch(
             "app.workspace_agents.execution_policy_runtime.load_repo_contract",
@@ -227,6 +105,68 @@ class EffectiveExecutionPolicyTests(unittest.TestCase):
 
         self.assertEqual(("services", "tests"), policy.write_paths)
         self.assertEqual("full", policy.execution_access)
+        self.assertTrue(policy.allow_all_tools)
+
+    def test_missing_project_contract_fails_closed_for_write_mounts(self) -> None:
+        policy = resolve_effective_policy(
+            role="backend",
+            workspace_allowed_paths=(),
+            task_allowed_paths=("services",),
+        )
+        self.assertEqual((), policy.write_paths)
+
+    def test_explicit_employee_tool_restrictions_are_not_bypassed(self) -> None:
+        from app.cli_runtime.agent_shell_hook import evaluate_hook_payload
+
+        policy = resolve_effective_policy(
+            role="backend",
+            employee_override=AgentExecutionPolicyOverride(
+                approved_wrapper_names=("run_contract_unit_tests.sh",),
+                network_mode="none",
+            ),
+            workspace_allowed_paths=("services", "tests"),
+            task_allowed_paths=None,
+        )
+        self.assertFalse(policy.allow_all_tools)
+        decision = evaluate_hook_payload(
+            {
+                "hook_event_name": "beforeShellExecution",
+                "command": "curl https://example.invalid",
+            },
+            approved_wrappers=frozenset(policy.approved_wrappers),
+            approved_command_prefixes=policy.approved_command_prefixes,
+            allow_all_tools=policy.allow_all_tools,
+        )
+        self.assertEqual("deny", decision["permission"])
+
+    def test_operations_contract_adds_only_role_owned_paths(self) -> None:
+        contract = (
+            "command-centre/",
+            "data/live/",
+            "data/exports/",
+            "docs/ops/",
+            "scripts/",
+        )
+        backend = resolve_effective_policy(
+            role="backend",
+            workspace_allowed_paths=contract,
+            task_allowed_paths=None,
+        )
+        frontend = resolve_effective_policy(
+            role="frontend",
+            workspace_allowed_paths=contract,
+            task_allowed_paths=None,
+        )
+        integrations = resolve_effective_policy(
+            role="integrations",
+            workspace_allowed_paths=contract,
+            task_allowed_paths=None,
+        )
+        self.assertIn("data/live", backend.write_paths)
+        self.assertNotIn("data/exports", backend.write_paths)
+        self.assertIn("command-centre", frontend.write_paths)
+        self.assertNotIn("data/live", frontend.write_paths)
+        self.assertIn("data/exports", integrations.write_paths)
 
 
 class EmployeeExecutionPolicyConfigTests(unittest.TestCase):
@@ -319,7 +259,7 @@ class SelfValidationPolicyTests(unittest.TestCase):
 
         return resolve_effective_policy(
             role=role,
-            workspace_allowed_paths=(),
+            workspace_allowed_paths=(".",),
             task_allowed_paths=None,
         )
 
@@ -331,6 +271,7 @@ class SelfValidationPolicyTests(unittest.TestCase):
             {"hook_event_name": "beforeShellExecution", "command": command},
             approved_wrappers=frozenset(policy.approved_wrappers),
             approved_command_prefixes=policy.approved_command_prefixes,
+            allow_all_tools=policy.allow_all_tools,
         )["permission"]
 
     def test_implementation_roles_can_run_their_own_validation(self) -> None:
@@ -347,20 +288,38 @@ class SelfValidationPolicyTests(unittest.TestCase):
     def test_validation_roles_can_materialize_local_dependencies(self) -> None:
         from app.workspace_agents.execution_policy import role_execution_policy
 
-        for role in ("backend", "frontend", "integrations", "lead"):
+        expected_dependency_roots = {
+            "backend": "node_modules",
+            "frontend": "node_modules",
+            "integrations": "node_modules",
+            "lead": "node_modules",
+        }
+        for role, root in expected_dependency_roots.items():
             with self.subTest(role=role):
-                self.assertIn("node_modules", role_execution_policy(role).write_paths)
+                self.assertIn(root, role_execution_policy(role).write_paths)
 
-    def test_mutating_package_commands_stay_gated(self) -> None:
+    def test_full_access_allows_local_package_and_runtime_tools(self) -> None:
         for command in (
             "npm install lodash",
-            "npm run deploy",
-            "npm publish",
             "npx create-app",
             "npx jest tests/x",
+            "node scripts/build.js",
+            "python3 scripts/check.py",
+            "curl https://example.invalid",
         ):
             with self.subTest(command=command):
-                self.assertEqual("deny", self._permission("backend", command))
+                self.assertEqual("allow", self._permission("backend", command))
+
+    def test_external_publication_commands_stay_gated(self) -> None:
+        for command in (
+            "npm run deploy",
+            "npm publish",
+            "vercel deploy --prod --yes",
+            "eas submit --platform android",
+            "supabase db push",
+        ):
+            with self.subTest(command=command):
+                self.assertEqual("deny", self._permission("integrations", command))
 
     def test_ci_read_roles_can_probe_gh_but_not_mutate_it(self) -> None:
         for role in ("lead", "integrations"):
@@ -369,15 +328,15 @@ class SelfValidationPolicyTests(unittest.TestCase):
                 self.assertEqual("allow", self._permission(role, "gh run list"))
                 self.assertEqual("deny", self._permission(role, "gh pr merge 12"))
 
-    def test_roles_without_ci_read_still_cannot_reach_gh(self) -> None:
-        self.assertEqual("deny", self._permission("backend", "gh auth status"))
+    def test_every_role_can_reach_gh(self) -> None:
+        self.assertEqual("allow", self._permission("backend", "gh auth status"))
 
-    def test_consultative_watcher_stays_read_only(self) -> None:
+    def test_watcher_has_the_same_tool_surface(self) -> None:
         self.assertEqual("allow", self._permission("watcher", "git status"))
-        self.assertEqual("deny", self._permission("watcher", "npm test"))
+        self.assertEqual("allow", self._permission("watcher", "npm test"))
 
-    def test_interpreter_and_privilege_escapes_remain_absolute(self) -> None:
-        for command in ('node -e "1"', "bash -c ls", "sudo npm test", "curl https://x.invalid"):
+    def test_privilege_and_destructive_git_guards_remain_separate(self) -> None:
+        for command in ("sudo npm test", "git push origin main", "git reset --hard"):
             with self.subTest(command=command):
                 self.assertEqual("deny", self._permission("backend", command))
 
@@ -399,12 +358,13 @@ class LeadDispatchWrapperTests(unittest.TestCase):
         from app.workspace_agents.execution_policy import resolve_effective_policy
 
         policy = resolve_effective_policy(
-            role=role, workspace_allowed_paths=(), task_allowed_paths=None
+            role=role, workspace_allowed_paths=(".",), task_allowed_paths=None
         )
         return evaluate_hook_payload(
             {"hook_event_name": "beforeShellExecution", "command": command},
             approved_wrappers=frozenset(policy.approved_wrappers),
             approved_command_prefixes=policy.approved_command_prefixes,
+            allow_all_tools=policy.allow_all_tools,
         )["permission"]
 
     def test_lead_can_fan_work_out_to_teammates(self) -> None:
@@ -413,21 +373,24 @@ class LeadDispatchWrapperTests(unittest.TestCase):
             self._permission("lead", "axon-assign --workspace workspace_dashpro -- Fix red CI"),
         )
 
-    def test_specialists_cannot_dispatch_each_other(self) -> None:
+    def test_every_role_can_dispatch_when_the_task_needs_it(self) -> None:
         for role in ("backend", "frontend", "integrations", "watcher"):
             with self.subTest(role=role):
                 self.assertEqual(
-                    "deny",
-                    self._permission(role, "axon-assign --workspace workspace_dashpro -- x"),
+                    "allow",
+                    self._permission(
+                        role,
+                        "axon-assign --workspace workspace_dashpro --role backend -- x",
+                    ),
                 )
 
     def test_watcher_can_look_up_run_evidence(self) -> None:
         self.assertEqual("allow", self._permission("watcher", "axon-runlog run_abc123"))
 
-    def test_only_watcher_can_use_runlog(self) -> None:
+    def test_every_role_can_use_runlog(self) -> None:
         for role in ("lead", "backend", "frontend", "integrations"):
             with self.subTest(role=role):
-                self.assertEqual("deny", self._permission(role, "axon-runlog run_abc123"))
+                self.assertEqual("allow", self._permission(role, "axon-runlog run_abc123"))
 
 
 if __name__ == "__main__":

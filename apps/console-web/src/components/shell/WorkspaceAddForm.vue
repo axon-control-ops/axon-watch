@@ -5,6 +5,7 @@ import {
   fetchWorkspaceProjectRootSuggestions,
   type WorkspaceProjectRootSuggestion,
 } from '../../api/workspace-api';
+import { titleFromWorkspaceId, workspaceIdFromLabel } from '../../lib/workspace-registration-input';
 import { useShellStore } from '../../stores/shell';
 
 const emit = defineEmits<{
@@ -18,6 +19,7 @@ const projectRoot = ref('');
 const displayName = ref('');
 const busy = ref(false);
 const error = ref('');
+const displayNameTouchedByOperator = ref(false);
 
 // Suggests a project_root from sibling directories of already-registered
 // workspaces, ranked against the workspace id as the operator types — the
@@ -67,7 +69,11 @@ function applySuggestion(suggestion: WorkspaceProjectRootSuggestion): void {
 }
 
 watch(workspaceId, (value) => {
-  scheduleSuggestions(value);
+  const inferredDisplayName = titleFromWorkspaceId(value);
+  if (!displayNameTouchedByOperator.value) {
+    displayName.value = inferredDisplayName;
+  }
+  scheduleSuggestions(workspaceIdFromLabel(value) || value);
 });
 
 onMounted(() => {
@@ -80,9 +86,10 @@ onUnmounted(() => {
   }
 });
 
+const normalizedWorkspaceId = computed(() => workspaceIdFromLabel(workspaceId.value));
 const canSubmit = computed(
   () =>
-    Boolean(workspaceId.value.trim()) &&
+    Boolean(normalizedWorkspaceId.value) &&
     Boolean(projectRoot.value.trim()) &&
     !busy.value,
 );
@@ -95,7 +102,7 @@ async function submit(): Promise<void> {
   error.value = '';
   try {
     const workspace = await shell.registerWorkspace({
-      workspaceId: workspaceId.value.trim(),
+      workspaceId: normalizedWorkspaceId.value,
       projectRoot: projectRoot.value.trim(),
       displayName: displayName.value.trim() || undefined,
     });
@@ -120,9 +127,15 @@ async function submit(): Promise<void> {
         type="text"
         name="workspace_id"
         autocomplete="off"
-        placeholder="workspace_my_project"
+        placeholder="MoveIT or workspace_moveit"
         required
       />
+      <small
+        v-if="normalizedWorkspaceId && workspaceId.trim() !== normalizedWorkspaceId"
+        class="workspace-add-form__hint"
+      >
+        Saved as {{ normalizedWorkspaceId }}
+      </small>
     </label>
     <label class="workspace-add-form__field">
       <span>Project root</span>
@@ -163,6 +176,7 @@ async function submit(): Promise<void> {
         name="display_name"
         autocomplete="off"
         placeholder="My project"
+        @input="displayNameTouchedByOperator = true"
       />
     </label>
     <p v-if="error" class="workspace-add-form__error" role="alert">{{ error }}</p>

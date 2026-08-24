@@ -1,24 +1,9 @@
-"""Auto-created tasks must carry a write scope, or they cannot do their job.
+"""Auto-created tasks record useful path hints without defining authority.
 
-A task with no allowed_paths is fail-closed downstream by design: the
-effective execution policy intersects the role's write_paths with the task
-scope, and execution_policy.py::_intersect_path_scopes returns () when either
-side is empty. Empty write_paths then downgrades the run to
-consultative/read-only, and the bwrap sandbox mounts nothing writable.
-
-That rule is deliberate ("Resolve role, employee, contract, and leased-task
-scope fail closed" — execution_policy_runtime.py) and is NOT changed here.
-
-The defect was that nearly every auto-created task omitted allowed_paths:
-CI repair, VAXON attend, VAXON fleet repair, Lead fan-out. Tasks whose entire
-purpose is to FIX something were structurally unable to write a single byte.
-Measured on the live host: 52 of 52 agent_execution_policy receipts in a 24h
-window read `writes=read-only`, and 27 of 27 preserved isolation worktrees
-contained zero agent-authored files.
-
-create_task now resolves an unset scope to the owning role's own documented
-write boundary. That is bounded, not permissive — the role ceiling is
-unchanged, and roles that are read-only by design stay read-only.
+The effective execution policy now gets write authority from the employee's
+role, explicit employee override, and repository contract. ``allowed_paths``
+on a task remains useful routing/acceptance metadata but cannot accidentally
+strand a colleague in a read-only sandbox.
 """
 
 from __future__ import annotations
@@ -56,12 +41,13 @@ class TaskDefaultRoleScopeTests(unittest.TestCase):
         self.assertTrue(expected, "precondition: backend role should have write paths")
         self.assertEqual(expected, task["allowed_paths"])
 
-    def test_read_only_role_stays_read_only(self) -> None:
-        # watcher's role write_paths are () by design — it is a health/triage
-        # role. Defaulting must not invent write access for it.
-        self.assertEqual((), role_execution_policy("watcher").write_paths)
+    def test_watcher_task_inherits_its_operational_role_lane(self) -> None:
+        self.assertTrue(role_execution_policy("watcher").write_paths)
         task = self._create(owner_role="watcher")
-        self.assertEqual([], task["allowed_paths"])
+        self.assertEqual(
+            list(role_execution_policy("watcher").write_paths),
+            task["allowed_paths"],
+        )
 
     def test_explicit_scope_is_never_overridden(self) -> None:
         task = self._create(owner_role="backend", allowed_paths=["services/control-plane/"])
@@ -146,31 +132,29 @@ class EffectivePolicyEndToEndTests(unittest.TestCase):
         )
         self.assertIn("hooks", policy.write_paths)
 
-    def test_watcher_task_remains_consultative(self) -> None:
+    def test_watcher_task_has_its_contract_bounded_operational_lane(self) -> None:
         _task, policy = self._policy_for("watcher")
-        self.assertEqual((), policy.write_paths)
-        self.assertEqual("consultative", policy.execution_access)
+        self.assertEqual(("docs/ops", "scripts/guardrails"), policy.write_paths)
+        self.assertEqual("full", policy.execution_access)
 
-    def test_explicit_narrow_scope_still_narrows_the_policy(self) -> None:
+    def test_explicit_task_scope_is_a_hint_not_an_authority_reduction(self) -> None:
         _task, policy = self._policy_for("backend", allowed_paths=["services/"])
-        self.assertTrue(policy.write_paths)
-        for path in policy.write_paths:
-            self.assertTrue(
-                str(path).startswith("services"),
-                f"explicit scope must bound the policy, got {path}",
-            )
+        self.assertIn("services", policy.write_paths)
+        self.assertIn("tests", policy.write_paths)
 
     def test_role_ceiling_still_bounds_an_overbroad_task_scope(self) -> None:
-        # A task asking for the repo root must not escape the role boundary —
-        # the intersection with role write_paths is what enforces that.
+        # A task asking for the repo root must not escape the role boundary.
+        # The effective ceiling includes non-standard role paths explicitly
+        # declared by this workspace contract (for backend, docs/ops).
         _task, policy = self._policy_for("backend", allowed_paths=["."])
-        role_paths = set(role_execution_policy("backend").write_paths)
-        for path in policy.write_paths:
-            self.assertIn(
-                str(path),
-                role_paths,
-                "task scope must not widen beyond the role ceiling",
-            )
+        expected = resolve_effective_policy(
+            role="backend",
+            employee_override=None,
+            workspace_allowed_paths=self.WORKSPACE_SCOPE,
+            workspace_forbidden_path_globs=(),
+            task_allowed_paths=None,
+        )
+        self.assertEqual(expected.write_paths, policy.write_paths)
 
 
 if __name__ == "__main__":

@@ -18,6 +18,7 @@ class DesktopSessionTests(unittest.TestCase):
                 "AXON_WATCH_AUTH_MODE",
                 "AXON_WATCH_AUTH_ALLOW_LOOPBACK",
                 "AXON_WATCH_OPERATOR_TOKEN",
+                "AXON_WATCH_OPERATOR_PASSWORD",
                 "AXON_WATCH_DESKTOP_SESSION_SECRET",
                 "AXON_WATCH_CONSOLE_DIST",
             )
@@ -25,6 +26,7 @@ class DesktopSessionTests(unittest.TestCase):
         os.environ["AXON_WATCH_AUTH_MODE"] = "local_token"
         os.environ["AXON_WATCH_AUTH_ALLOW_LOOPBACK"] = "0"
         os.environ["AXON_WATCH_OPERATOR_TOKEN"] = "desktop-test-token"
+        os.environ["AXON_WATCH_OPERATOR_PASSWORD"] = "desktop-test-password"
         os.environ["AXON_WATCH_DESKTOP_SESSION_SECRET"] = "desktop-test-secret"
         from app.auth.desktop_session import clear_pending_bootstrap
         from app.main import app
@@ -92,6 +94,23 @@ class DesktopSessionTests(unittest.TestCase):
         self.assertEqual(logout.status_code, 200)
         self.assertEqual(logout.json()["authenticated"], False)
         self.assertEqual(self.client.get("/api/auth/session").json()["authenticated"], False)
+
+    def test_browser_session_login_accepts_password_and_returns_mobile_session_token(self) -> None:
+        login = self.client.post(
+            "/api/auth/session",
+            json={"operator_password": "desktop-test-password", "return_session_token": True},
+        )
+        self.assertEqual(login.status_code, 200)
+        payload = login.json()
+        self.assertEqual(payload["identity"], "session")
+        self.assertTrue(payload.get("session_token"))
+
+        response = self.client.post(
+            "/api/runs",
+            json={"workspace_id": "workspace_axon_watch", "summary": "password session ok", "mode": "agent"},
+            headers={"x-axon-desktop-session": payload["session_token"]},
+        )
+        self.assertNotEqual(response.status_code, 401)
 
     def test_spa_served_when_console_dist_configured(self) -> None:
         with TemporaryDirectory() as tmp:

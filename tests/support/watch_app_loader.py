@@ -27,22 +27,16 @@ def prepare_watch_imports() -> dict[str, object]:
 
 
 def load_watch_app():
-    cached = {
-        name: module
-        for name, module in sys.modules.items()
-        if name == "app" or name.startswith("app.")
-    }
-    for name in cached:
-        del sys.modules[name]
-
-    sys.path.insert(0, str(WATCH_ROOT))
+    cached = prepare_watch_imports()
+    watch_path = str(WATCH_ROOT)
     try:
         from app.main import app as watch_app  # noqa: WPS433
     except Exception:
         restore_app_modules(cached)
         raise
     finally:
-        sys.path.remove(str(WATCH_ROOT))
+        if watch_path in sys.path:
+            sys.path.remove(watch_path)
 
     return watch_app, cached
 

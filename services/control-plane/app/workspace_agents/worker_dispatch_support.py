@@ -65,6 +65,16 @@ def release_worker_dispatch(run_id: str) -> None:
             _active_task_ids.pop(task_id, None)
 
 
+def is_worker_dispatch_active(run_id: str) -> bool:
+    """True when a dispatch thread already claimed this run in-memory.
+
+    Lets the stale reaper tell "no thread ever started" apart from "a thread
+    is alive and mid-startup" before it decides a run never got dispatched.
+    """
+    with _active_run_ids_lock:
+        return run_id in _active_run_ids
+
+
 def fail_worker_run(run_id: str, *, receipt_summary: str) -> dict[str, Any] | None:
     try:
         return fail_run(
@@ -270,5 +280,6 @@ __all__ = [
     "enqueue_verification_terminal_jobs",
     "fail_worker_run",
     "finalize_failed_worker_task",
+    "is_worker_dispatch_active",
     "release_worker_dispatch",
 ]

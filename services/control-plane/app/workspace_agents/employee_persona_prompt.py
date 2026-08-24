@@ -10,6 +10,7 @@ from app.workspace_agents.catalog import ROLE_CATALOG, _DEFAULT_OWNS, _DEFAULT_R
 from app.workspace_agents.config_loader import _role_label
 from app.workspace_agents.critical_review_clause import AGENT_STANDING_ACCURACY_CLAUSE
 from app.workspace_agents.fleet_leads_context import build_fleet_leads_context
+from app.workspace_agents.frontend_ux_doctrine import axon_x_frontend_ux_clause
 from app.workspace_agents.team_roster_context import build_team_roster_context
 
 EMPLOYEE_PERSONA_MARKER = "Employee persona (authoritative for this thread):"
@@ -122,6 +123,12 @@ def build_employee_persona_appendix(
         owns=owns,
     )
     roster_block = build_team_roster_context(workspace_id, viewer_role=role)
+    ux_clause = axon_x_frontend_ux_clause(
+        workspace_id=workspace_id,
+        name=name,
+        role=role,
+        owns=owns,
+    )
     fleet_block = ""
     lead_clause = ""
     if role.strip().lower() == "lead":
@@ -234,6 +241,7 @@ def build_employee_persona_appendix(
             "say which role should own it (frontend, backend, integrations, watcher, or lead) "
             "and stop; the operator will open that teammate."
         ),
+        ux_clause,
         (
             "If the operator asks you to retry a failed shift, own the retry as yourself: "
             f"'I will retry my last shift…' — never 'I am acting as {name}' or "

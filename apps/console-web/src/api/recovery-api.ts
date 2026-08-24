@@ -40,6 +40,21 @@ export type RecoveryCenterSnapshot = {
   items: RecoveryCenterItem[];
 };
 
+export type WorkspaceRecoveryResetResult = {
+  mode: 'DRY_RUN' | 'EXECUTE';
+  workspace_id: string;
+  run_ids: string[];
+  task_ids: string[];
+  orphaned_task_ids: string[];
+  recovery_ids: string[];
+  candidate_count: number;
+  cancelled_runs: string[];
+  cancelled_tasks: string[];
+  acknowledged_recoveries: string[];
+  errors: Array<{ kind: string; id: string; detail: string }>;
+  preserved: string[];
+};
+
 export async function fetchRecoveryCenter(workspaceId?: string | null): Promise<RecoveryCenterSnapshot> {
   const query = workspaceId ? `?workspace_id=${encodeURIComponent(workspaceId)}` : '';
   return fetchJson<RecoveryCenterSnapshot>(
@@ -90,5 +105,20 @@ export async function reconcilePlatform(execute = false): Promise<unknown> {
       body: JSON.stringify({ execute }),
     },
     'platform reconcile failed',
+  );
+}
+
+export async function clearWorkspaceStaleRecovery(
+  workspaceId: string,
+  execute = false,
+): Promise<WorkspaceRecoveryResetResult> {
+  return fetchJson<WorkspaceRecoveryResetResult>(
+    `/api/recovery/workspaces/${encodeURIComponent(workspaceId)}/clear-stale`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ execute }),
+    },
+    'workspace recovery reset failed',
   );
 }

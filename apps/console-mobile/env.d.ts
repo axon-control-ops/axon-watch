@@ -7,3 +7,8 @@ declare namespace NodeJS {
 declare const process: {
   env: NodeJS.ProcessEnv;
 };
+
+declare module "*.png" {
+  const value: number;
+  export default value;
+}

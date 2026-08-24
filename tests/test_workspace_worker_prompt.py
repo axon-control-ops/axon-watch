@@ -12,6 +12,7 @@ sys.path.insert(0, str(CONTROL_PLANE_ROOT))
 from tests.support.control_plane_db import isolate_control_plane_db  # noqa: E402
 
 from app.workspace_agents.config_loader import EmployeeConfig  # noqa: E402
+from app.workspace_agents import worker_prompt as worker_prompt_module  # noqa: E402
 from app.workspace_agents.worker_prompt import (  # noqa: E402
     OUT_OF_SCOPE_GUARD_MARKER,
     build_continuous_worker_prompt,
@@ -42,12 +43,42 @@ class WorkspaceWorkerPromptTests(unittest.TestCase):
         self.assertIn("one missing optional documentation/playbook path", prompt)
         self.assertIn("Avoid a combined multi-file read", prompt)
 
-    def test_prompt_includes_cross_role_receipts_for_specialist_handoffs(self) -> None:
+    def test_axon_x_jules_worker_prompt_teaches_vaxon_mobile_cockpit(self) -> None:
         with patch(
             "app.workspace_agents.worker_prompt.build_team_roster_context",
             return_value="",
-        ), patch(
-            "app.workspace_agents.worker_prompt._workspace_continuity_clause",
+        ):
+            prompt = build_continuous_worker_prompt(
+                workspace_id="workspace_axon_watch",
+                employee=EmployeeConfig(
+                    name="Jules",
+                    role="frontend",
+                    owns="Axon-X mobile VAXON control-plane cockpit and console UI/UX",
+                    schedule="continuous",
+                ),
+                task={
+                    "task_id": "task-jules-vaxon-mobile",
+                    "goal": "Move the mobile cockpit from basic control to advanced VAXON control.",
+                    "acceptance_criteria": "Uses orb/glass command UX and real control-plane state.",
+                },
+            )
+        self.assertIn("Axon-X/Jules advanced UI/UX doctrine", prompt)
+        self.assertIn("Observe (health, signals, fleet, live run state)", prompt)
+        self.assertIn("VAXON command surface", prompt)
+        self.assertIn("Overview, Command, Fleet, and Data", prompt)
+        self.assertIn("Do not collapse the mobile control-plane into one long tab", prompt)
+        self.assertIn("never let a poster-like background carry the product", prompt)
+        self.assertIn("radial/segmented quick actions", prompt)
+        self.assertIn("npm run typecheck -w @axon-watch/console-mobile", prompt)
+
+    def test_prompt_includes_cross_role_receipts_for_specialist_handoffs(self) -> None:
+        with patch.object(
+            worker_prompt_module,
+            "build_team_roster_context",
+            return_value="",
+        ), patch.object(
+            worker_prompt_module,
+            "_workspace_continuity_clause",
             return_value=(
                 "Recent cross-role continuity packet (receipt summaries, not proof that your task is done):\n"
                 "- backend completed (run-marco-1) — parent assignment query fixed\n"
@@ -108,7 +139,8 @@ class WorkspaceWorkerPromptTests(unittest.TestCase):
         self.assertIn("Delivery discipline", prompt)
         self.assertIn("Do not run `git add -A`, commit, push, merge, force-push", prompt)
         self.assertIn("stages only your verified changed paths", prompt)
-        self.assertIn("outside the leased task", prompt)
+        self.assertIn("inside your role-owned write surface", prompt)
+        self.assertIn("directly serve the leased objective", prompt)
 
     def test_backend_prompt_includes_ci_review_clause(self) -> None:
         with patch(
@@ -148,6 +180,53 @@ class WorkspaceWorkerPromptTests(unittest.TestCase):
             "",
         ))
         self.assertIn("Do not spin on Task/MCP workarounds", prompt)
+
+    def test_young_eagles_document_artifact_prompt_teaches_visual_fallback_verification(self) -> None:
+        agents = [
+            EmployeeConfig(
+                name="Lila",
+                role="frontend",
+                owns="Letters, printable packs, and parent-facing layouts",
+                schedule="continuous",
+            ),
+            EmployeeConfig(
+                name="Sol",
+                role="integrations",
+                owns="Document export hooks, EduDash/chat POP delivery wiring, and smoke-script verification",
+                schedule="continuous",
+            ),
+        ]
+        for employee in agents:
+            with self.subTest(role=employee.role), patch(
+                "app.workspace_agents.worker_prompt.build_team_roster_context",
+                return_value="",
+            ):
+                prompt = build_continuous_worker_prompt(
+                    workspace_id="workspace_young_eagles_day_care",
+                    employee=employee,
+                    task={
+                        "task_id": "task-register-restore",
+                        "goal": (
+                            "Restore the five daily register PDFs so they match the "
+                            "operator's IDE PDF style and layout."
+                        ),
+                        "acceptance_criteria": (
+                            "If reportlab is unavailable, use the active fallback renderer "
+                            "and prove the rendered PDFs match the reference."
+                        ),
+                    },
+                )
+
+                self.assertIn("Document/PDF artifact quality contract", prompt)
+                self.assertIn("assignment-document-quality.md", prompt)
+                self.assertIn("Do not treat a missing optional package", prompt)
+                self.assertIn("active fallback path", prompt)
+                self.assertIn("operator-named screenshot, IDE PDF, or reference file", prompt)
+                self.assertIn("PDF viewer, `pdftoppm`, `mutool`, `convert`", prompt)
+                self.assertIn("page size, page count, first-page layout", prompt)
+                self.assertIn("Add or update a targeted regression test", prompt)
+                self.assertIn("force the fallback in the test", prompt)
+                self.assertIn("visual parity evidence", prompt)
 
     def test_dashpro_prompt_locks_self_hosted_ci(self) -> None:
         with patch(
@@ -495,7 +574,7 @@ class WorkspaceWorkerPromptTests(unittest.TestCase):
                     "allowed_paths": ["scripts/guardrails/hotspot_budgets.json"],
                 },
             )
-        self.assertIn("Explicit allowed write paths", prompt)
+        self.assertIn("Starting path hints for this leased task", prompt)
         self.assertIn("scripts/guardrails/hotspot_budgets.json", prompt)
         self.assertNotIn("Hard scope anchors", prompt)
 

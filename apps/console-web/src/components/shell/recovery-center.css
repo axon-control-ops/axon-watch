@@ -37,6 +37,13 @@
   align-items: flex-start;
 }
 
+.recovery-center__header-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.45rem;
+}
+
 .recovery-center__eyebrow {
   margin: 0;
   letter-spacing: 0.12em;
@@ -79,11 +86,27 @@
 }
 
 .recovery-center__actions button,
-.recovery-center__dismiss {
+.recovery-center__dismiss,
+.recovery-center__clear {
   border: 1px solid rgba(90, 220, 255, 0.4);
   background: rgba(10, 40, 55, 0.8);
   color: #d7f4ff;
   border-radius: 0.3rem;
   padding: 0.25rem 0.55rem;
   cursor: pointer;
+}
+
+.recovery-center__clear {
+  border-color: rgba(255, 190, 90, 0.56);
+  background: rgba(78, 45, 8, 0.78);
+}
+
+.recovery-center__clear:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.recovery-center__result {
+  margin: 0.7rem 0 0;
+  color: #ffd18a;
 }

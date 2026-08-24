@@ -223,6 +223,45 @@ class RunStaleReconcileTests(unittest.TestCase):
         task = task_store.get_task(task_id) or {}
         self.assertEqual("open", task.get("status"))
 
+    def test_reap_spares_undispatched_run_with_live_dispatch_claim(self) -> None:
+        """A claimed-but-slow dispatch thread must not be raced by the 90s reaper.
+
+        begin_execution() persists phase=executing (starting the age clock) before
+        the dispatch thread is even spawned; that thread still has claim + task/lease
+        I/O to clear before it can post worker_dispatch_started. Under load that can
+        take >90s while the thread is alive and fine. Failing it out from under a
+        live claim is what produced repeat false "Quinn failed" reads.
+        """
+        from app.persistence import task_store
+        from app.runs.begin_execution import begin_execution
+        from app.workspace_agents.worker_dispatch_support import (
+            claim_worker_dispatch,
+            release_worker_dispatch,
+        )
+
+        record = _leased_worker_run(
+            workspace_id="workspace_claimed_slow_dispatch",
+            employee_role="backend",
+            summary="Verification after Marco (backend): npm test",
+        )
+        run_id = str(record["run_id"])
+        task_id = str(record.get("task_id") or "")
+        begin_execution(
+            run_id,
+            actor="workspace_scheduler",
+            receipt_summary="Queued fan-out run entered execution for dispatch",
+        )
+        self.assertTrue(claim_worker_dispatch(run_id, task_id=task_id))
+        self.addCleanup(release_worker_dispatch, run_id)
+        _age_run(run_id, seconds=120)
+
+        reaped = reap_stale_employee_runs()
+
+        self.assertEqual([], reaped)
+        self.assertEqual("executing", get_run(run_id)["phase"])
+        task = task_store.get_task(task_id) or {}
+        self.assertEqual("leased", task.get("status"))
+
     def test_reap_unlocks_ghost_dispatch_after_worker_dispatch_started(self) -> None:
         from app.persistence import task_store
         from app.runs.begin_execution import begin_execution
