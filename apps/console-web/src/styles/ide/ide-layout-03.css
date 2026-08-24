@@ -105,6 +105,18 @@
   z-index: 1300;
 }
 
+/* Teleported to <body> so no ancestor stacking context (the topbar's
+   z-index:50 + backdrop-filter) can bury it behind the threads rail.
+   Coordinates come from the trigger rect via inline style. */
+.workspace-picker-menu__panel--floating {
+  position: fixed;
+  z-index: 1400;
+}
+
+.workspace-picker-menu__panel--floating.workspace-picker-menu__panel--compact {
+  z-index: 1400;
+}
+
 .workspace-picker-menu__item {
   display: flex;
   align-items: center;
