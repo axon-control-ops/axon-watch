@@ -12,7 +12,9 @@ from app.workspace_agents.lead_plan_model import resolve_lead_task_plan
 from app.workspace_agents.lead_task_plan import (
     LeadPlanRosterMember,
     detect_fan_out_intent,
+    is_axon_x_mobile_companion_goal,
     is_employee_shift_retry_request,
+    should_execute_lead_fast_path,
     should_lead_decompose_dispatch,
 )
 
@@ -139,7 +141,11 @@ def maybe_post_lead_decompose_message(
 ) -> dict[str, object] | None:
     """When Lead hears a multi-domain implement ask, materialize decompose plan."""
     role = str(employee_role or "").strip().lower()
-    if composer_mode != "agent" or role != "lead":
+    executable = should_execute_lead_fast_path(composer_mode, content) or (
+        str(composer_mode or "").strip().lower() == "plan"
+        and is_axon_x_mobile_companion_goal(content, workspace_id)
+    )
+    if role != "lead" or not executable:
         return None
     if is_employee_shift_retry_request(content):
         return None
@@ -162,9 +168,10 @@ def maybe_post_lead_decompose_message(
         return None
 
     try:
+        materialize_goal = str(preview.goal or content).strip() or content
         materialize = materialize_lead_fan_out(
             workspace_id=workspace_id,
-            goal=content,
+            goal=materialize_goal,
             mode="decompose",
             create_runs=True,
             use_model=True,
@@ -185,7 +192,7 @@ def maybe_post_lead_decompose_message(
     plan_id = str(materialize.get("plan_id") or "").strip()
     handoff_run = record_lead_handoff_run(
         workspace_id=workspace_id,
-        summary=content,
+        summary=materialize_goal,
         detail=(
             f"Lead decompose handoff completed"
             + (f" (plan {plan_id})" if plan_id else "")

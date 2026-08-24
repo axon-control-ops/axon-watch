@@ -38,6 +38,8 @@ export type AgentDockComposerToolbarSource = {
   executionAccessHint: MaybeRef<string>;
   sandboxSessionEnabled: MaybeRef<boolean>;
   sandboxEnvForced: MaybeRef<boolean>;
+  sandboxAutoEnabled: MaybeRef<boolean>;
+  sandboxDirty: MaybeRef<boolean>;
   sandboxHint: MaybeRef<string>;
   sandboxLabel: MaybeRef<string>;
   sandboxSessionPending: MaybeRef<boolean>;
@@ -74,6 +76,7 @@ export type AgentDockComposerToolbarSource = {
   runtimeHint: MaybeRef<string>;
   canConvertInstructions: MaybeRef<boolean>;
   instructionsGenerating: MaybeRef<boolean>;
+  instructionsSpecialistLabel: MaybeRef<string>;
 };
 
 /** Bind composer setup refs into toolbar prop values (keeps AgentDockComposer.vue thin). */
@@ -108,6 +111,8 @@ export function useAgentDockComposerToolbarProps(
     executionAccessHint: toValue(composer.executionAccessHint),
     sandboxSessionEnabled: toValue(composer.sandboxSessionEnabled),
     sandboxEnvForced: toValue(composer.sandboxEnvForced),
+    sandboxAutoEnabled: toValue(composer.sandboxAutoEnabled),
+    sandboxDirty: toValue(composer.sandboxDirty),
     sandboxHint: toValue(composer.sandboxHint),
     sandboxLabel: toValue(composer.sandboxLabel),
     sandboxSessionPending: toValue(composer.sandboxSessionPending),
@@ -144,6 +149,7 @@ export function useAgentDockComposerToolbarProps(
     runtimeHint: toValue(composer.runtimeHint),
     canConvertInstructions: toValue(composer.canConvertInstructions),
     instructionsGenerating: toValue(composer.instructionsGenerating),
+    instructionsSpecialistLabel: toValue(composer.instructionsSpecialistLabel),
   }));
 }
 

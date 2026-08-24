@@ -124,6 +124,20 @@ main_tests=(
   tests.test_lead_replan
   tests.test_gate6_verifier_contract
   tests.test_gate6_project_contract
+  tests.test_agent_terminal_jobs
+  tests.test_lead_verification_handoff
+  tests.test_worker_completion_gate
+  tests.test_watcher_receipts
+  tests.test_prior_shift_evidence
+  tests.test_workspace_worker_prompt_dispatch
+  tests.test_workspace_missions
+  tests.test_composer_sandbox_policy_v2
+  tests.test_direct_reply_acceptance
+  tests.test_lead_text
+  tests.test_agent_write_contract
+  tests.test_lead_fan_out_routing
+  tests.test_runtime_agnostic_command_policy
+  tests.test_cli_runtime_agent_sandbox_hook_policy
   tests.test_ci_remediation
   tests.test_safe_improvement
   tests.test_safe_improvement_gate

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import os
 import re
 import shlex
 from pathlib import Path
@@ -13,7 +14,7 @@ from app.persistence import task_store
 logger = logging.getLogger(__name__)
 
 _VERIFICATION_COMMAND_RE = re.compile(
-    r"`((?:npm test[^\n`]*|npx tsx[^\n`]*|npx jest[^\n`]*))`",
+    r"`((?:npm test[^\n`]*|npm run[^\n`]*|npx (?:--no-install )?tsx[^\n`]*|npx (?:--no-install )?jest[^\n`]*))`",
     re.IGNORECASE,
 )
 _TEST_FILE_BACKTICK_RE = re.compile(
@@ -21,7 +22,7 @@ _TEST_FILE_BACKTICK_RE = re.compile(
     re.IGNORECASE,
 )
 _GOAL_INLINE_COMMAND_RE = re.compile(
-    r"(?<![/`])(npm test(?:\s+--\s+[^\n;`\[]+)?|npx tsx[^\n;`\[]+|npx jest[^\n;`\[]+)",
+    r"(?<![/`])(npm test(?:\s+--\s+[^\n;`\[]+)?|npx (?:--no-install )?tsx[^\n;`\[]+|npx (?:--no-install )?jest[^\n;`\[]+)",
     re.IGNORECASE,
 )
 _SOURCE_RUN_RE = re.compile(r"\[from run (run_[a-f0-9]+)\]", re.IGNORECASE)
@@ -31,10 +32,14 @@ _MALFORMED_VERIFY_COMMAND_RE = re.compile(
 )
 _VERIFICATION_SHELL_PREFIXES: tuple[tuple[str, ...], ...] = (
     ("npm", "test"),
-    ("npx", "jest"),
-    ("npx", "tsx"),
+    ("npm", "run"),
+    ("npx", "--no-install", "jest"),
+    ("npx", "--no-install", "tsx"),
 )
 _UNSAFE_SHELL_CHARACTERS = frozenset(";&|><$()\\\r\n\x00")
+# A job the watcher interrupted is a failure with a known cause, not an
+# "incomplete" run that leaves the gate guessing.
+_FAILED_JOB_STATUSES = frozenset({"failed", "timed_out", "cancelled"})
 
 
 def _verification_command_is_valid(command: str) -> bool:
@@ -50,7 +55,42 @@ def _verification_command_is_valid(command: str) -> bool:
         return False
     if len(argv) < 2:
         return False
-    return tuple(part.lower() for part in argv[:2]) in _VERIFICATION_SHELL_PREFIXES
+    lowered = tuple(part.lower() for part in argv)
+    return any(lowered[: len(prefix)] == prefix for prefix in _VERIFICATION_SHELL_PREFIXES)
+
+
+def _normalize_verification_command(command: str) -> str:
+    cleaned = " ".join(str(command or "").split()).strip().rstrip(".")
+    try:
+        argv = shlex.split(cleaned)
+    except ValueError:
+        return cleaned
+    if len(argv) >= 2 and argv[0].lower() == "npx" and argv[1].lower() in {"jest", "tsx"}:
+        return " ".join(("npx", "--no-install", *argv[1:]))
+    return cleaned
+
+
+def select_verification_commands(commands: list[str], *, limit: int = 3) -> list[str]:
+    """Normalize, validate, dedupe, and cap an arbitrary list of candidates.
+
+    capability_routing.py has called this since 22bfded to filter a mix of
+    freshly-extracted and single ad-hoc commands down to a safe, bounded set
+    before attaching them to a routed task -- but the function was never
+    added here, so every call crashed with an unconditional ImportError. It
+    is the same normalize/validate pipeline extract_verification_commands
+    already applies to fenced-block matches, generalized to any input list.
+    """
+    selected: list[str] = []
+    seen: set[str] = set()
+    for raw in commands or []:
+        if len(selected) >= max(0, limit):
+            break
+        command = _normalize_verification_command(raw)
+        if not _verification_command_is_valid(command) or command in seen:
+            continue
+        seen.add(command)
+        selected.append(command)
+    return selected
 
 
 def extract_verification_commands(reply_text: str | None) -> list[str]:
@@ -59,10 +99,20 @@ def extract_verification_commands(reply_text: str | None) -> list[str]:
     commands: list[str] = []
     seen: set[str] = set()
     for match in _VERIFICATION_COMMAND_RE.finditer(body):
-        command = " ".join(match.group(1).split()).strip()
-        if _verification_command_is_valid(command) and command not in seen:
-            seen.add(command)
-            commands.append(command)
+        parts = [part.strip() for part in re.split(r"\s&&\s", match.group(1)) if part.strip()]
+        if not parts:
+            continue
+        valid_parts: list[str] = []
+        for part in parts:
+            command = _normalize_verification_command(part)
+            if not _verification_command_is_valid(command):
+                valid_parts = []
+                break
+            valid_parts.append(command)
+        for command in valid_parts:
+            if command not in seen:
+                seen.add(command)
+                commands.append(command)
     for match in _TEST_FILE_BACKTICK_RE.finditer(body):
         test_path = " ".join(match.group(1).split()).strip()
         command = f"npm test -- {test_path}"
@@ -70,11 +120,60 @@ def extract_verification_commands(reply_text: str | None) -> list[str]:
             seen.add(command)
             commands.append(command)
     for match in _GOAL_INLINE_COMMAND_RE.finditer(body):
-        command = " ".join(match.group(1).split()).strip().rstrip(".")
+        command = _normalize_verification_command(match.group(1))
         if _verification_command_is_valid(command) and command not in seen:
             seen.add(command)
             commands.append(command)
     return commands[:4]
+
+
+_TEST_PATH_ARG_RE = re.compile(
+    r"(?<![\w/.-])((?:[\w.-]+/)+[\w.-]+\.(?:test|spec)\.(?:ts|tsx|js|jsx|mjs|cjs))"
+)
+_PRUNED_SEARCH_DIRS = frozenset({"node_modules", ".git", ".venv", "dist", "build", "coverage"})
+_MAX_SEARCH_DIRS = 4000
+
+
+def _find_test_file_by_name(root: Path, filename: str) -> str | None:
+    """Find a unique file with this basename, so a near-miss path is repairable."""
+    matches: list[str] = []
+    scanned = 0
+    for current, dirnames, filenames in os.walk(root):
+        dirnames[:] = [name for name in dirnames if name not in _PRUNED_SEARCH_DIRS]
+        scanned += 1
+        if scanned > _MAX_SEARCH_DIRS:
+            break
+        if filename in filenames:
+            matches.append(str(Path(current, filename).relative_to(root)))
+            if len(matches) > 1:
+                return None
+    return matches[0] if len(matches) == 1 else None
+
+
+def resolve_verification_command(command: str, root: Path | None) -> tuple[str | None, str]:
+    """Check a verify command's test paths before a run is spent on it.
+
+    Returns ``(runnable_command, note)``. ``runnable_command`` is None when the
+    command references a test file that does not exist and cannot be repaired —
+    running it would only produce a "test path absent" failure.
+    """
+    cleaned = " ".join(str(command or "").split()).strip()
+    if not cleaned:
+        return None, "empty command"
+    if root is None:
+        return cleaned, ""
+
+    resolved = cleaned
+    notes: list[str] = []
+    for referenced in dict.fromkeys(_TEST_PATH_ARG_RE.findall(cleaned)):
+        if (root / referenced).is_file():
+            continue
+        suggestion = _find_test_file_by_name(root, Path(referenced).name)
+        if suggestion is None:
+            return None, f"test path `{referenced}` does not exist in the workspace"
+        resolved = resolved.replace(referenced, suggestion)
+        notes.append(f"repaired `{referenced}` → `{suggestion}`")
+    return resolved, "; ".join(notes)
 
 
 def source_run_from_verification_goal(goal: str) -> str | None:
@@ -88,6 +187,22 @@ def is_verification_task(task: dict[str, Any] | None) -> bool:
     return str(task.get("goal") or "").strip().lower().startswith("verification after")
 
 
+def _split_compound_verification_commands(commands: list[str]) -> list[str]:
+    """Split ``cmd1 && cmd2`` goal backticks into individually enqueueable jobs."""
+    expanded: list[str] = []
+    seen: set[str] = set()
+    for command in commands:
+        for part in re.split(r"\s&&\s", str(command or "")):
+            normalized = _normalize_verification_command(part.strip())
+            if not normalized or normalized in seen:
+                continue
+            if not _verification_command_is_valid(normalized):
+                continue
+            seen.add(normalized)
+            expanded.append(normalized)
+    return expanded
+
+
 def verification_commands_for_task(task: dict[str, Any] | None) -> list[str]:
     if not isinstance(task, dict):
         return []
@@ -96,7 +211,7 @@ def verification_commands_for_task(task: dict[str, Any] | None) -> list[str]:
         for key in ("goal", "acceptance_criteria")
         if str(task.get(key) or "").strip()
     )
-    return extract_verification_commands(blob)
+    return _split_compound_verification_commands(extract_verification_commands(blob))
 
 
 def verification_approved_command_prefixes() -> tuple[tuple[str, ...], ...]:
@@ -179,19 +294,36 @@ def verification_terminal_jobs_for_run(
     ]
 
 
-def _job_passed(job: dict[str, Any]) -> bool:
+def job_passed(job: dict[str, Any]) -> bool:
     if str(job.get("status") or "").strip().lower() != "completed":
         return False
     exit_code = job.get("exit_code")
     return exit_code is not None and int(exit_code) == 0
 
 
-def _job_failed(job: dict[str, Any]) -> bool:
+def job_failed(job: dict[str, Any]) -> bool:
     status = str(job.get("status") or "").strip().lower()
-    if status == "failed":
+    if status in _FAILED_JOB_STATUSES:
         return True
     exit_code = job.get("exit_code")
     return status == "completed" and exit_code is not None and int(exit_code) != 0
+
+
+def describe_failed_jobs(jobs: list[dict[str, Any]]) -> str:
+    """Name what actually broke so the operator card is actionable."""
+    details: list[str] = []
+    for job in jobs[:3]:
+        command = str(job.get("command") or job.get("job_id") or "job").strip()
+        status = str(job.get("status") or "").strip().lower()
+        reason = str(job.get("failure_reason") or "").strip()
+        if reason:
+            outcome = reason
+        elif status == "completed":
+            outcome = f"exit {job.get('exit_code')}"
+        else:
+            outcome = status or "unknown"
+        details.append(f"`{command[:80]}` → {outcome}")
+    return "; ".join(details)
 
 
 def build_verification_acceptance_evaluation(
@@ -213,8 +345,8 @@ def build_verification_acceptance_evaluation(
         and str((entry.get("receipt") or {}).get("type") or "")
         == "verification_terminal_enqueued"
     )
-    failed = [job for job in jobs if _job_failed(job)]
-    passed = [job for job in jobs if _job_passed(job)]
+    failed = [job for job in jobs if job_failed(job)]
+    passed = [job for job in jobs if job_passed(job)]
     required = min(len(commands), 3) if commands else max(1, enqueued or len(passed))
     checks = [
         {
@@ -225,7 +357,10 @@ def build_verification_acceptance_evaluation(
         for job in passed
     ]
     if failed:
-        summary = f"acceptance=fail · verification jobs failed={len(failed)} ok={len(passed)}"
+        summary = (
+            f"acceptance=fail · verification jobs failed={len(failed)} ok={len(passed)} · "
+            f"{describe_failed_jobs(failed)}"
+        )
         passed_gate = False
     elif len(passed) >= required and required > 0:
         summary = f"acceptance=pass · verification jobs={len(passed)}/{required}"
@@ -292,18 +427,24 @@ def verification_worker_prompt_clause(*, workspace_id: str, task: dict[str, Any]
         else f"`axon-agent-terminal-job --workspace {workspace} -- <verify-command>`"
     )
     return (
-        " VERIFICATION SHIFT: run the scoped verify commands first via "
+        " VERIFICATION SHIFT: run the scoped verify commands first — in a sandbox "
+        "disposable checkout you may run approved `npm test` / `npx --no-install jest` "
+        "directly in Shell when node_modules is present; otherwise use "
         f"{wrapped}. Attach stdout/stderr receipts before static review. "
-        "Do not claim tests passed without terminal job output."
+        "Do not claim tests passed without command output."
     )
 
 
 __all__ = [
     "build_verification_acceptance_evaluation",
     "complete_verification_no_change_delivery",
+    "describe_failed_jobs",
     "extract_verification_commands",
     "is_verification_task",
+    "job_failed",
+    "job_passed",
     "resolve_verification_baseline",
+    "resolve_verification_command",
     "source_run_from_verification_goal",
     "verification_approved_command_prefixes",
     "verification_commands_for_task",

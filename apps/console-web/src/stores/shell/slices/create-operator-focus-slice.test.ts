@@ -5,7 +5,7 @@ import { createOperatorFocusSlice } from './create-operator-focus-slice';
 
 function createSlice(initialLayout: 'ide' | 'operator' = 'ide', ideActivityView = 'explorer') {
   const layoutMode = ref<'ide' | 'operator'>(initialLayout);
-  const operatorCenterView = ref<'grid' | 'graph'>('graph');
+  const operatorCenterView = ref<'mission' | 'graph' | 'attention' | 'dispatch' | 'vaxon'>('graph');
   const setLayoutMode = vi.fn((mode: 'ide' | 'operator') => {
     layoutMode.value = mode;
   });
@@ -62,7 +62,7 @@ describe('afterRunLifecycleMutation', () => {
 
     expect(setLayoutMode).not.toHaveBeenCalled();
     expect(layoutMode.value).toBe('operator');
-    expect(operatorCenterView.value).toBe('grid');
+    expect(operatorCenterView.value).toBe('mission');
   });
 });
 
@@ -71,7 +71,7 @@ describe('focusAttentionSidebar', () => {
     const ideAttentionPanelOpen = ref(false);
     const setCurrentWorkspace = vi.fn();
     const layoutMode = ref<'ide' | 'operator'>('ide');
-    const operatorCenterView = ref<'grid' | 'graph'>('graph');
+    const operatorCenterView = ref<'mission' | 'graph' | 'attention' | 'dispatch' | 'vaxon'>('graph');
     const slice = createOperatorFocusSlice({
       layoutMode,
       operatorBriefing: ref(null),
@@ -133,9 +133,9 @@ describe('focusAttentionSidebar', () => {
     expect(ideAttentionPanelOpen.value).toBe(false);
   });
 
-  it('switches Mission Control to grid and selects the signal workspace', () => {
+  it('switches Mission Control to the Attention tab and selects the signal workspace', () => {
     const setCurrentWorkspace = vi.fn();
-    const operatorCenterView = ref<'grid' | 'graph'>('graph');
+    const operatorCenterView = ref<'mission' | 'graph' | 'attention' | 'dispatch' | 'vaxon'>('graph');
     const highlightedSignalId = ref<string | null>(null);
     const slice = createOperatorFocusSlice({
       layoutMode: ref('operator'),
@@ -168,7 +168,7 @@ describe('focusAttentionSidebar', () => {
 
     slice.focusAttentionSidebar('signal_dash');
 
-    expect(operatorCenterView.value).toBe('grid');
+    expect(operatorCenterView.value).toBe('attention');
     expect(highlightedSignalId.value).toBe('signal_dash');
     expect(setCurrentWorkspace).toHaveBeenCalledWith('workspace_dashpro');
   });
@@ -224,9 +224,9 @@ describe('focusAttentionSidebar', () => {
 });
 
 describe('focusLiveOperations', () => {
-  it('expands the LIVE OPERATIONS thread seam instead of collapsing it', () => {
+  it('opens the VAXON center tab when Live Ops is requested', () => {
     const expandedDockSeams = ref(new Set<string>());
-    const operatorCenterView = ref<'grid' | 'graph'>('graph');
+    const operatorCenterView = ref<'mission' | 'graph' | 'attention' | 'dispatch' | 'vaxon'>('graph');
     const layoutMode = ref<'ide' | 'operator'>('ide');
     const setLayoutMode = vi.fn((mode: 'ide' | 'operator') => {
       layoutMode.value = mode;
@@ -256,15 +256,14 @@ describe('focusLiveOperations', () => {
     slice.focusLiveOperations();
 
     expect(setLayoutMode).toHaveBeenCalledWith('operator');
-    // Brain Galaxy hides the live-ops dock, so the grid view must win.
-    expect(operatorCenterView.value).toBe('grid');
-    expect(expandedDockSeams.value.has('thread')).toBe(true);
+    expect(operatorCenterView.value).toBe('vaxon');
     expect(setDockHeroMode).not.toHaveBeenCalled();
   });
 
-  it('never collapses Live Ops when briefing focus is requested', () => {
+  it('keeps Live Ops expanded when briefing focus is requested', () => {
     const expandedDockSeams = ref(new Set<string>(['thread']));
     const dockThreadSeamTouched = ref(false);
+    const operatorCenterView = ref<'mission' | 'graph' | 'attention' | 'dispatch' | 'vaxon'>('mission');
     const layoutMode = ref<'ide' | 'operator'>('operator');
     const slice = createOperatorFocusSlice({
       layoutMode,
@@ -277,7 +276,7 @@ describe('focusLiveOperations', () => {
       missionControlEmphasized: ref(false),
       connectorsEmphasized: ref(false),
       briefingSeamEmphasized: ref(false),
-      operatorCenterView: ref('grid'),
+      operatorCenterView,
       dockHeroMode: ref('command'),
       expandedDockSeams,
       dockThreadSeamTouched,
@@ -289,6 +288,7 @@ describe('focusLiveOperations', () => {
 
     slice.focusKairoBriefing();
 
+    expect(operatorCenterView.value).toBe('vaxon');
     expect(expandedDockSeams.value.has('thread')).toBe(true);
     expect(dockThreadSeamTouched.value).toBe(false);
   });

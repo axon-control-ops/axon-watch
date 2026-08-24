@@ -111,4 +111,13 @@ export type {
   HostEventRecord,
   OperatorReminderRecord,
 } from './host-context';
+export type {
+  WorkspaceImpactEdge,
+  WorkspaceMission,
+  WorkspaceMissionIntegrationManifest,
+  WorkspaceMissionNode,
+  WorkspaceMissionPromotion,
+  WorkspaceMissionStatus,
+  WorkspaceMissionVerification,
+} from './mission';
 export { DESKTOP_RUNTIMES, HOST_ACTION_TIERS } from './host-context';

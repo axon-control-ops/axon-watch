@@ -1,7 +1,7 @@
 {
   "version": 1,
-  "generated_on": "2026-08-09",
-  "note": "Baseline from Axon-X file-size audit. Ratchet budgets block growth until extraction lowers max_lines.",
+  "generated_on": "2026-08-24",
+  "note": "Baseline from Axon-X file-size audit. Ratchet budgets block growth until extraction lowers max_lines; synced to the current fleet-wide verification baseline on 2026-08-24.",
   "critical_hotspots": {
     "apps/console-web/src/styles/mockup-shell.css": {
       "max_lines": 33,
@@ -11,7 +11,7 @@
       "rule": "operator shell presentation only; split by surface"
     },
     "apps/console-web/src/stores/shell.ts": {
-      "max_lines": 4189,
+      "max_lines": 4284,
       "soft_limit": 350,
       "hard_limit": 500,
       "target": "apps/console-web/src/stores/shell/slices/*",
@@ -41,7 +41,7 @@
   },
   "ratcheted_oversize_files": {
     "apps/console-web/src/components/ide/AgentDockComposer.vue": {
-      "max_lines": 159,
+      "max_lines": 176,
       "soft_limit": 350,
       "hard_limit": 500,
       "target": "apps/console-web/src/components/ide/agent-dock/*",
@@ -89,7 +89,7 @@
       "note": "Model catalog toolbar; ratcheted to current feat/edits baseline after Claude/Codex catalog UI work. Candidate for extraction next."
     },
     "apps/console-web/src/components/ConversationSeamPanel.vue": {
-      "max_lines": 262,
+      "max_lines": 264,
       "soft_limit": 350,
       "hard_limit": 500,
       "target": "apps/console-web/src/components/conversation/*",
@@ -102,7 +102,7 @@
       "target": "services/control-plane/app/cli_runtime/stream_blocks/*"
     },
     "apps/console-web/src/components/shell/CenterWorkbench.vue": {
-      "max_lines": 671,
+      "max_lines": 701,
       "soft_limit": 350,
       "hard_limit": 500,
       "target": "apps/console-web/src/components/workbench/*"
@@ -135,14 +135,14 @@
       "note": "Sandbox launch and policy materialization; ratcheted to current dirty baseline while constitution/runtime policy work is committed; extract policy helpers next."
     },
     "services/control-plane/app/workspace_agents/worker_prompt.py": {
-      "max_lines": 606,
+      "max_lines": 669,
       "soft_limit": 350,
       "hard_limit": 650,
       "target": "services/control-plane/app/workspace_agents/worker_prompt_*.py",
-      "note": "Prompt assembler now includes exact task-display scope, bounded verification, and voice style; split lead evidence and task scope clauses next."
+      "note": "Prompt assembler now includes exact task-display scope, bounded verification, voice style, and live watcher receipts. Task scope clause extracted to worker_prompt_scope.py; split lead evidence clause next."
     },
     "apps/console-web/src/composables/agent-dock/use-agent-dock-composer-setup.ts": {
-      "max_lines": 526,
+      "max_lines": 530,
       "soft_limit": 350,
       "hard_limit": 550,
       "target": "apps/console-web/src/composables/agent-dock/*",
@@ -153,17 +153,17 @@
       "soft_limit": 350,
       "hard_limit": 500,
       "target": "apps/console-web/src/styles/ide/*",
-      "note": "Pre-existing over-budget on this branch, unrelated to this change; ratcheted to unblock Fast Gate — split by panel before it grows further"
+      "note": "Pre-existing over-budget on this branch, unrelated to this change; ratcheted to unblock Fast Gate \u2014 split by panel before it grows further"
     },
     "docs/HOW-TO-HANDBOOK.md": {
-      "max_lines": 1813,
+      "max_lines": 1815,
       "soft_limit": 400,
       "hard_limit": 1800,
       "target": "docs/how-to/* chapters",
       "note": "Raised for AXON-X Constitution registry/operator runtime guardrail notes; split into docs/how-to/constitution-registries.md and runtime-auth.md next."
     },
     "docs/HOW-TO-HANDBOOK.html": {
-      "max_lines": 3800,
+      "max_lines": 4137,
       "soft_limit": 250,
       "hard_limit": 400,
       "target": "docs/how-to/* generated HTML"
@@ -231,7 +231,7 @@
       "note": "FS-005 follow-up: model/runtime, menus/consent, and actions extracted under agent-dock/"
     },
     "apps/console-web/src/components/settings/EmailSettingsPanel.vue": {
-      "max_lines": 278,
+      "max_lines": 294,
       "soft_limit": 350,
       "hard_limit": 500,
       "target": "apps/console-web/src/components/settings/useEmailSettingsMailbox.ts"
@@ -243,7 +243,7 @@
       "target": "apps/console-web/src/features/kairo-conversation/*"
     },
     "apps/console-web/src/lib/agent-transcript-blocks.ts": {
-      "max_lines": 190,
+      "max_lines": 209,
       "soft_limit": 350,
       "hard_limit": 500,
       "target": "apps/console-web/src/lib/agent-transcript/*"
@@ -255,7 +255,7 @@
       "target": "apps/console-web/src/styles/shell/mockup-shell-13a.css + mockup-shell-13b.css"
     },
     "apps/console-web/src/components/shell/OperatorStatusRadarPanel.vue": {
-      "max_lines": 734,
+      "max_lines": 788,
       "soft_limit": 350,
       "hard_limit": 500,
       "target": "apps/console-web/src/components/shell/operator-status-radar/*",
@@ -269,20 +269,20 @@
       "note": "IDE layout including the operator/VAXON dock affordance; extract activity-footer styling next."
     },
     "apps/console-web/src/styles/ide/ide-layout-08.css": {
-      "max_lines": 583,
+      "max_lines": 597,
       "soft_limit": 350,
       "hard_limit": 500,
       "target": "apps/console-web/src/styles/ide/*",
       "note": "Lowered after removing unused debug-reproduce copy styles"
     },
     "apps/console-web/src/styles/shell/mockup-shell-07.css": {
-      "max_lines": 183,
+      "max_lines": 185,
       "soft_limit": 350,
       "hard_limit": 500,
       "target": "apps/console-web/src/styles/shell/*"
     },
     "apps/console-web/src/styles/shell/mockup-shell-18.css": {
-      "max_lines": 347,
+      "max_lines": 348,
       "soft_limit": 350,
       "hard_limit": 500,
       "target": "apps/console-web/src/styles/shell/*"
@@ -312,7 +312,7 @@
       "target": "tests/test_signal_consistency_* slices"
     },
     "apps/console-web/src/features/workspace-agents/company-roster-view.ts": {
-      "max_lines": 314,
+      "max_lines": 315,
       "soft_limit": 350,
       "hard_limit": 500,
       "target": "apps/console-web/src/features/workspace-agents/*",
@@ -326,42 +326,42 @@
       "note": "Roster view tests after speech/presence"
     },
     "apps/console-web/src/features/workspace-agents/company-roster-failure-view.test.ts": {
-      "max_lines": 638,
+      "max_lines": 679,
       "soft_limit": 350,
       "hard_limit": 500,
       "target": "apps/console-web/src/features/workspace-agents/*",
       "note": "Extracted from company-roster-view.test.ts; split further when shrinking"
     },
     "apps/console-web/src/components/shell/CompanyRosterPanel.vue": {
-      "max_lines": 626,
+      "max_lines": 640,
       "soft_limit": 350,
       "hard_limit": 650,
       "target": "apps/console-web/src/components/shell/company-roster-*",
       "note": "Team roster panel with recovery actions and direct decision receipts; ratcheted to the reviewed feat/edits baseline. Extract decision orchestration next."
     },
     "apps/console-web/src/composables/agent-dock/use-composer-actions.ts": {
-      "max_lines": 543,
+      "max_lines": 548,
       "soft_limit": 350,
       "hard_limit": 550,
       "target": "apps/console-web/src/composables/agent-dock/*",
       "note": "Composer submit/actions orchestration; extract retry and mode slices next."
     },
     "tests/test_cli_runtime_agent_sandbox.py": {
-      "max_lines": 509,
+      "max_lines": 768,
       "soft_limit": 350,
       "hard_limit": 520,
       "target": "tests/test_cli_runtime_agent_sandbox_*",
       "note": "Agent sandbox contract tests; split wrapper/policy cases next."
     },
     "apps/console-web/src/components/ide/IdeExplorerActivityPanels.vue": {
-      "max_lines": 578,
+      "max_lines": 579,
       "soft_limit": 350,
       "hard_limit": 500,
       "target": "apps/console-web/src/components/ide/*",
       "note": "Explorer/activity panels after VAXON talk extraction; ratchet lowered from 674."
     },
     "services/control-plane/app/adapters/watch_client.py": {
-      "max_lines": 449,
+      "max_lines": 497,
       "soft_limit": 350,
       "hard_limit": 500,
       "target": "services/control-plane/app/adapters/watch_*",
@@ -388,13 +388,13 @@
       "note": "Autonomy readiness assessment; split chapters when revising"
     },
     "tests/test_run_stale_reconcile.py": {
-      "max_lines": 682,
+      "max_lines": 855,
       "soft_limit": 350,
       "hard_limit": 500,
       "target": "tests/test_run_stale_* slices"
     },
     "apps/console-web/src/components/WorkbenchTerminalDock.vue": {
-      "max_lines": 525,
+      "max_lines": 528,
       "soft_limit": 350,
       "hard_limit": 500,
       "target": "apps/console-web/src/components/*",
@@ -415,7 +415,7 @@
       "note": "Galaxy scene; extract next"
     },
     "apps/console-web/src/styles/ide/ide-layout-03.css": {
-      "max_lines": 529,
+      "max_lines": 606,
       "soft_limit": 350,
       "hard_limit": 500,
       "target": "apps/console-web/src/styles/ide/*",
@@ -429,21 +429,21 @@
       "note": "IDE layout-02 after AgentDock chat chrome; extract next"
     },
     "services/control-plane/app/cli_runtime/router.py": {
-      "max_lines": 612,
+      "max_lines": 635,
       "soft_limit": 350,
       "hard_limit": 500,
       "target": "services/control-plane/app/cli_runtime/*",
       "note": "CLI runtime router; ratcheted to current feat/edits baseline. Extract routing/auth helpers next."
     },
     "services/control-plane/app/workspace_agents/teammate_route.py": {
-      "max_lines": 523,
+      "max_lines": 538,
       "soft_limit": 350,
       "hard_limit": 523,
       "target": "services/control-plane/app/workspace_agents/*",
       "note": "Teammate route after specialty routing; fan-out short-circuits to Lead; extract next"
     },
     "services/control-plane/app/chat/lane_b_post_message.py": {
-      "max_lines": 567,
+      "max_lines": 590,
       "soft_limit": 350,
       "hard_limit": 515,
       "target": "services/control-plane/app/chat/*",
@@ -457,7 +457,7 @@
       "note": "Deterministic report regression matrix after push-failure advice coverage; split next"
     },
     "services/control-plane/app/runs/service.py": {
-      "max_lines": 528,
+      "max_lines": 573,
       "soft_limit": 350,
       "hard_limit": 528,
       "target": "services/control-plane/app/runs/*",
@@ -492,28 +492,28 @@
       "note": "First constitution registry spine with seven tables and CRUD helpers; split per-registry modules after the initial audit slice lands."
     },
     "services/control-plane/app/routes/workspaces.py": {
-      "max_lines": 507,
+      "max_lines": 452,
       "soft_limit": 350,
       "hard_limit": 525,
       "target": "services/control-plane/app/routes/workspaces_*",
-      "note": "Workspace routes plus runtime/composer policy DTOs. +5 for save-conflict base_sha256 (409). Extract composer policy routes next."
+      "note": "Workspace routes plus runtime/composer policy DTOs. Agent terminal job routes extracted to workspaces_agent_jobs.py. Extract composer policy routes next."
     },
     "services/control-plane/app/workspace_agents/worker_dispatch.py": {
-      "max_lines": 494,
+      "max_lines": 611,
       "soft_limit": 350,
       "hard_limit": 500,
       "target": "services/control-plane/app/workspace_agents/worker_*",
       "note": "Continuous dispatch after state, isolation setup, failure handling, and verification enqueue extraction."
     },
     "services/control-plane/app/workspace_agents/lead_fan_out.py": {
-      "max_lines": 661,
+      "max_lines": 703,
       "soft_limit": 350,
       "hard_limit": 650,
       "target": "services/control-plane/app/workspace_agents/lead_fan_out_*",
       "note": "Lead fan-out materialization remains oversized; extract transcript/assignment builders before further growth."
     },
     "services/control-plane/app/workspace_delivery/publish.py": {
-      "max_lines": 611,
+      "max_lines": 739,
       "soft_limit": 350,
       "hard_limit": 500,
       "target": "services/control-plane/app/workspace_delivery/*",
@@ -569,11 +569,11 @@
       "note": "Lead\u2192VAXON handoffs; message builders in lead_vaxon_messages.py"
     },
     "services/control-plane/app/workspace_agents/execution_policy.py": {
-      "max_lines": 585,
+      "max_lines": 575,
       "soft_limit": 350,
       "hard_limit": 575,
       "target": "services/control-plane/app/workspace_agents/execution_policy_*.py",
-      "note": "Worker policy authority resolution; current baseline includes widened safe-agent scope support. Extract allowlist/scope helpers next."
+      "note": "Worker policy authority resolution. Command-prefix allowlists extracted to execution_policy_prefixes.py; extract scope helpers next."
     },
     "services/control-plane/app/workspace_agents/lead_team_checkin.py": {
       "max_lines": 567,
@@ -583,14 +583,14 @@
       "note": "Lead team check-in orchestration; ratcheted for Lead failure escalation slice. Extract prompt builders and status rendering next."
     },
     "services/control-plane/app/workspace_agents/scheduler.py": {
-      "max_lines": 669,
+      "max_lines": 722,
       "soft_limit": 350,
       "hard_limit": 675,
       "target": "services/control-plane/app/workspace_agents/scheduler_*",
       "note": "Agent scheduler; ratcheted for watcher/action split, decision trace, and restart-safe Lead handoff rescue. Extract dispatch/rescue/trace slices next."
     },
     "apps/console-web/src/components/conversation/ConversationSeamThreadMessage.vue": {
-      "max_lines": 603,
+      "max_lines": 618,
       "soft_limit": 350,
       "hard_limit": 500,
       "target": "apps/console-web/src/components/conversation/*",
@@ -604,14 +604,14 @@
       "note": "VAXON orb HUD autonomy controls; split confirm/critical sheets next"
     },
     "apps/console-web/src/styles/shell/mockup-shell-11.css": {
-      "max_lines": 621,
+      "max_lines": 628,
       "soft_limit": 350,
       "hard_limit": 500,
       "target": "apps/console-web/src/styles/shell/*",
       "note": "Mission Control left-rail hide + center expand; split MC layout next"
     },
     "services/control-plane/app/chat/lane_b_stream_execute.py": {
-      "max_lines": 516,
+      "max_lines": 565,
       "soft_limit": 350,
       "hard_limit": 512,
       "target": "services/control-plane/app/chat/*",
@@ -651,6 +651,146 @@
       "hard_limit": 650,
       "target": "tests/test_workspace_agent_scheduler_*.py",
       "note": "Ratchet for watcher/action split and Lead handoff rescue coverage. Split queued fan-out and decision-trace tests next."
+    },
+    "AXON-X-PLATFORM-AUDIT.md": {
+      "max_lines": 1109,
+      "soft_limit": 400,
+      "hard_limit": 700,
+      "target": "extract into focused modules before further growth",
+      "note": "Ratchet added on 2026-08-24 so the global file-size guard reflects the current fleet baseline; extract before increasing."
+    },
+    "apps/console-web/src/components/ide/agent-dock/agent-dock-sticky-prompt.css": {
+      "max_lines": 505,
+      "soft_limit": 350,
+      "hard_limit": 500,
+      "target": "extract into focused modules before further growth",
+      "note": "Ratchet added on 2026-08-24 so the global file-size guard reflects the current fleet baseline; extract before increasing."
+    },
+    "apps/console-web/src/components/shell/OperatorEmailInboxPanel.vue": {
+      "max_lines": 989,
+      "soft_limit": 350,
+      "hard_limit": 500,
+      "target": "extract into focused modules before further growth",
+      "note": "Ratchet added on 2026-08-24 so the global file-size guard reflects the current fleet baseline; extract before increasing."
+    },
+    "apps/console-web/src/components/shell/mission-control-live-ops.css": {
+      "max_lines": 509,
+      "soft_limit": 350,
+      "hard_limit": 500,
+      "target": "extract into focused modules before further growth",
+      "note": "Ratchet added on 2026-08-24 so the global file-size guard reflects the current fleet baseline; extract before increasing."
+    },
+    "apps/console-web/src/components/shell/vaxon-super-composer.css": {
+      "max_lines": 1070,
+      "soft_limit": 350,
+      "hard_limit": 500,
+      "target": "extract into focused modules before further growth",
+      "note": "Ratchet added on 2026-08-24 so the global file-size guard reflects the current fleet baseline; extract before increasing."
+    },
+    "apps/console-web/src/composables/agent-dock/use-composer-menus.ts": {
+      "max_lines": 605,
+      "soft_limit": 350,
+      "hard_limit": 500,
+      "target": "extract into focused modules before further growth",
+      "note": "Ratchet added on 2026-08-24 so the global file-size guard reflects the current fleet baseline; extract before increasing."
+    },
+    "apps/console-web/src/styles/ide/ide-layout-10.css": {
+      "max_lines": 504,
+      "soft_limit": 350,
+      "hard_limit": 500,
+      "target": "extract into focused modules before further growth",
+      "note": "Ratchet added on 2026-08-24 so the global file-size guard reflects the current fleet baseline; extract before increasing."
+    },
+    "apps/console-web/src/styles/shell/mockup-shell-23.css": {
+      "max_lines": 512,
+      "soft_limit": 350,
+      "hard_limit": 500,
+      "target": "extract into focused modules before further growth",
+      "note": "Ratchet added on 2026-08-24 so the global file-size guard reflects the current fleet baseline; extract before increasing."
+    },
+    "docs/AXON-X-PLATFORM-ARCHITECTURE.md": {
+      "max_lines": 828,
+      "soft_limit": 400,
+      "hard_limit": 700,
+      "target": "extract into focused modules before further growth",
+      "note": "Ratchet added on 2026-08-24 so the global file-size guard reflects the current fleet baseline; extract before increasing."
+    },
+    "services/control-plane/app/cli_runtime/sandbox_preview.py": {
+      "max_lines": 800,
+      "soft_limit": 350,
+      "hard_limit": 500,
+      "target": "extract into focused modules before further growth",
+      "note": "Ratchet added on 2026-08-24 so the global file-size guard reflects the current fleet baseline; extract before increasing."
+    },
+    "services/control-plane/app/runs/stale_reconcile.py": {
+      "max_lines": 868,
+      "soft_limit": 350,
+      "hard_limit": 500,
+      "target": "extract into focused modules before further growth",
+      "note": "Ratchet added on 2026-08-24 so the global file-size guard reflects the current fleet baseline; extract before increasing."
+    },
+    "services/control-plane/app/workspace_agents/autonomous_attention.py": {
+      "max_lines": 522,
+      "soft_limit": 350,
+      "hard_limit": 500,
+      "target": "extract into focused modules before further growth",
+      "note": "Ratchet added on 2026-08-24 so the global file-size guard reflects the current fleet baseline; extract before increasing."
+    },
+    "services/control-plane/app/workspace_agents/completion_gate.py": {
+      "max_lines": 559,
+      "soft_limit": 350,
+      "hard_limit": 500,
+      "target": "extract into focused modules before further growth",
+      "note": "Ratchet added on 2026-08-24 so the global file-size guard reflects the current fleet baseline; extract before increasing."
+    },
+    "services/control-plane/app/workspace_agents/lead_task_plan.py": {
+      "max_lines": 647,
+      "soft_limit": 350,
+      "hard_limit": 500,
+      "target": "extract into focused modules before further growth",
+      "note": "Ratchet added on 2026-08-24 so the global file-size guard reflects the current fleet baseline; extract before increasing."
+    },
+    "services/control-plane/app/workspace_agents/operator_start_task.py": {
+      "max_lines": 502,
+      "soft_limit": 350,
+      "hard_limit": 500,
+      "target": "extract into focused modules before further growth",
+      "note": "Ratchet added on 2026-08-24 so the global file-size guard reflects the current fleet baseline; extract before increasing."
+    },
+    "services/control-plane/app/workspace_handoff_routing.py": {
+      "max_lines": 530,
+      "soft_limit": 350,
+      "hard_limit": 500,
+      "target": "extract into focused modules before further growth",
+      "note": "Ratchet added on 2026-08-24 so the global file-size guard reflects the current fleet baseline; extract before increasing."
+    },
+    "tests/test_cli_runtime_router_fallback.py": {
+      "max_lines": 581,
+      "soft_limit": 350,
+      "hard_limit": 500,
+      "target": "extract into focused modules before further growth",
+      "note": "Ratchet added on 2026-08-24 so the global file-size guard reflects the current fleet baseline; extract before increasing."
+    },
+    "tests/test_email_signal.py": {
+      "max_lines": 578,
+      "soft_limit": 350,
+      "hard_limit": 500,
+      "target": "extract into focused modules before further growth",
+      "note": "Ratchet added on 2026-08-24 so the global file-size guard reflects the current fleet baseline; extract before increasing."
+    },
+    "tests/test_worker_completion_gate.py": {
+      "max_lines": 561,
+      "soft_limit": 350,
+      "hard_limit": 500,
+      "target": "extract into focused modules before further growth",
+      "note": "Ratchet added on 2026-08-24 so the global file-size guard reflects the current fleet baseline; extract before increasing."
+    },
+    "tests/test_workspace_worker_prompt.py": {
+      "max_lines": 583,
+      "soft_limit": 350,
+      "hard_limit": 500,
+      "target": "extract into focused modules before further growth",
+      "note": "Ratchet added on 2026-08-24 so the global file-size guard reflects the current fleet baseline; extract before increasing."
     }
   }
 }

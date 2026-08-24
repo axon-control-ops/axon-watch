@@ -81,23 +81,20 @@ class EffectiveScopeTests(unittest.TestCase):
         codes = {f.code for f in findings}
         self.assertIn("out_of_scope", codes)
 
-    def test_evaluate_acceptance_uses_task_allowed_paths(self) -> None:
+    def test_evaluate_acceptance_treats_task_paths_as_routing_hints(self) -> None:
         contract = {
             "allowed_paths": ["apps/", "scripts/"],
             "forbidden_path_globs": ["**/.env"],
             "verifier": {"required_checks": []},
             "commands": {},
         }
-        blocked = evaluate_acceptance(
+        adjacent_role_file = evaluate_acceptance(
             contract=contract,
             check_results={},
             changed_paths=["apps/console-web/src/App.vue"],
             task_allowed_paths=["scripts/guardrails/"],
         )
-        self.assertFalse(blocked.passed)
-        self.assertTrue(
-            any(f.code == "out_of_scope" for f in blocked.policy_findings)
-        )
+        self.assertTrue(adjacent_role_file.passed)
         passed = evaluate_acceptance(
             contract=contract,
             check_results={},
@@ -105,6 +102,29 @@ class EffectiveScopeTests(unittest.TestCase):
             task_allowed_paths=["scripts/guardrails/"],
         )
         self.assertTrue(passed.passed)
+        outside_contract = evaluate_acceptance(
+            contract=contract,
+            check_results={},
+            changed_paths=["private/internal.txt"],
+            task_allowed_paths=["private/"],
+        )
+        self.assertFalse(outside_contract.passed)
+        self.assertTrue(
+            any(
+                finding.code == "out_of_scope"
+                for finding in outside_contract.policy_findings
+            )
+        )
+        forbidden = evaluate_acceptance(
+            contract=contract,
+            check_results={},
+            changed_paths=["apps/.env"],
+            task_allowed_paths=["scripts/guardrails/"],
+        )
+        self.assertFalse(forbidden.passed)
+        self.assertTrue(
+            any(f.code == "forbidden_path" for f in forbidden.policy_findings)
+        )
 
 
 class FileSizePatrolTests(unittest.TestCase):

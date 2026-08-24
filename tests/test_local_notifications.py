@@ -44,3 +44,35 @@ class LocalNotificationTests(unittest.TestCase):
     def test_executing_phase_does_not_notify(self, run) -> None:
         self.assertFalse(notify_run_transition({"phase": "executing"}))
         run.assert_not_called()
+
+    @patch("app.persistence.task_store.get_task")
+    @patch("app.local_notifications.subprocess.run")
+    def test_retryable_employee_failure_does_not_notify(self, run, get_task) -> None:
+        get_task.return_value = {"attempts_used": 1, "attempt_budget": 3}
+        self.assertFalse(
+            notify_run_transition({
+                "phase": "failed",
+                "employee_role": "lead",
+                "task_id": "task_retryable",
+            })
+        )
+        run.assert_not_called()
+
+    @patch("app.local_notifications.notification_capability", return_value={"enabled": True})
+    @patch("app.local_notifications.shutil.which", return_value="/usr/bin/notify-send")
+    @patch("app.persistence.task_store.get_task")
+    @patch("app.local_notifications.subprocess.run")
+    def test_exhausted_employee_failure_notifies(
+        self, run, get_task, _which, _capability,
+    ) -> None:
+        get_task.return_value = {"attempts_used": 3, "attempt_budget": 3}
+        run.return_value.returncode = 0
+        self.assertTrue(
+            notify_run_transition({
+                "phase": "failed",
+                "employee_role": "lead",
+                "task_id": "task_exhausted",
+                "summary": "Delivery failed",
+            })
+        )
+        run.assert_called_once()

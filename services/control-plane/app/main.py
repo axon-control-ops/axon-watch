@@ -20,11 +20,11 @@ app = FastAPI(
 app.add_middleware(
     CORSMiddleware,
     allow_origins=_cors_origins(),
+    allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE"],
     allow_headers=["*"],
 )
 # Outer middleware runs first on the request; auth must see mutating methods.
 app.add_middleware(MutatingAuthMiddleware)
 register_routes(app)
-# Re-export for tests/support/stable_connector_probe.py patch sites.
 __all__ = ["app", "probe_all_connectors"]

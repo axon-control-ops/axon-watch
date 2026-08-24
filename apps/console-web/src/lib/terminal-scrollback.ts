@@ -10,7 +10,16 @@ const ANSI_ESCAPE_PATTERN = /\x1b\[[0-9;]*m/g;
 const CSI_SEQUENCE_PATTERN =
   /\u001b(?:\u009b)?[[\]()#;?]*(?:\d{1,4}(?:;\d{0,4})*)?[\dA-PRZcf-nqry=><~]/g;
 const OSC_SEQUENCE_PATTERN = /\u001b\][^\u0007]*(?:\u0007|\u001b\\)/g;
-const ORPHAN_CSI_PATTERN = /(?:\uFFFD)?(?:\[[0-9;?]*[A-Za-z])+/g;
+// The trailing (?![A-Za-z]) is load-bearing: without it, this "orphan CSI"
+// pattern also matches the first letter of any ordinary bracketed word (e.g.
+// "[operator_blocker]", "[run=abc123]" -- both real formats this codebase
+// emits in structured agent replies), silently eating the "[o"/"[r" prefix
+// and corrupting unrelated content. A genuine orphan ANSI final byte is
+// always followed by a non-letter (another escape, whitespace, EOL); mid-word
+// text is not.
+const ORPHAN_CSI_PATTERN = /(?:\uFFFD)?(?:\[[0-9;?]*[A-Za-z])+(?![A-Za-z])/g;
+const ORPHAN_CSI_ONLY_LINE =
+  /^[\s\uFFFD]*(?:\[[0-9;?]*[A-Za-z](?![A-Za-z])[\s\uFFFD]*)+$/;
 
 const SINGLE_SHELL_PROMPT_LINE = /^[^\s]+@[^\s:]+:.*\$\s*$/;
 
@@ -27,23 +36,29 @@ export function stripAnsi(text: string): string {
 
 /** Strip CSI fragments when the ESC byte was lost in tee/storage (Jest cursor spam). */
 export function stripOrphanAnsiFragments(text: string): string {
-  return String(text || '').replace(ORPHAN_CSI_PATTERN, '');
+  const stripped = String(text || '').replace(ORPHAN_CSI_PATTERN, '');
+  return stripped
+    .split('\n')
+    .filter((line) => !ORPHAN_CSI_ONLY_LINE.test(line))
+    .join('\n');
 }
 
 function lineLooksAnsiPolluted(line: string): boolean {
+  const trimmed = line.trim();
   return (
     /\u001b/.test(line) ||
     /\[[0-9]+[A-Z]/.test(line) ||
-    (line.match(/\[[0-9;?]*[A-Za-z]/g)?.length ?? 0) >= 2
+    ORPHAN_CSI_ONLY_LINE.test(trimmed) ||
+    (line.match(/\[[0-9;?]*[A-Za-z](?![A-Za-z])/g)?.length ?? 0) >= 2
   );
 }
 
 export function cleanTerminalDisplayLine(line: string): string {
   let cleaned = stripAnsi(line);
   if (lineLooksAnsiPolluted(line)) {
-    cleaned = stripOrphanAnsiFragments(cleaned).replace(/\[[0-9;?]*[A-Za-z]/g, '');
+    cleaned = stripOrphanAnsiFragments(cleaned).replace(/\[[0-9;?]*[A-Za-z](?![A-Za-z])/g, '');
   }
-  return cleaned;
+  return cleaned.trimEnd();
 }
 
 /** Jest/npm test scrollback: drop cursor-rewrite noise, keep pass/fail + summaries. */

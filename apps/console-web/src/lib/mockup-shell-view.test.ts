@@ -110,6 +110,18 @@ describe('mockup shell view helpers', () => {
     expect(zones.right).toEqual([]);
   });
 
+  it('does not show IDLE when recovery attention exists without an active run', () => {
+    const zones = buildStatusBarZones({
+      runtimeSummary,
+      runtimeSummaryLoadState: 'loaded',
+      primaryActiveRun: null,
+      workspaceId: 'workspace_smoke',
+      attentionCount: 2,
+    });
+    expect(zones.center[0]?.label).toBe('RUN PHASE: RECOVERY');
+    expect(zones.center.some((item) => item.id === 'attention')).toBe(true);
+  });
+
   it('builds IDE quiet status bar without watch or ops telemetry', () => {
     const zones = buildStatusBarZones({
       runtimeSummary,

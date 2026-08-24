@@ -5,6 +5,20 @@ from __future__ import annotations
 import os
 
 
+_DEFAULT_CORS_ORIGINS = (
+    "http://127.0.0.1:4173",
+    "http://localhost:4173",
+    "http://127.0.0.1:8081",
+    "http://localhost:8081",
+    "http://127.0.0.1:19006",
+    "http://localhost:19006",
+    "http://127.0.0.1:8787",
+    "http://localhost:8787",
+    "tauri://localhost",
+    "https://tauri.localhost",
+)
+
+
 def _watch_base_url() -> str:
     return os.environ.get(
         "AXON_WATCH_WATCH_SERVICE_BASE_URL",
@@ -29,13 +43,10 @@ def _public_base_url() -> str:
 
 def _cors_origins() -> list[str]:
     raw = os.environ.get("AXON_WATCH_CORS_ORIGINS", "").strip()
+    origins = list(_DEFAULT_CORS_ORIGINS)
     if raw:
-        return [origin.strip() for origin in raw.split(",") if origin.strip()]
-    return [
-        "http://127.0.0.1:4173",
-        "http://localhost:4173",
-        "http://127.0.0.1:8787",
-        "http://localhost:8787",
-        "tauri://localhost",
-        "https://tauri.localhost",
-    ]
+        for origin in raw.split(","):
+            normalized = origin.strip()
+            if normalized and normalized not in origins:
+                origins.append(normalized)
+    return origins

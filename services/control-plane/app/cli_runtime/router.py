@@ -32,6 +32,7 @@ from app.workspace_agents.failure_detail import is_billing_failure, is_usage_lim
 from app.cli_runtime.sentry_context import sentry_monitor_context
 from app.cli_runtime.subprocess_runner import RuntimeProcessStoppedError
 from app.cli_runtime.sandbox_policy_adapter import prepare_execution_sandbox
+from app.cli_runtime.router_prompt import build_agent_prompt as _build_prompt
 from app.cli_runtime.cursor_agent import (
     CursorAgentReply,
     run_cursor_local,
@@ -54,10 +55,8 @@ from app.debug_prompt import build_debug_system_prompt
 from app.kairo_ask_prompt import build_ask_system_prompt
 from app.cli_runtime.long_running_shell_prompt import LONG_RUNNING_SHELL_CLAUSE
 from app.instructions_engine import build_instructions_system_prompt
-from app.cli_runtime.plan_system_prompt import (
-    ask_fence_instruction,
-    build_plan_system_prompt,
-)
+from app.specialist_roles import SpecialistContext
+from app.cli_runtime.plan_system_prompt import ask_fence_instruction, build_plan_system_prompt
 from app.workspace_agents.critical_review_clause import append_critical_review_clause
 from app.workspace_agents.execution_policy import AgentExecutionPolicy
 from app.research.availability import format_capability_line, research_capability_snapshot
@@ -111,13 +110,14 @@ def _system_prompt(
     *,
     persona_enabled: bool | None = None,
     research_snapshot: dict[str, object] | None = None,
+    instructions_context: SpecialistContext | None = None,
 ) -> str:
     research_line = format_capability_line(research_snapshot or research_capability_snapshot())
     if composer_mode == "ask":
         enabled = persona_enabled if persona_enabled is not None else _operator_persona_enabled()
         return f"{build_ask_system_prompt(persona_enabled=enabled)} {research_line}"
     if composer_mode == "instructions":
-        return build_instructions_system_prompt()
+        return build_instructions_system_prompt(instructions_context)
     if composer_mode == "plan":
         offline_clause = (
             "Ground the plan in the local repo and provided context. "
@@ -162,42 +162,6 @@ def _system_prompt(
         "supplied workspace context, propose concrete next steps, and do not claim you "
         f"edited files or ran commands. {ask_fence_instruction()}"
         f"{_INSTRUCTION_TAKING} {research_line} {_REPLY_STYLE}"
-    )
-def _build_prompt(
-    *,
-    composer_mode: str,
-    user_prompt: str,
-    context_block: str,
-    execution_tier: str = "consultative",
-    research_snapshot: dict[str, object] | None = None,
-    write_scope_hint: str = "",
-) -> str:
-    from app.workspace_agents.employee_persona_prompt import (
-        adapt_lane_b_system_prompt_for_employee,
-        split_employee_persona_from_context,
-    )
-
-    snapshot = research_snapshot or research_capability_snapshot()
-    workbook_policy = assignment_workbook_policy_appendix(user_prompt, context_block)
-    policy_block = f"\n\n{workbook_policy}" if workbook_policy else ""
-    system = adapt_lane_b_system_prompt_for_employee(
-        _system_prompt(composer_mode, execution_tier, research_snapshot=snapshot),
-        context_block,
-    )
-    persona_block, remainder_context = split_employee_persona_from_context(context_block)
-    persona_section = f"\n\n{persona_block}" if persona_block else ""
-    workspace_body = remainder_context if persona_block else context_block
-    sentry_context = _sentry_monitor_context(user_prompt)
-    sentry_section = f"\n\n{sentry_context}" if sentry_context else ""
-    scope_section = f"\n\nSandbox write scope: {write_scope_hint}" if write_scope_hint else ""
-    return (
-        f"{system}"
-        f"{policy_block}"
-        f"{persona_section}\n\n"
-        f"Workspace context:\n{workspace_body}\n\n"
-        f"{sentry_section}"
-        f"{scope_section}\n\n"
-        f"Operator request:\n{user_prompt.strip()}"
     )
 def _resolve_workspace_root(workspace_id: str) -> Path | None:
     try:
@@ -260,6 +224,14 @@ def _cursor_reply_content(reply: CursorAgentReply, approval_notice: str | None) 
     return content
 
 
+def _cursor_named_model_requires_auto(detail: str) -> bool:
+    lowered = str(detail or "").lower()
+    return (
+        "named models unavailable" in lowered
+        and "free plans can only use auto" in lowered
+    )
+
+
 def dispatch_ide_composer(
     *,
     workspace_id: str,
@@ -275,13 +247,21 @@ def dispatch_ide_composer(
     workspace_root: Path | None = None,
     execution_policy: AgentExecutionPolicy | None = None,
     fallback_runtime_families: tuple[str, ...] = (),
+    respect_cached_usage_limit: bool = False,
+    instructions_context: SpecialistContext | None = None,
 ) -> dict[str, object]:
     def _finish(payload: dict[str, object]) -> dict[str, object]:
         return _attach_dispatch_metadata(payload, composer_mode=composer_mode)
 
     subprocess_env = runtime_subprocess_env()
-    # Only autonomous dispatch opts into provider-key fallback.
-    snapshot = runtime_status_snapshot(force_refresh=bool(subprocess_env.get("CURSOR_API_KEY")))
+    # Only interactive dispatch blocks on live CLI auth probes. Continuous workers
+    # set ``respect_cached_usage_limit`` and must not hang after isolation when a
+    # ``cursor agent status`` probe stalls.
+    snapshot = runtime_status_snapshot(
+        force_refresh=bool(subprocess_env.get("CURSOR_API_KEY"))
+        and not respect_cached_usage_limit,
+        allow_stale=respect_cached_usage_limit,
+    )
     resolved_root = workspace_root if workspace_root is not None else _resolve_workspace_root(workspace_id)
     if resolved_root is None:
         return _finish({
@@ -320,6 +300,8 @@ def dispatch_ide_composer(
         execution_tier=execution_tier,
         research_snapshot=research_snapshot,
         write_scope_hint=write_scope_hint,
+        workspace_id=workspace_id,
+        instructions_context=instructions_context,
     )
     approval_notice = consultative_only_notice(
         composer_mode=composer_mode,
@@ -374,7 +356,11 @@ def dispatch_ide_composer(
             and fallback_runtime_families
             and env_has_api_key(subprocess_env, family=family)
         )
-        if not allows_retry and not use_provider_key_after_known_subscription_limit:
+        if (
+            not allows_retry
+            and respect_cached_usage_limit
+            and not use_provider_key_after_known_subscription_limit
+        ):
             label = str(record.get("label") or runtime_id)
             errors.append(f"{label} usage limit is still active")
             continue
@@ -411,26 +397,58 @@ def dispatch_ide_composer(
             env=dispatch_env,
             workspace_id=workspace_id,
             run_id=run_id,
+            workspace_root=workspace_root,
         )
         try:
             if target_type == "cloud":
                 raise RuntimeError(_cloud_runtime_message(record))
             if family == "cursor":
-                cursor_reply = run_cursor_local_with_recursion_retry(
-                    runtime_id=runtime_id,
-                    workspace_id=workspace_id,
-                    binary=binary,
-                    prompt=prompt,
-                    workspace_root=workspace_root,
-                    composer_mode=composer_mode,
-                    execution_tier=execution_tier,
-                    model=model,
-                    subprocess_env=dispatch_env,
-                    run_id=run_id,
-                    on_chunk=on_chunk,
-                    trust_policy=cursor_trust_policy,
-                    sandbox_policy=sandbox_policy,
-                )
+                try:
+                    cursor_reply = run_cursor_local_with_recursion_retry(
+                        runtime_id=runtime_id,
+                        workspace_id=workspace_id,
+                        binary=binary,
+                        prompt=prompt,
+                        workspace_root=workspace_root,
+                        composer_mode=composer_mode,
+                        execution_tier=execution_tier,
+                        model=model,
+                        subprocess_env=dispatch_env,
+                        run_id=run_id,
+                        on_chunk=on_chunk,
+                        trust_policy=cursor_trust_policy,
+                        sandbox_policy=sandbox_policy,
+                    )
+                except RuntimeError as cursor_exc:
+                    # Cursor free plans may be logged in and otherwise ready
+                    # while rejecting an explicit model pin. Treat that as an
+                    # Auto-model retry, not as a provider failure that burns
+                    # Codex/Claude fallback capacity or strands the worker.
+                    if model and _cursor_named_model_requires_auto(str(cursor_exc)):
+                        logger.info(
+                            "cursor_named_model_unavailable_retry_auto "
+                            "runtime_id=%s workspace_id=%s model=%s",
+                            runtime_id,
+                            workspace_id,
+                            model,
+                        )
+                        cursor_reply = run_cursor_local_with_recursion_retry(
+                            runtime_id=runtime_id,
+                            workspace_id=workspace_id,
+                            binary=binary,
+                            prompt=prompt,
+                            workspace_root=workspace_root,
+                            composer_mode=composer_mode,
+                            execution_tier=execution_tier,
+                            model="",
+                            subprocess_env=dispatch_env,
+                            run_id=run_id,
+                            on_chunk=on_chunk,
+                            trust_policy=cursor_trust_policy,
+                            sandbox_policy=sandbox_policy,
+                        )
+                    else:
+                        raise
                 content = _cursor_reply_content(cursor_reply, approval_notice)
                 return _finish({
                     "content": content,
@@ -489,6 +507,12 @@ def dispatch_ide_composer(
                     record_claude_usage_limit_hit(detail)
                 elif family == "codex":
                     record_codex_usage_limit_hit(detail)
+                elif family == "cursor":
+                    from app.cli_runtime.cursor_usage_probe import (
+                        record_cursor_usage_limit_hit,
+                    )
+
+                    record_cursor_usage_limit_hit(detail)
             logger.exception(
                 "lane_b_dispatch_failed runtime_id=%s family=%s composer_mode=%s "
                 "workspace_id=%s exc_type=%s",
@@ -601,12 +625,10 @@ def route_ide_composer(
     user_prompt: str,
     context_block: str,
 ) -> str:
-    return str(
-        dispatch_ide_composer(
-            workspace_id=workspace_id,
-            composer_mode=composer_mode,
-            user_prompt=user_prompt,
-            context_block=context_block,
-        ).get("content")
-        or ""
+    reply = dispatch_ide_composer(
+        workspace_id=workspace_id,
+        composer_mode=composer_mode,
+        user_prompt=user_prompt,
+        context_block=context_block,
     )
+    return str(reply.get("content") or "")

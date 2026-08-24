@@ -6,15 +6,34 @@ import {
   openWatchConnectors,
 } from '../../composables/useIdeEditorStatusBar';
 import { openOperatorStandup } from '../../features/kairo-conversation/open-operator-standup';
+import { openRecoveryCenter } from '../../features/recovery-center/recovery-overlay-state';
 import { isClaudeUsageStatusBarChip } from '../../lib/claude-usage-view';
 import { isConnectorStatusBarChip } from '../../lib/connector-glance-view';
 import { isCursorUsageStatusBarChip } from '../../lib/cursor-usage-view';
+import { useSandboxPreviewServers } from '../../composables/use-sandbox-preview-servers';
 import { useShellStore } from '../../stores/shell';
 import SupportedCommandsFooter from './SupportedCommandsFooter.vue';
 import PersonaTitle from '../PersonaTitle.vue';
 
 const shell = useShellStore();
 const clockLabel = ref('00:00:00');
+const previewServers = useSandboxPreviewServers(() => shell.currentWorkspace?.workspace_id);
+const previewChipRef = ref<HTMLElement | null>(null);
+// The status bar frame sets `overflow: hidden`, so an absolutely positioned
+// panel inside it is clipped away. The panel is teleported to <body> and
+// anchored to the chip's measured rect instead.
+const previewAnchor = ref({ left: 0, bottom: 0 });
+
+function togglePreviewPanel(): void {
+  const rect = previewChipRef.value?.getBoundingClientRect();
+  if (rect) {
+    previewAnchor.value = {
+      left: Math.min(rect.left, window.innerWidth - 340),
+      bottom: window.innerHeight - rect.top + 6,
+    };
+  }
+  previewServers.togglePanel();
+}
 
 function updateClock(): void {
   const now = new Date();
@@ -32,11 +51,19 @@ async function onOpenStandup(): Promise<void> {
 
 function isInteractiveCenterChip(id: string): boolean {
   return (
-    isConnectorStatusBarChip(id) || isCursorUsageStatusBarChip(id) || isClaudeUsageStatusBarChip(id)
+    isConnectorStatusBarChip(id) ||
+    isCursorUsageStatusBarChip(id) ||
+    isClaudeUsageStatusBarChip(id) ||
+    id === 'attention' ||
+    id === 'phase'
   );
 }
 
 function onCenterChipClick(id: string): void {
+  if (id === 'attention' || id === 'phase') {
+    void openRecoveryCenter(shell.currentWorkspace?.workspace_id);
+    return;
+  }
   if (isCursorUsageStatusBarChip(id) || isClaudeUsageStatusBarChip(id)) {
     openRuntimeUsageSettings(shell);
     return;
@@ -215,6 +242,60 @@ onUnmounted(() => {
           <span class="status-bar-mockup__chip-label">{{ operatorZone.label }}</span>
         </div>
 
+        <div v-if="previewServers.hasServers.value" class="status-bar-mockup__preview">
+          <button
+            type="button"
+            class="status-bar-mockup__chip status-bar-mockup__chip--preview"
+            ref="previewChipRef"
+            :aria-expanded="previewServers.panelOpen.value"
+            :title="`${previewServers.count.value} sandbox preview server(s) running \u2014 click to view or stop`"
+            @click="togglePreviewPanel()"
+          >
+            <span class="status-bar-mockup__preview-dot" aria-hidden="true" />
+            <span class="status-bar-mockup__chip-label">
+              Preview {{ previewServers.count.value > 1 ? `\u00d7${previewServers.count.value}` : '' }}
+            </span>
+          </button>
+
+          <Teleport to="body">
+          <div
+            v-if="previewServers.panelOpen.value"
+            class="status-bar-mockup__preview-panel"
+            :style="{ left: `${previewAnchor.left}px`, bottom: `${previewAnchor.bottom}px` }"
+          >
+            <div class="status-bar-mockup__preview-head">
+              <span>Sandbox preview servers</span>
+              <button
+                type="button"
+                class="status-bar-mockup__preview-stop"
+                :disabled="previewServers.pending.value"
+                @click="previewServers.stopAll()"
+              >Stop all</button>
+            </div>
+            <div
+              v-for="server in previewServers.servers.value"
+              :key="server.port"
+              class="status-bar-mockup__preview-row"
+            >
+              <a :href="server.url" target="_blank" rel="noopener noreferrer">{{ server.url }}</a>
+              <span class="status-bar-mockup__preview-meta">
+                pid {{ server.pid }} \u00b7 {{ server.managed ? 'managed' : 'orphan' }}
+              </span>
+              <button
+                type="button"
+                class="status-bar-mockup__preview-stop"
+                :disabled="previewServers.pending.value"
+                :title="`Stop the server on port ${server.port}`"
+                @click="previewServers.stop(server.port)"
+              >Stop</button>
+            </div>
+            <p v-if="previewServers.error.value" class="status-bar-mockup__preview-error">
+              {{ previewServers.error.value }}
+            </p>
+          </div>
+          </Teleport>
+        </div>
+
         <button
           type="button"
           class="status-bar-mockup__chip status-bar-mockup__chip--standup"
@@ -267,3 +348,77 @@ onUnmounted(() => {
     </div>
   </footer>
 </template>
+
+<style scoped>
+.status-bar-mockup__preview {
+  position: relative;
+}
+
+.status-bar-mockup__preview-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: rgb(74, 222, 128);
+  box-shadow: 0 0 6px rgba(74, 222, 128, 0.8);
+}
+
+.status-bar-mockup__preview-panel {
+  position: fixed;
+  z-index: 200;
+  min-width: 20rem;
+  padding: 0.5rem 0.6rem;
+  border: 1px solid rgba(45, 212, 191, 0.4);
+  border-radius: 8px;
+  background: rgba(2, 8, 23, 0.97);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+  font-size: 0.62rem;
+}
+
+.status-bar-mockup__preview-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.35rem;
+  color: rgba(226, 236, 248, 0.8);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.status-bar-mockup__preview-row {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.22rem 0;
+}
+
+.status-bar-mockup__preview-row a {
+  color: rgb(134, 239, 172);
+  text-decoration: underline;
+}
+
+.status-bar-mockup__preview-meta {
+  flex: 1;
+  color: rgba(226, 236, 248, 0.6);
+}
+
+.status-bar-mockup__preview-stop {
+  padding: 0.1rem 0.4rem;
+  border: 1px solid rgba(248, 113, 113, 0.5);
+  border-radius: 4px;
+  background: none;
+  color: rgb(248, 113, 113);
+  cursor: pointer;
+  font-size: 0.58rem;
+}
+
+.status-bar-mockup__preview-stop:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.status-bar-mockup__preview-error {
+  margin: 0.3rem 0 0;
+  color: rgba(254, 243, 199, 0.9);
+}
+</style>

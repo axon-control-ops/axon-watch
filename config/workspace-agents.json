@@ -34,7 +34,7 @@
         {
           "name": "Jules",
           "role": "frontend",
-          "owns": "console UI/UX, dock, and shell polish",
+          "owns": "Axon-X console UI/UX, mobile VAXON control-plane cockpit, orb/glass-morphism interaction design, dock, and shell polish",
           "schedule": "continuous",
           "azure_voice_id": "en-GB-LibbyNeural"
         },

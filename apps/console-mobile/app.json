@@ -1,0 +1,16 @@
+{
+  "expo": {
+    "name": "Axon-X Companion",
+    "slug": "axon-x-companion",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "dark",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.axonwatch.consolemobile"
+    },
+    "android": {
+      "package": "com.axonwatch.consolemobile"
+    }
+  }
+}

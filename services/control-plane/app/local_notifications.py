@@ -29,9 +29,34 @@ def notification_capability(env: dict[str, str] | None = None) -> dict[str, obje
     return {"enabled": ready, "provider": "notify-send" if binary else "unavailable"}
 
 
+def _is_retryable_employee_failure(record: dict[str, Any]) -> bool:
+    if str(record.get("phase") or "").strip().lower() != "failed":
+        return False
+    if not str(record.get("employee_role") or "").strip():
+        return False
+    task_id = str(record.get("task_id") or "").strip()
+    if not task_id:
+        return False
+    try:
+        from app.persistence import task_store
+
+        task = task_store.get_task(task_id)
+    except Exception:
+        return False
+    if not task:
+        return False
+    used = int(task.get("attempts_used") or 0)
+    budget = int(task.get("attempt_budget") or 0)
+    return budget > 0 and used < budget
+
+
 def notify_run_transition(record: dict[str, Any]) -> bool:
     phase = str(record.get("phase") or "").strip().lower()
     if phase not in _NOTIFIABLE_PHASES:
+        return False
+    # Intermediate worker failures are durable in the run/task ledger and
+    # Recovery Center. Notify only after their bounded retry budget is exhausted.
+    if _is_retryable_employee_failure(record):
         return False
     capability = notification_capability()
     if not capability["enabled"]:

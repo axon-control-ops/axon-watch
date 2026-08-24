@@ -66,6 +66,7 @@ class GenerateInstructionsRequest(BaseModel):
 
     workspace_id: str
     content: str
+    specialist_context: dict[str, Any] | None = None
     runtime_target: str | None = None
     runtime_model: str | None = None
 
@@ -96,6 +97,17 @@ class EnqueueAgentTerminalJobRequest(BaseModel):
     stream_to_chat: bool | None = None
     thread_id: str | None = None
     message_id: str | None = None
+    # Per-job deadline override; omitted means the command-class default.
+    timeout_seconds: float | None = None
+    # "workspace" (bound project root) or "sandbox" (the composer checkout).
+    target: str | None = None
+
+
+class StartSandboxPreviewRequest(BaseModel):
+    """Optional overrides when the preview heuristic cannot infer a project."""
+
+    command: str | None = None
+    port: int | None = None
 
 
 class RenameTerminalSessionRequest(BaseModel):

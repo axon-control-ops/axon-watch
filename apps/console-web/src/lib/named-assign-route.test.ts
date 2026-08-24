@@ -3,7 +3,9 @@ import { describe, expect, it } from 'vitest';
 import routeCases from '../../../../packages/shared-types/fixtures/teammate-route-cases.json';
 import type { TeammateRouteEmployee } from './composer-teammate-route';
 import {
+  isVagueNamedAssignPrompt,
   matchNamedAssignEmployee,
+  namedAssignActionBody,
   rewriteNamedAssignPrompt,
 } from './named-assign-route';
 
@@ -55,6 +57,14 @@ describe('named-assign-route', () => {
     expect(rewritten).toContain('Operator ask:');
     expect(rewritten.toLowerCase()).not.toContain('assign cole');
     expect(rewritten.toLowerCase()).toContain('lesego login table');
+  });
+
+  it('detects vague named assigns instead of inventing a handoff body', () => {
+    expect(namedAssignActionBody('Route the task to Priya', 'Priya')).toBeNull();
+    expect(isVagueNamedAssignPrompt('Route the task to Priya', 'Priya')).toBe(true);
+    expect(rewriteNamedAssignPrompt('Route the task to Priya', 'Priya')).toContain(
+      'did not include a concrete task body',
+    );
   });
 
   it('ignores casual name mentions without assign framing', () => {

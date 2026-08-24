@@ -10,9 +10,22 @@ export interface IdeComposerQueuedMessage {
   content: string;
   composerMode: IdeComposerMode;
   createdAt: string;
+  threadId: string | null;
 }
 
 export const IDE_COMPOSER_QUEUE_LIMIT = 5;
+
+export function ideComposerQueueScopeKey(
+  workspaceId: string | null | undefined,
+  threadId: string | null | undefined,
+): string | null {
+  const workspace = workspaceId?.trim();
+  if (!workspace) {
+    return null;
+  }
+  const thread = threadId?.trim();
+  return `${workspace}::${thread || 'workspace'}`;
+}
 
 export function resolveIdeStopRun(input: {
   linkedRun: RunRecord | null | undefined;

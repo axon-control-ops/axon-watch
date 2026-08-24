@@ -37,6 +37,7 @@ import {
 } from '../../../lib/run-lifecycle-ui';
 import { buildStatusBarSegments, buildTopbarChips } from '../../../lib/runtime-strip';
 import { selectPrimaryApprovalRun } from '../../shell-run-selection';
+import { recoveryAttentionCount } from '../../../features/recovery-center/recovery-overlay-state';
 import type {
   InboxLoadState,
   LayoutMode,
@@ -160,6 +161,7 @@ export function createShellDisplaySlice(input: CreateShellDisplaySliceInput) {
       layoutMode: input.layoutMode.value,
       idePresenceProfile: input.getIdePresenceProfile(),
       activeSignalCount: activeOperatorSignalCount.value,
+      attentionCount: recoveryAttentionCount.value,
     });
 
     const watchConnected = input.runtimeSummary.value?.watch.connected ?? false;

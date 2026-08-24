@@ -15,7 +15,7 @@ export type RunEmployeeShiftRetryShell = {
   submitIdeComposer: (
     mode: IdeComposerMode,
     options?: { attachmentFiles?: File[]; contentOverride?: string },
-  ) => Promise<void | boolean>;
+  ) => Promise<void | boolean | 'queued'>;
   openOrFocusEmployeeIdeThread?: (
     employee: {
       employee_id: string;

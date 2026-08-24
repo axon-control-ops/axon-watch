@@ -1,7 +1,9 @@
 /** Parse block-annotated agent transcripts (:::thinking / :::edit / :::tool / :::terminal). */
 
 import { sanitizeAgentThinkingForOperator, THINKING_SPEECH_FALLBACK } from './agent-live-line-view';
+import { tryParseClarifyingMarkdown } from './agent-question-view';
 import { tryParseLegacyLeadFanOutText } from './lead-fan-out-card';
+import { looksLikeLeadCheckinReport } from './lead-checkin-card';
 import { looksLikeLeadStandupReport } from './lead-standup-card';
 
 export type {
@@ -33,9 +35,17 @@ export function agentContentHasTranscriptBlocks(content: string): boolean {
   ) {
     return true;
   }
+  // Some runtimes and mobile clients emit a plain question plus numbered
+  // options instead of an :::ask fence. The parser already upgrades that
+  // shape; surface it through the same interactive card rendering path.
+  if (tryParseClarifyingMarkdown(content)) {
+    return true;
+  }
   // Legacy Lead essays (pre-fence) still get the cinematic fan-out / stand-up cards.
   return (
-    tryParseLegacyLeadFanOutText(content) != null || looksLikeLeadStandupReport(content)
+    tryParseLegacyLeadFanOutText(content) != null ||
+    looksLikeLeadStandupReport(content) ||
+    looksLikeLeadCheckinReport(content)
   );
 }
 
@@ -163,6 +173,15 @@ export function thinkingPreview(text: string, maxLength = 90): string {
     return flattened;
   }
   return `${flattened.slice(0, maxLength - 1).trimEnd()}…`;
+}
+
+const READ_TOOL_LABEL_RE = /^Read\s+(.+)$/;
+
+/** Path a "Read <path>" tool-block label points at, or null for any other tool (Glob, Grep, ...). */
+export function readToolBlockPath(label: string): string | null {
+  const match = READ_TOOL_LABEL_RE.exec(label.trim());
+  const path = match?.[1]?.trim();
+  return path || null;
 }
 
 export function normalizeEditedFilePath(path: string): string {

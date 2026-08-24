@@ -12,7 +12,6 @@ import {
   persistOperatorPresenceSettings,
   readPersistedOperatorPresenceSettings,
 } from '../../../lib/operator-presence-settings';
-import type { AgentExecutionAccess } from '../../../lib/agent-execution-access-prefs';
 
 interface CreateOperatorPresenceSettingsSliceInput {
   operatorPresenceSettings: Ref<OperatorPresenceSettings>;
@@ -21,22 +20,12 @@ interface CreateOperatorPresenceSettingsSliceInput {
   operatorPresenceSettingsError: Ref<string | null>;
   operatorPresenceSettingsSavedAt: Ref<number | null>;
   loadOperatorBriefing: () => Promise<void>;
-  agentExecutionAccess: Ref<AgentExecutionAccess>;
-  setAgentExecutionAccess: (value: AgentExecutionAccess) => void;
 }
 
 export function createOperatorPresenceSettingsSlice(
   input: CreateOperatorPresenceSettingsSliceInput,
 ) {
   let operatorPresenceSettingsSaveQueue: Promise<void> = Promise.resolve();
-
-  function syncFullAutonomyExecutionAccess(settings: OperatorPresenceSettings): void {
-    const shouldPromote = settings.autonomy_mode === 'full';
-    const previousAccess = input.agentExecutionAccess.value;
-    if (shouldPromote && previousAccess !== 'full') {
-      input.setAgentExecutionAccess('full');
-    }
-  }
 
   async function loadOperatorPresenceSettings(options?: {
     reportError?: boolean;
@@ -50,7 +39,6 @@ export function createOperatorPresenceSettingsSlice(
       const snapshot = await fetchOperatorPresenceSettings();
       input.operatorPresenceSettings.value = normalizeOperatorPresenceSettings(snapshot.settings);
       persistOperatorPresenceSettings(input.operatorPresenceSettings.value);
-      syncFullAutonomyExecutionAccess(input.operatorPresenceSettings.value);
       input.operatorPresenceSettingsError.value = null;
     } catch (error) {
       if (options?.reportError) {
@@ -77,7 +65,6 @@ export function createOperatorPresenceSettingsSlice(
       const snapshot = await saveOperatorPresenceSettings(patch);
       input.operatorPresenceSettings.value = normalizeOperatorPresenceSettings(snapshot.settings);
       persistOperatorPresenceSettings(input.operatorPresenceSettings.value);
-      syncFullAutonomyExecutionAccess(input.operatorPresenceSettings.value);
       input.operatorPresenceSettingsSavedAt.value = Date.now();
       input.operatorPresenceSettingsError.value = null;
       await input.loadOperatorBriefing();

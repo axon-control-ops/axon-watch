@@ -94,8 +94,8 @@ export function createOperatorFocusSlice(input: CreateOperatorFocusSliceInput) {
       input.ideExplorerCollapsed.value = false;
       persistIdeExplorerCollapsed(false);
     } else {
-      // Mission Control Attention strip lives under Fleet Health (left rail hidden).
-      setOperatorCenterView('grid');
+      // Mission Control Attention lives on its own center tab.
+      setOperatorCenterView('attention');
       const highlightedId = input.highlightedSignalId.value;
       const signalWorkspaceId =
         (highlightedId
@@ -150,7 +150,7 @@ export function createOperatorFocusSlice(input: CreateOperatorFocusSliceInput) {
     if (input.layoutMode.value === 'ide') {
       input.setLayoutMode('operator');
     }
-    setOperatorCenterView('grid');
+    setOperatorCenterView('mission');
     input.missionControlEmphasized.value = true;
     if (typeof window !== 'undefined') {
       window.requestAnimationFrame(() => {
@@ -166,7 +166,7 @@ export function createOperatorFocusSlice(input: CreateOperatorFocusSliceInput) {
   }
 
   function focusOperatorTaskBoard(): void {
-    setOperatorCenterView('grid');
+    setOperatorCenterView('dispatch');
     input.missionControlEmphasized.value = true;
     if (typeof window !== 'undefined') {
       window.requestAnimationFrame(() => {
@@ -190,9 +190,7 @@ export function createOperatorFocusSlice(input: CreateOperatorFocusSliceInput) {
       input.setLayoutMode('operator');
     }
 
-    if (input.operatorCenterView.value === 'graph') {
-      setOperatorCenterView('grid');
-    }
+    setOperatorCenterView('mission');
 
     input.connectorsEmphasized.value = true;
     if (typeof window !== 'undefined') {
@@ -246,21 +244,13 @@ export function createOperatorFocusSlice(input: CreateOperatorFocusSliceInput) {
   }
 
   /**
-   * Mission Control hosts VAXON in the LIVE OPERATIONS thread seam, not the
-   * briefing seam, so briefing focus would collapse the panel we want to show.
+   * Mission Control hosts VAXON on the dedicated center tab.
    */
   function focusLiveOperations(): void {
     if (input.layoutMode.value === 'ide') {
       input.setLayoutMode('operator');
     }
-    if (input.operatorCenterView.value === 'graph') {
-      setOperatorCenterView('grid');
-    }
-    if (!input.expandedDockSeams.value.has('thread')) {
-      const next = new Set(input.expandedDockSeams.value);
-      next.add('thread');
-      input.expandedDockSeams.value = next;
-    }
+    setOperatorCenterView('vaxon');
     if (typeof window !== 'undefined') {
       window.requestAnimationFrame(() => {
         document.getElementById('mission-control-live-ops')?.scrollIntoView({
@@ -280,6 +270,7 @@ export function createOperatorFocusSlice(input: CreateOperatorFocusSliceInput) {
         openIdeBriefingPanel();
       }
     } else {
+      setOperatorCenterView('vaxon');
       input.setDockHeroMode('briefing');
       collapseOperatorThreadForBriefing();
     }
@@ -294,17 +285,12 @@ export function createOperatorFocusSlice(input: CreateOperatorFocusSliceInput) {
           ? 'ide-vaxon-talk-panel'
           : input.layoutMode.value === 'ide'
             ? 'ide-briefing-panel'
-            : 'dock-seam-briefing';
+            : 'mission-control-live-ops';
         const target = document.getElementById(targetId);
         target?.classList.add('dock-hero-panel--focus-reveal');
         target?.scrollIntoView({
           behavior: 'smooth',
           block: 'end',
-          inline: 'nearest',
-        });
-        document.querySelector('.region-right-dock')?.scrollIntoView({
-          behavior: 'smooth',
-          block: 'nearest',
           inline: 'nearest',
         });
         window.setTimeout(() => {

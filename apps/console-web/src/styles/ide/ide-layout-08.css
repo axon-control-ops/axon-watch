@@ -344,6 +344,20 @@
   background: rgba(255, 196, 120, 0.08);
 }
 
+/* An ask-block is a worker waiting on a specific answer, not a generic
+   tool-consent pause -- a distinct tone keeps the two from reading as the
+   same prompt with the same two buttons. */
+.agent-dock-composer__approval-banner--ask-block {
+  border-color: rgba(129, 212, 250, 0.4);
+  background: rgba(59, 130, 246, 0.08);
+}
+
+.agent-dock-composer__approval-hint {
+  margin: 0.2rem 0 0;
+  font-size: 0.56rem;
+  color: rgba(226, 236, 248, 0.72);
+}
+
 .agent-dock-composer__debug-reproduce-banner {
   border: 1px solid rgba(167, 139, 250, 0.4);
   background: rgba(46, 16, 101, 0.58);

@@ -6,9 +6,13 @@ import type { IdeComposerMode } from './ide-composer-queue';
 
 export type SubmitQuestionAnswerShell = {
   openIdeComposerWithDraft: (content: string) => void;
-  submitIdeComposer: (mode: IdeComposerMode) => Promise<boolean | void>;
+  submitIdeComposer: (mode: IdeComposerMode) => Promise<boolean | 'queued' | void>;
   activeIdeThreadId?: string | null;
 };
+
+/** 'dispatched' = the agent actually received it; 'queued' = held behind the
+ * current stream and not yet delivered — callers must not treat this as answered. */
+export type SubmitQuestionAnswerResult = 'dispatched' | 'queued';
 
 function resolveSubmitMode(
   workspaceId: string | null | undefined,
@@ -30,16 +34,23 @@ export async function submitQuestionAnswer(
     messageId?: string;
     customText?: string;
   },
-): Promise<void> {
+): Promise<SubmitQuestionAnswerResult> {
   const answer = formatQuestionAnswer(input.option, input.prompt, input.customText).trim();
   if (!answer) {
-    return;
+    return 'dispatched';
   }
   const mode = resolveSubmitMode(input.workspaceId, shell.activeIdeThreadId);
   requestIdeComposerMode(mode);
-  if (input.messageId && input.prompt) {
+  shell.openIdeComposerWithDraft(answer);
+  const submitted = await shell.submitIdeComposer(mode);
+  if (submitted === false) {
+    throw new Error('Unable to send this choice. Your selection is still available.');
+  }
+  const dispatched = submitted !== 'queued';
+  // Only mark the ask "answered" once the agent has actually received it —
+  // a queued answer is still sitting in the composer queue, not delivered.
+  if (dispatched && input.messageId && input.prompt) {
     markQuestionAnswered(input.messageId, input.prompt);
   }
-  shell.openIdeComposerWithDraft(answer);
-  await shell.submitIdeComposer(mode);
+  return dispatched ? 'dispatched' : 'queued';
 }

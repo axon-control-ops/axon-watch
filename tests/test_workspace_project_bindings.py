@@ -146,5 +146,59 @@ class WorkspaceProjectBindingsTests(unittest.TestCase):
                 self.assertEqual(reloaded["workspace_new"].display_name, "New Project")
 
 
+    def test_single_lookup_is_not_broken_by_an_unrelated_bad_binding(self) -> None:
+        """Regression guard for a real, recurring outage.
+
+        get_workspace_record (and therefore build_company_roster, sandbox
+        status, and live-service policy widening -- three separate incidents
+        in one session) used to call the *full* registry loader just to look
+        up one workspace. One misconfigured workspace anywhere in the
+        bindings file broke every *other* workspace's lookup, because that
+        loader deliberately fails closed for the whole map. A single-workspace
+        lookup must resolve or fail on its own binding only.
+        """
+        with tempfile.TemporaryDirectory() as tempdir:
+            good_root = Path(tempdir) / "good"
+            good_root.mkdir()
+            bad_root = Path(tempdir) / "bad"
+            bad_root.mkdir()
+            bindings_file = Path(tempdir) / "bindings.json"
+            bindings_file.write_text(
+                json.dumps(
+                    {
+                        "bindings": {
+                            "workspace_good": {"project_root": str(good_root)},
+                            "workspace_bad": {"project_root": str(bad_root)},
+                        }
+                    }
+                ),
+                encoding="utf-8",
+            )
+            with patch.dict(
+                os.environ,
+                {"AXON_WATCH_PROJECT_ROOT_ALLOWLIST": str(good_root)},
+                clear=False,
+            ), patch(
+                "app.workspace_project_bindings.default_bindings_file",
+                return_value=bindings_file,
+            ):
+                # The full registry loader is untouched: it still fails closed
+                # for the whole map, exactly as test_rejects_project_root_outside_allowlist
+                # above requires.
+                with self.assertRaises(WorkspaceBindingError):
+                    load_workspace_project_bindings(bindings_file)
+
+                # workspace_bad's own violation is still enforced individually.
+                with self.assertRaises(WorkspaceBindingError):
+                    get_workspace_project_binding("workspace_bad")
+
+                # workspace_good must resolve fine -- this is the exact case
+                # that broke get_workspace_record for every unrelated workspace.
+                binding = get_workspace_project_binding("workspace_good")
+                self.assertIsNotNone(binding)
+                assert binding is not None
+                self.assertEqual(binding.project_root, good_root.resolve())
+
+
 if __name__ == "__main__":
     unittest.main()

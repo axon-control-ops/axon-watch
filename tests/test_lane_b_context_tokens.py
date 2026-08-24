@@ -18,6 +18,25 @@ from app.chat.lane_b_agent import (  # noqa: E402
 
 
 class LaneBContextTokenTests(unittest.TestCase):
+    @patch("app.chat.lane_b_agent.resolve_workspace_root", return_value=Path("/live/project"))
+    @patch("app.chat.lane_b_agent.list_workspace_files", return_value=[])
+    def test_sandbox_context_uses_active_checkout_not_bound_project(
+        self,
+        _mock_files,
+        mock_bound_root,
+    ) -> None:
+        block = build_lane_b_context_block(
+            LaneBContext(
+                workspace_id="workspace_dashpro",
+                composer_mode="agent",
+            ),
+            workspace_root=Path("/tmp/disposable/checkout"),
+        )
+        self.assertIn("Project root: /tmp/disposable/checkout", block)
+        self.assertIn("active disposable checkout", block)
+        self.assertNotIn("/live/project", block)
+        mock_bound_root.assert_not_called()
+
     @patch("app.chat.lane_b_agent.resolve_workspace_root", return_value=Path("/tmp/ws"))
     @patch("app.chat.lane_b_agent.list_workspace_files", return_value=[])
     def test_build_lane_b_context_block_includes_selection_and_terminal(

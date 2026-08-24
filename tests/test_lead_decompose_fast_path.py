@@ -169,6 +169,126 @@ class LeadDecomposeFastPathTests(unittest.TestCase):
         self.assertEqual("decompose", materialize_call.call_args.kwargs["mode"])
         self.assertTrue(materialize_call.call_args.kwargs["create_runs"])
 
+    def test_plan_mode_materializes_concrete_implementation_handoff(self) -> None:
+        saved: list[dict] = []
+        prompt = (
+            "I found the mobile UI; now I want Mira and her team to continue "
+            "working on it in an Expo native app, fix Mira's plan, clear old "
+            "stale runs, and upgrade the agents where possible."
+        )
+        materialize = {
+            "plan_id": "plan_axon_expo",
+            "mode": "decompose",
+            "tasks": [{"owner_role": "frontend", "goal": prompt}],
+            "runs": [{"run_id": "run_jules", "owner_role": "frontend"}],
+            "deferred": [],
+        }
+        handoff = {"run_id": "run_lead_handoff", "phase": "completed", "employee_role": "lead"}
+
+        with (
+            patch("app.chat.lane_b_lead_decompose_fast_path._roster_members", return_value=ROSTER),
+            patch(
+                "app.chat.lane_b_lead_decompose_fast_path.materialize_lead_fan_out",
+                return_value=materialize,
+            ) as materialize_call,
+            patch(
+                "app.chat.lane_b_lead_decompose_fast_path.record_lead_handoff_run",
+                return_value=handoff,
+            ),
+            patch(
+                "app.chat.lane_b_lead_decompose_fast_path._kick_continuous_dispatch",
+                return_value=1,
+            ),
+        ):
+            response = maybe_post_lead_decompose_message(
+                workspace_id="workspace_axon_watch",
+                content=prompt,
+                thread_id="thread_lead",
+                employee_role="lead",
+                lead_name="Mira",
+                composer_mode="plan",
+                created_at="2026-08-23T21:00:00Z",
+                save_message=lambda payload: saved.append(payload) or payload,
+                new_message_id=lambda prefix: f"{prefix}_1",
+                bind_attachments=lambda _mid: [],
+            )
+
+        self.assertIsNotNone(response)
+        assert response is not None
+        self.assertEqual("run_lead_handoff", response["run_id"])
+        self.assertTrue(response["dispatched"])
+        self.assertEqual("plan_axon_expo", response["lead_decompose"]["plan_id"])
+        materialize_call.assert_called_once()
+        self.assertEqual("decompose", materialize_call.call_args.kwargs["mode"])
+        self.assertTrue(materialize_call.call_args.kwargs["create_runs"])
+
+    def test_plan_mode_mobile_app_correction_materializes_axon_x_companion_contract(self) -> None:
+        saved: list[dict] = []
+        prompt = "I meant the mobile app -"
+        materialize = {
+            "plan_id": "plan_axon_mobile",
+            "mode": "decompose",
+            "tasks": [{"owner_role": "frontend", "goal": "Axon-X mobile companion"}],
+            "runs": [{"run_id": "run_jules", "owner_role": "frontend"}],
+            "deferred": [],
+        }
+        handoff = {"run_id": "run_lead_handoff", "phase": "completed", "employee_role": "lead"}
+
+        with (
+            patch("app.chat.lane_b_lead_decompose_fast_path._roster_members", return_value=ROSTER),
+            patch(
+                "app.chat.lane_b_lead_decompose_fast_path.materialize_lead_fan_out",
+                return_value=materialize,
+            ) as materialize_call,
+            patch(
+                "app.chat.lane_b_lead_decompose_fast_path.record_lead_handoff_run",
+                return_value=handoff,
+            ) as handoff_call,
+            patch(
+                "app.chat.lane_b_lead_decompose_fast_path._kick_continuous_dispatch",
+                return_value=1,
+            ),
+        ):
+            response = maybe_post_lead_decompose_message(
+                workspace_id="workspace_axon_watch",
+                content=prompt,
+                thread_id="thread_lead",
+                employee_role="lead",
+                lead_name="Mira",
+                composer_mode="plan",
+                created_at="2026-08-24T00:10:00Z",
+                save_message=lambda payload: saved.append(payload) or payload,
+                new_message_id=lambda prefix: f"{prefix}_1",
+                bind_attachments=lambda _mid: [],
+            )
+
+        self.assertIsNotNone(response)
+        materialize_call.assert_called_once()
+        normalized_goal = materialize_call.call_args.kwargs["goal"]
+        self.assertIn("apps/console-mobile", normalized_goal)
+        self.assertIn("workspace_axon_watch", normalized_goal)
+        self.assertIn("Do not route this to DashPro", normalized_goal)
+        self.assertIn("127.0.0.1", normalized_goal)
+        self.assertEqual("decompose", materialize_call.call_args.kwargs["mode"])
+        handoff_call.assert_called_once()
+        self.assertEqual(normalized_goal, handoff_call.call_args.kwargs["summary"])
+
+    def test_plan_mode_review_prompt_stays_out_of_fast_path(self) -> None:
+        response = maybe_post_lead_decompose_message(
+            workspace_id="workspace_axon_watch",
+            content="Before I run this prompt, check Mira's plan and advice on that",
+            thread_id="thread_lead",
+            employee_role="lead",
+            lead_name="Mira",
+            composer_mode="plan",
+            created_at="2026-08-23T21:00:00Z",
+            save_message=lambda payload: payload,
+            new_message_id=lambda prefix: f"{prefix}_1",
+            bind_attachments=lambda _mid: [],
+        )
+
+        self.assertIsNone(response)
+
     def test_skips_assign_all_intent(self) -> None:
         response = maybe_post_lead_decompose_message(
             workspace_id="workspace_dashpro",

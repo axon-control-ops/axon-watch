@@ -66,6 +66,12 @@ export interface TerminalSessionRecord {
   title: string;
   run_id: string | null;
   created_at: string;
+  /** Directory this PTY is really rooted at — isolated lanes differ from the bound root. */
+  cwd?: string;
+  /** Branch at `cwd`; for an isolated lane this is the worker branch, not the bound one. */
+  branch?: string;
+  /** True when the lane runs inside the disposable Sandbox checkout. */
+  isolated?: boolean;
 }
 
 function encodeWorkspaceFilePath(filePath: string): string {
@@ -146,6 +152,29 @@ export async function registerWorkspaceBinding(
       }),
     },
     'workspace register failed',
+  );
+}
+
+export interface WorkspaceProjectRootSuggestion {
+  project_root: string;
+  label: string;
+  parent: string;
+}
+
+export interface WorkspaceProjectRootSuggestionSnapshot {
+  items: WorkspaceProjectRootSuggestion[];
+  count: number;
+}
+
+export async function fetchWorkspaceProjectRootSuggestions(
+  query: string,
+): Promise<WorkspaceProjectRootSuggestionSnapshot> {
+  const trimmed = query.trim();
+  const search = trimmed ? `?query=${encodeURIComponent(trimmed)}` : '';
+  return fetchJson<WorkspaceProjectRootSuggestionSnapshot>(
+    `/api/workspaces/project-root-suggestions${search}`,
+    {},
+    'workspace project root suggestions request failed',
   );
 }
 
@@ -377,6 +406,13 @@ export type AgentTerminalJobRecord = {
   status: string;
   created_at: string;
   receipt: string;
+  /** Set once the job reaches a terminal state (completed/failed/timed_out/cancelled). */
+  finished_at?: string | null;
+  exit_code?: number | null;
+  /** Why a job ended without its own exit code (deadline, cancellation). */
+  failure_reason?: string | null;
+  timeout_seconds?: number;
+  output_tail?: string;
   stream_to_chat?: boolean;
   thread_id?: string | null;
   message_id?: string | null;
@@ -425,4 +461,24 @@ export async function fetchAgentTerminalJobStatus(
     {},
     'workspace agent terminal job status request failed',
   );
+}
+
+/** Interrupt a running job (SIGINT) and close it out as cancelled, so a hung
+ * command can be stopped without tearing down the whole agent PTY session. */
+export async function cancelAgentTerminalJob(
+  workspaceId: string,
+  jobId: string,
+): Promise<AgentTerminalJobRecord> {
+  const encodedWorkspaceId = encodeURIComponent(workspaceId);
+  const encodedJobId = encodeURIComponent(jobId);
+  const payload = await fetchJson<{
+    workspace_id: string;
+    cancelled: boolean;
+    job: AgentTerminalJobRecord;
+  }>(
+    `/api/workspaces/${encodedWorkspaceId}/terminal/agent-jobs/${encodedJobId}`,
+    { method: 'DELETE' },
+    'workspace agent terminal job cancel failed',
+  );
+  return payload.job;
 }

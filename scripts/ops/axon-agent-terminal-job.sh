@@ -4,8 +4,9 @@
 # can stream mid-run output.
 #
 # Usage:
-#   axon-agent-terminal-job [--workspace ID] [--no-stream] -- <command...>
+#   axon-agent-terminal-job [--workspace ID] [--no-stream] [--timeout SECONDS] -- <command...>
 #   axon-agent-terminal-job --status <job_id> --workspace ID
+#   axon-agent-terminal-job --cancel <job_id> --workspace ID
 #   AXON_WATCH_WORKSPACE_ID=workspace_dashpro axon-agent-terminal-job -- npm run ota:canary
 #
 # From DashPro (or any bound project cwd), prefer the PATH name installed by
@@ -19,9 +20,11 @@ source_workspace_id="${AXON_AGENT_SOURCE_WORKSPACE_ID:-${AXON_WATCH_WORKSPACE_ID
 stream_to_chat="true"
 run_id="${AXON_WATCH_RUN_ID:-}"
 status_job_id=""
+cancel_job_id=""
+timeout_seconds=""
 
 usage() {
-  sed -n '2,12p' "$0" | sed 's/^# \{0,1\}//'
+  sed -n '2,13p' "$0" | sed 's/^# \{0,1\}//'
   exit 2
 }
 
@@ -64,6 +67,14 @@ while [[ $# -gt 0 ]]; do
       ;;
     --status)
       status_job_id="${2:-}"
+      shift 2
+      ;;
+    --cancel)
+      cancel_job_id="${2:-}"
+      shift 2
+      ;;
+    --timeout)
+      timeout_seconds="${2:-}"
       shift 2
       ;;
     -h|--help)
@@ -109,8 +120,27 @@ if [[ -n "${status_job_id}" ]]; then
   exit 0
 fi
 
+if [[ -n "${cancel_job_id}" ]]; then
+  auth_args=()
+  if [[ -n "${AXON_WATCH_OPERATOR_TOKEN:-}" ]]; then
+    auth_args=(-H "Authorization: Bearer ${AXON_WATCH_OPERATOR_TOKEN}")
+  fi
+  response="$(
+    curl -sS -X DELETE \
+      "${cp_base}/api/workspaces/${encoded_workspace}/terminal/agent-jobs/$(encode_workspace "${cancel_job_id}")" \
+      "${auth_args[@]}"
+  )"
+  echo "${response}" | jq .
+  cancelled_status="$(echo "${response}" | jq -r '.job.status // empty')"
+  if [[ -z "${cancelled_status}" ]]; then
+    echo "cancel failed: ${response}" >&2
+    exit 1
+  fi
+  exit 0
+fi
+
 if [[ $# -lt 1 ]]; then
-  echo "command is required (or pass --status <job_id>)" >&2
+  echo "command is required (or pass --status <job_id> / --cancel <job_id>)" >&2
   usage
 fi
 
@@ -122,12 +152,14 @@ payload="$(
     --argjson stream "${stream_to_chat}" \
     --arg run_id "${run_id}" \
     --arg source_workspace_id "${source_workspace_id}" \
+    --arg timeout_seconds "${timeout_seconds}" \
     '{
       command: $command,
       stream_to_chat: $stream
     }
     + (if $run_id == "" then {} else {run_id: $run_id} end)
-    + (if $source_workspace_id == "" then {} else {source_workspace_id: $source_workspace_id} end)'
+    + (if $source_workspace_id == "" then {} else {source_workspace_id: $source_workspace_id} end)
+    + (if $timeout_seconds == "" then {} else {timeout_seconds: ($timeout_seconds | tonumber)} end)'
 )"
 
 auth_args=()

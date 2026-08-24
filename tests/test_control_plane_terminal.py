@@ -173,6 +173,36 @@ class ControlPlaneTerminalTests(unittest.TestCase):
 
         fake_pty.write.assert_called_once_with(b"npm run ota:canary\n")
 
+    def test_agent_job_routes_enqueue_read_and_cancel(self) -> None:
+        from app.terminal.agent_jobs import reset_agent_terminal_jobs
+
+        reset_agent_terminal_jobs()
+        self.addCleanup(reset_agent_terminal_jobs)
+
+        created = self.client.post(
+            "/api/workspaces/workspace_alpha/terminal/agent-jobs",
+            json={"command": "sleep 600", "run_id": "run_route_cancel"},
+        )
+        self.assertEqual(200, created.status_code)
+        job_id = created.json()["job_id"]
+
+        status = self.client.get(
+            f"/api/workspaces/workspace_alpha/terminal/agent-jobs/{job_id}"
+        )
+        self.assertEqual(200, status.status_code)
+        self.assertEqual("running", status.json()["status"])
+
+        cancelled = self.client.delete(
+            f"/api/workspaces/workspace_alpha/terminal/agent-jobs/{job_id}"
+        )
+        self.assertEqual(200, cancelled.status_code)
+        self.assertEqual("cancelled", cancelled.json()["job"]["status"])
+
+        missing = self.client.delete(
+            "/api/workspaces/workspace_alpha/terminal/agent-jobs/agent-job-missing"
+        )
+        self.assertEqual(404, missing.status_code)
+
 
 if __name__ == "__main__":
     unittest.main()

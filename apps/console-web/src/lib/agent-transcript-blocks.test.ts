@@ -8,6 +8,7 @@ import {
   normalizeEditedFilePath,
   parseAgentTranscriptBlocks,
   prepareAgentTranscriptSegmentsForDisplay,
+  readToolBlockPath,
   thinkingPreview,
 } from './agent-transcript-blocks';
 
@@ -331,6 +332,32 @@ describe('parseAgentTranscriptBlocks', () => {
     ]);
   });
 
+  it('routes plain numbered questions through interactive card rendering', () => {
+    const content = [
+      'What should the workspace validation cover?',
+      '',
+      '1. Graduation groups',
+      '2. Confirmed but unallocated children',
+      '3. Cross-system sync',
+      '4. All of the above',
+    ].join('\n');
+
+    expect(agentContentHasTranscriptBlocks(content)).toBe(true);
+    expect(parseAgentTranscriptBlocks(content)).toEqual([
+      {
+        kind: 'question',
+        prompt: 'What should the workspace validation cover?',
+        options: [
+          { id: '1', label: 'Graduation groups' },
+          { id: '2', label: 'Confirmed but unallocated children' },
+          { id: '3', label: 'Cross-system sync' },
+          { id: '4', label: 'All of the above' },
+        ],
+        open: false,
+      },
+    ]);
+  });
+
   it('parses edit-failed fences and legacy tool labels', () => {
     const content = [
       ':::edit-failed tests/test_foo.py',
@@ -397,6 +424,22 @@ describe('normalizeEditedFilePath', () => {
     expect(
       normalizeEditedFilePath('/home/edp/.cursor/projects/foo/README.md'),
     ).toBe('README.md');
+  });
+});
+
+describe('readToolBlockPath', () => {
+  it('extracts the path from a Read tool label', () => {
+    expect(readToolBlockPath('Read README.md')).toBe('README.md');
+    expect(readToolBlockPath('Read docs/ops/company-profile.md')).toBe(
+      'docs/ops/company-profile.md',
+    );
+  });
+
+  it('returns null for tool labels with no single-file target', () => {
+    expect(readToolBlockPath('Glob apps/*/package.json')).toBeNull();
+    expect(readToolBlockPath('Grep .axon-si')).toBeNull();
+    expect(readToolBlockPath('Ask Question')).toBeNull();
+    expect(readToolBlockPath('')).toBeNull();
   });
 });
 

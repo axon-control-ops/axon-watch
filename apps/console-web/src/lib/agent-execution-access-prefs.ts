@@ -72,6 +72,6 @@ export function agentExecutionAccessLabel(value: AgentExecutionAccess): string {
 
 export function agentExecutionAccessHint(value: AgentExecutionAccess): string {
   return value === 'full'
-    ? 'Composer tools after approval — separate from company worker isolation'
+    ? 'Stored PC preference; effective access becomes Full inside a Full Auto or manually enabled Sandbox'
     : 'Read-only answers; no file edits or shell tools';
 }

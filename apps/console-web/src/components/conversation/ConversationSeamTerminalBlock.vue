@@ -27,6 +27,7 @@ const emit = defineEmits<{
   reveal: [segment: TerminalSegment];
   background: [segment: TerminalSegment];
   copyOutput: [output: string];
+  cancelJob: [jobId: string];
 }>();
 
 const expandedInChat = ref(false);
@@ -82,6 +83,18 @@ const showFullOutput = computed(() =>
     expandedInChat: expandedInChat.value,
   }),
 );
+
+/** Only a job still running can be cancelled; finished cards keep a clean footer. */
+const cancellableJobId = computed<string | null>(() => {
+  const jobId = jobView.value.jobId;
+  if (!jobId) {
+    return null;
+  }
+  const status = String(
+    props.agentTerminalJobStatuses?.[jobId] ?? jobView.value.status ?? '',
+  ).toLowerCase();
+  return status === 'running' ? jobId : null;
+});
 
 const statusHint = computed(() => {
   if (props.segment.open && props.streaming && isMirrored.value) {
@@ -177,6 +190,16 @@ const bodyText = computed(() => {
         @click="showRawOutput = !showRawOutput"
       >
         {{ showRawOutput ? 'Compact' : 'Raw' }}
+      </button>
+      <button
+        v-if="!compact && cancellableJobId"
+        type="button"
+        class="agent-block__terminal-cancel"
+        title="Interrupt this running job (SIGINT) without tearing down the terminal session"
+        aria-label="Cancel running job"
+        @click="emit('cancelJob', cancellableJobId)"
+      >
+        Cancel job
       </button>
       <button
         v-if="!compact && segment.output"

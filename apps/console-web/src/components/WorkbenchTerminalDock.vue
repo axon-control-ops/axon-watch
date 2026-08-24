@@ -153,6 +153,9 @@ function paneLabel(session: (typeof shell.terminalSessions)[number]): string {
     role: session.role,
     title: session.title,
     run_id: session.runId,
+    cwd: session.cwd,
+    branch: session.branch,
+    isolated: session.isolated,
     created_at: '',
   });
   if (session.role === 'agent' && agentShellMirrorActive.value) {

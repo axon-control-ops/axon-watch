@@ -18,6 +18,7 @@ class DesktopSessionTests(unittest.TestCase):
                 "AXON_WATCH_AUTH_MODE",
                 "AXON_WATCH_AUTH_ALLOW_LOOPBACK",
                 "AXON_WATCH_OPERATOR_TOKEN",
+                "AXON_WATCH_OPERATOR_PASSWORD",
                 "AXON_WATCH_DESKTOP_SESSION_SECRET",
                 "AXON_WATCH_CONSOLE_DIST",
             )
@@ -25,6 +26,7 @@ class DesktopSessionTests(unittest.TestCase):
         os.environ["AXON_WATCH_AUTH_MODE"] = "local_token"
         os.environ["AXON_WATCH_AUTH_ALLOW_LOOPBACK"] = "0"
         os.environ["AXON_WATCH_OPERATOR_TOKEN"] = "desktop-test-token"
+        os.environ["AXON_WATCH_OPERATOR_PASSWORD"] = "desktop-test-password"
         os.environ["AXON_WATCH_DESKTOP_SESSION_SECRET"] = "desktop-test-secret"
         from app.auth.desktop_session import clear_pending_bootstrap
         from app.main import app
@@ -57,6 +59,57 @@ class DesktopSessionTests(unittest.TestCase):
         # Pause awareness is a mutating host route.
         response = self.client.post("/api/host/privacy/pause", json={"minutes": 1})
         # 200 or 422 both mean auth passed; 401 would mean cookie rejected.
+        self.assertNotEqual(response.status_code, 401)
+
+    def test_browser_session_login_status_and_logout(self) -> None:
+        initial = self.client.get("/api/auth/session")
+        self.assertEqual(initial.status_code, 200)
+        self.assertEqual(initial.json()["authenticated"], False)
+        self.assertEqual(initial.json()["auth_required"], True)
+        self.assertEqual(initial.json()["loopback_bypass"], False)
+        self.assertEqual(initial.json()["cookie_max_age_seconds"], 60 * 60 * 24 * 30)
+        self.assertEqual(initial.json()["auth_mode"], "local_token")
+
+        rejected = self.client.post(
+            "/api/auth/session",
+            json={"operator_token": "wrong-token"},
+        )
+        self.assertEqual(rejected.status_code, 401)
+        self.assertNotIn("axon_desktop_session", rejected.cookies)
+
+        login = self.client.post(
+            "/api/auth/session",
+            json={"operator_token": "desktop-test-token"},
+        )
+        self.assertEqual(login.status_code, 200)
+        self.assertEqual(login.json()["identity"], "session")
+        self.assertIn("axon_desktop_session", login.cookies)
+        self.assertIn("HttpOnly", login.headers["set-cookie"])
+
+        authenticated = self.client.get("/api/auth/session")
+        self.assertEqual(authenticated.json()["authenticated"], True)
+        self.assertEqual(authenticated.json()["identity"], "session")
+
+        logout = self.client.delete("/api/auth/session")
+        self.assertEqual(logout.status_code, 200)
+        self.assertEqual(logout.json()["authenticated"], False)
+        self.assertEqual(self.client.get("/api/auth/session").json()["authenticated"], False)
+
+    def test_browser_session_login_accepts_password_and_returns_mobile_session_token(self) -> None:
+        login = self.client.post(
+            "/api/auth/session",
+            json={"operator_password": "desktop-test-password", "return_session_token": True},
+        )
+        self.assertEqual(login.status_code, 200)
+        payload = login.json()
+        self.assertEqual(payload["identity"], "session")
+        self.assertTrue(payload.get("session_token"))
+
+        response = self.client.post(
+            "/api/runs",
+            json={"workspace_id": "workspace_axon_watch", "summary": "password session ok", "mode": "agent"},
+            headers={"x-axon-desktop-session": payload["session_token"]},
+        )
         self.assertNotEqual(response.status_code, 401)
 
     def test_spa_served_when_console_dist_configured(self) -> None:

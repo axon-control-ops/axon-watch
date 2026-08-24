@@ -48,6 +48,23 @@ def _prepare_command(
     run_id: str,
 ) -> list[str]:
     if sandbox_policy is None:
+        # Record the absence too: without this, "no sandbox receipt" is
+        # indistinguishable from "receipt not written", and an operator cannot
+        # tell from the run history whether a turn was isolated.
+        if str(run_id or "").strip():
+            from app.runs.service import append_run_execution_receipt
+
+            append_run_execution_receipt(
+                run_id,
+                receipt_type="agent_sandbox_skipped",
+                receipt_summary=(
+                    "No execution policy for this turn — running unsandboxed on the host "
+                    "workspace (no Bubblewrap, no command hook)."
+                ),
+                actor="cli_runtime",
+                success=True,
+                intent="sandbox_startup",
+            )
         return wrap_command_in_agent_scope(command)
     if cwd is None:
         raise RuntimeError("Sandboxed agent execution requires a workspace root.")

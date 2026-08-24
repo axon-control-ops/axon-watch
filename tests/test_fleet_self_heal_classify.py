@@ -65,6 +65,20 @@ class ClassifyFailureSignatureTests(unittest.TestCase):
         self.assertEqual("cursor_recursion", signature.subsystem)
         self.assertNotEqual("", signature.fingerprint)
 
+    def test_sandbox_toolchain_marker_routes_to_fleet_infra(self) -> None:
+        signature = classify_failure_signature(
+            detail="Agent dispatch preflight failed: Sandbox checkout toolchain is not runnable: jest: not found"
+        )
+        self.assertEqual("fleet_infra", signature.category)
+        self.assertEqual("sandbox_toolchain", signature.subsystem)
+
+    def test_bwrap_env_bind_marker_routes_to_fleet_infra(self) -> None:
+        signature = classify_failure_signature(
+            detail="bwrap: Can't create file at /tmp/composer-abc/.env.production"
+        )
+        self.assertEqual("fleet_infra", signature.category)
+        self.assertEqual("sandbox_bwrap_bind", signature.subsystem)
+
     def test_fingerprint_is_stable_across_different_raw_text_same_marker(self) -> None:
         first = classify_failure_signature(
             detail="run_a1b2c3: Lane B agent fallback reply generated (maximum recursion depth exceeded)"

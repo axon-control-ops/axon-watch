@@ -93,6 +93,141 @@
   color: rgba(254, 243, 199, 0.98);
 }
 
+.agent-dock-composer__sandbox-strip {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.55rem;
+  align-items: center;
+  margin: -0.18rem 0 0.55rem;
+  padding: 0.5rem 0.58rem;
+  border: 1px solid rgba(45, 212, 191, 0.34);
+  border-radius: 10px;
+  background:
+    linear-gradient(90deg, rgba(8, 47, 73, 0.42), rgba(6, 78, 72, 0.34)),
+    rgba(2, 8, 23, 0.72);
+  box-shadow: inset 0 0 16px rgba(45, 212, 191, 0.08);
+}
+
+.agent-dock-composer__sandbox-strip-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-width: 0;
+}
+
+.agent-dock-composer__sandbox-strip-kicker {
+  color: rgba(153, 246, 228, 0.98);
+  font-family: var(--font-mono);
+  font-size: 0.53rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.agent-dock-composer__sandbox-strip-detail,
+.agent-dock-composer__sandbox-strip-message {
+  color: rgba(226, 236, 248, 0.86);
+  font-size: 0.58rem;
+  line-height: 1.35;
+}
+
+.agent-dock-composer__sandbox-strip-message {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: rgba(254, 243, 199, 0.94);
+}
+
+.agent-dock-composer__sandbox-strip-toggle {
+  /* The strip is a two-column grid (copy | actions). The header must claim a
+     full row of its own, otherwise it takes the copy cell and pushes copy and
+     actions onto separate wrapped rows. */
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
+}
+
+.agent-dock-composer__sandbox-strip-chevron {
+  font-size: 0.6rem;
+  opacity: 0.75;
+}
+
+.agent-dock-composer__sandbox-strip-summary {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: rgba(226, 236, 248, 0.72);
+  font-size: 0.56rem;
+}
+
+.agent-dock-composer__sandbox-strip--collapsed {
+  padding-top: 0.3rem;
+  padding-bottom: 0.3rem;
+}
+
+.agent-dock-composer__sandbox-strip-link {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: rgb(134, 239, 172);
+  font-size: 0.58rem;
+  line-height: 1.35;
+  text-decoration: underline;
+}
+
+.agent-dock-composer__sandbox-strip-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.35rem;
+}
+
+.agent-dock-composer__sandbox-strip-btn {
+  border: 1px solid rgba(148, 163, 184, 0.3);
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.75);
+  color: rgba(226, 236, 248, 0.9);
+  cursor: pointer;
+  font-family: var(--font-mono);
+  font-size: 0.52rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  padding: 0.32rem 0.58rem;
+  text-transform: uppercase;
+}
+
+.agent-dock-composer__sandbox-strip-btn:hover:not(:disabled),
+.agent-dock-composer__sandbox-strip-btn:focus-visible {
+  border-color: rgba(45, 212, 191, 0.6);
+  color: rgba(204, 251, 241, 0.98);
+  box-shadow: 0 0 0 1px rgba(45, 212, 191, 0.2), 0 0 14px rgba(45, 212, 191, 0.16);
+  outline: none;
+}
+
+.agent-dock-composer__sandbox-strip-btn--primary {
+  border-color: rgba(45, 212, 191, 0.54);
+  background: rgba(8, 145, 178, 0.24);
+  color: rgba(204, 251, 241, 0.98);
+}
+
+.agent-dock-composer__sandbox-strip-btn--danger {
+  border-color: rgba(251, 113, 133, 0.38);
+  color: rgba(254, 205, 211, 0.94);
+}
+
+.agent-dock-composer__sandbox-strip-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.46;
+}
+
 @keyframes agent-dock-access-pulse {
   0% {
     box-shadow: 0 0 0 0 rgba(255, 255, 255, 0.35);

@@ -1,30 +1,20 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
+import { computed, nextTick, ref, watch } from 'vue';
 
-import {
-  fetchAutonomyStatus,
-  type AutonomyReceipt,
-} from '../../api/autonomy-api';
 import { useSpokenUtteranceText } from '../../composables/useSpokenUtteranceText';
-import {
-  OPERATOR_PERSONA_NAME,
-  OPERATOR_PERSONA_OPS_TAGLINE,
-} from '../../lib/operator-persona-name';
+import { OPERATOR_PERSONA_NAME } from '../../lib/operator-persona-name';
 import {
   kairoConversationPhase,
   kairoConversationReply,
   kairoConversationThread,
-  kairoLastRoutingReceipt,
   clearKairoConversationThread,
 } from '../../features/kairo-conversation/kairo-conversation-state';
 import { useKairoConversation } from '../../features/kairo-conversation/use-kairo-conversation';
 import { formatVoiceGateFeedback } from '../../lib/kairo-voice-gate';
-import KairoGalaxyOrb from '../../features/brain-galaxy/KairoGalaxyOrb.vue';
-import { resolveGalaxyPresence } from '../../features/brain-galaxy/galaxy-presence-state';
-import { projectLiveOperationsStream } from '../../features/brain-galaxy/live-operations-stream';
-import { companyBusyEmployeesCount } from '../../features/workspace-agents/company-roster-busy';
-import MissionControlAutonomyControl from './MissionControlAutonomyControl.vue';
+import { useMcVaxonPresence } from '../../composables/use-mc-vaxon-presence';
 import MissionControlMachineCeoStrip from './MissionControlMachineCeoStrip.vue';
+import McVaxonHeroBlock from './McVaxonHeroBlock.vue';
+import VaxonSuperComposer from './VaxonSuperComposer.vue';
 import { resolveVaxonTransmissionView } from '../../lib/mc-vaxon-transmission-view';
 import {
   vaxonAffirmReplyCta,
@@ -35,75 +25,53 @@ import {
   markTransmissionAskAnswered,
 } from '../../lib/vaxon-transmission-reply-state';
 import { useShellStore } from '../../stores/shell';
-import VaxonExecutiveComposer from './VaxonExecutiveComposer.vue';
+
+const props = withDefaults(
+  defineProps<{
+    layout?: 'dock' | 'center';
+  }>(),
+  {
+    layout: 'dock',
+  },
+);
 
 const shell = useShellStore();
 const { spokenText } = useSpokenUtteranceText();
 const { pending, submitTurn, speechCapture } = useKairoConversation();
-const autonomyReceipts = ref<AutonomyReceipt[]>([]);
-const autonomyEffective = ref(false);
 const threadEl = ref<HTMLElement | null>(null);
-let autonomyPoll: ReturnType<typeof setInterval> | null = null;
 
-const companyBusyCount = computed(() =>
-  companyBusyEmployeesCount(shell.companyEmployeesFleet),
+const isCenterLayout = computed(() => props.layout === 'center');
+
+const {
+  autonomyMode,
+  fullAutonomyActive,
+  liveBadge,
+  modeChip,
+  presencePhase,
+  streamItems,
+} = useMcVaxonPresence();
+
+const vaxonConversePending = computed(
+  () => pending.value || kairoConversationPhase.value === 'thinking',
 );
-const fleetActiveRuns = computed(
+
+const fleetActivityActive = computed(
   () =>
-    shell.runtimeSummary?.active_runs?.length ??
-    shell.operatorBriefing?.active_runs?.length ??
-    0,
-);
-
-const autonomyMode = computed(
-  () => shell.operatorPresenceSettings.autonomy_mode ?? 'manual',
-);
-const fullAutonomyActive = computed(
-  () => autonomyMode.value === 'full' && autonomyEffective.value,
-);
-
-const presence = computed(() =>
-  resolveGalaxyPresence({
-    selectedNodeId: null,
-    selectedNodeKind: null,
-    conversationPhase: kairoConversationPhase.value,
-    speechCapturing: false,
-    kairoSpeechActive: shell.kairoSpeechActive,
-    agentStreamActive: shell.agentStreamActive,
-    companyBusyCount: companyBusyCount.value,
-    fleetActiveRuns: fleetActiveRuns.value,
-    pendingApprovals:
-      shell.runtimeSummary?.approvals.pending_count ??
-      shell.operatorBriefing?.pending_approvals.count ??
-      0,
-    criticalSignals: shell.runtimeSummary?.signals.critical_count ?? 0,
-    highSignals: shell.runtimeSummary?.signals.high_count ?? 0,
-    openSignals: shell.runtimeSummary?.signals.open_count ?? 0,
-    fullAutonomyActive: fullAutonomyActive.value,
-  }),
-);
-
-const presencePhase = computed(() => presence.value.phase);
-
-const streamItems = computed(() =>
-  projectLiveOperationsStream({
-    briefing: shell.operatorBriefing,
-    primaryActiveRun: shell.primaryActiveRun,
-    employees: shell.companyEmployeesForCurrentWorkspace,
-    presencePhase: presencePhase.value,
-    routingReceipt: kairoLastRoutingReceipt.value,
-    degradedReasons: [],
-    autonomyReceipts: autonomyReceipts.value,
-    autonomyMode: autonomyMode.value,
-  }),
+    !vaxonConversePending.value &&
+    (presencePhase.value === 'thinking' ||
+      presencePhase.value === 'autonomous' ||
+      Boolean(shell.primaryActiveRun)),
 );
 
 const transmission = computed(() =>
   resolveVaxonTransmissionView({
     spokenText: spokenText.value,
     conversationReply: kairoConversationReply.value,
-    speaking: shell.kairoSpeechActive || presencePhase.value === 'speaking',
-    pending: pending.value || presencePhase.value === 'thinking',
+    speaking:
+      shell.kairoSpeechActive ||
+      kairoConversationPhase.value === 'speaking' ||
+      presencePhase.value === 'speaking',
+    pending: vaxonConversePending.value,
   }),
 );
 
@@ -117,33 +85,17 @@ const asksForReply = computed(
 );
 const affirmCta = computed(() => vaxonAffirmReplyCta(spokenLine.value));
 
-const isTransmitting = computed(
-  () => transmission.value.mode === 'transmitting' || pending.value,
-);
+const isTransmitting = computed(() => vaxonConversePending.value);
 
 const hasThread = computed(() => kairoConversationThread.value.length > 0);
 
-const modeChip = computed(() => {
-  if (presencePhase.value === 'speaking') return 'speaking';
-  if (presencePhase.value === 'listening') return 'listening';
-  if (presencePhase.value === 'autonomous' || fullAutonomyActive.value) return 'autonomous';
-  if (presencePhase.value === 'alerting') return 'scanning';
-  return 'standby';
+const focusedWorkspaceLabel = computed(() => {
+  const ws = shell.currentWorkspace;
+  if (!ws) {
+    return null;
+  }
+  return ws.display_name?.trim() || ws.workspace_id;
 });
-
-const liveBadge = computed(
-  () =>
-    shell.kairoSpeechActive ||
-    presencePhase.value === 'listening' ||
-    presencePhase.value === 'speaking' ||
-    presencePhase.value === 'thinking' ||
-    presencePhase.value === 'autonomous' ||
-    presencePhase.value === 'alerting' ||
-    fullAutonomyActive.value ||
-    Boolean(shell.primaryActiveRun) ||
-    companyBusyCount.value > 0 ||
-    fleetActiveRuns.value > 0,
-);
 
 const micLive = computed(
   () => speechCapture.capturing.value && speechCapture.captureMode.value === 'manual',
@@ -158,14 +110,6 @@ const voiceGateFeedback = computed(() =>
     speechCapture.lastAccepted.value,
   ),
 );
-
-const focusedWorkspaceLabel = computed(() => {
-  const ws = shell.currentWorkspace;
-  if (!ws) {
-    return null;
-  }
-  return ws.display_name?.trim() || ws.workspace_id;
-});
 
 async function sendReply({
   content,
@@ -182,7 +126,6 @@ async function sendReply({
   if (message === 'yes' || message === 'not now') {
     markTransmissionAskAnswered(spokenLine.value);
   }
-  // Affirmative Needs-you answers must be allowed to trigger dig-in / handoff.
   const intent =
     message === 'yes' ? 'dispatch' : message === 'not now' ? 'ask' : submissionIntent;
   await submitTurn(message, { submissionIntent: intent, dockAttachments: attachments });
@@ -199,22 +142,6 @@ function toggleMic(): void {
   void speechCapture.startCapture('manual', { takeover: true });
 }
 
-async function refreshAutonomyReceipts(): Promise<void> {
-  try {
-    const workspaceId = shell.currentWorkspace?.workspace_id?.trim();
-    const feed = await fetchAutonomyStatus(workspaceId);
-    if (feed.autonomy_mode !== shell.operatorPresenceSettings.autonomy_mode) {
-      await shell.loadOperatorPresenceSettings({ reportError: false });
-    }
-    autonomyReceipts.value = feed.recent_receipts ?? [];
-    autonomyEffective.value =
-      feed.effective_autonomy &&
-      feed.autonomy_mode === shell.operatorPresenceSettings.autonomy_mode;
-  } catch {
-    // Keep last good receipts; stream falls back to briefing items.
-  }
-}
-
 watch(
   () => kairoConversationThread.value.length,
   () => void nextTick(() => {
@@ -223,20 +150,6 @@ watch(
     }
   }),
 );
-
-onMounted(() => {
-  void refreshAutonomyReceipts();
-  autonomyPoll = setInterval(() => {
-    void refreshAutonomyReceipts();
-  }, 10_000);
-});
-
-onUnmounted(() => {
-  if (autonomyPoll !== null) {
-    clearInterval(autonomyPoll);
-    autonomyPoll = null;
-  }
-});
 </script>
 
 <template>
@@ -245,11 +158,13 @@ onUnmounted(() => {
     class="mc-live-ops"
     :class="{
       'mc-live-ops--busy': liveBadge,
-      'mc-live-ops--transmitting': transmission.mode === 'transmitting',
+      'mc-live-ops--transmitting': vaxonConversePending,
+      'mc-live-ops--center': isCenterLayout,
+      'mc-live-ops--thread-focus': isCenterLayout,
     }"
     aria-label="VAXON live operations"
   >
-    <header class="mc-live-ops__header">
+    <header v-if="!isCenterLayout" class="mc-live-ops__header">
       <div class="mc-live-ops__title-row">
         <p class="mc-live-ops__eyebrow">Live operations</p>
         <span class="mc-live-ops__live" :data-live="liveBadge ? 'true' : 'false'">
@@ -261,31 +176,23 @@ onUnmounted(() => {
       </p>
     </header>
 
-    <!-- Above the orb so Machine CEO is never buried under Needs-you sheets. -->
-    <MissionControlMachineCeoStrip />
+    <template v-if="!isCenterLayout">
+      <MissionControlMachineCeoStrip />
+
+      <McVaxonHeroBlock
+        :mode-chip="modeChip"
+        :full-autonomy-active="fullAutonomyActive"
+        :autonomy-mode="autonomyMode"
+      />
+    </template>
 
     <div
-      class="mc-live-ops__orb-stage"
-      :data-speaking="shell.kairoSpeechActive ? 'true' : 'false'"
-      :data-mode="modeChip"
-      :data-autonomy="fullAutonomyActive ? 'armed' : autonomyMode"
+      class="mc-live-ops__scroll"
+      :class="{ 'mc-live-ops__scroll--center': isCenterLayout }"
     >
-      <div class="mc-live-ops__orb-visual">
-        <KairoGalaxyOrb placement-mode="embedded" />
-        <div class="mc-live-ops__orb-labels" aria-hidden="true">
-          <p class="mc-live-ops__orb-name">{{ OPERATOR_PERSONA_NAME }}</p>
-          <span class="mc-live-ops__orb-wave" />
-          <p class="mc-live-ops__orb-tagline">{{ OPERATOR_PERSONA_OPS_TAGLINE }}</p>
-        </div>
-        <MissionControlAutonomyControl />
-      </div>
-    </div>
-
-    <div class="mc-live-ops__scroll">
-
-      <!-- ── Conversation thread ─────────────────────────────────────────── -->
       <article
         class="mc-transmission"
+        :class="{ 'mc-transmission--thread-focus': isCenterLayout }"
         :data-mode="transmission.mode"
         :aria-live="isTransmitting ? 'polite' : 'off'"
         aria-label="VAXON transmission"
@@ -307,7 +214,6 @@ onUnmounted(() => {
           </div>
         </header>
 
-        <!-- Thread view: full conversation history -->
         <div
           v-if="hasThread"
           ref="threadEl"
@@ -327,7 +233,6 @@ onUnmounted(() => {
             <p class="mc-transmission__turn-body">{{ turn.content }}</p>
           </div>
 
-          <!-- Thinking indicator -->
           <div v-if="isTransmitting" class="mc-transmission__turn mc-transmission__turn--thinking" data-role="vaxon">
             <div class="mc-transmission__turn-meta">
               <span class="mc-transmission__turn-role">{{ OPERATOR_PERSONA_NAME }}</span>
@@ -338,18 +243,32 @@ onUnmounted(() => {
           </div>
         </div>
 
-        <!-- Empty state: no thread yet -->
-        <div v-else class="mc-transmission__empty">
+        <div
+          v-else
+          class="mc-transmission__empty"
+          :class="{ 'mc-transmission__empty--thread-focus': isCenterLayout }"
+        >
           <p v-if="isTransmitting" class="mc-transmission__thinking-inline">
             <span class="mc-transmission__thinking-dots"><span /><span /><span /></span>
             {{ OPERATOR_PERSONA_NAME }} is working…
           </p>
+          <template v-else-if="isCenterLayout">
+            <p class="mc-transmission__empty-title">Conversation thread</p>
+            <p v-if="fleetActivityActive" class="mc-transmission__fleet-note">
+              Fleet run in progress — this channel opens when you command VAXON.
+            </p>
+            <p class="mc-transmission__empty-body">{{ transmission.body }}</p>
+            <ul class="mc-transmission__empty-hints" aria-label="Suggested prompts">
+              <li>Ask for status, routing, or a recommendation</li>
+              <li>Type <strong>REPORT</strong> for a stand-up briefing</li>
+              <li>Use <strong>Dispatch</strong> to assign work to the fleet</li>
+            </ul>
+          </template>
           <p v-else class="mc-transmission__empty-body">
             {{ transmission.body }}
           </p>
         </div>
 
-        <!-- CTA buttons for yes/no prompts -->
         <div v-if="asksForReply" class="mc-transmission__actions">
           <button type="button" :disabled="pending" @click="void sendReply({ content: 'yes' })">
             {{ affirmCta }}
@@ -360,17 +279,8 @@ onUnmounted(() => {
         </div>
       </article>
 
-      <!-- ── Mode chips ──────────────────────────────────────────────────── -->
-      <div class="mc-live-ops__modes" role="status" aria-label="Voice mode">
-        <span class="mc-live-ops__mode" :data-active="modeChip === 'speaking' ? 'true' : 'false'">Speaking</span>
-        <span class="mc-live-ops__mode" :data-active="modeChip === 'listening' ? 'true' : 'false'">Listening</span>
-        <span class="mc-live-ops__mode" :data-active="modeChip === 'autonomous' ? 'true' : 'false'">Autonomous</span>
-        <span class="mc-live-ops__mode" :data-active="modeChip === 'scanning' ? 'true' : 'false'">Scanning</span>
-        <span class="mc-live-ops__mode" :data-active="modeChip === 'standby' ? 'true' : 'false'">Standby</span>
-      </div>
-
-      <!-- ── Live stream — collapses while VAXON is transmitting ──────────── -->
       <ul
+        v-if="!isCenterLayout"
         class="mc-live-ops__stream"
         :class="{ 'mc-live-ops__stream--collapsed': isTransmitting }"
         aria-label="Live updates"
@@ -389,8 +299,24 @@ onUnmounted(() => {
       </ul>
     </div>
 
-    <VaxonExecutiveComposer
-      :pending="pending"
+    <VaxonSuperComposer
+      v-if="isCenterLayout"
+      layout="center"
+      class="mc-live-ops__vaxon-composer"
+      :pending="vaxonConversePending"
+      :mic-live="micLive"
+      :mic-supported="speechCapture.supported"
+      :privacy-blocked="shell.operatorPresenceSettings.privacy_mode"
+      :focused-workspace-label="focusedWorkspaceLabel"
+      :capture-error="speechCaptureError"
+      :voice-gate-feedback="voiceGateFeedback"
+      @submit="void sendReply($event)"
+      @toggle-mic="toggleMic"
+    />
+    <VaxonSuperComposer
+      v-else
+      layout="dock"
+      :pending="vaxonConversePending"
       :mic-live="micLive"
       :mic-supported="speechCapture.supported"
       :privacy-blocked="shell.operatorPresenceSettings.privacy_mode"

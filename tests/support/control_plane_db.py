@@ -21,6 +21,11 @@ def isolate_control_plane_db(testcase, run_store) -> str:
             ),
             # Keep TestClient lifespan from starting continuous worker ticks.
             "AXON_WATCH_WORKER_SCHEDULER": "0",
+            # Run-phase transitions in isolated tests must never shell out to a
+            # real notify-send: a live desktop session running this suite
+            # would fire a real "Axon-X run failed" notification for every
+            # fixture that transitions a run to failed/blocked/review_ready.
+            "AXON_WATCH_NOTIFICATIONS_ENABLED": "0",
         },
         clear=False,
     )

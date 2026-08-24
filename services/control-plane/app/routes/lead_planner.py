@@ -37,6 +37,9 @@ class LeadFanOutRequest(BaseModel):
     mode: _PLAN_MODE = "auto"
     create_runs: bool = True
     use_model: bool = True
+    target_role: (
+        Literal["lead", "watcher", "frontend", "backend", "integrations"] | None
+    ) = None
 
 
 class LeadReplanRequest(BaseModel):
@@ -142,6 +145,7 @@ def workspace_lead_fan_out(workspace_id: str, body: LeadFanOutRequest) -> dict[s
             mode=body.mode,  # type: ignore[arg-type]
             create_runs=body.create_runs,
             use_model=body.use_model,
+            target_role=body.target_role,
         )
     except LeadFanOutError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc

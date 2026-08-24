@@ -1,6 +1,6 @@
 [Unit]
 Description=Axon-X Watch Service (user always-on)
-After=network.target
+After=network-online.target
 Wants=network-online.target
 
 [Service]

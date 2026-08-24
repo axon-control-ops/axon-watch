@@ -142,7 +142,7 @@ class WorkerOpsDeliveryTests(unittest.TestCase):
         self.assertFalse(no_change_delivery_is_successful_ops_task(task))
 
     def test_full_access_no_change_verification_task_completes_with_terminal_receipt(self) -> None:
-        from app.terminal import agent_jobs
+        from app.terminal.agent_job_registry import register_job
 
         opened = task_store.create_task(
             workspace_id="workspace_worker_verify_noop",
@@ -167,8 +167,8 @@ class WorkerOpsDeliveryTests(unittest.TestCase):
             require_leased_task=True,
         )
         run_id = str(created["run_id"])
-        with agent_jobs._lock:
-            agent_jobs._jobs["agent-job-verify-noop"] = {
+        register_job(
+            {
                 "job_id": "agent-job-verify-noop",
                 "workspace_id": "workspace_worker_verify_noop",
                 "run_id": run_id,
@@ -177,6 +177,7 @@ class WorkerOpsDeliveryTests(unittest.TestCase):
                 "exit_code": 0,
                 "created_at": "2026-01-01T00:00:00Z",
             }
+        )
         with patch.object(
             worker_dispatch,
             "generate_lane_b_result",

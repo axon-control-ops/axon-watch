@@ -23,6 +23,7 @@ import {
 } from '../../lib/apply-employee-specialty-route';
 import { shouldSoftSwitchAgentToPlan } from '../../lib/composer-plan-auto-switch';
 import {
+  isVagueNamedAssignPrompt,
   matchNamedAssignEmployee,
   rewriteNamedAssignPrompt,
 } from '../../lib/named-assign-route';
@@ -37,9 +38,8 @@ import { focusAgentDockComposerInput } from '../../lib/agent-dock-composer-focus
 import type { TeammateRouteNotice } from '../../lib/teammate-route-notice';
 import { resolveComposerWorkspaceScopeMismatch } from '../../lib/composer-workspace-scope';
 import {
-  clearWorkspaceScopeNotice,
-  setWorkspaceScopeNotice,
-  workspaceScopeNotice,
+  clearWorkspaceScopeNotice, stayInCurrentWorkspaceScope,
+  setWorkspaceScopeNotice, workspaceScopeNotice, isWorkspaceScopePairSuppressed,
   type WorkspaceScopeNotice,
 } from '../../lib/workspace-scope-notice';
 import { applyChatUiAction } from '../../lib/chat-ui-action';
@@ -224,7 +224,8 @@ export function useComposerActions(options: UseComposerActionsOptions) {
 
     const workspaceId = shell.currentWorkspace?.workspace_id ?? '';
     const scopeMismatch = resolveComposerWorkspaceScopeMismatch(workspaceId, submitDraft);
-    if (scopeMismatch) {
+    // A suppressed pair must fall through and send, never abort silently.
+    if (scopeMismatch && !isWorkspaceScopePairSuppressed(scopeMismatch.currentWorkspaceId, scopeMismatch.inferredWorkspaceId)) {
       setWorkspaceScopeNotice({
         currentWorkspaceId: scopeMismatch.currentWorkspaceId,
         inferredWorkspaceId: scopeMismatch.inferredWorkspaceId,
@@ -252,7 +253,9 @@ export function useComposerActions(options: UseComposerActionsOptions) {
       roster,
       useModelTiebreak: false,
     });
-    const routed = await maybeApplySpecialtyRoute(routeDecision);
+    const vagueNamedAssign =
+      Boolean(namedAssign) && isVagueNamedAssignPrompt(submitDraft, namedAssign?.employee.name ?? '');
+    const routed = vagueNamedAssign ? false : await maybeApplySpecialtyRoute(routeDecision);
     const shouldRewriteNamedAssign =
       Boolean(namedAssign) &&
       (routed ||
@@ -349,7 +352,9 @@ export function useComposerActions(options: UseComposerActionsOptions) {
       roster,
       useModelTiebreak: false,
     });
-    const routed = await maybeApplySpecialtyRoute(routeDecision);
+    const vagueNamedAssign =
+      Boolean(namedAssign) && isVagueNamedAssignPrompt(pending, namedAssign?.employee.name ?? '');
+    const routed = vagueNamedAssign ? false : await maybeApplySpecialtyRoute(routeDecision);
     const shouldRewriteNamedAssign =
       Boolean(namedAssign) &&
       (routed ||
@@ -385,9 +390,9 @@ export function useComposerActions(options: UseComposerActionsOptions) {
     dismissEmployeeSpecialtyRoute();
   }
 
-  function dismissWorkspaceScopeNotice(): void {
-    clearWorkspaceScopeNotice();
-  }
+  /** stayHere also suppresses re-prompting for this workspace pair. */
+  const dismissWorkspaceScopeNotice = (stayHere = false): void =>
+    (stayHere ? stayInCurrentWorkspaceScope : clearWorkspaceScopeNotice)();
 
   function switchComposerWorkspaceScope(): void {
     const notice = workspaceScopeNotice.value;

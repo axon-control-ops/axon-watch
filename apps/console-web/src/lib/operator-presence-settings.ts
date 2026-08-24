@@ -123,7 +123,7 @@ export function normalizeAutonomyMode(raw: unknown): AutonomyMode {
   return DEFAULT_AUTONOMY_MODE;
 }
 
-export function resolveAutoComposerRuntimeOverride(
+export function resolveAutoWorkerRuntimeFallback(
   raw: Partial<OperatorPresenceSettings> | null | undefined,
 ): string {
   const settings = normalizeOperatorPresenceSettings(raw);

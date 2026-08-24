@@ -49,6 +49,11 @@ export function shouldOfferRunContinue(input: {
   );
 }
 
+/** Show Stop only when the backend explicitly grants the capability. */
+export function shouldOfferRunStop(canStop: boolean | null | undefined): boolean {
+  return canStop === true;
+}
+
 /** Mission Control / IDE label: CONTINUE for idle execute, RESUME otherwise. */
 export function runContinueActionLabel(input: {
   phase: RunPhase | null | undefined;

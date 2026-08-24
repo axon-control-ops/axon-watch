@@ -62,6 +62,10 @@ _SHORTCUT_SHELL_COMMANDS = {
     "dashpro ota": "npm run ota:canary",
     "dashpro ota canary": "npm run ota:canary",
     "verify": "npm run verify:production-operator",
+    "mobile dev": "npm run dev:console-mobile",
+    "console mobile dev": "npm run dev:console-mobile",
+    "start mobile app": "npm run dev:console-mobile",
+    "start console mobile": "npm run dev:console-mobile",
 }
 
 # Read-only shell shortcuts that may auto-dispatch / auto-complete like health_probe.

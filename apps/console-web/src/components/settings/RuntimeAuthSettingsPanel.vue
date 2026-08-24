@@ -78,17 +78,17 @@ const selectedAutoOverrideTarget = computed(() => {
 });
 const autoOverrideSummary = computed(() => {
   if (!autoOverrideEnabled.value) {
-    return 'Off — composers keep their manual per-thread runtime selections.';
+    return 'Off — isolated workers use each workspace runtime policy.';
   }
   if (!autoOverrideTarget.value.trim()) {
-    return 'Choose a runtime target before Full Auto can override composers.';
+    return 'Choose a fallback runtime before Full Auto can steer isolated workers.';
   }
   const target = selectedAutoOverrideTarget.value;
   const label = target ? `${target.label} (${runtimeStatusLine(target)})` : autoOverrideTarget.value;
   if (shell.operatorPresenceSettings.autonomy_mode !== 'full') {
     return `${label} is armed, but it only applies when VAXON is on Full Auto.`;
   }
-  return `${label} is controlling all composers while VAXON is on Full Auto.`;
+  return `${label} is the Full Auto worker fallback. PC composers keep their own selections.`;
 });
 
 function shortenBinaryPath(path: string): string {
@@ -363,11 +363,10 @@ onMounted(() => {
 
     <section v-if="!isLoading" class="runtime-auth-settings__policy-section">
       <header class="runtime-auth-settings__policy-header">
-        <h2>Full Auto composer runtime</h2>
+        <h2>Full Auto worker runtime</h2>
         <p>
-          Temporarily force every IDE composer and continuous worker onto one runtime while
-          VAXON is on Full Auto. Manual per-thread choices are preserved and return when this
-          toggle or Full Auto is off.
+          Choose the fallback runtime for isolated continuous workers while VAXON is on Full
+          Auto. This never changes the runtime selected in your PC composer.
         </p>
       </header>
       <label class="operator-settings-form__row">
@@ -378,15 +377,15 @@ onMounted(() => {
           @change="onAutoOverrideToggle"
         />
         <span class="operator-settings-form__copy">
-          <strong>Override all composers during Full Auto</strong>
+          <strong>Steer isolated workers during Full Auto</strong>
           <small>{{ autoOverrideSummary }}</small>
         </span>
       </label>
       <label class="operator-settings-form__row operator-settings-form__row--select">
         <span class="operator-settings-form__copy">
-          <strong>Runtime to use in Auto</strong>
+          <strong>Worker fallback runtime</strong>
           <small>
-            This does not erase manual composer selections; it only masks them while active.
+            Per-thread PC composer selections remain independent and visible.
           </small>
         </span>
         <select
@@ -395,7 +394,7 @@ onMounted(() => {
           :disabled="shell.operatorPresenceSettingsSaving || !autoOverrideEnabled"
           @change="onAutoOverrideTargetChange"
         >
-          <option value="">Use each composer's manual runtime</option>
+          <option value="">Use each workspace's worker runtime</option>
           <option
             v-for="target in runtimeTargets"
             :key="target.id"

@@ -13,6 +13,7 @@ from app.workspace_agents.critical_review_clause import is_review_type_task
 from app.runs.service import (
     RunLifecycleError,
     append_run_execution_receipt,
+    block_run_on_operator_ask,
     complete_run,
     fail_run,
     touch_run_activity,
@@ -35,7 +36,11 @@ from app.workspace_agents.worker_prompt import build_continuous_worker_prompt
 from app.workspace_agents.worker_prompt import parse_out_of_scope_guard
 from app.persistence import task_store
 from app.persistence import worker_scheduler_settings_store
-from app.workspace_agents.ask_autopilot import escalate_unresolved_operator_ask, maybe_resolve_safe_ask
+from app.workspace_agents.ask_autopilot import (
+    escalate_unresolved_operator_ask,
+    maybe_resolve_safe_ask,
+    parse_latest_ask_card,
+)
 from app.persistence.workspace_composer_prefs_store import (
     resolve_worker_runtime_model,
     resolve_worker_runtime_fallback_families,
@@ -65,9 +70,68 @@ from app.workspace_agents.worker_dispatch_support import (
 
 logger = logging.getLogger(__name__)
 
+
+def _ask_prompt_for_receipt(reply_text: str) -> str:
+    """The worker's own question, for the blocked run's current_step."""
+    parsed = parse_latest_ask_card(reply_text)
+    return parsed[0] if parsed else "Awaiting an operator decision"
+
 def worker_dispatch_enabled() -> bool:
     raw = os.environ.get("AXON_WATCH_WORKER_SCHEDULER_DISPATCH", "1").strip().lower()
     return raw not in {"0", "false", "off", "no"}
+
+
+def _implementation_scope_block(
+    *, task: dict[str, Any] | None, execution_policy: Any
+) -> str | None:
+    """Reason an implementation task cannot possibly write its own targets.
+
+    Runs were burning a full shift and then failing at the completion gate with
+    "produced no changed files", because the agent had no write scope covering
+    the files the task expected. One dispatch had
+    ``writes=command-centre,output/...`` against
+    ``expected_files=docs/ops/school-running-plan.md`` — unwinnable before the
+    first token. Catch it up front so the operator gets a routing error in
+    seconds instead of a mystery no-op twenty minutes later.
+
+    Deliberately narrow: only implementation tasks, and only when *nothing* the
+    task expects is writable. Analysis, review and receipt-backed ops tasks are
+    untouched, and a partial overlap still runs.
+    """
+    from app.workspace_agents.completion_gate import (
+        expected_files_for_task,
+        implementation_requested,
+    )
+
+    if not implementation_requested(task):
+        return None
+
+    write_paths = tuple(getattr(execution_policy, "write_paths", ()) or ())
+    if not write_paths:
+        return (
+            "implementation task dispatched with no writable scope "
+            f"(access={getattr(execution_policy, 'execution_access', 'unknown')}); "
+            "check the workspace project.axon.yaml and the task's allowed_paths"
+        )
+
+    expected = [str(item).strip().lstrip("./") for item in (expected_files_for_task(task) or [])]
+    expected = [item for item in expected if item]
+    if not expected:
+        return None
+
+    def covered(candidate: str) -> bool:
+        return any(
+            candidate == root or candidate.startswith(f"{root.rstrip('/')}/")
+            for root in (str(w).strip().lstrip("./") for w in write_paths)
+        )
+
+    if any(covered(item) for item in expected):
+        return None
+    return (
+        "implementation task expects files outside the writable scope — "
+        f"expected={', '.join(expected[:6])} vs writes={', '.join(map(str, write_paths))}; "
+        "route this task to a role that owns those paths, or widen the task scope"
+    )
 
 
 def dispatch_continuous_worker_run(
@@ -81,7 +145,7 @@ def dispatch_continuous_worker_run(
     if not run_id:
         return False, None
 
-    if not claim_worker_dispatch(run_id):
+    if not claim_worker_dispatch(run_id, task_id=str(run_record.get("task_id") or "")):
         logger.warning("continuous worker dispatch already active for %s", run_id)
         return False, None
 
@@ -157,9 +221,21 @@ def dispatch_continuous_worker_run(
         )
         agent_root = worker_agent_workspace(isolation_root)
         execution_policy = resolve_worker_execution_policy(
-            employee=employee, task_payload=task, workspace_root=agent_root
+            employee=employee,
+            task_payload=task,
+            workspace_root=agent_root,
+            workspace_id=workspace_id,
         )
         record_execution_policy_receipt(run_id, execution_policy)
+        scope_block = _implementation_scope_block(
+            task=task, execution_policy=execution_policy
+        )
+        if scope_block:
+            failed = fail_worker_run(
+                run_id,
+                receipt_summary=f"Dispatch refused: {scope_block}",
+            )
+            return False, failed
         append_run_execution_receipt(
             run_id,
             receipt_type="worker_isolation_created",
@@ -168,11 +244,26 @@ def dispatch_continuous_worker_run(
             success=True,
             intent="worker_isolation",
         )
-        enqueue_verification_terminal_jobs(
-            workspace_id=workspace_id,
-            run_id=run_id,
-            task=task,
-        )
+
+        def _enqueue_verify_jobs() -> None:
+            try:
+                enqueue_verification_terminal_jobs(
+                    workspace_id=workspace_id,
+                    run_id=run_id,
+                    task=task,
+                )
+            except Exception:  # noqa: BLE001 — never block Lane B on verify enqueue
+                logger.exception(
+                    "continuous worker verification enqueue failed for %s role=%s",
+                    run_id,
+                    employee.role,
+                )
+
+        threading.Thread(
+            target=_enqueue_verify_jobs,
+            daemon=True,
+            name=f"verify-enqueue-{run_id}",
+        ).start()
         prompt = build_continuous_worker_prompt(
             workspace_id=workspace_id,
             employee=employee,
@@ -187,6 +278,15 @@ def dispatch_continuous_worker_run(
         runtime_family = (runtime_target or "cursor_local").split("_", 1)[0]
         runtime_model = resolve_worker_runtime_model(workspace_id, runtime_family)
         fallback_runtime_families = resolve_worker_runtime_fallback_families(workspace_id)
+        append_run_execution_receipt(
+            run_id,
+            receipt_type="lane_b_invoke_started",
+            receipt_summary=(
+                f"Invoking Lane B for role={employee.role} task={task_id} "
+                f"runtime={runtime_target or 'cursor_local'}"
+            ),
+            actor="workspace_scheduler",
+        )
         lane_b_result = generate_lane_b_result(
             context=context,
             user_prompt=prompt,
@@ -200,12 +300,12 @@ def dispatch_continuous_worker_run(
             execution_policy=execution_policy,
             allow_git_dispatch=False,
             fallback_runtime_families=fallback_runtime_families,
+            respect_cached_usage_limit=True,
         )
         reply_text = str(lane_b_result.get("content") or "")
         from app.workspace_agents.employee_first_person import (
             rewrite_employee_third_person_to_first,
         )
-
         reply_text = rewrite_employee_third_person_to_first(
             reply_text,
             str(employee.name or "").strip() or None,
@@ -225,7 +325,7 @@ def dispatch_continuous_worker_run(
                 success=True,
                 intent="worker_autonomy",
             )
-        escalate_unresolved_operator_ask(
+        escalated_ask = escalate_unresolved_operator_ask(
             reply_text,
             employee_name=employee.name,
             employee_role=str(employee.role or ""),
@@ -234,7 +334,18 @@ def dispatch_continuous_worker_run(
             run_id=run_id,
         )
         scope_guard_detail = parse_out_of_scope_guard(reply_text)
-        if scope_guard_detail:
+        if escalated_ask:
+            # The worker asked a question only the operator may answer. Recording
+            # the receipt alone left the run executing, so it could carry on past
+            # its own stated blocker and even finalize as complete while the ask
+            # sat unanswered. Hold it in the blocked phase instead; answering the
+            # ask resumes it through the normal approve path.
+            dispatched = False
+            finalized = block_run_on_operator_ask(
+                run_id,
+                prompt=_ask_prompt_for_receipt(reply_text),
+            )
+        elif scope_guard_detail:
             dispatched = False
             finalized = fail_worker_run(
                 run_id,
@@ -358,7 +469,13 @@ def dispatch_continuous_worker_run(
                         finalized = fail_worker_run(
                             run_id,
                             receipt_summary=(
-                                f"Workspace delivery blocked at {publish.stage}: {publish.detail}"
+                                # publish.stage is always the literal string
+                                # "blocked" on this path (it only carries a
+                                # distinct value -- "no_change" -- on the
+                                # success side, checked above); including it
+                                # here just produced "blocked at blocked".
+                                # The real reason always lives in .detail.
+                                f"Workspace delivery blocked: {publish.detail}"
                             ),
                         )
                         dispatched = False

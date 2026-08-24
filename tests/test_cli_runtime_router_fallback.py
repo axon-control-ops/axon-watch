@@ -206,7 +206,6 @@ class DispatchRecursionRecoveryTests(unittest.TestCase):
                     context_block="ctx",
                     runtime_target="cursor_local",
                 )
-
         self.assertTrue(result.get("dispatched"))
         self.assertEqual("Recovered without research MCP.", result.get("content"))
         self.assertEqual([None, False], calls)
@@ -298,6 +297,55 @@ class DispatchRecursionRecoveryTests(unittest.TestCase):
         self.assertNotIn("API key was rejected", reason)
         mock_non_cursor.assert_not_called()
 
+    def test_cursor_named_model_limit_retries_auto_before_fallback(self) -> None:
+        calls: list[str] = []
+
+        def fake_cursor(**kwargs):  # noqa: ANN003
+            model = str(kwargs.get("model") or "")
+            calls.append(model)
+            if model:
+                raise RuntimeError(
+                    "ActionRequiredError: Named models unavailable. "
+                    "Free plans can only use Auto. Switch to Auto or upgrade plans to continue."
+                )
+            return CursorAgentReply(content="Recovered with Cursor Auto.")
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            with (
+                patch(
+                    "app.cli_runtime.router.runtime_status_snapshot",
+                    return_value=_snapshot_cursor_and_codex_ready(),
+                ),
+                patch(
+                    "app.cli_runtime.router._resolve_workspace_root",
+                    return_value=root,
+                ),
+                patch(
+                    "app.cli_runtime.router.ensure_workspace_research_mcp",
+                    return_value=True,
+                ),
+                patch(
+                    "app.cli_runtime.router.run_cursor_local_with_recursion_retry",
+                    side_effect=fake_cursor,
+                ),
+                patch("app.cli_runtime.router.run_non_cursor_local") as mock_non_cursor,
+            ):
+                result = dispatch_ide_composer(
+                    workspace_id="workspace_dashpro",
+                    composer_mode="agent",
+                    user_prompt="Continue the bounded task.",
+                    context_block="ctx",
+                    runtime_target="cursor_local",
+                    runtime_model="sonnet",
+                    fallback_runtime_families=("codex",),
+        )
+
+        self.assertTrue(result.get("dispatched"))
+        self.assertTrue(str(result.get("content") or "").startswith("Recovered with Cursor Auto."))
+        self.assertEqual(["sonnet", ""], calls)
+        mock_non_cursor.assert_not_called()
+
     def test_autonomous_worker_uses_only_approved_fallback_family(self) -> None:
         snapshot = _snapshot_cursor_and_codex_ready()
         snapshot["codex_usage"] = {"limit_reached": True}
@@ -320,8 +368,8 @@ class DispatchRecursionRecoveryTests(unittest.TestCase):
                     context_block="ctx",
                     runtime_target="codex_local",
                     fallback_runtime_families=("cursor",),
+                    respect_cached_usage_limit=True,
                 )
-
         self.assertTrue(result.get("dispatched"))
         self.assertEqual("cursor_local", result.get("runtime_id"))
         self.assertTrue(
@@ -382,7 +430,7 @@ class DispatchRecursionRecoveryTests(unittest.TestCase):
             mock_non_cursor.call_args_list[1].kwargs["subprocess_env"]["ANTHROPIC_API_KEY"],
         )
 
-    def test_explicit_codex_quota_does_not_replace_signed_in_account_with_vault_key(self) -> None:
+    def test_cached_codex_limit_blocks_workers_but_manual_retry_probes_again(self) -> None:
         snapshot = {
             "default_runtime": "codex_local",
             "local": [
@@ -418,11 +466,22 @@ class DispatchRecursionRecoveryTests(unittest.TestCase):
                     user_prompt="Continue the bounded task.",
                     context_block="ctx",
                     runtime_target="codex_local",
+                    respect_cached_usage_limit=True,
                 )
-
-        self.assertFalse(result.get("dispatched"))
-        self.assertIn("usage limit is still active", str(result.get("reason") or ""))
-        run_codex.assert_not_called()
+                self.assertFalse(result.get("dispatched"))
+                self.assertIn("usage limit is still active", str(result.get("reason") or ""))
+                run_codex.assert_not_called()
+                run_codex.return_value = "Manual retry succeeded."
+                manual_result = dispatch_ide_composer(
+                    workspace_id="workspace_young_eagles_day_care",
+                    composer_mode="agent",
+                    user_prompt="Try again now.",
+                    context_block="ctx",
+                    runtime_target="codex_local",
+                )
+        self.assertTrue(manual_result.get("dispatched"))
+        self.assertEqual("Manual retry succeeded.", manual_result.get("content"))
+        run_codex.assert_called_once()
 
     def test_codex_subscription_limit_retries_configured_vault_key(self) -> None:
         snapshot = {
@@ -483,6 +542,38 @@ class DispatchRecursionRecoveryTests(unittest.TestCase):
         self.assertEqual(
             "vault-key",
             mock_non_cursor.call_args_list[1].kwargs["subprocess_env"]["OPENAI_API_KEY"],
+        )
+
+    def test_continuous_worker_uses_stale_runtime_snapshot_when_api_key_set(self) -> None:
+        snapshot = _snapshot_cursor_and_codex_ready()
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            with (
+                patch(
+                    "app.cli_runtime.router.runtime_subprocess_env",
+                    return_value={"CURSOR_API_KEY": "vault-key", "PATH": "/usr/bin"},
+                ),
+                patch(
+                    "app.cli_runtime.router.runtime_status_snapshot",
+                    return_value=snapshot,
+                ) as mock_snapshot,
+                patch("app.cli_runtime.router._resolve_workspace_root", return_value=root),
+                patch("app.cli_runtime.router.ensure_workspace_research_mcp", return_value=True),
+                patch(
+                    "app.cli_runtime.router.run_cursor_local_with_recursion_retry",
+                    return_value=CursorAgentReply(content="ok"),
+                ),
+            ):
+                dispatch_ide_composer(
+                    workspace_id="workspace_tps",
+                    composer_mode="agent",
+                    user_prompt="Continue the bounded task.",
+                    context_block="ctx",
+                    respect_cached_usage_limit=True,
+                )
+        mock_snapshot.assert_called_once_with(
+            force_refresh=False,
+            allow_stale=True,
         )
 
 

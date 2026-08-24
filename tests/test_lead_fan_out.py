@@ -116,6 +116,77 @@ class LeadFanOutMaterializeTests(unittest.TestCase):
             len(result["tasks"]),
         )
 
+    def test_specialist_can_assign_one_colleague_without_lead_planning(self) -> None:
+        from app.workspace_agents.lead_fan_out import materialize_lead_fan_out
+
+        result = materialize_lead_fan_out(
+            workspace_id="workspace_axon_watch",
+            goal="Implement the persistence guard in services/control-plane/app/store.py",
+            target_role="backend",
+            create_runs=True,
+            use_model=False,
+        )
+
+        self.assertEqual("backend", result["target_role"])
+        self.assertEqual("decompose", result["mode"])
+        self.assertEqual(1, len(result["tasks"]))
+        self.assertEqual("backend", result["tasks"][0]["owner_role"])
+        self.assertEqual(1, len(result["runs"]))
+        self.assertEqual("backend", result["runs"][0]["owner_role"])
+
+    def test_direct_assignment_rejects_an_unstaffed_role(self) -> None:
+        from app.persistence import task_store
+        from app.workspace_agents.lead_fan_out import (
+            LeadFanOutError,
+            materialize_lead_fan_out,
+        )
+
+        existing = task_store.create_task(
+            workspace_id="workspace_axon_watch",
+            goal="Do specialist work",
+            owner_role="backend",
+        )
+        with self.assertRaisesRegex(LeadFanOutError, "not staffed"):
+            materialize_lead_fan_out(
+                workspace_id="workspace_axon_watch",
+                goal="Do specialist work",
+                target_role="finance",
+                create_runs=False,
+                use_model=False,
+            )
+        stored = task_store.get_task(str(existing["task_id"]))
+        self.assertIsNotNone(stored)
+        self.assertEqual("open", stored and stored["status"])
+
+    def test_direct_assignment_only_supersedes_the_target_colleagues_duplicate(self) -> None:
+        from app.persistence import task_store
+        from app.workspace_agents.lead_fan_out import materialize_lead_fan_out
+
+        goal = "Implement the shared persistence safeguard for recurring task records"
+        frontend = task_store.create_task(
+            workspace_id="workspace_axon_watch",
+            goal=goal,
+            owner_role="frontend",
+        )
+        backend = task_store.create_task(
+            workspace_id="workspace_axon_watch",
+            goal=goal,
+            owner_role="backend",
+        )
+
+        materialize_lead_fan_out(
+            workspace_id="workspace_axon_watch",
+            goal=goal,
+            target_role="backend",
+            create_runs=False,
+            use_model=False,
+        )
+
+        stored_frontend = task_store.get_task(str(frontend["task_id"]))
+        stored_backend = task_store.get_task(str(backend["task_id"]))
+        self.assertEqual("open", stored_frontend and stored_frontend["status"])
+        self.assertEqual("cancelled", stored_backend and stored_backend["status"])
+
     def test_route_teammate_does_not_pick_single_winner_on_fan_out(self) -> None:
         from app.workspace_agents.teammate_route import route_teammate_decision
 

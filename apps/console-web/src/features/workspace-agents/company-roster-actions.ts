@@ -8,6 +8,7 @@ import {
 } from '../../lib/verification-handoff';
 import {
   employeeDockReceiptRunId,
+  employeeFailureBlocksRetry,
   employeeFailureLine,
   employeeFailureRetryActionLabel,
   isRuntimeAuthFailure,
@@ -144,8 +145,8 @@ export function employeeReceiptsDraft(employee: CompanyEmployeeRecord): string {
     if (runtime !== 'Cursor') {
       return (
         `Walk me through what happened on my last job${runHint}. ` +
-        `The signed-in ${runtime} account was quota-limited. Check that workspace's approved ` +
-        `Auto fallback runtimes, then suggest the next move.`
+        `The ${runtime} CLI reported a usage-limit block, but Axon cannot verify the live ` +
+        `account quota. Retry once, check approved Auto fallback runtimes, then suggest the next move.`
       );
     }
     return (
@@ -285,10 +286,13 @@ export function employeeQuickActions(
     chatKind: 'receipts',
     composerMode: 'ask',
   };
+  // Working-as-intended policy blocks (e.g. private-document paths) fail the
+  // same way on every retry — offering "Try again" here just burns a shift.
+  const blocksRetry = failed && employeeFailureBlocksRetry(employee);
   const actions: TeamMemberQuickAction[] = [
     ...(failed
       ? [
-          retryAction,
+          ...(blocksRetry ? [] : [retryAction]),
           ...(employeeDockReceiptRunId(employee) ? [receiptsAction] : []),
           talkAction,
         ]

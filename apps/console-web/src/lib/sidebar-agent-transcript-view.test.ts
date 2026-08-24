@@ -22,7 +22,7 @@ describe('buildSidebarAgentTranscriptLines', () => {
     expect(lines.map((line) => line.kind)).toEqual(['thinking', 'tool', 'edit']);
     expect(lines[0]?.text).toContain('Checking Sentry');
     expect(lines[1]?.text).toBe('Read OPERATIONS.md');
-    expect(lines[2]?.text).toContain('App.vue');
+    expect(lines[2]?.text).toBe('Edited file: src/App.vue');
   });
 
   it('marks open thinking as live while streaming', () => {

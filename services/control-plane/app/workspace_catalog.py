@@ -6,7 +6,11 @@ from app.adapters.watch_client import fetch_watch_inbox
 from app.inbox_projection import WatchInboxFetcher, build_inbox_response
 from app.runs.service import list_runs
 from app.operator_workspace_scope import filter_operator_workspace_records
-from app.workspace_project_bindings import WorkspaceProjectBinding, load_workspace_project_bindings
+from app.workspace_project_bindings import (
+    WorkspaceProjectBinding,
+    get_workspace_project_binding,
+    list_valid_workspace_project_bindings,
+)
 
 
 def _catalog_inbox_fetcher() -> dict[str, object] | None:
@@ -67,7 +71,9 @@ def list_workspace_records(
     inbox_fetcher: WatchInboxFetcher | None = None,
     operator_surface: bool = False,
 ) -> list[dict[str, str | bool]]:
-    bindings = load_workspace_project_bindings()
+    # Best-effort: a misconfigured, unrelated workspace binding must not take
+    # the entire /api/workspaces listing down for every other workspace.
+    bindings = list_valid_workspace_project_bindings()
     workspace_ids = {
         str(record.get("workspace_id", "")).strip()
         for record in list_runs()
@@ -107,10 +113,14 @@ def get_workspace_record(
     *,
     inbox_fetcher: WatchInboxFetcher | None = None,
 ) -> dict[str, str | bool]:
-    bindings = load_workspace_project_bindings()
     normalized_id = workspace_id.strip()
-    if normalized_id in bindings:
-        return _workspace_record(normalized_id, bindings[normalized_id])
+    # Resolve only this workspace's own binding, not the full registry: an
+    # unrelated workspace's project_root moving outside the allowlist used to
+    # break every other workspace's lookup here, since the full-registry
+    # loader fails closed for the whole map when any one entry is invalid.
+    binding = get_workspace_project_binding(normalized_id)
+    if binding is not None:
+        return _workspace_record(normalized_id, binding)
 
     for record in list_workspace_records(inbox_fetcher=inbox_fetcher):
         if record["workspace_id"] == normalized_id:

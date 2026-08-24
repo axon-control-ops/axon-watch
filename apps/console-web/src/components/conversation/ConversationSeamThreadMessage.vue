@@ -13,7 +13,11 @@ import {
   threadMessageSpeakerLabel,
   threadMessageSpeakerStyle,
 } from '../../lib/thread-message-view';
-import { thinkingPreview, agentContentHasTranscriptBlocks } from '../../lib/agent-transcript-blocks';
+import {
+  thinkingPreview,
+  agentContentHasTranscriptBlocks,
+  readToolBlockPath,
+} from '../../lib/agent-transcript-blocks';
 import {
   isMarkdownFileAgentResponse,
   shouldHideAgentReportInThread,
@@ -33,6 +37,7 @@ import {
   agentReplyRegeneratePrompt,
   regenerateAgentReplyFromPrompt,
 } from '../../lib/operator-message-composer-actions';
+import { cancelAgentTerminalJobFromCard, copyTerminalOutput } from '../../lib/agent-terminal-cancel';
 import { useShellStore } from '../../stores/shell';
 import AgentMarkdownBlock from '../ide/AgentMarkdownBlock.vue';
 import AgentFileReadBlock from '../ide/AgentFileReadBlock.vue';
@@ -264,12 +269,9 @@ function hasEmbeddedEmployeeReports(content: string): boolean {
   return embeddedReportLines(content).some((line) => line.speaker !== null);
 }
 
-async function copyTerminalOutput(output: string): Promise<void> {
-  if (typeof navigator === 'undefined' || !navigator.clipboard || !output.trim()) {
-    return;
-  }
-  await navigator.clipboard.writeText(output);
-}
+const onCancelAgentTerminalJob = (jobId: string): void => void cancelAgentTerminalJobFromCard(
+  { workspaceId: shell.currentWorkspace?.workspace_id, jobId, statuses: shell.agentTerminalJobStatuses },
+);
 </script>
 
 <template>
@@ -376,6 +378,16 @@ async function copyTerminalOutput(output: string): Promise<void> {
         </p>
       </div>
 
+      <button
+        v-else-if="segment.kind === 'tool' && readToolBlockPath(segment.label)"
+        type="button"
+        class="agent-block agent-block--tool agent-block--tool-link"
+        :title="`Open ${readToolBlockPath(segment.label)}`"
+        @click="shell.openWorkspaceFile(readToolBlockPath(segment.label)!)"
+      >
+        <span class="agent-block__tool-dot" aria-hidden="true" />
+        <span>{{ segment.label }}</span>
+      </button>
       <div v-else-if="segment.kind === 'tool'" class="agent-block agent-block--tool">
         <span class="agent-block__tool-dot" aria-hidden="true" />
         <span>{{ segment.label }}</span>
@@ -387,7 +399,8 @@ async function copyTerminalOutput(output: string): Promise<void> {
           segment.kind === 'question' ||
           segment.kind === 'research' ||
           segment.kind === 'lead-fan-out' ||
-          segment.kind === 'lead-standup'
+          segment.kind === 'lead-standup' ||
+          segment.kind === 'lead-checkin'
         "
         :segment="segment"
         :workspace-id="shell.currentWorkspace?.workspace_id ?? null"
@@ -395,13 +408,14 @@ async function copyTerminalOutput(output: string): Promise<void> {
           segment.kind !== 'plan' &&
           segment.kind !== 'lead-fan-out' &&
           segment.kind !== 'lead-standup' &&
+          segment.kind !== 'lead-checkin' &&
           segment.open &&
           isStreamingMessage(message.message_id)
         "
         :message-id="message.message_id"
         :segment-index="segmentIndex"
         :answered-option="
-          segment.kind === 'question'
+          segment.kind === 'question' || segment.kind === 'lead-checkin'
             ? answeredOptionForQuestion(
               message.message_id,
               segment.prompt,
@@ -423,6 +437,7 @@ async function copyTerminalOutput(output: string): Promise<void> {
         @reveal="revealTerminalPanel"
         @background="backgroundAgentTerminalRun"
         @copy-output="copyTerminalOutput"
+        @cancel-job="onCancelAgentTerminalJob"
       />
 
       <AgentEditBlock

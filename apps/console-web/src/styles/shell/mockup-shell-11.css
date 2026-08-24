@@ -220,9 +220,11 @@
   min-height: 0;
 }
 
-/* Operator Mission Control: give LIVE OPERATIONS a mockup-width rail. */
+/* Operator Mission Control: give LIVE OPERATIONS a mockup-width rail.
+   Its own variable -- must stay independent of the IDE agent dock's
+   --shell-agent-dock-width, which resizing the IDE panel also writes to. */
 .console-shell--mockup.console-shell--operator {
-  --shell-agent-dock-width: min(26rem, 32vw);
+  --shell-live-ops-width: min(26rem, 32vw);
 }
 
 /* Brain Graph: full-bleed galaxy stage. Left shell rail stays hidden
@@ -246,17 +248,22 @@
   grid-column: centerWorkbench;
 }
 
-/* Mission Control grid: left rail is redundant with Fleet Health.
-   Keep LIVE OPERATIONS / RightDock; expand the center workbench. */
+/* Mission Control tabs: center workbench + resizable LIVE OPS glance rail. */
 .console-shell--mockup.console-shell--operator.console-shell--mission-control {
   grid-template-columns:
-    0
+    minmax(14rem, var(--shell-left-sidebar-width, 340px))
     minmax(0, 1fr)
-    var(--shell-agent-dock-width, min(26rem, 32vw));
+    var(--shell-live-ops-width, 360px);
+}
+
+.console-shell--mockup.console-shell--operator.console-shell--mission-control .region-right-dock {
+  display: flex;
+  min-width: 0;
 }
 
 .console-shell--mockup.console-shell--operator.console-shell--mission-control .region-left-sidebar {
-  display: none;
+  display: flex;
+  min-width: 0;
 }
 
 .console-shell--mockup.console-shell--operator.console-shell--mission-control .region-center-workbench {

@@ -2,7 +2,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
   buildLiveEventsUrl,
+  getLiveEventsTelemetry,
   parseLiveEventData,
+  resetLiveEventsTelemetryForTests,
   shouldTriggerPresenceRefresh,
   shouldTriggerRefresh,
   startLiveEventsSession,
@@ -60,6 +62,7 @@ describe('live events session helpers', () => {
 describe('startLiveEventsSession', () => {
   beforeEach(() => {
     vi.useFakeTimers();
+    resetLiveEventsTelemetryForTests();
   });
 
   afterEach(() => {
@@ -395,5 +398,42 @@ describe('startLiveEventsSession', () => {
     session.disconnect();
     vi.advanceTimersByTime(30_000);
     expect(onRefresh).toHaveBeenCalledTimes(1);
+  });
+
+  it('reconnects EventSource and resyncs authoritative state after a disconnect', async () => {
+    const onRefresh = vi.fn();
+    const onResync = vi.fn();
+    const sources: Array<{ onerror: (() => void) | null }> = [];
+
+    class MockEventSource {
+      onmessage: ((event: MessageEvent) => void) | null = null;
+      onerror: (() => void) | null = null;
+
+      constructor(_url: string) {
+        sources.push(this);
+      }
+
+      close(): void {}
+    }
+
+    const session = startLiveEventsSession({
+      onRefresh,
+      onResync,
+      reconnectBackoffMs: [1_000],
+      EventSourceImpl: MockEventSource as unknown as typeof EventSource,
+      documentRef: {
+        visibilityState: 'visible',
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+      },
+    });
+
+    expect(sources).toHaveLength(1);
+    sources[0]?.onerror?.();
+    await vi.advanceTimersByTimeAsync(1_000);
+    expect(sources).toHaveLength(2);
+    expect(onResync).toHaveBeenCalledTimes(1);
+    expect(getLiveEventsTelemetry().reconnect_count).toBe(1);
+    session.disconnect();
   });
 });

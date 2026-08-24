@@ -270,3 +270,17 @@ Template:
 - acceptance evidence: `acceptance=pass · intent=lead_frontend_dispatch_triage · actor=lead-follow-up-receipt · summary=Existing-file writable target repair and regression coverage present; 30 targeted tests passed; no live completion claimed because control plane is unavailable`
 - residual risk: the running control plane may not have loaded the repaired source; Jules's frontend task must be retried once after service recovery/restart and its run history must show completion with passing Gate 6 evidence
 - next gate unlocked: restore or restart the control plane, retry the same bounded frontend assignment once, then verify the specialist run and synthesize the plan before marking Done
+
+### Lead continuous shift retry (unclosed receipt) — 2026-08-24
+- owner: lead (prior roster fail: Direct reply incomplete — runtime output ended inside an unclosed receipt block)
+- commit: not requested
+- commands run: `axon-agent-terminal-job --workspace workspace_axon_watch -- curl …` / `npx --no-install jest --listTests` → HTTP 400 smart-routed to integrations scoped tasks; raw `curl` denied (network); disk reads of roster-aligned receipts + `diff_policy.py` + `ensure-python-deps.sh` + `agent_sandbox.py`
+- pass/fail: pass for bounded Lead retry — incomplete-receipt failure closed; Quinn delivery block triaged; Jules frontend Gate 6 receipt confirmed on disk; live Fast Gate/health left unverified (terminal scoping)
+- exit criteria met: yes for Lead owns (priorities / hierarchy / Fast Gate triage attempt / coach / upgrades); no for live API or Fast Gate run-id proof this turn
+- fleet: roster — Rowan watching (last completed); Jules completed; Reed completed; Quinn blocked on `private_company_material: output/python-bootstrap/requirements.sha256`
+- coach decisions: Quinn relocate stamp outside `output/**` then retry delivery; Jules keep frontend verify receipt; Rowan keep post-push Fast Gate; Reed idle; ship not approved
+- upgrade proposals: (1) move bootstrap stamp off `**/output/**`; (2) fix Lead terminal smart-route away from integrations scoped tasks; (3) keep closed receipt + Confidence hard gates
+- acceptance evidence: `acceptance=pass · intent=lead_continuous_shift_retry · actor=lead-retry-receipt · summary=Unclosed-receipt retry closed; Quinn output/ stamp vs private glob root-caused; Jules Gate 6 receipt on disk; live probes blocked by terminal smart-route; ship not approved`
+- residual risks: Quinn delivery still blocked until stamp path moves; Lead cannot prove Fast Gate green without scoped terminal; live plan board for `lead-plan-a3c6ea9dd9574936` not re-verified this turn
+- next gate unlocked: Quinn integrations fix for stamp path; restore Lead-scoped terminal jobs; Rowan Fast Gate on next push
+- human receipt: `docs/ops/agent-reports/lead-continuous-shift-retry-2026-08-24.md`

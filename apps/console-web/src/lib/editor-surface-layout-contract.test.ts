@@ -259,6 +259,49 @@ describe('IDE editor surface layout contract', () => {
     expect(buildPlanDisabled).toMatch(/cursor:\s*not-allowed/);
   });
 
+  it('contains IDE terminal scrolling inside xterm when the bottom dock is focused', () => {
+    const shell05 = readCss('shell/mockup-shell-05.css');
+    const terminalBody = ruleBlock(
+      shell05,
+      '.console-shell--mockup .center-workbench__terminal-body .surface-host--terminal-mockup .surface-host__body',
+    );
+    const terminalHost = ruleBlock(shell05, '.center-workbench__terminal-body .xterm');
+    const terminalViewport = ruleBlock(shell05, '.center-workbench__terminal-body .xterm-viewport');
+    const terminalScreen = ruleBlock(shell05, '.center-workbench__terminal-body .xterm-screen');
+
+    expect(terminalBody).toMatch(/min-height:\s*0/);
+    expect(terminalBody).toMatch(/overflow:\s*hidden/);
+    expect(terminalHost).toMatch(/height:\s*100%/);
+    expect(terminalHost).toMatch(/overflow:\s*hidden/);
+    expect(terminalHost).toMatch(/overscroll-behavior:\s*contain/);
+    expect(terminalViewport).toMatch(/overflow-y:\s*auto\s*!important/);
+    expect(terminalViewport).toMatch(/overscroll-behavior:\s*contain/);
+    expect(terminalViewport).toMatch(/touch-action:\s*pan-y/);
+    expect(terminalScreen).toMatch(/overscroll-behavior:\s*contain/);
+  });
+
+  it('keeps PDF previews flex-bound when the IDE terminal dock is open', () => {
+    const shell07 = readCss('shell/mockup-shell-07.css');
+    const editor = ruleBlock(shell07, '.center-workbench__editor');
+    expect(editor).toMatch(/min-height:\s*0/);
+    expect(editor).toMatch(/overflow:\s*hidden/);
+    expect(editor).toMatch(/overscroll-behavior:\s*contain/);
+
+    const shell25 = readCss('shell/mockup-shell-25.css');
+    const pdfPreview = ruleBlock(shell25, '.editor-pdf-preview');
+    const pdfFrame = ruleBlock(shell25, '.editor-pdf-preview__frame');
+
+    expect(pdfPreview).toMatch(/flex:\s*1 1 auto/);
+    expect(pdfPreview).toMatch(/min-height:\s*0/);
+    expect(pdfPreview).toMatch(/overflow:\s*hidden/);
+    expect(pdfPreview).toMatch(/overscroll-behavior:\s*contain/);
+    expect(pdfFrame).toMatch(/flex:\s*1 1 auto/);
+    expect(pdfFrame).toMatch(/height:\s*100%/);
+    expect(pdfFrame).toMatch(/min-height:\s*0/);
+    expect(pdfFrame).toMatch(/overscroll-behavior:\s*contain/);
+    expect(pdfFrame).not.toMatch(/calc\(100vh - 14rem\)/);
+  });
+
   it('loads quick-guide failure secondary action styles from the shell chain', () => {
     const shell07 = readCss('shell/mockup-shell-07.css');
     expect(shell07).toMatch(/@import\s+['"]\.\/center-workbench-ide-guide\.css['"]/);

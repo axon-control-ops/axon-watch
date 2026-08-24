@@ -6,6 +6,7 @@
 import type { CompanyEmployeeRecord } from '../contracts/canonical';
 import { isBuildPlanImplementPrompt } from './build-plan-prompt';
 import {
+  isVagueNamedAssignPrompt,
   matchNamedAssignEmployee,
   namedAssignRouteReason,
 } from './named-assign-route';
@@ -282,6 +283,18 @@ export function shouldSoftRouteToTeammate(
 
   const named = matchNamedAssignEmployee(text, employees);
   if (named) {
+    if (isVagueNamedAssignPrompt(text, named.employee.name)) {
+      const currentId = currentEmployee?.employee_id?.trim() ?? '';
+      return {
+        shouldRoute: false,
+        reason: 'vague_named_assign',
+        employee: named.employee,
+        fromEmployeeId: currentId || undefined,
+        fromName: currentEmployee?.name.trim() || (currentId ? 'teammate' : 'workspace'),
+        source: 'deterministic',
+        routingReceipt: `named_assign;vague;as=${named.matchedAs};to=${named.employee.employee_id}`,
+      };
+    }
     const currentId = currentEmployee?.employee_id?.trim() ?? '';
     const target = named.employee;
     if (currentId && target.employee_id.trim() === currentId) {

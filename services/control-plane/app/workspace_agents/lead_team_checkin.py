@@ -27,6 +27,7 @@ from app.workspace_agents.lead_checkin_assign import (
     assign_owner_role_for_failed_shift,
     assign_owner_role_for_monitor,
 )
+from app.workspace_agents.lead_checkin_report import format_lead_checkin_message
 from app.workspace_agents.autonomous_attention_policy import attention_finding_auto_dispatches
 from app.workspace_agents.run_outcome import latest_role_run_outcome
 
@@ -166,26 +167,6 @@ def _post_lead_checkin_message(
             employee_role="lead",
         )
     thread_id = str(thread["thread_id"])
-    lines = [
-        f"{CHECKIN_GOAL_PREFIX} scheduled team health pass.",
-        f"Findings: {len(findings)} · Assignments created: {len(assigned)}",
-        "",
-    ]
-    for index, finding in enumerate(findings[:12], start=1):
-        flag = "ESCALATE" if finding.escalate_only else f"→ {finding.owner_role}"
-        lines.append(f"{index}. [{finding.kind}] {finding.title} ({flag})")
-        # finding.detail already went through normalize_operator_failure_detail +
-        # word-boundary truncation upstream (run_outcome.latest_role_run_outcome) —
-        # do not re-normalize or re-truncate it here.
-        if finding.detail:
-            lines.append(f"   {finding.detail}")
-    if not findings:
-        lines.append("No failed shifts or degraded third-party signals this pass.")
-    # No trailing "Hierarchy" / "Confidence" boilerplate: this is a deterministic
-    # status message, not an LLM turn — there's no model self-assessment to score,
-    # and the org-chart line is unparsed narration repeated on every check-in with
-    # no reader value (see app.kairo_conversation_runtime_context for the actual
-    # functional hierarchy line, which feeds VAXON's own reasoning context instead).
     message_id = f"message_system_{uuid4().hex}"
     chat_store.save_message(
         {
@@ -194,7 +175,7 @@ def _post_lead_checkin_message(
             "workspace_id": workspace_id,
             "run_id": None,
             "role": "agent",
-            "content": "\n".join(lines),
+            "content": format_lead_checkin_message(findings, assigned),
             "created_at": created_at,
         }
     )
@@ -366,7 +347,9 @@ def _open_assignment_tasks(workspace_id: str) -> list[dict[str, Any]]:
 
 
 def _already_tracked(dedupe_key: str, existing: list[dict[str, Any]]) -> bool:
-    needle = dedupe_key.lower()
+    needle = dedupe_key.strip().lower()
+    if not needle:
+        return False
     for row in existing:
         goal = str(row.get("goal") or "").lower()
         criteria = str(row.get("acceptance_criteria") or "").lower()
@@ -445,6 +428,7 @@ def escalate_operator_blockers_to_vaxon(
         return []
 
     escalated: list[dict[str, Any]] = []
+    existing = _open_assignment_tasks(workspace)
     for finding in findings:
         if len(escalated) >= max(1, int(max_escalations)):
             break
@@ -452,6 +436,15 @@ def escalate_operator_blockers_to_vaxon(
             continue
         dedupe_key = finding.dedupe_key
         try:
+            # Operator approval resolves the Needs-you receipt and creates a
+            # bounded VAXON/attend task that carries the same dedupe key. The
+            # receipt cooldown is intentionally short, but an open recovery
+            # task is durable evidence that the failure is already being
+            # handled. Without this guard, lead/runtime failures can reappear
+            # as the same card every cooldown window while the approved
+            # recovery task is still open or leased.
+            if _already_tracked(dedupe_key, existing):
+                continue
             if autonomous_attention_store.has_recent_dedupe_key(dedupe_key):
                 continue
             receipt = autonomous_attention_store.append_receipt(

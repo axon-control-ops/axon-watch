@@ -15,6 +15,36 @@ SECRET_PATTERNS: tuple[re.Pattern[str], ...] = (
     re.compile(r"(?i)api[_-]?key\s*[:=]\s*['\"][^'\"]{12,}['\"]"),
 )
 
+# Private business material may be created locally as part of customer work,
+# but it is never a worker-delivery artifact.  Keep this list intentionally
+# path/type based: a generic ``docs/`` directory remains publishable for code
+# documentation, while RFQ packs, customer records, generated exports and
+# office-document formats fail closed before staging or pushing.
+PRIVATE_COMPANY_PATH_GLOBS: tuple[str, ...] = (
+    "**/documents/**",
+    "**/docs/rfq/**",
+    "**/docs/profiles-internal/**",
+    "**/data/requisitions/**",
+    "**/data/exports/**",
+    "**/output/**",
+    "**/evidence/**",
+    "**/release/**",
+    "**/business-profile.json",
+    "**/document-brand-profile.json",
+    "**/*-package-profile.json",
+    "**/HANDOFF-*",
+    "**/SEGO-*",
+    "**/*.pdf",
+    "**/*.doc",
+    "**/*.docx",
+    "**/*.odt",
+    "**/*.xls",
+    "**/*.xlsx",
+    "**/*.ods",
+    "**/*.odg",
+    "**/*.zip",
+)
+
 
 # Paths the control plane writes into an agent's isolation worktree itself,
 # before/around the agent's own work. They are Axon bookkeeping, never agent

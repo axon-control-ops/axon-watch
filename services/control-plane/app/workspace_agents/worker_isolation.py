@@ -23,13 +23,27 @@ def create_worker_isolation(
     baseline_ref: str | None = None,
 ) -> Path:
     """Create a disposable checkout for one continuous-worker run."""
+    from app.workspace_agents.workspace_runtime_bootstrap import ensure_workspace_runtime_ready
+
+    ensure_workspace_runtime_ready(workspace_id)
     bound = resolve_workspace_root(workspace_id)
-    return create_isolation_root(
+    checkout = create_isolation_root(
         proposal_id=run_id,
         bound_project_root=bound,
         baseline_commit=baseline_commit,
         baseline_ref=baseline_ref,
     )
+    from app.cli_runtime.sandbox_preview import ensure_isolation_checkout_runnable
+
+    borrow = ensure_isolation_checkout_runnable(checkout)
+    if not borrow.get("ok"):
+        errors = borrow.get("errors") or []
+        detail = "; ".join(str(item) for item in errors if str(item).strip())
+        raise IsolationError(
+            "sandbox checkout toolchain borrow failed"
+            + (f": {detail}" if detail else "")
+        )
+    return checkout
 
 
 def worker_agent_workspace(isolation_root: Path) -> Path:

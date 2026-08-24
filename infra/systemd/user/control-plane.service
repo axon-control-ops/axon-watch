@@ -1,6 +1,6 @@
 [Unit]
 Description=Axon-X Control Plane (user always-on)
-After=network.target axon-watch.service
+After=network-online.target axon-watch.service
 Wants=network-online.target axon-watch.service
 # Soft dependency only — if watch flaps, CP must keep serving :8787
 # (Requires= used to stop CP with watch and flood Vite with ECONNREFUSED).

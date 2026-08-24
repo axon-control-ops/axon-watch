@@ -400,6 +400,13 @@ wait_for_http() {
 }
 
 write_stack_manifest() {
+  local manifest_dir
+  manifest_dir="$(dirname "${stack_manifest}")"
+  if [[ ! -d "${manifest_dir}" ]] || [[ ! -w "${manifest_dir}" ]]; then
+    echo "WARN: cannot write stack manifest at ${stack_manifest}; continuing without local state file." >&2
+    return 0
+  fi
+
   cat >"${stack_manifest}" <<EOF
 AXON_WATCH_PUBLIC_BASE_URL=$(service_base_url "console-web")
 AXON_WATCH_CONTROL_PLANE_BASE_URL=$(service_base_url "control-plane")

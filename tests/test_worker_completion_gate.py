@@ -16,6 +16,7 @@ from app.workspace_agents.completion_gate import (  # noqa: E402
     CompletionGateResult,
     evaluate_post_publish_completion_gate,
     evaluate_pre_publish_completion_gate,
+    record_completion_gate_receipt,
 )
 
 
@@ -169,6 +170,150 @@ class WorkerCompletionGateTests(unittest.TestCase):
         self.assertTrue(result.passed, result)
         self.assertEqual("non-implementation task", result.reason)
 
+    def test_report_task_receipt_names_edit_receipt_paths(self) -> None:
+        opened = task_store.create_task(
+            workspace_id="workspace_dashpro",
+            owner_role="lead",
+            goal="Document AXON isolation and access acceptance probe findings.",
+            acceptance_criteria="Create an ops note if useful and report evidence.",
+            allowed_paths=["node_modules", "docs/planning", "docs/ops", "plans"],
+        )
+        task = task_store.lease_task(
+            opened["task_id"],
+            lease_holder="employee-workspace_dashpro-lead",
+        )
+        run_id = create_run(
+            workspace_id="workspace_dashpro",
+            mode="agent",
+            summary="Lead ops note",
+            employee_role="lead",
+            task_id=str(task["task_id"]),
+            require_leased_task=True,
+        )["run_id"]
+        self._pass_acceptance(str(run_id))
+
+        with tempfile.TemporaryDirectory() as tempdir:
+            result = evaluate_pre_publish_completion_gate(
+                run_id=str(run_id),
+                task=task,
+                isolation_root=Path(tempdir),
+                reply_text=(
+                    "Created the operator note.\n"
+                    ":::edit docs/ops/AXON_FULL_ACCESS_PROBE.md +25 -0\n"
+                    ":::\n"
+                    "Confidence: 9/10"
+                ),
+                changed_paths=[],
+            )
+
+        self.assertTrue(result.passed, result)
+        self.assertEqual(["docs/ops/AXON_FULL_ACCESS_PROBE.md"], result.changed_paths)
+        record_completion_gate_receipt(str(run_id), result)
+        run = run_store.get_run(str(run_id))
+        history = run_store.list_history(str((run or {}).get("history_ref") or ""))
+        receipt = next(
+            item.get("receipt") for item in history
+            if (item.get("receipt") or {}).get("type") == "completion_gate"
+        )
+        self.assertIn(
+            "changed_files=docs/ops/AXON_FULL_ACCESS_PROBE.md",
+            str(receipt.get("summary") or ""),
+        )
+
+    def _latest_completion_gate_summary(self, run_id: str) -> str:
+        run = run_store.get_run(run_id)
+        history = run_store.list_history(str((run or {}).get("history_ref") or ""))
+        receipt = next(
+            item.get("receipt") for item in history
+            if (item.get("receipt") or {}).get("type") == "completion_gate"
+        )
+        return str(receipt.get("summary") or "")
+
+    def test_preflight_receipt_is_labelled_preflight_not_completion(self) -> None:
+        """The receipt recorded before publish must not read as the final verdict.
+
+        Regression: a private-material publish block still left an earlier
+        ``completion=pass`` receipt in run history from this pre-publish call —
+        anyone (agent or operator) reading only that receipt saw a false pass
+        for a run that was later failed by the publish gate.
+        """
+        task = self._leased_backend_task(goal="receipt-backed ops task")
+        run_id = self._run_for_task(task)
+        result = CompletionGateResult(
+            passed=True,
+            reason="receipt-backed ops task",
+            changed_paths=[],
+            expected_files=[],
+            validation_status="deferred to delivery receipt",
+        )
+        record_completion_gate_receipt(run_id, result, final=False)
+        summary = self._latest_completion_gate_summary(run_id)
+        self.assertTrue(summary.startswith("preflight=pass"), summary)
+        self.assertNotIn("completion=", summary)
+
+    def test_post_publish_receipt_is_labelled_completion(self) -> None:
+        task = self._leased_backend_task(goal="receipt-backed ops task")
+        run_id = self._run_for_task(task)
+        result = CompletionGateResult(
+            passed=True,
+            reason="completion gate passed",
+            changed_paths=["supabase/migrations/0001_init.sql"],
+            expected_files=["supabase"],
+            validation_status="passed",
+            commit_sha="abc123",
+        )
+        record_completion_gate_receipt(run_id, result, final=True)
+        summary = self._latest_completion_gate_summary(run_id)
+        self.assertTrue(summary.startswith("completion=pass"), summary)
+
+    def test_overlap_note_flags_disjoint_changed_and_expected_files(self) -> None:
+        """A receipt-backed pass whose changed files share nothing with the
+        task's expected scope is exactly the shape that let a blocked
+        private-material delivery (assets/TPS-PACK.zip, ...) sit next to an
+        unrelated expected scope (docs/ops, docs/planning, ...) and still
+        read as a clean pass."""
+        task = self._leased_backend_task(goal="receipt-backed ops task")
+        run_id = self._run_for_task(task)
+        result = CompletionGateResult(
+            passed=True,
+            reason="receipt-backed ops task",
+            changed_paths=["assets/TPS-PACK.zip", "assets/_extracted/pack/photo.jpeg"],
+            expected_files=["node_modules", "docs/planning", "docs/ops", "plans"],
+            validation_status="deferred to delivery receipt",
+        )
+        record_completion_gate_receipt(run_id, result, final=False)
+        summary = self._latest_completion_gate_summary(run_id)
+        self.assertIn("note=changed_files did not overlap expected_files", summary)
+
+    def test_overlap_note_absent_when_changed_files_are_in_scope(self) -> None:
+        task = self._leased_backend_task(goal="receipt-backed ops task")
+        run_id = self._run_for_task(task)
+        result = CompletionGateResult(
+            passed=True,
+            reason="receipt-backed ops task",
+            changed_paths=["docs/ops/rollup.md"],
+            expected_files=["docs/ops", "docs/planning"],
+            validation_status="deferred to delivery receipt",
+        )
+        record_completion_gate_receipt(run_id, result, final=False)
+        summary = self._latest_completion_gate_summary(run_id)
+        self.assertNotIn("note=", summary)
+
+    def test_overlap_note_absent_on_failed_result(self) -> None:
+        """Advisory only on a pass — a failure receipt already says why."""
+        task = self._leased_backend_task(goal="receipt-backed ops task")
+        run_id = self._run_for_task(task)
+        result = CompletionGateResult(
+            passed=False,
+            reason="Workspace delivery blocked: private_company_material: assets/x.zip",
+            changed_paths=["assets/x.zip"],
+            expected_files=["docs/ops"],
+            validation_status="not checked",
+        )
+        record_completion_gate_receipt(run_id, result, final=False)
+        summary = self._latest_completion_gate_summary(run_id)
+        self.assertNotIn("note=", summary)
+
     def test_verification_refusal_without_command_receipts_cannot_pass(self) -> None:
         opened = task_store.create_task(
             workspace_id="workspace_dashpro",
@@ -196,7 +341,7 @@ class WorkerCompletionGateTests(unittest.TestCase):
         self.assertIn("required evidence", result.reason)
 
     def test_specialist_verification_handoff_passes_with_terminal_jobs(self) -> None:
-        from app.terminal import agent_jobs
+        from app.terminal.agent_job_registry import register_job
         from app.workspace_agents.verifier_contract import ensure_acceptance_before_publish
 
         opened = task_store.create_task(
@@ -215,8 +360,8 @@ class WorkerCompletionGateTests(unittest.TestCase):
             lease_holder="employee-workspace_dashpro-backend",
         )
         run_id = self._run_for_task(task)
-        with agent_jobs._lock:
-            agent_jobs._jobs["agent-job-verify-gate"] = {
+        register_job(
+            {
                 "job_id": "agent-job-verify-gate",
                 "workspace_id": "workspace_dashpro",
                 "run_id": run_id,
@@ -225,6 +370,7 @@ class WorkerCompletionGateTests(unittest.TestCase):
                 "exit_code": 0,
                 "created_at": "2026-01-01T00:00:00Z",
             }
+        )
         ensure_acceptance_before_publish(run_id, changed_paths=["src/out_of_scope.ts"])
 
         with tempfile.TemporaryDirectory() as tempdir:
@@ -369,6 +515,46 @@ class WorkerCompletionGateTests(unittest.TestCase):
 
         self.assertFalse(result.passed)
         self.assertIn("missing validation command outputs", result.reason)
+
+
+class ReviewShapedTaskClassificationTests(unittest.TestCase):
+    """Regression: a review goal mentioning "fixes" demanded a diff, so an
+    honest report failed with "worker produced no changed files"."""
+
+    def _requested(self, goal: str) -> bool:
+        from app.workspace_agents.completion_gate import implementation_requested
+
+        return implementation_requested(
+            {"owner_role": "backend", "goal": goal, "acceptance_criteria": ""}
+        )
+
+    def test_review_then_apply_fixes_is_not_an_implementation_demand(self) -> None:
+        self.assertFalse(
+            self._requested(
+                "Critically review all your previous work for factual errors. "
+                "Suggest fixes/improvements - Apply them - Then rewrite the answer."
+            )
+        )
+
+    def test_audit_goal_is_report_first(self) -> None:
+        self.assertFalse(self._requested("Audit the CI workflows and report findings"))
+
+    def test_dashboard_status_report_does_not_match_add_substring(self) -> None:
+        self.assertFalse(
+            self._requested(
+                "Produce a clear status report on the teacher dashboard and "
+                "parent/child dashboard flow work completed to date."
+            )
+        )
+
+    def test_review_that_names_a_build_still_demands_a_diff(self) -> None:
+        self.assertTrue(
+            self._requested("Review the lessons service and implement the missing endpoint")
+        )
+
+    def test_plain_implementation_goals_are_unchanged(self) -> None:
+        self.assertTrue(self._requested("Fix the failing lessons service test"))
+        self.assertTrue(self._requested("Add a new payments endpoint"))
 
 
 if __name__ == "__main__":

@@ -196,6 +196,23 @@ def _resolve_tunnel_url(config: dict[str, object], *, process_running: bool) -> 
     return ""
 
 
+def probe_local_origin(config: dict[str, object] | None = None) -> dict[str, object]:
+    """Check the local origin the tunnel fronts, without touching Cloudflare."""
+
+    config = config or load_tunnel_slice() or {}
+    url = str(config.get("local_health_url") or "").strip()
+    if not url:
+        origin = str(config.get("local_origin_url") or "http://127.0.0.1:4173").strip().rstrip("/")
+        url = f"{origin}/api/health"
+    healthy, latency_ms, detail = _probe_http(url)
+    return {
+        "healthy": healthy,
+        "url": url,
+        "latency_ms": latency_ms,
+        "detail": detail,
+    }
+
+
 def build_tunnel_diagnostics(config: dict[str, object] | None = None) -> dict[str, object]:
     config = config or load_tunnel_slice() or {}
     checked_at = utc_now_iso()

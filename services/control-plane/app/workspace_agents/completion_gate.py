@@ -15,6 +15,7 @@ from app.workspace_agents.lead_verification_handoff import (
     verification_terminal_jobs_for_run,
 )
 from app.workspace_agents.ops_delivery import no_change_delivery_is_successful_ops_task
+from app.chat.reply_verification import extract_edit_paths
 
 
 _IMPLEMENTATION_ROLES = frozenset({"frontend", "backend", "integrations"})
@@ -78,6 +79,10 @@ _STOP_WORDS = frozenset(
 )
 
 
+def _has_intent_word(text: str, words: Iterable[str]) -> bool:
+    return any(re.search(rf"\b{re.escape(word)}\b", text) for word in words)
+
+
 @dataclass(frozen=True)
 class CompletionGateResult:
     passed: bool
@@ -112,14 +117,44 @@ def implementation_requested(task: dict[str, Any] | None) -> bool:
     assigned_blob = " ".join(
         str(task.get(key) or "") for key in ("goal", "acceptance_criteria")
     ).lower()
-    explicitly_requests_implementation = any(word in assigned_blob for word in _IMPLEMENTATION_WORDS)
+    explicitly_requests_implementation = _has_intent_word(
+        assigned_blob,
+        _IMPLEMENTATION_WORDS,
+    )
     if no_change_delivery_is_successful_ops_task(task):
         return False
+    # "Critically review X, suggest fixes, apply them" leads with review: the
+    # diff is conditional on finding something. Counting the word "fix" as a
+    # hard implementation demand fails an honest report with the misleading
+    # reason "worker produced no changed files".
+    if _leads_with_review_intent(task) and not _demands_unconditional_change(assigned_blob):
+        return False
     if role in _IMPLEMENTATION_ROLES:
-        return explicitly_requests_implementation or not any(
-            word in assigned_blob for word in _REPORT_ONLY_WORDS
+        return explicitly_requests_implementation or not _has_intent_word(
+            assigned_blob,
+            _REPORT_ONLY_WORDS,
         )
     return explicitly_requests_implementation
+
+
+_REVIEW_LEAD_RE = re.compile(
+    r"^\s*(?:please\s+)?(?:critically\s+)?"
+    r"(review|re-?check|audit|critique|verify|validate|inspect|triage|assess)\b",
+    re.IGNORECASE,
+)
+# Phrasing that still demands a diff even inside a review-shaped goal.
+_UNCONDITIONAL_CHANGE_RE = re.compile(
+    r"\b(implement|add|create|build|migrate|refactor|rewrite the (?:code|module|service))\b",
+    re.IGNORECASE,
+)
+
+
+def _leads_with_review_intent(task: dict[str, Any]) -> bool:
+    return bool(_REVIEW_LEAD_RE.match(str(task.get("goal") or "")))
+
+
+def _demands_unconditional_change(assigned_blob: str) -> bool:
+    return bool(_UNCONDITIONAL_CHANGE_RE.search(assigned_blob))
 
 
 def expected_files_for_task(task: dict[str, Any] | None) -> list[str]:
@@ -181,35 +216,70 @@ def _worker_reported_changed_files(reply_text: str, paths: Iterable[str]) -> boo
     return bool(re.search(r"\b[\w.-]+\.(tsx?|jsx?|vue|css|py|sql|md)\b", reply))
 
 
+def _receipt_reported_changed_paths(reply_text: str) -> list[str]:
+    """Changed paths explicitly backed by edit receipt blocks in the reply.
+
+    Some report/ops tasks legitimately do not publish a product diff, but still
+    create operator-facing notes inside the disposable checkout. Their completion
+    receipt should not say ``changed_files=none`` when the reply contains a
+    concrete ``:::edit path`` receipt.
+    """
+    cleaned: list[str] = []
+    seen: set[str] = set()
+    for raw in extract_edit_paths(reply_text or ""):
+        path = str(raw or "").strip().lstrip("./")
+        if not path or path in seen:
+            continue
+        seen.add(path)
+        cleaned.append(path)
+    return strip_control_plane_owned_paths(cleaned)
+
+
+def _merge_receipt_paths_for_reporting(
+    *,
+    task: dict[str, Any] | None,
+    paths: list[str],
+    reply_text: str,
+) -> list[str]:
+    if implementation_requested(task):
+        return paths
+    receipt_paths = _receipt_reported_changed_paths(reply_text)
+    if not receipt_paths:
+        return paths
+    merged: list[str] = []
+    seen: set[str] = set()
+    for item in [*paths, *receipt_paths]:
+        cleaned = str(item or "").strip()
+        if not cleaned or cleaned in seen:
+            continue
+        seen.add(cleaned)
+        merged.append(cleaned)
+    return merged
+
+
 def _validation_status(run_id: str, task: dict[str, Any]) -> tuple[bool, str]:
     run = run_store.get_run(run_id)
     if not isinstance(run, dict):
         return False, "missing run record"
 
     if is_verification_task(task):
+        from app.workspace_agents.verification_execution import (
+            describe_failed_jobs,
+            job_failed,
+            job_passed,
+        )
+
         workspace_id = str(task.get("workspace_id") or "").strip()
         terminal_jobs = verification_terminal_jobs_for_run(workspace_id, run_id)
-        passed_jobs = [
-            job
-            for job in terminal_jobs
-            if str(job.get("status") or "").strip().lower() == "completed"
-            and job.get("exit_code") is not None
-            and int(job.get("exit_code") or 0) == 0
-        ]
+        passed_jobs = [job for job in terminal_jobs if job_passed(job)]
         if passed_jobs:
             return True, f"passed with {len(passed_jobs)} verification terminal job(s)"
-        failed_jobs = [
-            job
-            for job in terminal_jobs
-            if str(job.get("status") or "").strip().lower() == "failed"
-            or (
-                str(job.get("status") or "").strip().lower() == "completed"
-                and job.get("exit_code") is not None
-                and int(job.get("exit_code") or 0) != 0
-            )
-        ]
+        failed_jobs = [job for job in terminal_jobs if job_failed(job)]
         if failed_jobs:
-            return False, f"verification terminal jobs failed ({len(failed_jobs)})"
+            return False, (
+                f"verification terminal jobs failed ({len(failed_jobs)}): "
+                f"{describe_failed_jobs(failed_jobs)}"
+            )
         if terminal_jobs:
             return False, "verification terminal jobs incomplete"
         return False, "missing verification terminal job receipts"
@@ -256,6 +326,11 @@ def evaluate_pre_publish_completion_gate(
         from app.workspace_delivery.publish import list_isolation_changed_paths
 
         paths = strip_control_plane_owned_paths(list_isolation_changed_paths(isolation_root))
+    paths = _merge_receipt_paths_for_reporting(
+        task=task,
+        paths=paths,
+        reply_text=reply_text,
+    )
 
     if not implementation_requested(task):
         if not isinstance(task, dict) or not str(task.get("goal") or "").strip():
@@ -358,16 +433,52 @@ def evaluate_post_publish_completion_gate(
     )
 
 
+def _changed_expected_overlap_note(result: CompletionGateResult) -> str:
+    """Flag when changed_files and expected_files share nothing in common.
+
+    A receipt-backed ops/coordination pass legitimately has no product diff,
+    so this is advisory, not a gate — but a completely disjoint changed/expected
+    set on an otherwise-passing receipt is exactly the shape that let a blocked
+    private-material delivery's changed_files (assets/TPS-PACK.zip, ...) sit
+    next to an unrelated expected_files scope (docs/ops, docs/planning, ...)
+    and still read as a clean pass to anyone skimming the receipt.
+    """
+    if not result.passed or not result.changed_paths or not result.expected_files:
+        return ""
+    changed = {path.strip().lstrip("./") for path in result.changed_paths if path.strip()}
+    expected_roots = {path.strip().lstrip("./") for path in result.expected_files if path.strip()}
+    overlaps = any(
+        changed_path == root or changed_path.startswith(f"{root.rstrip('/')}/")
+        for changed_path in changed
+        for root in expected_roots
+    )
+    if overlaps:
+        return ""
+    return " · note=changed_files did not overlap expected_files"
+
+
 def record_completion_gate_receipt(
     run_id: str,
     result: CompletionGateResult,
     *,
     actor: str = "workspace_scheduler",
+    final: bool = False,
 ) -> dict[str, Any]:
+    """Record a completion-gate receipt.
+
+    ``final=False`` (the default) is used for the receipt recorded before
+    ``publish_worker_isolation`` runs (see ``run_worker_delivery_gate``) — the
+    delivery can still be blocked after this point (e.g. a private-material
+    path gate), so it is labelled ``preflight`` rather than ``completion`` to
+    avoid reading as the run's terminal verdict. Only the receipt recorded
+    after a successful publish (``final=True``) uses ``completion=``.
+    """
     status = "pass" if result.passed else "fail"
+    label = "completion" if final else "preflight"
     paths = ", ".join(result.changed_paths[:8]) if result.changed_paths else "none"
     expected = ", ".join(result.expected_files[:8]) if result.expected_files else "task/role scope"
     commit = result.commit_sha or "pending"
+    overlap_note = _changed_expected_overlap_note(result)
     return append_run_execution_receipt(
         run_id,
         receipt_type="completion_gate",
@@ -375,9 +486,9 @@ def record_completion_gate_receipt(
         success=result.passed,
         intent="worker_completion_gate",
         receipt_summary=(
-            f"completion={status} · reason={result.reason} · changed_files={paths} · "
+            f"{label}={status} · reason={result.reason} · changed_files={paths} · "
             f"expected_files={expected} · validation={result.validation_status} · "
-            f"commit={commit}"
+            f"commit={commit}{overlap_note}"
         ),
     )
 
@@ -417,7 +528,7 @@ def run_worker_delivery_gate(
         isolation_root=isolation_root,
         reply_text=reply_text,
     )
-    record_completion_gate_receipt(run_id, preflight)
+    record_completion_gate_receipt(run_id, preflight, final=False)
     if not preflight.passed:
         return WorkerDeliveryGateOutcome(
             False,
@@ -438,7 +549,7 @@ def run_worker_delivery_gate(
             delivery=publish.delivery,
             preflight=preflight,
         )
-        record_completion_gate_receipt(run_id, final)
+        record_completion_gate_receipt(run_id, final, final=True)
         if not final.passed:
             return WorkerDeliveryGateOutcome(
                 False,

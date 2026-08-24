@@ -387,6 +387,47 @@ def resume_run(run_id: str) -> dict[str, Any]:
     )
 
 
+def block_run_on_operator_ask(
+    run_id: str,
+    *,
+    prompt: str,
+    actor: str = "workspace_scheduler",
+) -> dict[str, Any] | None:
+    """Hold a run that asked the operator a question it may not answer itself.
+
+    Raising the ask as a durable receipt is not enough on its own: the run kept
+    executing and could finalize as complete while its own reply said it was
+    blocked. ``awaiting_approval`` is the existing blocked phase and is already
+    resumable through ``approve_run``, so answering the ask releases the run
+    through the normal path rather than a bespoke one.
+
+    Returns ``None`` when the run is not in a phase that can be held — a run
+    that already failed or completed must not be dragged back into blocked.
+    """
+    record = run_store.get_run(run_id)
+    if record is None:
+        raise RunNotFoundError(f"run not found: {run_id}")
+    if not can_transition(record["phase"], "awaiting_approval"):
+        return None
+
+    step = " ".join(str(prompt or "").split()).strip() or "Awaiting an operator decision"
+    if len(step) > 180:
+        step = step[:179].rstrip() + "…"
+
+    blocked = _transition_record(
+        record,
+        to_phase="awaiting_approval",
+        current_step=f"Blocked on operator decision: {step}",
+        actor=actor,
+        receipt_type="worker_ask_block",
+        receipt_summary=f"Run held for an operator decision: {step}",
+    )
+    from app.runs.run_material_change import notify_run_material_change
+
+    notify_run_material_change(run_id, blocked)
+    return blocked
+
+
 def approve_run(run_id: str) -> dict[str, Any]:
     record = run_store.get_run(run_id)
     if record is None:
@@ -506,7 +547,10 @@ from app.runs.queries import (
     list_runs,
     to_runtime_summary_active_run,
 )
-from app.runs.restart_reconcile import reconcile_orphaned_runs_on_startup
+from app.runs.restart_reconcile import (
+    reconcile_employee_runs_missing_tasks,
+    reconcile_orphaned_runs_on_startup,
+)
 from app.runs.employee_retention import (
     DEFAULT_KEEP_PER_ROLE,
     drain_terminal_employee_runs,
@@ -525,4 +569,5 @@ from app.runs.stale_reconcile import (
     employee_run_stale_seconds,
     employee_run_stale_seconds_for_role,
     reap_stale_employee_runs,
+    reap_stale_interactive_runs,
 )

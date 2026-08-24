@@ -17,6 +17,7 @@ sys.path.insert(0, str(CONTROL_PLANE_ROOT))
 from app.persistence import chat_store, run_store, task_store  # noqa: E402
 from app.runs.service import append_run_execution_receipt, create_run  # noqa: E402
 from app.workspace_agents.config_loader import EmployeeConfig  # noqa: E402
+from app.workspace_agents.execution_policy import AgentExecutionPolicy  # noqa: E402
 
 
 def _seed_leased_run(*, workspace_id: str, owner_role: str, goal: str) -> dict[str, object]:
@@ -37,6 +38,21 @@ def _seed_leased_run(*, workspace_id: str, owner_role: str, goal: str) -> dict[s
         employee_role=owner_role,
         task_id=leased["task_id"],
         require_leased_task=True,
+    )
+
+
+def _test_full_policy() -> AgentExecutionPolicy:
+    return AgentExecutionPolicy(
+        read_paths=(".",),
+        write_paths=("services", "tests"),
+        forbidden_path_globs=(),
+        approved_wrapper_names=(),
+        approved_command_prefixes=(),
+        audited_capabilities=("test", "workspace_read"),
+        network_mode="none",
+        timeout_seconds=1200,
+        trust_policy="worker",
+        execution_access="full",
     )
 
 
@@ -113,13 +129,16 @@ class WorkerIdeStreamTests(unittest.TestCase):
             "app.workspace_agents.worker_dispatch.generate_lane_b_result",
             side_effect=fake_lane_b,
         ), patch(
-            "app.workspace_agents.worker_dispatch.create_worker_isolation",
+            "app.workspace_agents.worker_dispatch.create_dispatch_isolation",
             return_value=isolation,
         ), patch(
             "app.workspace_agents.worker_dispatch.worker_agent_workspace",
             return_value=isolation,
         ), patch(
-            "app.workspace_agents.worker_dispatch.cleanup_worker_isolation",
+            "app.workspace_agents.worker_dispatch.resolve_worker_execution_policy",
+            return_value=_test_full_policy(),
+        ), patch(
+            "app.workspace_agents.worker_dispatch.cleanup_dispatch_isolation",
             return_value={"cleaned": True, "removed": True},
         ), patch(
             "app.workspace_agents.verifier_contract.ensure_acceptance_before_publish",
@@ -215,13 +234,16 @@ class WorkerIdeStreamTests(unittest.TestCase):
             "app.workspace_agents.worker_dispatch.generate_lane_b_result",
             side_effect=fake_lane_b,
         ), patch(
-            "app.workspace_agents.worker_dispatch.create_worker_isolation",
+            "app.workspace_agents.worker_dispatch.create_dispatch_isolation",
             return_value=isolation,
         ), patch(
             "app.workspace_agents.worker_dispatch.worker_agent_workspace",
             return_value=isolation,
         ), patch(
-            "app.workspace_agents.worker_dispatch.cleanup_worker_isolation",
+            "app.workspace_agents.worker_dispatch.resolve_worker_execution_policy",
+            return_value=_test_full_policy(),
+        ), patch(
+            "app.workspace_agents.worker_dispatch.cleanup_dispatch_isolation",
             return_value={"cleaned": True, "removed": True},
         ), patch(
             "app.workspace_agents.verifier_contract.ensure_acceptance_before_publish",
@@ -289,13 +311,16 @@ class WorkerIdeStreamTests(unittest.TestCase):
             "app.workspace_agents.worker_dispatch.generate_lane_b_result",
             side_effect=RuntimeError("boom"),
         ), patch(
-            "app.workspace_agents.worker_dispatch.create_worker_isolation",
+            "app.workspace_agents.worker_dispatch.create_dispatch_isolation",
             return_value=__import__("pathlib").Path("/tmp/axon-worker-ide-fail/checkout"),
         ), patch(
             "app.workspace_agents.worker_dispatch.worker_agent_workspace",
             return_value=__import__("pathlib").Path("/tmp/axon-worker-ide-fail/checkout"),
         ), patch(
-            "app.workspace_agents.worker_dispatch.cleanup_worker_isolation",
+            "app.workspace_agents.worker_dispatch.resolve_worker_execution_policy",
+            return_value=_test_full_policy(),
+        ), patch(
+            "app.workspace_agents.worker_dispatch.cleanup_dispatch_isolation",
             return_value={"cleaned": True, "removed": True},
         ):
             dispatched, finalized = dispatch_continuous_worker_run(

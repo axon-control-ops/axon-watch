@@ -13,6 +13,7 @@ import {
   employeeDockReceiptRunId,
   employeeDockReceiptRunLabel,
   employeeFailureBeatAriaLabel,
+  employeeFailureBlocksRetry,
   employeeFailureDetailTooltip,
   employeeFailureLine,
   employeeMetaLine,
@@ -24,7 +25,8 @@ import {
   employeeTalkLineDetailTooltip,
 } from '../../features/workspace-agents/company-roster-view';
 import {
-  failedShiftSubjectFromDecisionTitle,
+  APPROVE_PENDING_RECOVERY_ID,
+  failedShiftSubject,
   pendingDecisionCardOptions,
   pendingDecisionPrompt as resolvePendingDecisionPrompt,
 } from '../../features/workspace-agents/company-roster-focus';
@@ -70,6 +72,9 @@ const failure = computed(() =>
 const interruptedShift = computed(() =>
   Boolean(failure.value) && employeeShiftNeedsContinuation(props.employee),
 );
+const retryBlocked = computed(
+  () => Boolean(failure.value) && employeeFailureBlocksRetry(props.employee),
+);
 const failureDetailTooltip = computed(() => employeeFailureDetailTooltip(props.employee));
 const failureBeatAriaLabel = computed(() => employeeFailureBeatAriaLabel(props.employee));
 const beatDetailTooltip = computed(
@@ -93,6 +98,14 @@ const liveBeat = computed(() => {
   }
   if (props.liveBusy && props.runtimeShiftHint?.trim()) {
     return props.runtimeShiftHint.trim();
+  }
+  const decisionSubject = failedShiftSubject(props.employee);
+  if (
+    props.employee.pending_decision_id
+    && decisionSubject
+    && decisionSubject.role !== (props.employee.role ?? '').trim().toLowerCase()
+  ) {
+    return `${props.employee.name} is holding a recovery review for ${decisionSubject.name} (${decisionSubject.role}).`;
   }
   if (failure.value) {
     return failure.value;
@@ -136,14 +149,20 @@ const pendingDecisionCopy = computed(
   () => resolvePendingDecisionPrompt(props.employee) || 'Review the pending decision',
 );
 const pendingDecisionSubject = computed(() =>
-  failedShiftSubjectFromDecisionTitle(props.employee.pending_decision_title),
+  failedShiftSubject(props.employee),
 );
 const pendingDecisionOptions = computed(() =>
   pendingDecisionCardOptions(props.employee).slice(0, 3),
 );
-const retryActionLabel = computed(
-  () => displayActions.value.find((action) => action.id === 'retry')?.label ?? 'Try again',
+const hasRecoveryDecisionOption = computed(() =>
+  pendingDecisionOptions.value.some((option) => option.id === APPROVE_PENDING_RECOVERY_ID),
 );
+const retryActionLabel = computed(() => {
+  if (retryBlocked.value) {
+    return 'Talk to resolve';
+  }
+  return displayActions.value.find((action) => action.id === 'retry')?.label ?? 'Try again';
+});
 
 const transcriptRef = ref<HTMLElement | null>(null);
 
@@ -297,10 +316,12 @@ watch(
       >
         <span class="agent-persona-dock__decision-icon" aria-hidden="true">!</span>
         <span class="agent-persona-dock__decision-copy">
-          <span class="agent-persona-dock__decision-kicker">Decision required</span>
+          <span class="agent-persona-dock__decision-kicker">
+            {{ pendingDecisionSubject ? `Recovery review for ${pendingDecisionSubject.name}` : 'Decision required' }}
+          </span>
           <strong id="agent-pending-decision-title">{{ pendingDecisionCopy }}</strong>
           <small v-if="pendingDecisionSubject && pendingDecisionSubject.role !== (employee.role ?? '').trim().toLowerCase()">
-            {{ employee.name }} is holding this decision for {{ pendingDecisionSubject.name }} ({{ pendingDecisionSubject.role }})
+            Decision owner: {{ employee.name }} ({{ employee.role }}) · Affected agent: {{ pendingDecisionSubject.name }} ({{ pendingDecisionSubject.role }})
           </small>
           <small v-else-if="pendingDecisionSubject">
             Shift failure · {{ pendingDecisionSubject.name }} ({{ pendingDecisionSubject.role }})
@@ -309,8 +330,13 @@ watch(
             {{ pendingDecisionOptions.map((option) => option.label).join(' · ') }}
           </small>
         </span>
-        <span class="agent-persona-dock__decision-open">Review in composer →</span>
+        <span class="agent-persona-dock__decision-open">Open decision in composer →</span>
       </button>
+      <p class="agent-persona-dock__decision-help">
+        Opens this decision as an editable operator reply. The primary action creates a narrow
+        diagnosis task for the decision owner; it does not silently rerun the affected agent,
+        deploy, or make broad changes.
+      </p>
       <div
         v-if="pendingDecisionOptions.length"
         class="agent-persona-dock__decision-options"
@@ -322,11 +348,19 @@ watch(
           :key="option.id"
           type="button"
           class="agent-persona-dock__decision-option"
+          :class="{
+            'agent-persona-dock__decision-option--primary':
+              option.id === APPROVE_PENDING_RECOVERY_ID,
+          }"
           @click="emit('decisionOption', option)"
         >
           {{ option.label }}
         </button>
       </div>
+      <p v-if="hasRecoveryDecisionOption" class="agent-persona-dock__decision-footnote">
+        Use diagnosis for recoverable runtime, quota, connectivity, or stale-shift blockers. Use
+        composer review when you need to steer the team or explicitly retry the affected agent.
+      </p>
     </section>
 
     <ul

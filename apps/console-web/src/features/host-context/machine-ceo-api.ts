@@ -1,4 +1,6 @@
 /** VAXON Machine CEO — host pulse + safe process kill. */
+import { fetchJson } from '../../api/client';
+
 
 export type MachineProcessRow = {
   pid: number;
@@ -44,18 +46,14 @@ export type MachineCeoTick = {
 };
 
 async function jsonFetch<T>(path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(path, {
+  return fetchJson<T>(path, {
     ...init,
     headers: {
       Accept: 'application/json',
       'Content-Type': 'application/json',
       ...(init?.headers ?? {}),
     },
-  });
-  if (!response.ok) {
-    throw new Error(`${path} failed: ${response.status}`);
-  }
-  return (await response.json()) as T;
+  }, `${path} failed`);
 }
 
 export async function fetchMachinePulse(): Promise<MachinePulse> {

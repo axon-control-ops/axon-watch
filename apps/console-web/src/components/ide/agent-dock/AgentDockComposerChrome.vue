@@ -37,6 +37,7 @@ const props = defineProps<{
   commandMutationPending: boolean;
   agentStreamActive: boolean;
   showApprovalBanner: boolean;
+  approvalCurrentStep?: string | null;
   canApproveIdeAgentRun: boolean;
   runMutationPending: boolean;
   planSoftSwitchNotice: PlanSoftSwitchNotice | null;
@@ -70,7 +71,7 @@ const emit = defineEmits<{
   undoTeammateRoute: [];
   dismissTeammateRoute: [];
   switchWorkspaceScope: [];
-  dismissWorkspaceScope: [];
+  dismissWorkspaceScope: [stayHere?: boolean];
 }>();
 </script>
 
@@ -105,6 +106,7 @@ const emit = defineEmits<{
   <!-- Soft Attention actions live on IdeAgentReviewStrip; no copy-only banner under it. -->
   <AgentDockApprovalBanner
     :show="showApprovalBanner"
+    :current-step="approvalCurrentStep"
     :can-approve="canApproveIdeAgentRun"
     :reject-pending="runMutationPending"
     @approve="emit('approveRun')"
@@ -137,6 +139,6 @@ const emit = defineEmits<{
     :inferred-label="workspaceScopeNotice?.inferredLabel ?? ''"
     :current-label="workspaceScopeNotice?.currentLabel ?? ''"
     @switch-workspace="emit('switchWorkspaceScope')"
-    @dismiss="emit('dismissWorkspaceScope')"
+    @dismiss="emit('dismissWorkspaceScope', $event)"
   />
 </template>

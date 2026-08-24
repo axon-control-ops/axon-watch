@@ -333,6 +333,26 @@ def post_lead_takeover_report(
                 reply_text=reply_text,
                 blockers=blockers,
             )
+        elif not str(task_id or "").strip():
+            from app.workspace_agents.capability_routing import (
+                looks_like_terminal_capability_handoff,
+                try_route_capability_handoff,
+            )
+
+            if looks_like_terminal_capability_handoff(
+                reply_text=reply_text,
+                blockers=blockers,
+                goal_hint=goal,
+            ):
+                try_route_capability_handoff(
+                    workspace_id=workspace_id,
+                    source_run_id=cleaned_run,
+                    source_role=role,
+                    source_name=employee_name,
+                    reply_text=reply_text,
+                    blockers=blockers,
+                    goal_hint=goal,
+                )
         follow_up_deps = (
             [str(verification_task.get("task_id") or "").strip()]
             if isinstance(verification_task, dict)

@@ -6,6 +6,7 @@ import re
 from typing import Any
 
 from app.workspace_agents.agent_voice_style import append_agent_voice_style
+from app.workspace_agents.agent_write_contract import WRITE_CONTRACT_CLAUSE
 from app.workspace_agents.backend_agent_training import backend_agent_training_clause
 from app.workspace_agents.catalog import _DEFAULT_OWNS
 from app.workspace_agents.config_loader import EmployeeConfig
@@ -15,29 +16,26 @@ from app.workspace_agents.critical_review_clause import (
     is_review_type_task,
 )
 from app.workspace_agents.employee_persona_prompt import build_employee_identity_line
+from app.workspace_agents.frontend_ux_doctrine import axon_x_frontend_ux_clause
 from app.workspace_agents.lead_text import truncate_text as _truncate
-from app.workspace_agents.run_outcome import latest_role_run_outcome
+from app.workspace_agents.prior_shift_evidence import (
+    looks_like_review_or_retry,
+    prior_failure_clause as _prior_failure_clause,
+    prior_shift_evidence_clause,
+)
+from app.workspace_agents.dashpro_homework_submit_triage import dashpro_homework_submit_triage_clause
 from app.workspace_agents.supabase_self_heal import dashpro_supabase_self_heal_clause
+from app.workspace_agents.watcher_receipts import (
+    should_attach_watcher_receipts,
+    watcher_receipts_prompt_block,
+)
 from app.workspace_agents.team_roster_context import build_team_roster_context
+from app.workspace_agents.worker_prompt_scope import (
+    OUT_OF_SCOPE_GUARD_MARKER,
+    task_scope_clause,
+)
 
-OUT_OF_SCOPE_GUARD_MARKER = "OUT_OF_SCOPE_GUARD:"
 _OUT_OF_SCOPE_GUARD_RE = re.compile(r"OUT_OF_SCOPE_GUARD:\s*(.+)", re.IGNORECASE)
-
-
-def _prior_failure_clause(*, workspace_id: str, role: str) -> str:
-    """Surface the last terminal failure so a new shift can retry with context."""
-    outcome = latest_role_run_outcome(workspace_id, role)
-    if not outcome or str(outcome.get("outcome") or "").strip().lower() != "failed":
-        return ""
-    detail = str(outcome.get("detail") or "").strip()
-    run_id = str(outcome.get("run_id") or "").strip()
-    if not detail:
-        detail = "open run history for receipts"
-    run_hint = f" (run {run_id})" if run_id else ""
-    return (
-        f" Prior shift failed{run_hint}: {detail}. "
-        "Prefer fixing or clearing that failure before unrelated work. "
-    )
 
 
 def _workspace_continuity_clause(*, workspace_id: str, current_role: str) -> str:
@@ -117,11 +115,82 @@ def _auto_mode_ask_clause() -> str:
     )
 
 
+def _axon_x_mobile_companion_clause(*, workspace_id: str, goal: str, acceptance: str) -> str:
+    if str(workspace_id or "").strip() != "workspace_axon_watch":
+        return ""
+    blob = f"{goal} {acceptance}".lower()
+    if "apps/console-mobile" not in blob and "mobile companion" not in blob:
+        return ""
+    return (
+        " Axon-X mobile companion command contract: this task targets "
+        "`apps/console-mobile`, not the root Axon-X platform dev stack. "
+        "Never run root `npm run dev` for this task — it starts/rewires the "
+        "control-plane + console-web stack and can leave stale tunnel/proxy runs. "
+        "If the operator says `npm run dev` while this task packet is active, "
+        "interpret that as `npm run dev:console-mobile` and say so in the receipt. "
+        "Use these exact receipts instead: "
+        "`npm run typecheck -w @axon-watch/console-mobile`; "
+        "`npm exec -w @axon-watch/console-mobile -- expo config --json`; "
+        "and, only for a live Expo smoke, "
+        "`axon-agent-terminal-job --workspace workspace_axon_watch -- npm run dev:console-mobile`. "
+        "For physical phones, do not use `127.0.0.1`; report the LAN IP or "
+        "read-only tunnel URL the phone should open."
+    )
+
+
+_DOCUMENT_ARTIFACT_RE = re.compile(
+    r"\b(pdf|printable|register|renderer?|rendered|document|letter|worksheet|"
+    r"workbook|evidence pack|export|daily register|sign-in|sign-out)\b",
+    re.IGNORECASE,
+)
+
+
+def _document_artifact_quality_clause(
+    *,
+    goal: str,
+    acceptance: str,
+    role: str,
+    owns: str,
+) -> str:
+    blob = f"{goal} {acceptance} {role} {owns}"
+    if not _DOCUMENT_ARTIFACT_RE.search(blob):
+        return ""
+    return (
+        " Document/PDF artifact quality contract "
+        "(see `config/agent-rules/assignment-document-quality.md`): "
+        "when the task touches a PDF, printable pack, register, letter, worksheet, "
+        "workbook, document export, or visual artifact, the rendered artifact is the "
+        "product. First identify the exact command/script that produces it and whether "
+        "the live path uses an optional dependency or fallback. Do not treat a missing "
+        "optional package, package-network outage, or rich renderer dependency as a "
+        "final blocker until you have inspected any active fallback path and tried to "
+        "patch the fallback to preserve the requested layout. Treat an operator-named "
+        "screenshot, IDE PDF, or reference file as authoritative: inspect or render "
+        "the current output using a PDF viewer, `pdftoppm`, `mutool`, `convert`, or "
+        "an equivalent preview; compare page size, page count, first-page layout, "
+        "colors, headers, tables, and text readability before reporting. If the "
+        "output does not match, patch the renderer/source and regenerate the files, "
+        "not just filenames. Add or update a targeted regression test; if fallback "
+        "rendering was involved, force the fallback in the test. Final receipt must "
+        "list generated file paths plus page count/size and visual parity evidence. "
+        "Never claim complete from source checks alone."
+    )
+
+
 def _role_tools_clause(role: str) -> str:
     """Tell specialists which tools they should use — Full Access means Shell/Edit/Read."""
     cleaned = str(role or "").strip().lower()
     shared = (
         " Tools: this shift has Full Access for project Shell, Read, Edit, and Grep. "
+        "You have the contract-bounded write surface for your professional role and may use ordinary "
+        "project tools exposed by the isolated checkout or registered workspace terminal. The "
+        "isolated checkout enforces role write mounts; registered terminal commands remain audited "
+        "and should be used for scoped verification or approved operational jobs. If another role "
+        "must contribute, assign it directly to "
+        "that colleague with `axon-assign --workspace <current_workspace_id> --role "
+        "<frontend|backend|integrations|watcher|lead> -- <goal>`; do not mutate another "
+        "workspace or another colleague's lane. Cross-workspace or cross-company work "
+        "needs operator approval and an explicit handoff. "
         "Use them to verify — do not invent counts or claim done without a command receipt. "
         "If Shell fails once, retry once with a shorter command; then report the exact error. "
         "Do not make one missing optional documentation/playbook path a user-facing stop: "
@@ -130,12 +199,18 @@ def _role_tools_clause(role: str) -> str:
         "Avoid a combined multi-file read that stops at its first missing path; check required files "
         "individually or guard optional reads. "
         "Do not spin on Task/MCP workarounds for basic ls/node/npm checks. "
+        + WRITE_CONTRACT_CLAUSE
     )
     if cleaned == "watcher":
         return (
             shared
             + "Watcher focus: health probes, signal receipts, and CI/gate status checks "
             "via short shell/read — not product feature builds. "
+            "Acceptance evidence, diff_budget findings, and phase transitions (e.g. "
+            "review_ready/complete) for another agent's run are never files in this "
+            "checkout — they live only in the control-plane's run store. Use "
+            "`axon-runlog <run_id>` to fetch that run's status and history directly "
+            "instead of asking the operator for a pointer you can resolve yourself. "
         )
     if cleaned == "integrations":
         return (
@@ -155,68 +230,22 @@ def _role_tools_clause(role: str) -> str:
             shared
             + "Frontend focus: UI/files edits with targeted checks; avoid heavy servers "
             "unless the leased goal requires them. "
+            "In a disposable sandbox checkout, node_modules is borrowed from the bound "
+            "project — use `npx --no-install jest <test-path>` or `npm test -- <path>` "
+            "for receipts; do not claim jest is missing without running one of those. "
         )
     if cleaned == "lead":
         return (
-            " Tools: prefer Read/ Grep for receipts and specialist reports; "
-            "delegate Shell-heavy verification to specialists unless you must confirm a gate. "
+            shared
+            + "Lead focus: coordinate the objective, while using Shell/Edit/Read directly "
+            "when that is the fastest verified path to completion. "
+            "You can actually dispatch teammates — `axon-assign --workspace <workspace_id> "
+            "-- <goal>` fans a goal out into role-scoped tasks and starts their runs; use "
+            "`--role <role>` for one explicit colleague. "
+            "Use it instead of describing a handoff in a document: a document dispatches "
+            "nobody. Report the task ids it returns. "
         )
     return shared
-
-
-def _task_scope_anchors(*parts: str, limit: int = 8) -> list[str]:
-    anchors: list[str] = []
-    seen: set[str] = set()
-    for part in parts:
-        text = str(part or "")
-        candidates = re.findall(r"`([^`]+)`", text)
-        candidates.extend(re.findall(r"\b[\w./-]*[./_-][\w./-]+\b", text))
-        for raw in candidates:
-            cleaned = str(raw).strip().strip(".,;:()[]{}")
-            if not cleaned or len(cleaned) < 3:
-                continue
-            lowered = cleaned.lower()
-            if lowered in seen:
-                continue
-            seen.add(lowered)
-            anchors.append(cleaned)
-            if len(anchors) >= limit:
-                return anchors
-    return anchors
-
-
-def _task_scope_clause(
-    *,
-    goal: str,
-    acceptance: str,
-    allowed_paths: list[str] | None = None,
-) -> str:
-    paths = [str(p).strip() for p in (allowed_paths or []) if str(p).strip()]
-    anchors = _task_scope_anchors(goal, acceptance)
-    anchor_clause = ""
-    if paths:
-        joined = ", ".join(f"`{path}`" for path in paths[:12])
-        anchor_clause = (
-            f" Explicit allowed write paths for this leased task: {joined}. "
-            "Do not modify any path outside that allowlist."
-        )
-    elif anchors:
-        joined = ", ".join(f"`{anchor}`" for anchor in anchors)
-        anchor_clause = f" Hard scope anchors from the task: {joined}. "
-    return (
-        " Scope guard: before you browse, edit, or summarize anything, lock onto the "
-        "leased task's exact goal and acceptance criteria."
-        f"{anchor_clause}"
-        "Only open, mention, or modify files and topics that directly serve that scope. "
-        "Do not drift into neighboring files, similarly named campaigns, prior tasks, or "
-        "semantically related artifacts just because they are nearby. "
-        "If the goal is about a README, docs, layout, bug, API, or specific deliverable, "
-        "treat unrelated posts, assets, illustrations, marketing copy, and old workspace "
-        "tasks as out of scope unless the goal explicitly asks for them. "
-        f"If the next file or topic is not clearly justified by the task, stop and reply "
-        f"with `{OUT_OF_SCOPE_GUARD_MARKER} <file-or-topic> is not required for this leased task` "
-        "instead of continuing."
-    )
 
 
 def _current_task_packet(
@@ -412,7 +441,7 @@ def build_continuous_worker_prompt(
         if isinstance(exclusive_paths_raw, list)
         else []
     )
-    scope_clause = _task_scope_clause(
+    scope_clause = task_scope_clause(
         goal=goal,
         acceptance=acceptance,
         allowed_paths=allowed_paths,
@@ -509,6 +538,26 @@ def build_continuous_worker_prompt(
             "do not stack Quality Gates + Android + typecheck heaps. "
         )
         memory_clause += dashpro_supabase_self_heal_clause()
+        memory_clause += dashpro_homework_submit_triage_clause()
+    mobile_companion_clause = _axon_x_mobile_companion_clause(
+        workspace_id=workspace_id,
+        goal=goal,
+        acceptance=acceptance,
+    )
+    document_artifact_clause = _document_artifact_quality_clause(
+        goal=goal,
+        acceptance=acceptance,
+        role=role,
+        owns=owns,
+    )
+    ux_clause = axon_x_frontend_ux_clause(
+        workspace_id=workspace_id,
+        name=name,
+        role=role,
+        owns=owns,
+        goal=goal,
+        acceptance=acceptance,
+    )
     prior_failure = "" if task_payload else _prior_failure_clause(workspace_id=workspace_id, role=role)
     task_packet = _current_task_packet(
         workspace_id=workspace_id,
@@ -520,6 +569,14 @@ def build_continuous_worker_prompt(
     )
     roster_block = build_team_roster_context(workspace_id, viewer_role=role)
     roster_clause = f"\n\n{roster_block}" if roster_block else ""
+    # Receipts live in the project root, unreachable from the isolation checkout;
+    # prior-shift artifacts are what makes "review your previous work" answerable.
+    watcher_clause = evidence_clause = ""
+    if should_attach_watcher_receipts(role=role, goal=goal):
+        block = watcher_receipts_prompt_block(workspace_id)
+        watcher_clause = f"\n\n{block}" if block else ""
+    if looks_like_review_or_retry(goal, acceptance):
+        evidence_clause = prior_shift_evidence_clause(workspace_id=workspace_id, role=role)
     continuity = _workspace_continuity_clause(
         workspace_id=workspace_id,
         current_role=role,
@@ -561,8 +618,9 @@ def build_continuous_worker_prompt(
         "you actually ran. Do not run `git add -A`, commit, push, merge, force-push, or "
         "touch a protected branch yourself. The delivery service independently checks scope "
         "and secrets, stages only your verified changed paths, then creates the worker-branch "
-        "commit and draft PR. If any changed path is outside the leased task, stop and report "
-        "it as a blocker instead of trying to include or discard it."
+        "commit and draft PR. Task path lists are starting hints, but every changed path must "
+        "remain inside your role-owned write surface and directly serve the leased objective. "
+        "Assign work outside that role surface to the colleague who owns it."
     )
     tools_clause = _role_tools_clause(role)
     from app.workspace_agents.lead_verification_handoff import (
@@ -589,11 +647,16 @@ def build_continuous_worker_prompt(
         f"{lead_clause}"
         f"{delivery_clause}"
         f"{tools_clause}"
+        f"{document_artifact_clause}"
+        f"{ux_clause}"
         f"{ci_clause}"
+        f"{mobile_companion_clause}"
         f"{memory_clause}"
         f"{_auto_mode_ask_clause()}"
         " If a step fails, say what failed and why (command, assertion, import, CI step) — "
         "never a bare FAILED."
+        f"{evidence_clause}"
+        f"{watcher_clause}"
         f"{roster_clause}"
     )
     assembled = append_agent_voice_style(assembled)

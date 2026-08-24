@@ -12,12 +12,12 @@ describe('shouldShowVaxonRosterVoiceDock', () => {
     );
   });
 
-  it('hides the roster popup on Mission Control because right Live Ops owns VAXON', () => {
+  it('hides the roster popup on Mission Control because the VAXON tab owns presence', () => {
     expect(
       shouldShowVaxonRosterVoiceDock({
         layoutMode: 'operator',
         operatorBrainGalaxyActive: false,
-        operatorCenterView: 'grid',
+        operatorCenterView: 'mission',
         voiceDockVisible: true,
       }),
     ).toBe(false);

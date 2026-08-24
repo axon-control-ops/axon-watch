@@ -1,5 +1,9 @@
 {
   "bindings": {
+    "MoveIT": {
+      "display_name": "move-it",
+      "project_root": "/run/media/vaxon/axon-data/repos/axon-nvme/repos/axon-watch/move-it"
+    },
     "workspace_audio_transcribe": {
       "display_name": "audio-transcribe",
       "project_root": "/run/media/vaxon/axon-data/projectx/product/audio-transcribe"
@@ -8,13 +12,13 @@
       "display_name": "axon-local",
       "project_root": "/run/media/vaxon/axon-data/repos/axon-nvme/repos/axon-local"
     },
-    "workspace_axon_watch": {
-      "display_name": "axon-watch",
-      "project_root": "/run/media/vaxon/axon-data/repos/axon-nvme/repos/axon-watch"
-    },
     "workspace_axon_online": {
       "display_name": "axon-online",
       "project_root": "/run/media/vaxon/axon-data/projectx/internal/axon-online"
+    },
+    "workspace_axon_watch": {
+      "display_name": "axon-watch",
+      "project_root": "/run/media/vaxon/axon-data/repos/axon-nvme/repos/axon-watch"
     },
     "workspace_bkk_invoice_system": {
       "display_name": "bkk-invoice-system",

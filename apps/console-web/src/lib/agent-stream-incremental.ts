@@ -6,6 +6,7 @@ import {
   truncateAgentLiveLineForDisplay,
 } from './agent-live-line-view';
 import type { NarrationMilestone, StreamingActivityView } from './kairo-agent-narration';
+import { agentEditEventLabel } from './agent-edit-operation';
 import { toolMilestoneSpeakLine } from './kairo-tool-milestone';
 import { personaThreadPrefix } from './operator-persona-name';
 
@@ -199,7 +200,11 @@ export function createAgentStreamIncrementalState(options?: {
       editCount += 1;
       milestones.push({
         key: `edit:${index}`,
-        message: `${path} +${added} -${removed}`,
+        message: agentEditEventLabel({
+          path,
+          added: Number(added),
+          removed: Number(removed),
+        }),
         editPath: path,
       });
       inBlock = 'other';

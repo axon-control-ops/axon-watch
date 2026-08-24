@@ -67,6 +67,7 @@ Startup contract:
 Bootstrap URLs:
 
 - console web: `http://127.0.0.1:4173`
+- console mobile companion: `npm run dev:console-mobile` (Expo; defaults to `http://127.0.0.1:8787`)
 - control plane health: `http://127.0.0.1:8787/api/health`
 - watch health: `http://127.0.0.1:8788/internal/watch/health`
 - runtime summary: `http://127.0.0.1:8787/api/runtime/summary`

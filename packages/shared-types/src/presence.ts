@@ -42,12 +42,12 @@ export interface OperatorPresenceSettings {
    */
   vaxon_model_id: string;
   /**
-   * When enabled, Full Auto temporarily forces IDE composers and continuous
-   * workers to use the selected runtime target without overwriting manual
-   * per-thread composer prefs.
+   * When enabled, Full Auto supplies a fallback runtime target to isolated
+   * continuous workers. Interactive PC composer runtime and access
+   * preferences remain independent.
    */
   auto_composer_runtime_override_enabled: boolean;
-  /** Runtime target id used while Full Auto + override are active. */
+  /** Worker runtime target id used while Full Auto + override are active. */
   auto_composer_runtime_target: string;
   /** Speak tool milestones during agent runs (conversational only). */
   narrate_tool_progress: boolean;

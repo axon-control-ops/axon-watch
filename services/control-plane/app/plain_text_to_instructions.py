@@ -4,6 +4,13 @@ from __future__ import annotations
 
 import re
 
+from app.specialist_roles import (
+    GENERAL_ROLE_ID,
+    SPECIALIST_ROLE_IDS,
+    SpecialistContext,
+)
+from app.instructions_fallback_builder import build_fallback_instructions_markdown
+
 _INSTRUCTIONS_HEADING_RE = re.compile(r"^#\s*Instructions\b", re.IGNORECASE | re.MULTILINE)
 _ALT_INSTRUCTIONS_HEADING_RE = re.compile(r"^##\s*Instructions\b", re.IGNORECASE | re.MULTILINE)
 _FENCED_MARKDOWN_RE = re.compile(
@@ -11,11 +18,28 @@ _FENCED_MARKDOWN_RE = re.compile(
     re.IGNORECASE,
 )
 _SECTION_RE = re.compile(
-    r"^##\s*(Goal|In scope|Out of scope|Steps|Constraints|Assumptions|Source request)\s*$",
+    r"^##\s*(Assigned specialist|Role mandate|Ownership boundaries|Goal|Context|Delivery mode|In scope|Out of scope|Steps|Acceptance criteria|Validation|Handoff|Constraints|Assumptions|Source request)\s*$",
     re.IGNORECASE | re.MULTILINE,
 )
-_REQUIRED_SECTION_KEYS = ("goal", "in_scope", "out_of_scope", "steps", "constraints")
-_OPTIONAL_SECTION_KEYS = ("assumptions", "source_request")
+_BASE_REQUIRED_SECTION_KEYS = (
+    "goal",
+    "context",
+    "delivery_mode",
+    "in_scope",
+    "out_of_scope",
+    "steps",
+    "acceptance_criteria",
+    "validation",
+    "constraints",
+)
+_SPECIALIST_REQUIRED_SECTION_KEYS = (
+    "assigned_specialist",
+    "role_mandate",
+    "ownership_boundaries",
+    *_BASE_REQUIRED_SECTION_KEYS,
+)
+_REQUIRED_SECTION_KEYS = _BASE_REQUIRED_SECTION_KEYS
+_OPTIONAL_SECTION_KEYS = ("handoff", "assumptions", "source_request")
 _MIN_STEP_LINES = 4
 _GIT_OUT_OF_SCOPE_RE = re.compile(
     r"\b(?:commit(?:ting|s)?|push(?:ing|es)?|merg(?:e|ing)|releas(?:e|ing))\b",
@@ -53,149 +77,101 @@ def _parse_sections(prompt: str) -> dict[str, str]:
     return sections
 
 
+def _required_section_keys(context: SpecialistContext | None = None) -> tuple[str, ...]:
+    if context is not None and context.role in SPECIALIST_ROLE_IDS:
+        return _SPECIALIST_REQUIRED_SECTION_KEYS
+    return _BASE_REQUIRED_SECTION_KEYS
+
+
+_MEANINGLESS_SECTION_RE = re.compile(
+    r"^\s*(?:n/?a|none|tbd|todo|placeholder|same as above|see above|\.{3}|-+\s*)\s*$",
+    re.IGNORECASE,
+)
+
+
 def _section_nonempty(body: str, *, key: str) -> bool:
     text = body.strip()
     if not text:
         return False
+    if _MEANINGLESS_SECTION_RE.match(text):
+        return False
+    if key == "ownership_boundaries":
+        return "### Owned by this specialist" in text and "### Requires handoff" in text
+    if key == "assigned_specialist":
+        return "- Role:" in text and "- Workspace:" in text
     if key == "steps":
         numbered = [line for line in text.splitlines() if re.match(r"^\s*\d+[\).\s]", line.strip())]
         return len(numbered) >= _MIN_STEP_LINES
-    if key in {"in_scope", "out_of_scope", "constraints", "assumptions"}:
+    if key in {
+        "delivery_mode",
+        "in_scope",
+        "out_of_scope",
+        "acceptance_criteria",
+        "validation",
+        "handoff",
+        "constraints",
+        "assumptions",
+    }:
         return any(line.strip().startswith("-") for line in text.splitlines())
     return len(text) >= 12
 
 
-def instructions_markdown_is_complete(prompt: str) -> bool:
+def _assigned_role_matches(sections: dict[str, str], context: SpecialistContext | None) -> bool:
+    if context is None or context.role not in SPECIALIST_ROLE_IDS:
+        return True
+    assigned = sections.get("assigned_specialist", "")
+    display = context.profile.display_name
+    return bool(re.search(rf"\bRole:\s*{re.escape(display)}\b", assigned, re.IGNORECASE))
+
+
+def instructions_markdown_is_complete(
+    prompt: str,
+    context: SpecialistContext | None = None,
+) -> bool:
     extracted = extract_instructions_markdown(prompt)
     if not extracted:
         return False
     sections = _parse_sections(extracted)
-    for key in _REQUIRED_SECTION_KEYS:
+    if not _assigned_role_matches(sections, context):
+        return False
+    for key in _required_section_keys(context):
         if not _section_nonempty(sections.get(key, ""), key=key):
             return False
     return True
 
 
-def _summarize_goal(source: str) -> str:
-    cleaned = re.sub(r"\s+", " ", source.strip())
-    if not cleaned:
-        return "Complete the operator request."
-    first_sentence = re.split(r"(?<=[.!?])\s+", cleaned, maxsplit=1)[0].strip()
-    if len(first_sentence) >= 24:
-        return first_sentence
-    return cleaned[:220].rstrip(" ,.;") + ("…" if len(cleaned) > 220 else "")
-
-
-def _infer_scope_bullets(source: str) -> list[str]:
-    lowered = source.lower()
-    candidates: list[str] = []
-    mappings = [
-        ("workspace", "Configure and validate the requested workspace integration"),
-        ("teacher", "Model Teacher-X behaviour as a real in-app teacher user"),
-        ("layout", "Review app layout, navigation, and screen discoverability"),
-        ("feature", "Exercise and validate the relevant product features end-to-end"),
-        ("screen", "Verify the named screens and user flows in the live app"),
-        ("homework", "Cover homework creation, assignment, and parent/teacher visibility"),
-        ("assignment", "Cover assignment workflows, submission, and grading paths"),
-        ("grading", "Validate grading flows and reporting outputs"),
-        ("report", "Validate report generation and export/share behaviour"),
-        ("language", "Verify multilingual support across official South African languages"),
-        ("parent", "Validate parent-facing journeys and notifications"),
-        ("principal", "Validate principal/admin operational workflows"),
-        ("axon-x", "Use Axon-X fleet workflows to drive discovery, fixes, and upgrades"),
-        ("bug", "Log, reproduce, and fix defects encountered during holistic testing"),
-    ]
-    for needle, bullet in mappings:
-        if needle in lowered and bullet not in candidates:
-            candidates.append(bullet)
-    if not candidates:
-        for sentence in re.split(r"(?<=[.!?])\s+", source.strip()):
-            trimmed = sentence.strip(" \"'")
-            if len(trimmed) >= 24:
-                candidates.append(trimmed[:160])
-            if len(candidates) >= 6:
-                break
-    if not candidates:
-        candidates.append("Execute only what the source request describes")
-    return candidates[:8]
-
-
-def _infer_steps(source: str) -> list[str]:
-    bullets = _infer_scope_bullets(source)
-    steps = [
-        "Read the source request and restate the Goal, acceptance checks, and anything explicitly out of scope.",
-        "Map the requested product areas to concrete screens, roles, and workflows in the workspace app before changing anything.",
-    ]
-    for bullet in bullets[:4]:
-        steps.append(f"Exercise and document: {bullet}. Capture screenshots, broken flows, and missing capabilities.")
-    steps.extend(
-        [
-            "When Axon-X or the product fleet is part of the request, run the work through that workflow and record fixes or upgrades discovered.",
-            "Verify the requested outcomes on web and mobile where applicable; note any feature that requires a native rebuild instead of OTA.",
-            "Summarize findings, remaining gaps, and the next operator action without claiming git/release work that was not requested.",
-        ]
+def build_instructions_markdown_from_source(
+    source: str,
+    context: SpecialistContext | None = None,
+) -> str:
+    return build_fallback_instructions_markdown(
+        source,
+        context,
+        git_actions_requested=prompt_requests_git_actions(source),
     )
-    return steps[:8]
 
 
-def build_instructions_markdown_from_source(source: str) -> str:
-    cleaned = source.strip()
-    goal = _summarize_goal(cleaned)
-    in_scope = _infer_scope_bullets(cleaned)
-    steps = _infer_steps(cleaned)
-    out_of_scope = [
-        "Committing, pushing, merging, tagging, or releasing unless explicitly requested",
-        "Inventing unrelated refactors, migrations, or cleanup chores",
-    ]
-    constraints = [
-        "Follow only the steps listed above",
-        "Treat Out of scope as binding",
-        "Preserve every explicit requirement from the source request",
-        "Call out native-build-only gaps separately from OTA-safe fixes",
-        "Do not deploy, publish, or notify external parties unless explicitly requested",
-        "Do not claim work was implemented, tested, or verified without evidence",
-    ]
-    if prompt_requests_git_actions(cleaned):
-        out_of_scope = [item for item in out_of_scope if "Committing" not in item]
-
-    lines = [
-        "# Instructions",
-        "",
-        "## Goal",
-        goal,
-        "",
-        "## In scope",
-        *[f"- {item}" for item in in_scope],
-        "",
-        "## Out of scope",
-        *[f"- {item}" for item in out_of_scope],
-        "",
-        "## Steps",
-        *[f"{index}. {step}" for index, step in enumerate(steps, start=1)],
-        "",
-        "## Constraints",
-        *[f"- {item}" for item in constraints],
-        "",
-        "## Source request",
-        cleaned,
-        "",
-    ]
-    return "\n".join(lines)
-
-
-def compose_instructions_markdown(source: str, model_markdown: str | None = None) -> str:
-    fallback = build_instructions_markdown_from_source(source)
+def compose_instructions_markdown(
+    source: str,
+    model_markdown: str | None = None,
+    context: SpecialistContext | None = None,
+) -> str:
+    fallback = build_instructions_markdown_from_source(source, context)
     extracted = extract_instructions_markdown(model_markdown or "")
-    if extracted and instructions_markdown_is_complete(extracted):
+    if extracted and instructions_markdown_is_complete(extracted, context):
         return extracted if extracted.endswith("\n") else f"{extracted}\n"
 
-    if not extracted:
+    if not extracted or (
+        context is not None
+        and context.role in SPECIALIST_ROLE_IDS
+        and not _assigned_role_matches(_parse_sections(extracted), context)
+    ):
         return fallback if fallback.endswith("\n") else f"{fallback}\n"
 
     model_sections = _parse_sections(extracted)
     fallback_sections = _parse_sections(fallback)
     merged: dict[str, str] = {}
-    for key in _REQUIRED_SECTION_KEYS:
+    for key in _required_section_keys(context):
         model_body = model_sections.get(key, "").strip()
         fallback_body = fallback_sections.get(key, "").strip()
         merged[key] = model_body if _section_nonempty(model_body, key=key) else fallback_body
@@ -206,14 +182,38 @@ def compose_instructions_markdown(source: str, model_markdown: str | None = None
     # these never reaches this branch (see the early return above).
     assumptions = model_sections.get("assumptions", "").strip()
     source_request = model_sections.get("source_request", "").strip()
+    handoff = model_sections.get("handoff", "").strip()
+    fallback_handoff = fallback_sections.get("handoff", "").strip()
+    if not handoff:
+        handoff = fallback_handoff
     if not source_request:
         source_request = fallback_sections.get("source_request", "").strip()
 
     lines = [
         "# Instructions",
         "",
+    ]
+    if context is not None and context.role in SPECIALIST_ROLE_IDS:
+        lines += [
+            "## Assigned specialist",
+            merged["assigned_specialist"],
+            "",
+            "## Role mandate",
+            merged["role_mandate"],
+            "",
+            "## Ownership boundaries",
+            merged["ownership_boundaries"],
+            "",
+        ]
+    lines += [
         "## Goal",
         merged["goal"],
+        "",
+        "## Context",
+        merged["context"],
+        "",
+        "## Delivery mode",
+        merged["delivery_mode"],
         "",
         "## In scope",
         merged["in_scope"],
@@ -224,6 +224,16 @@ def compose_instructions_markdown(source: str, model_markdown: str | None = None
         "## Steps",
         merged["steps"],
         "",
+        "## Acceptance criteria",
+        merged["acceptance_criteria"],
+        "",
+        "## Validation",
+        merged["validation"],
+        "",
+    ]
+    if handoff:
+        lines += ["## Handoff", handoff, ""]
+    lines += [
         "## Constraints",
         merged["constraints"],
     ]

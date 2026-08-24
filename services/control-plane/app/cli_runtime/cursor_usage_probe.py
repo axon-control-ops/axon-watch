@@ -18,6 +18,11 @@ StatusRecord = dict[str, Any]
 _USAGE_CACHE: dict[str, Any] = {"fetched_at": 0.0, "payload": None}
 _USAGE_CACHE_TTL_SECONDS = 45.0
 _USAGE_LOCK = threading.Lock()
+# Observed "out of usage" reply from the Cursor CLI itself, used only when the
+# live pool cannot be read (see record_cursor_usage_limit_hit).
+_LIMIT_STATE: dict[str, Any] = {"hit_at": 0.0, "detail": ""}
+_LIMIT_LOCK = threading.Lock()
+_LIMIT_COOLDOWN_SECONDS = 900.0
 _USAGE_URL = "https://api2.cursor.sh/aiserver.v1.DashboardService/GetCurrentPeriodUsage"
 _STRIPE_URL = "https://api2.cursor.sh/auth/full_stripe_profile"
 
@@ -105,15 +110,51 @@ def _empty_usage(*, ok: bool, message: str, source: str = "unavailable") -> Stat
         "auto_display_message": None,
         "api_display_message": None,
         "message": message,
-        "allows_agent_retry": True,
+        # An unreadable pool still fails open, but must not advertise headroom
+        # the CLI just told us we do not have. Codex's probe already reports
+        # its observed limit hit this way; cursor hardcoded True, so callers
+        # reading this payload disagreed with the scheduler's own gate.
+        "allows_agent_retry": not cursor_usage_limit_hit_is_fresh(),
     }
+
+
+def record_cursor_usage_limit_hit(detail: str) -> None:
+    """Remember a real Cursor 'out of usage' failure observed by a caller.
+
+    Claude and Codex already cache their observed limit hits; Cursor did not,
+    and ``cursor_usage_allows_agent_retry`` deliberately fails *open* when the
+    live pool cannot be read. With no memory of the CLI's own "You're out of
+    usage" reply, an unreadable probe re-opened the auto-start gate on every
+    tick and the scheduler redispatched the same doomed shift in a loop.
+    """
+    with _LIMIT_LOCK:
+        _LIMIT_STATE["hit_at"] = time.time()
+        _LIMIT_STATE["detail"] = str(detail or "").strip()
+    # Force the next probe to refetch rather than serve a stale pre-hit payload.
+    with _USAGE_LOCK:
+        _USAGE_CACHE["fetched_at"] = 0.0
+
+
+def cursor_usage_limit_hit_is_fresh() -> bool:
+    """True when a Cursor usage-limit failure was seen within the cooldown."""
+    with _LIMIT_LOCK:
+        hit_at = float(_LIMIT_STATE.get("hit_at") or 0.0)
+    return bool(hit_at) and (time.time() - hit_at) < _LIMIT_COOLDOWN_SECONDS
+
+
+def reset_cursor_usage_limit_state_for_tests() -> None:
+    with _LIMIT_LOCK:
+        _LIMIT_STATE["hit_at"] = 0.0
+        _LIMIT_STATE["detail"] = ""
 
 
 def cursor_usage_allows_agent_retry(usage: StatusRecord | None) -> bool:
     """True when Auto headroom or on-demand spend means retries are still sensible."""
     if not isinstance(usage, dict) or not usage.get("ok"):
-        # Unknown live quota — do not invent an account-wide hard stop.
-        return True
+        # Unknown live quota — do not invent an account-wide hard stop, but do
+        # respect a limit the CLI itself just reported. Without this, an
+        # unreadable probe silently re-opened the gate every tick.
+        return not cursor_usage_limit_hit_is_fresh()
     if usage.get("on_demand_enabled") is True:
         return True
     for key in ("auto_percent_used", "total_percent_used"):
@@ -219,5 +260,8 @@ def probe_cursor_usage(*, force_refresh: bool = False) -> StatusRecord:
 
 __all__ = [
     "cursor_usage_allows_agent_retry",
+    "cursor_usage_limit_hit_is_fresh",
     "probe_cursor_usage",
+    "record_cursor_usage_limit_hit",
+    "reset_cursor_usage_limit_state_for_tests",
 ]

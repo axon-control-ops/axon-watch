@@ -373,7 +373,7 @@ def cleanup_isolation_root(root: Path) -> dict[str, Any]:
     branch_deleted = False
     branch_cleanup_error: str | None = None
 
-    if isolation_kind == "worktree" and bound:
+    if isolation_kind == "worktree" and bound and Path(bound).is_dir():
         bound_path = Path(bound)
         _run_git(["worktree", "remove", "--force", str(root)], cwd=bound_path)
         _run_git(["worktree", "prune"], cwd=bound_path)

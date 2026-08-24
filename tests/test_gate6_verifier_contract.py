@@ -128,7 +128,7 @@ class Gate6VerifierContractTests(unittest.TestCase):
 
 
     def test_ensure_acceptance_uses_terminal_jobs_for_verification_task(self) -> None:
-        from app.terminal import agent_jobs
+        from app.terminal.agent_job_registry import register_job
 
         task = task_store.create_task(
             workspace_id="workspace_dashpro",
@@ -153,8 +153,8 @@ class Gate6VerifierContractTests(unittest.TestCase):
             require_leased_task=True,
         )
         run_id = str(created["run_id"])
-        with agent_jobs._lock:
-            agent_jobs._jobs["agent-job-gate6"] = {
+        register_job(
+            {
                 "job_id": "agent-job-gate6",
                 "workspace_id": "workspace_dashpro",
                 "run_id": run_id,
@@ -163,6 +163,7 @@ class Gate6VerifierContractTests(unittest.TestCase):
                 "exit_code": 0,
                 "created_at": "2026-01-01T00:00:00Z",
             }
+        )
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             dirty = root / "src" / "unrelated.ts"

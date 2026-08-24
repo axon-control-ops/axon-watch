@@ -8,6 +8,28 @@ from pathlib import Path
 from app.cli_runtime.agent_sandbox import AgentSandboxPolicy, SandboxConfigurationError
 
 
+def validate_sandbox_workspace_toolchain(workspace_root: Path | str | None) -> None:
+    """Ensure disposable checkouts borrowed runnable npm/jest tooling before dispatch."""
+    raw = str(workspace_root or "").strip()
+    if not raw:
+        return
+    checkout = Path(raw).expanduser().resolve()
+    sidecar = checkout / ".axon-si" / "baseline.json"
+    if not sidecar.is_file():
+        return
+    from app.cli_runtime.sandbox_preview import ensure_isolation_checkout_runnable
+
+    result = ensure_isolation_checkout_runnable(checkout)
+    if result.get("ok"):
+        return
+    errors = result.get("errors") or []
+    detail = "; ".join(str(item) for item in errors if str(item).strip())
+    raise SandboxConfigurationError(
+        "Sandbox checkout toolchain is not runnable"
+        + (f": {detail}" if detail else ". Run npm install in the bound workspace first.")
+    )
+
+
 def validate_agent_dispatch_preflight(
     *,
     family: str,
@@ -45,6 +67,19 @@ def validate_agent_dispatch_preflight(
         issues.append(
             "node is required for workflow scripts and CI tooling but was not found in PATH."
         )
+
+    if sandbox_policy is not None and shutil.which("npm") is None:
+        issues.append(
+            "npm is required for sandbox validation scripts but was not found in PATH."
+        )
+
+    if sandbox_policy is not None:
+        for tool in ("awk", "bash"):
+            if shutil.which(tool) is None:
+                issues.append(
+                    f"{tool} is required for agent shell/PTY sessions but was not found in PATH. "
+                    "Install coreutils/gawk on the control-plane host."
+                )
 
     if issues:
         raise SandboxConfigurationError("Agent dispatch preflight failed: " + " ".join(issues))

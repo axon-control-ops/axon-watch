@@ -23,14 +23,10 @@ export function shouldShowVaxonRosterVoiceDock(input: {
   operatorCenterView?: string | null;
   voiceDockVisible: boolean;
 }): boolean {
-  if (
-    !input.voiceDockVisible ||
-    input.layoutMode === 'ide' ||
-    input.operatorCenterView === 'grid'
-  ) {
+  if (!input.voiceDockVisible || input.layoutMode === 'ide') {
     return false;
   }
-  // Mission Control already owns VAXON presence in the right LIVE OPERATIONS orb.
+  // Brain Graph uses the floating orb; Mission Control tabs own VAXON in-center.
   return input.operatorBrainGalaxyActive;
 }
 

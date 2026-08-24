@@ -48,4 +48,23 @@ export type AgentTranscriptSegment =
       bodyMarkdown: string;
       confidence: string | null;
       verificationNotice: string | null;
+    }
+  | {
+      kind: 'lead-checkin';
+      title: string;
+      summary: string;
+      findingCount: number;
+      assignmentCount: number;
+      findings: Array<{
+        kind: string;
+        kindLabel: string;
+        title: string;
+        owner: string;
+        escalate: boolean;
+        summary: string;
+        detail: string;
+      }>;
+      nextSteps: string[];
+      prompt: string;
+      options: Array<{ id: string; label: string }>;
     };

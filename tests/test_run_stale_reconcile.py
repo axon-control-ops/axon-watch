@@ -223,6 +223,178 @@ class RunStaleReconcileTests(unittest.TestCase):
         task = task_store.get_task(task_id) or {}
         self.assertEqual("open", task.get("status"))
 
+    def test_reap_spares_undispatched_run_with_live_dispatch_claim(self) -> None:
+        """A claimed-but-slow dispatch thread must not be raced by the 90s reaper.
+
+        begin_execution() persists phase=executing (starting the age clock) before
+        the dispatch thread is even spawned; that thread still has claim + task/lease
+        I/O to clear before it can post worker_dispatch_started. Under load that can
+        take >90s while the thread is alive and fine. Failing it out from under a
+        live claim is what produced repeat false "Quinn failed" reads.
+        """
+        from app.persistence import task_store
+        from app.runs.begin_execution import begin_execution
+        from app.workspace_agents.worker_dispatch_support import (
+            claim_worker_dispatch,
+            release_worker_dispatch,
+        )
+
+        record = _leased_worker_run(
+            workspace_id="workspace_claimed_slow_dispatch",
+            employee_role="backend",
+            summary="Verification after Marco (backend): npm test",
+        )
+        run_id = str(record["run_id"])
+        task_id = str(record.get("task_id") or "")
+        begin_execution(
+            run_id,
+            actor="workspace_scheduler",
+            receipt_summary="Queued fan-out run entered execution for dispatch",
+        )
+        self.assertTrue(claim_worker_dispatch(run_id, task_id=task_id))
+        self.addCleanup(release_worker_dispatch, run_id)
+        _age_run(run_id, seconds=120)
+
+        reaped = reap_stale_employee_runs()
+
+        self.assertEqual([], reaped)
+        self.assertEqual("executing", get_run(run_id)["phase"])
+        task = task_store.get_task(task_id) or {}
+        self.assertEqual("leased", task.get("status"))
+
+    def test_reap_unlocks_ghost_dispatch_after_worker_dispatch_started(self) -> None:
+        from app.persistence import task_store
+        from app.runs.begin_execution import begin_execution
+
+        record = _leased_worker_run(
+            workspace_id="workspace_ghost_dispatch",
+            employee_role="frontend",
+            summary="Verification after Priya (frontend): npm test",
+        )
+        run_id = str(record["run_id"])
+        task_id = str(record.get("task_id") or "")
+        begin_execution(
+            run_id,
+            actor="workspace_scheduler",
+            receipt_summary="Operator start entered execution",
+        )
+        append_run_execution_receipt(
+            run_id,
+            receipt_type="worker_dispatch_started",
+            receipt_summary="Continuous worker dispatch started for role=frontend",
+            actor="workspace_scheduler",
+        )
+        _age_run(run_id, seconds=120)
+
+        reaped = reap_stale_employee_runs()
+
+        self.assertEqual([run_id], reaped)
+        self.assertEqual("failed", get_run(run_id)["phase"])
+        task = task_store.get_task(task_id) or {}
+        self.assertEqual("open", task.get("status"))
+
+    def test_reap_unlocks_post_isolation_lane_b_stall(self) -> None:
+        from app.persistence import task_store
+        from app.runs.begin_execution import begin_execution
+
+        record = _leased_worker_run(
+            workspace_id="workspace_post_isolation_stall",
+            employee_role="frontend",
+            summary="frontend: Thapelosego supplier quotation",
+        )
+        run_id = str(record["run_id"])
+        task_id = str(record.get("task_id") or "")
+        begin_execution(
+            run_id,
+            actor="workspace_scheduler",
+            receipt_summary="Operator start entered execution",
+        )
+        append_run_execution_receipt(
+            run_id,
+            receipt_type="worker_dispatch_started",
+            receipt_summary="Continuous worker dispatch started for role=frontend",
+            actor="workspace_scheduler",
+        )
+        append_run_execution_receipt(
+            run_id,
+            receipt_type="worker_isolation_created",
+            receipt_summary="worker isolation worktree branch=worker/test",
+            actor="workspace_scheduler",
+        )
+        _age_run(run_id, seconds=120)
+
+        reaped = reap_stale_employee_runs()
+
+        self.assertEqual([run_id], reaped)
+        self.assertEqual("failed", get_run(run_id)["phase"])
+        task = task_store.get_task(task_id) or {}
+        self.assertEqual("open", task.get("status"))
+
+    def test_verification_shift_uses_longer_stale_ttl(self) -> None:
+        from app.persistence import task_store
+        from app.runs.stale_reconcile import DEFAULT_VERIFICATION_STALE_SECONDS, employee_run_stale_seconds_for_record
+
+        opened = task_store.create_task(
+            workspace_id="workspace_verify_ttl",
+            goal="Verification after Priya (frontend): npm test",
+            owner_role="frontend",
+        )
+        task_id = str(opened["task_id"])
+        task_store.lease_task(task_id, lease_holder="test")
+        record = create_run(
+            workspace_id="workspace_verify_ttl",
+            mode="agent",
+            summary="frontend: verification ttl",
+            employee_role="frontend",
+            task_id=task_id,
+        )
+        self.assertEqual(
+            DEFAULT_VERIFICATION_STALE_SECONDS,
+            employee_run_stale_seconds_for_record(record),
+        )
+
+    def test_stale_executing_fail_reopens_leased_task_with_refund(self) -> None:
+        from app.persistence import task_store
+        from app.runs.begin_execution import begin_execution
+
+        opened = task_store.create_task(
+            workspace_id="workspace_stale_reopen",
+            goal="frontend: ordinary shift",
+            owner_role="frontend",
+        )
+        task_id = str(opened["task_id"])
+        task_store.lease_task(task_id, lease_holder="test")
+        record = create_run(
+            workspace_id="workspace_stale_reopen",
+            mode="agent",
+            summary="frontend: stale reopen",
+            employee_role="frontend",
+            task_id=task_id,
+        )
+        run_id = str(record["run_id"])
+        begin_execution(run_id, actor="test", receipt_summary="entered execution")
+        append_run_execution_receipt(
+            run_id,
+            receipt_type="worker_dispatch_started",
+            receipt_summary="dispatch started",
+            actor="workspace_scheduler",
+        )
+        append_run_execution_receipt(
+            run_id,
+            receipt_type="worker_isolation_created",
+            receipt_summary="isolation ready",
+            actor="workspace_scheduler",
+        )
+        _age_run(run_id, seconds=1300)
+
+        reaped = reap_stale_employee_runs(stale_seconds=600)
+
+        self.assertIn(run_id, reaped)
+        self.assertEqual("failed", get_run(run_id)["phase"])
+        task = task_store.get_task(task_id) or {}
+        self.assertEqual("open", task.get("status"))
+        self.assertLess(int(task.get("attempts_used") or 0), int(task.get("attempt_budget") or 0))
+
     def test_touch_run_activity_does_not_block_stale_reaper(self) -> None:
         record = create_run(
             workspace_id="workspace_axon_watch",
@@ -441,7 +613,8 @@ class RunStaleReconcileTests(unittest.TestCase):
             employee_role="backend",
         )
         run_id = str(stale["run_id"])
-        _age_run(run_id, seconds=900)
+        # Default worker TTL is 1200s; 900s is still inside the live window.
+        _age_run(run_id, seconds=1320)
 
         with patch(
             "app.workspace_agents.scheduler.load_workspace_agent_configs",
@@ -464,7 +637,7 @@ class RunStaleReconcileTests(unittest.TestCase):
             employee_role="backend",
         )
         run_id = str(stale["run_id"])
-        _age_run(run_id, seconds=900)
+        _age_run(run_id, seconds=1320)
 
         with patch(
             "app.workspace_agents.scheduler.load_workspace_agent_configs",
@@ -628,7 +801,7 @@ class RunStaleReconcileTests(unittest.TestCase):
             employee_role="backend",
         )
         run_id = str(record["run_id"])
-        _age_run(run_id, seconds=900)
+        _age_run(run_id, seconds=1320)
 
         app = load_control_plane_app()
         with patch.dict(
@@ -663,7 +836,7 @@ class RunStaleReconcileTests(unittest.TestCase):
             employee_role="backend",
         )
         run_id = str(record["run_id"])
-        _age_run(run_id, seconds=900)
+        _age_run(run_id, seconds=1320)
 
         client = TestClient(load_control_plane_app())
         try:

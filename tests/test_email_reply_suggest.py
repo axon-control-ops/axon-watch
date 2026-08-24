@@ -32,8 +32,46 @@ class EmailReplySuggestTests(unittest.TestCase):
             text="Can you confirm payment by Friday?",
         )
         self.assertTrue(draft["reply_subject"].startswith("Re:"))
-        self.assertIn("follow-up", draft["reply_body"].lower())
+        self.assertIn("requested update", draft["reply_body"].lower())
         self.assertEqual("capture_follow_up", draft["recommended_action"])
+
+    def test_reply_to_sender_request_ignores_quoted_history(self) -> None:
+        draft = suggest_email_reply(
+            subject=(
+                "Re: RFQ26052 — Quotation Submission: MNT240XED Magnetic Name Tags "
+                "(9 000 units) — THAPELOSEGO"
+            ),
+            sender='"Visser, Mathilda" <Visser.Ma@dbe.gov.za>',
+            text=(
+                "Good day,\n\n"
+                "Kindly provide us with the batch number for the product quoted, namely "
+                "the MNT240XED Magnetic Name Tag, in order for us to verify that it is the exact item.\n\n"
+                "________________________________\n"
+                "From: info@thapelosego.co.za <info@thapelosego.co.za>\n"
+                "Sent: Thursday, 20 August\n"
+                "Please note that a batch number is a unique identification code.\n"
+                "Please send it to both my emails addresses as listed below "
+                "Visser.Ma@dbe.gov.za VisserMathilda.dbe@hotmail.com\n"
+            ),
+        )
+        body = draft["reply_body"]
+        self.assertTrue(body.startswith("Hi Mathilda,"))
+        self.assertIn("MNT240XED Magnetic Name Tag", body)
+        self.assertIn("batch number", body)
+        self.assertNotIn("Please note that a batch number", body)
+        self.assertNotIn("Please send it to both my emails", body)
+        self.assertNotIn("Timing noted", body)
+        self.assertNotIn("Axon operator", body)
+        self.assertTrue(body.rstrip().endswith("Kind regards,"))
+
+    def test_real_operator_name_is_used_as_signature(self) -> None:
+        draft = suggest_email_reply(
+            subject="Please send the batch number",
+            sender="Mathilda Visser <visser@example.com>",
+            text="Please send the batch number.",
+            operator_name="Thapelo Sego",
+        )
+        self.assertIn("\nKind regards,\nThapelo Sego\n", draft["reply_body"])
 
 
 if __name__ == "__main__":

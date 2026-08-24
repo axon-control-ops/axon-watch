@@ -1,4 +1,6 @@
 # Interactive zsh for Axon workspace PTY sessions (local shell, not agent mirror).
+# Fleet host tools (awk, git, axon-agent-terminal-job) must be on PATH before OMZ.
+export PATH="${HOME}/.local/bin:/usr/local/bin:/usr/bin:/bin:${PATH}"
 # Prefer host Oh My Zsh when installed so the IDE terminal feels like the real machine.
 export STARSHIP_DISABLED=1
 export DISABLE_AUTO_TITLE=1

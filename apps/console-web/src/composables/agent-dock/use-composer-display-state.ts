@@ -15,6 +15,10 @@ import {
 import { OPERATOR_PERSONA_NAME } from '../../lib/operator-persona-name';
 import { runContinueActionLabel } from '../../lib/run-lifecycle-ui';
 import {
+  buildInstructionsSpecialistContext,
+  instructionsSpecialistLabel as formatInstructionsSpecialistLabel,
+} from '../../lib/instructions-specialist-context';
+import {
   composerAccessBannerCopy,
   composerAccessTone,
 } from '../../lib/sandbox-session-view';
@@ -194,23 +198,39 @@ export function useComposerDisplayState(options: UseComposerDisplayStateOptions)
     },
   });
   const instructionsGenerating = ref(false);
+  const instructionsSpecialistLabel = computed(() => {
+    return formatInstructionsSpecialistLabel(shell.activeIdeEmployeeRecord);
+  });
   const canConvertInstructions = computed(
-    () => Boolean(composerDraftModel.value.trim()) && !instructionsGenerating.value,
+    () =>
+      Boolean(shell.currentWorkspace?.workspace_id) &&
+      Boolean(composerDraftModel.value.trim()) &&
+      !instructionsGenerating.value,
   );
 
   async function convertDraftToInstructions(): Promise<void> {
+    const workspace = shell.currentWorkspace;
+    const workspaceId = workspace?.workspace_id;
     const source = composerDraftModel.value.trim();
-    const workspaceId = shell.currentWorkspace?.workspace_id;
-    if (!source || !workspaceId || instructionsGenerating.value) return;
+    if (!workspaceId || !source || instructionsGenerating.value) return;
     instructionsGenerating.value = true;
     try {
       const result = await generateInstructions({
         workspace_id: workspaceId,
         content: source,
+        specialist_context: buildInstructionsSpecialistContext({
+          workspace,
+          employee: shell.activeIdeEmployeeRecord,
+          composerMode: composerMode.value,
+        }),
         runtime_target: shell.selectedRuntimeTargetId || null,
         runtime_model: shell.selectedComposerModel || null,
       });
-      composerDraftModel.value = result.content;
+      const markdown = result.content.trim();
+      if (!markdown) {
+        throw new Error('Instruction generation returned empty markdown');
+      }
+      composerDraftModel.value = markdown.endsWith('\n') ? markdown : `${markdown}\n`;
       await nextTick(syncComposerHeight);
     } catch (error) {
       shell.commandMutationError = error instanceof Error
@@ -266,6 +286,7 @@ export function useComposerDisplayState(options: UseComposerDisplayStateOptions)
     composerDraftModel,
     canConvertInstructions,
     instructionsGenerating,
+    instructionsSpecialistLabel,
     convertDraftToInstructions,
     composerPlaceholder,
     composerQueueHint,

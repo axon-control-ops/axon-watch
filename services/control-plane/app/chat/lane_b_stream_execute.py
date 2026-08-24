@@ -14,6 +14,8 @@ from app.chat.lane_b_generated_image_actions import (
 )
 from app.chat.chat_stream_defer import finish_chat_stream
 from app.chat.lane_b_stream_progress import build_lane_b_stream_on_chunk
+from app.chat.direct_reply_acceptance import enforce_direct_reply_acceptance
+from app.chat.lane_b_turn_memory import remember_lane_b_turn
 from app.chat.reply_verification import verify_lane_b_reply
 from app.cli_runtime.approval_gate import is_tool_capable_composer_mode
 from app.cli_runtime.research_stream_blocks import normalize_transcript_content
@@ -22,7 +24,6 @@ from app.chat.progress_milestones import (
     publish_stream_error_milestone,
 )
 from app.plans.service import maybe_attach_plan_artifact
-from app.kairo.turn_memory import remember_turn
 from app.persistence import chat_store
 from app.workspace_agents.execution_policy import AgentExecutionPolicy
 from app.runs.service import (
@@ -80,21 +81,6 @@ class LaneBStreamJob:
 
 def _utc_now() -> str:
     return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
-
-
-def remember_lane_b_turn(
-    *,
-    kairo_session_id: str | None,
-    operator_content: str,
-    agent_content: str,
-) -> None:
-    session = str(kairo_session_id or "").strip()
-    if not session:
-        return
-    if str(operator_content or "").strip():
-        remember_turn(session, "user", operator_content)
-    if str(agent_content or "").strip():
-        remember_turn(session, "assistant", agent_content)
 
 
 def lane_b_system_content(
@@ -172,6 +158,22 @@ def finalize_lane_b_agent_run(
     )
     try:
         if dispatched:
+            _maybe_route_terminal_capability_lane_b(
+                dispatch_run_id=dispatch_run_id,
+                run_record=run_record,
+                reply_text=reply_text,
+            )
+            accepted, acceptance_record = enforce_direct_reply_acceptance(
+                dispatch_run_id, reply_text
+            )
+            run_record = acceptance_record or run_record
+            if not accepted:
+                _maybe_notify_lead_after_lane_b(
+                    dispatch_run_id=dispatch_run_id,
+                    run_record=run_record,
+                    reply_text=reply_text,
+                )
+                return False, run_record
             confidence, auto_recovered = resolve_critical_review_confidence(reply_text)
             if confidence is None:
                 if require_critical_review:
@@ -253,6 +255,48 @@ def finalize_lane_b_agent_run(
         reply_text=reply_text,
     )
     return dispatched, run_record
+
+
+def _maybe_route_terminal_capability_lane_b(
+    *,
+    dispatch_run_id: str,
+    run_record: dict[str, object] | None,
+    reply_text: str,
+) -> dict[str, object] | None:
+    """Smart-route one-shot Lane B shifts that hit terminal limits."""
+    if not isinstance(run_record, dict):
+        return None
+    if str(run_record.get("task_id") or "").strip():
+        return None
+    workspace_id = str(run_record.get("workspace_id") or "").strip()
+    role = str(run_record.get("employee_role") or "").strip().lower()
+    if not workspace_id or not role or role == "overview_agent":
+        return None
+    from app.workspace_agents.capability_routing import (
+        looks_like_terminal_capability_handoff,
+        try_route_capability_handoff,
+    )
+
+    if not looks_like_terminal_capability_handoff(reply_text=reply_text):
+        return None
+    try:
+        from app.workspace_agents import build_company_roster
+
+        name = role
+        for row in build_company_roster(workspace_id).get("employees") or []:
+            if str(row.get("role") or "").strip().lower() == role:
+                name = str(row.get("name") or role).strip() or role
+                break
+    except Exception:  # noqa: BLE001
+        name = role
+    return try_route_capability_handoff(
+        workspace_id=workspace_id,
+        source_run_id=dispatch_run_id,
+        source_role=role,
+        source_name=name,
+        reply_text=reply_text,
+        goal_hint=reply_text[:280],
+    )
 
 
 def _maybe_notify_lead_after_lane_b(
@@ -356,10 +400,15 @@ def execute_lane_b_stream(job: LaneBStreamJob) -> None:
         speaker_name = employee_name_from_persona_block(job.memory_appendix)
         agent_content = rewrite_employee_third_person_to_first(agent_content, speaker_name)
         execution_tier = str(lane_b_result.get("execution_tier") or "consultative")
-        try:
-            workspace_root = resolve_workspace_root(job.workspace_id)
-        except WorkspaceRootError:
-            workspace_root = None
+        # Verify edit receipts against the same checkout the runtime used.
+        # Falling back to the bound project root made valid sandbox edits look
+        # missing and, worse, could validate an unrelated live-tree path.
+        workspace_root = job.workspace_root
+        if workspace_root is None:
+            try:
+                workspace_root = resolve_workspace_root(job.workspace_id)
+            except WorkspaceRootError:
+                workspace_root = None
         run_started_epoch = None
         if job.dispatch_run_id:
             try:

@@ -15,7 +15,11 @@ from app.chat.lane_b_generated_image_actions import (
 from app.chat.lane_b_lead_decompose_fast_path import maybe_post_lead_decompose_message
 from app.chat.lane_b_lead_fan_out_fast_path import maybe_post_lead_fan_out_message
 from app.chat.lane_b_lead_named_assign_fast_path import maybe_post_lead_named_assign_message
-from app.chat.lane_b_persona_fast_path import build_lane_b_persona_reply, post_lane_b_persona_message
+from app.chat.lane_b_persona_fast_path import (
+    build_ambiguous_reply_guard,
+    build_lane_b_persona_reply,
+    post_lane_b_persona_message,
+)
 from app.chat.lane_b_plan_run import finalize_lane_b_plan_run
 from app.chat.lane_b_run_dispatch import resolve_lane_b_agent_run
 from app.chat.lane_b_system_content import lane_b_system_content as _lane_b_system_content
@@ -29,7 +33,6 @@ from app.cli_runtime.approval_gate import is_run_linked_composer_mode, is_tool_c
 from app.persistence import chat_store
 from app.plans.service import maybe_attach_plan_artifact
 from app.terminal.session_registry import ensure_agent_session, serialize_session
-from app.workspace_agents.execution_policy import role_execution_policy
 from app.workspace_agents.employee_persona_prompt import build_employee_persona_appendix
 from app.workspace_agents.employee_first_person import (
     employee_name_from_persona_block,
@@ -102,9 +105,9 @@ def post_lane_b_message(
         _remember_lane_b_turn,
         _resolve_chat_thread,
     )
-    from app.cli_runtime.composer_sandbox import resolve_sandbox_workspace_root
+    from app.cli_runtime.composer_sandbox import resolve_sandbox_execution
 
-    sandbox_workspace_root = resolve_sandbox_workspace_root(workspace_id)
+    sandbox_workspace_root, execution_access = resolve_sandbox_execution(workspace_id, composer_mode, execution_access)
 
     try:
         switch_intent = resolve_workspace_switch_intent(content)
@@ -182,8 +185,13 @@ def post_lane_b_message(
     # Role baseline this thread is bound to, independent of the operator's own
     # Full Access toggle — a message landing in a consultative-only role's
     # thread must not inherit the operator's own write access.
-    thread_execution_policy = (
-        role_execution_policy(thread_employee_role) if thread_employee_role else None
+    from app.cli_runtime.composer_execution_policy import resolve_composer_execution_policy
+
+    thread_execution_policy = resolve_composer_execution_policy(
+        sandbox_workspace_root,
+        thread_employee_role,
+        composer_mode,
+        execution_access,
     )
     lead_name = employee_name_from_persona_block(employee_persona or "") or "Lead"
     bind_lane_b_attachments = lambda message_id: _bind_message_attachments(
@@ -192,6 +200,21 @@ def post_lane_b_message(
         message_id=message_id,
         thread_id=thread_id,
     )[0]
+    # A number typed into the free-text composer has no reliable connection to
+    # an earlier decision card.  Never recover a stale question from history or
+    # turn it into a Lead handoff.
+    ambiguous_reply = build_ambiguous_reply_guard(content)
+    if ambiguous_reply:
+        return post_lane_b_persona_message(
+            workspace_id=workspace_id,
+            content=content,
+            thread_id=thread_id,
+            created_at=created_at,
+            save_message=chat_store.save_message,
+            new_message_id=_new_message_id,
+            bind_attachments=bind_lane_b_attachments,
+            agent_content=ambiguous_reply,
+        )
     # Named assign before fan-out: "assign Cole…" must not become assign-all / Lead essay.
     lead_named_assign_response = maybe_post_lead_named_assign_message(
         workspace_id=workspace_id,

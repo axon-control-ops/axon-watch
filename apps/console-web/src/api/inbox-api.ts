@@ -16,11 +16,81 @@ export interface AcknowledgeInboxSignalsResult {
   status?: string;
 }
 
-export async function fetchInbox(): Promise<InboxSnapshot> {
+export async function fetchInbox(options?: { force?: boolean }): Promise<InboxSnapshot> {
+  const path = options?.force ? '/api/inbox?force=true' : '/api/inbox';
   return fetchJson<InboxSnapshot>(
-    '/api/inbox',
+    path,
     {},
     'inbox request failed',
+    INBOX_FETCH_TIMEOUT_MS,
+  );
+}
+
+export type EmailFolderRole = 'inbox' | 'sent' | 'junk' | 'archive' | 'trash' | 'drafts';
+
+export interface EmailFoldersResult {
+  account_id: string;
+  folders: Partial<Record<EmailFolderRole, string>>;
+}
+
+export interface EmailFolderMessage {
+  uid: string;
+  message_id: string;
+  subject: string;
+  from: string;
+  text: string;
+  snippet: string;
+  sent_at: string;
+  account_id: string;
+  account_email: string;
+}
+
+export interface EmailMessagesResult {
+  account_id: string;
+  role: string;
+  items: EmailFolderMessage[];
+  count: number;
+}
+
+export type EmailMailboxScope = {
+  workspaceId?: string;
+  accountId?: string;
+};
+
+function emailMailboxScopeParams(scope: EmailMailboxScope): URLSearchParams {
+  const params = new URLSearchParams();
+  if (scope.accountId) {
+    params.set('account_id', scope.accountId);
+  } else if (scope.workspaceId) {
+    params.set('workspace_id', scope.workspaceId);
+  }
+  return params;
+}
+
+export async function fetchEmailFolders(scope: EmailMailboxScope): Promise<EmailFoldersResult> {
+  const params = emailMailboxScopeParams(scope);
+  return fetchJson<EmailFoldersResult>(
+    `/api/email/folders?${params.toString()}`,
+    {},
+    'email folders request failed',
+    INBOX_FETCH_TIMEOUT_MS,
+  );
+}
+
+export async function fetchEmailMessages(
+  scope: EmailMailboxScope,
+  role: EmailFolderRole,
+  options?: { limit?: number },
+): Promise<EmailMessagesResult> {
+  const params = emailMailboxScopeParams(scope);
+  params.set('role', role);
+  if (options?.limit) {
+    params.set('limit', String(options.limit));
+  }
+  return fetchJson<EmailMessagesResult>(
+    `/api/email/messages?${params.toString()}`,
+    {},
+    'email messages request failed',
     INBOX_FETCH_TIMEOUT_MS,
   );
 }

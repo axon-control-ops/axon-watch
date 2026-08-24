@@ -210,6 +210,22 @@
   word-break: break-word;
 }
 
+.agent-block--tool-link {
+  border: none;
+  background: transparent;
+  padding: 0;
+  margin: 0;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.agent-block--tool-link:hover,
+.agent-block--tool-link:focus-visible {
+  color: rgba(210, 224, 240, 0.98);
+  text-decoration: underline;
+}
+
 .agent-block--edit-failed {
   display: flex;
   flex-direction: column;

@@ -4,6 +4,7 @@ import {
   tryParseLegacyLeadFanOutText,
 } from '../lead-fan-out-card';
 import { parseLeadStandupReport } from '../lead-standup-card';
+import { parseLeadCheckinReport } from '../lead-checkin-card';
 import { sanitizeResearchCardTitle, sanitizeResearchSnippet } from '../research-snippet';import { inferResearchBlockKind, type ResearchBlockKind } from '../research-provider';
 import {
   sanitizeTerminalDisplayOutput,
@@ -87,6 +88,21 @@ function upgradeClarifyingTextSegments(
       });
       continue;
     }
+    const checkin = parseLeadCheckinReport(segment.text);
+    if (checkin) {
+      next.push({
+        kind: 'lead-checkin',
+        title: checkin.title,
+        summary: checkin.summary,
+        findingCount: checkin.findingCount,
+        assignmentCount: checkin.assignmentCount,
+        findings: checkin.findings,
+        nextSteps: checkin.nextSteps,
+        prompt: checkin.prompt,
+        options: checkin.options,
+      });
+      continue;
+    }
     const question = tryParseClarifyingMarkdown(segment.text);
     if (!question) {
       next.push(segment);
@@ -118,7 +134,7 @@ export function parseAgentTranscriptBlocksUncached(
 
   function flushText(): void {
     let raw = textBuffer.join('\n').replace(/^\n+|\n+$/g, '');
-    if (raw.length > 8_000 && /\[[0-9;?]*[A-Za-z]/.test(raw)) {
+    if (/\[[0-9;?]*[A-Za-z]/.test(raw)) {
       raw = stripOrphanAnsiFragments(raw);
     }
     const text = dedupeProseText(raw);

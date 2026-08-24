@@ -158,6 +158,27 @@ describe('company-roster-actions', () => {
     expect(employeeChatComposerMode('receipts')).toBe('ask');
   });
 
+  it('drops retry (but keeps receipts/talk) for a working-as-intended private-material block', () => {
+    const blocked = employee({
+      status: 'idle',
+      last_outcome: 'failed',
+      last_outcome_detail:
+        'Workspace delivery blocked: private_company_material: assets/TPS-PACK.zip matches ' +
+        'a private-document rule (financial records, RFQ packs, exports, and office-document ' +
+        'formats never leave a workspace automatically) -- this is expected, working-as-intended ' +
+        "behavior, not an error to retry.",
+      last_run_id: 'run_blocked_abc123',
+    });
+    expect(employeeQuickActions(blocked).map((action) => action.id)).toEqual([
+      'receipts',
+      'talk',
+      'status',
+      'assign',
+      'toggle_enabled',
+    ]);
+    expect(employeeQuickActions(blocked).find((action) => action.id === 'retry')).toBeUndefined();
+  });
+
   it('still offers Try again when Cursor usage is exhausted (copy warns; dock must not hide retry)', () => {
     const usageBlocked = employee({
       status: 'idle',

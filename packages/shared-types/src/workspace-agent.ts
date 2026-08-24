@@ -83,6 +83,12 @@ export interface CompanyEmployeeRecord {
   pending_decision_reason?: string | null;
   /** Human-readable choices supplied by the worker. */
   pending_decision_options?: Array<{ id: string; label: string }> | null;
+  /** Role responsible for deciding or diagnosing this recovery. */
+  pending_decision_owner_role?: string | null;
+  /** Role whose failed run caused this decision. */
+  pending_decision_subject_role?: string | null;
+  /** Exact failed run that caused this decision. */
+  pending_decision_subject_run_id?: string | null;
   /** Optional Azure neural voice for Talk / teammate TTS (falls back to operator voice). */
   azure_voice_id?: string | null;
   /** Latest worker delivery stage for this role (git/PR/CI pipeline). */

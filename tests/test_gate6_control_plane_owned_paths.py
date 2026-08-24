@@ -126,10 +126,8 @@ class Gate6AcceptanceWithControlPlanePathsTests(unittest.TestCase):
         self.assertTrue(any(f.code == "out_of_scope" for f in verdict.policy_findings))
 
     def test_in_scope_agent_work_mixed_with_control_plane_noise_passes(self) -> None:
-        # task_allowed_paths is required for a *writing* task: evaluate_acceptance
-        # uses fail_closed_missing_task=True, so an unscoped task denies all
-        # paths. Supplying it here mirrors the real Gate 6 caller, which reads
-        # allowed_paths off the task record.
+        # Task paths are routing hints. Gate 6 enforces the repository contract,
+        # while the sandbox and publication gate enforce the role-owned lane.
         verdict = evaluate_acceptance(
             contract=self.CONTRACT,
             check_results={},
@@ -141,8 +139,7 @@ class Gate6AcceptanceWithControlPlanePathsTests(unittest.TestCase):
         self.assertTrue(verdict.passed, verdict.summary)
 
     def test_control_plane_noise_passes_even_for_an_unscoped_task(self) -> None:
-        # The live failures were unscoped consultative runs: no task
-        # allowed_paths, so effective scope is deny-all. Stripping the
+        # The live failures were unscoped consultative runs. Stripping the
         # control-plane paths leaves nothing to police, which is the point —
         # the agent genuinely changed nothing.
         verdict = evaluate_acceptance(

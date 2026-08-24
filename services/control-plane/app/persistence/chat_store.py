@@ -395,3 +395,21 @@ def count_messages() -> int:
     with _managed_connection() as connection:
         row = connection.execute("SELECT COUNT(*) FROM chat_messages").fetchone()
     return int(row[0]) if row is not None else 0
+
+
+def delete_thread(thread_id: str) -> dict[str, Any]:
+    """Permanently remove one chat thread and its messages."""
+    cleaned = str(thread_id or "").strip()
+    if not cleaned:
+        raise ChatThreadNotFoundError("thread_id is required")
+    with _managed_connection() as connection:
+        row = connection.execute(
+            "SELECT thread_id FROM chat_threads WHERE thread_id = ?",
+            (cleaned,),
+        ).fetchone()
+        if row is None:
+            raise ChatThreadNotFoundError(f"thread not found: {cleaned}")
+        connection.execute("DELETE FROM chat_messages WHERE thread_id = ?", (cleaned,))
+        connection.execute("DELETE FROM chat_threads WHERE thread_id = ?", (cleaned,))
+        connection.commit()
+    return {"thread_id": cleaned, "deleted": True}

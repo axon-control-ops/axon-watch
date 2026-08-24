@@ -18,8 +18,11 @@ from app.runs.service import (
     prune_terminal_employee_runs,
     reap_abandoned_review_ready_runs,
     reap_stale_employee_runs,
+    reap_stale_interactive_runs,
+    reconcile_employee_runs_missing_tasks,
 )
 from app.runs.stale_reconcile import BUSY_EMPLOYEE_PHASES
+from app.workspace_agents.isolation_reaper import reap_abandoned_worker_isolations
 from app.workspace_agents.config_loader import EmployeeConfig, load_workspace_agent_configs
 from app.workspace_agents.scheduler_auto_start_gates import (
     continuous_auto_start_skip_reason,
@@ -340,6 +343,40 @@ def run_observation_tick() -> dict[str, Any]:
     if reaped:
         logger.info("continuous worker tick reaped %s stale run(s)", len(reaped))
 
+    # An operator composer thread has no employee_role, so the reaper above
+    # deliberately skips it -- correctly, a real turn can run long. But that
+    # left no periodic path back to a sane state for one actually abandoned
+    # (tab closed mid-turn); only a control-plane restart could resolve it.
+    reaped_interactive = reap_stale_interactive_runs()
+    result["reaped_interactive_count"] = len(reaped_interactive)
+    if reaped_interactive:
+        logger.info(
+            "continuous worker tick reaped %s abandoned interactive run(s)",
+            len(reaped_interactive),
+        )
+
+    # Regression guard for a real outage: preserve_isolation keeps a checkout on
+    # disk for operator recovery after a blocked/failed publish, but nothing
+    # ever swept those checkouts afterward. 77 accumulated (7.9G) on this host's
+    # 9.8G tmpfs /tmp and filled it to 100%, which then failed *every new*
+    # isolation with "refusing to write the bound project root" -- a
+    # platform-wide stall from disk pressure, not a code defect anywhere else.
+    reaped_isolations = reap_abandoned_worker_isolations()
+    result["reaped_isolation_count"] = len(reaped_isolations)
+    if reaped_isolations:
+        logger.info(
+            "continuous worker tick reaped %s abandoned isolation checkout(s)",
+            len(reaped_isolations),
+        )
+
+    missing_task_runs = reconcile_employee_runs_missing_tasks()
+    result["missing_task_reconciled_count"] = len(missing_task_runs)
+    if missing_task_runs:
+        logger.info(
+            "continuous worker tick cancelled %s active employee run(s) with missing tasks",
+            len(missing_task_runs),
+        )
+
     abandoned = reap_abandoned_review_ready_runs()
     result["abandoned_count"] = len(abandoned)
     if abandoned:
@@ -441,6 +478,22 @@ def run_continuous_worker_tick(
             )
     except Exception:  # noqa: BLE001 — never block scheduler on handoff retry
         logger.exception("handoff autostart retry failed")
+
+    try:
+        from app.workspace_handoff_routing import notify_completed_handoffs
+
+        # A cross-workspace handoff previously stopped at one ack when routed;
+        # the source Lead never learned whether the target workspace actually
+        # finished the delegated work. Close that loop on the same tick that
+        # already retries stuck autostarts.
+        handoffs_closed = notify_completed_handoffs()
+        if handoffs_closed:
+            logger.info(
+                "continuous worker tick closed %s completed handoff(s)",
+                len(handoffs_closed),
+            )
+    except Exception:  # noqa: BLE001 — never block scheduler on handoff completion notice
+        logger.exception("handoff completion notice failed")
 
     if not scheduler_enabled():
         return []

@@ -10,6 +10,7 @@ from app.workspace_agents.lead_handoff_receipt import record_lead_handoff_run
 from app.workspace_agents.lead_task_plan import (
     detect_fan_out_intent,
     is_employee_shift_retry_request,
+    should_execute_lead_fast_path,
 )
 
 
@@ -73,7 +74,7 @@ def maybe_post_lead_fan_out_message(
     if is_employee_shift_retry_request(content):
         return None
     intent = detect_fan_out_intent(content)
-    if composer_mode != "agent" or role != "lead" or not intent:
+    if role != "lead" or not should_execute_lead_fast_path(composer_mode, content) or not intent:
         return None
 
     try:

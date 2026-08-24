@@ -6,6 +6,7 @@ import {
   resolveAgentContinuePrompt,
   runContinueActionLabel,
   shouldOfferRunContinue,
+  shouldOfferRunStop,
 } from './run-lifecycle-ui';
 
 describe('run-lifecycle-ui', () => {
@@ -18,6 +19,12 @@ describe('run-lifecycle-ui', () => {
   it('blocks complete on terminal phases', () => {
     expect(isOperatorCompletablePhase('completed')).toBe(false);
     expect(isOperatorCompletablePhase('cancelled')).toBe(false);
+  });
+
+  it('offers stop only when the backend grants can_stop', () => {
+    expect(shouldOfferRunStop(true)).toBe(true);
+    expect(shouldOfferRunStop(false)).toBe(false);
+    expect(shouldOfferRunStop(undefined)).toBe(false);
   });
 
   it('offers resume only for paused or input-blocked resumable runs', () => {

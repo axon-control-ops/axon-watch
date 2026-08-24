@@ -92,11 +92,11 @@ describe('thread-message-view', () => {
   it('strips blank lines from the collapsed preview so real content shows first', () => {
     const text = ['# Instructions', '', '## Goal', '', 'Create the 2nd-week menu.'].join('\n');
     const preview = stickyPromptPreviewText(text);
-    expect(preview.split('\n')).toEqual(['# Instructions', '## Goal', 'Create the 2nd-week menu.']);
+    expect(preview).toBe('Create the 2nd-week menu.');
   });
 
-  it('caps the preview at 3 meaningful lines', () => {
+  it('caps the preview at one substantive line', () => {
     const text = ['Line one', 'Line two', 'Line three', 'Line four'].join('\n');
-    expect(stickyPromptPreviewText(text).split('\n')).toEqual(['Line one', 'Line two', 'Line three']);
+    expect(stickyPromptPreviewText(text)).toBe('Line one');
   });
 });

@@ -38,6 +38,7 @@ import {
   ensureWorkspaceFilesLoaded,
   openWatchConnectors,
 } from '../../composables/useIdeEditorStatusBar';
+import { shouldOfferRunStop } from '../../lib/run-lifecycle-ui';
 import { useShellStore } from '../../stores/shell';
 
 const shell = useShellStore();
@@ -518,10 +519,10 @@ watch(
         {{ shell.primaryActiveRun.summary }}
       </p>
       <button
-        v-if="shell.primaryActiveRun && (shell.canStopPrimaryRun || shell.primaryActiveRun.phase === 'executing')"
+        v-if="shouldOfferRunStop(shell.primaryActiveRun?.can_stop)"
         type="button"
         class="ide-panel-action"
-        :disabled="!shell.canStopPrimaryRun && shell.primaryActiveRun.phase !== 'executing'"
+        :disabled="!shell.canStopPrimaryRun"
         @click="shell.stopPrimaryRun()"
       >
         {{ shell.runMutationState === 'stopping' ? 'STOPPING…' : 'STOP RUN' }}

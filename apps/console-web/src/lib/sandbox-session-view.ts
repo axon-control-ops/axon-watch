@@ -1,10 +1,28 @@
 export const SANDBOX_SESSION_CONSENT_LINES = [
   'Sandbox opens a disposable copy of the project for self-improvement work.',
   'Edits stay in that copy — not your live project root, vault, or production targets.',
-  'It lasts for this control-plane session only. Turn Sandbox off when you are done.',
+  'Your per-workspace preference is durable. Dirty changes require Publish or explicit Discard.',
 ] as const;
 
 export type ComposerAccessTone = 'full' | 'sandbox' | 'sandbox-full';
+
+export function sandboxUnpromotedChangesMessage(): string {
+  return 'Sandbox has unpromoted changes — use Review / Preview before publish.';
+}
+
+export function sandboxRootDirtyMessage(input: {
+  bound_branch?: string;
+  root_changed_paths?: string[];
+}): string {
+  const rootPaths = (input.root_changed_paths ?? []).slice(0, 4).join(', ');
+  return `Root worktree is dirty on ${input.bound_branch || 'current branch'} (${rootPaths}). Clean root before publishing Sandbox changes.`;
+}
+
+export function sandboxStripDetailCopy(dirty: boolean): string {
+  return dirty
+    ? 'Review and preview this disposable checkout before publishing.'
+    : 'Sandbox is active; root preview stays separate.';
+}
 
 export function sandboxSessionHint(enabled: boolean, envForced: boolean): string {
   if (envForced) {
@@ -64,7 +82,7 @@ export function composerAccessBannerCopy(input: {
   if (tone === 'sandbox-full') {
     return {
       title: 'Sandbox · Full Access',
-      detail: 'Disposable copy · tools run after you approve',
+      detail: 'Disposable copy · routine tools autonomous; high-risk effects gated',
       glyph: '▣',
       tone,
     };
@@ -83,13 +101,12 @@ export function composerAccessMenuStatus(input: {
 }): { executionLine: string; sandboxLine: string; workerIsolationLine: string } {
   return {
     executionLine: input.fullAccess
-      ? 'Full Access active — tools after approval'
+      ? 'Full Access active — routine tools autonomous; high-risk effects gated'
       : 'Consultative — read-only tools',
     sandboxLine: input.sandboxEnabled
       ? 'Sandbox on — disposable session copy'
       : 'Sandbox off — live project',
-    workerIsolationLine: input.sandboxEnabled
-      ? 'Company workers still use isolated git checkouts for AUTO shifts'
-      : 'Company workers use isolated checkouts — not Composer Sandbox',
+    workerIsolationLine:
+      'Full Auto supplies lazy isolated checkouts; manual workspace Sandbox remains enabled afterward',
   };
 }

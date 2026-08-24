@@ -4,7 +4,10 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from app.cli_runtime.agent_dispatch_preflight import validate_agent_dispatch_preflight
+from app.cli_runtime.agent_dispatch_preflight import (
+    validate_agent_dispatch_preflight,
+    validate_sandbox_workspace_toolchain,
+)
 from app.cli_runtime.agent_sandbox import (
     CURSOR_WRITABLE_STATE_RELATIVE,
     AgentSandboxPolicy,
@@ -69,6 +72,7 @@ def adapt_execution_policy(
     runtime_binary: str,
     family: str = "",
     env: dict[str, str] | None = None,
+    injected_env: tuple[tuple[str, str], ...] = (),
 ) -> AgentSandboxPolicy:
     return AgentSandboxPolicy(
         writable_roots=policy.write_paths,
@@ -77,6 +81,8 @@ def adapt_execution_policy(
         forbidden_path_globs=policy.forbidden_path_globs,
         cursor_readonly_paths=_runtime_paths(runtime_binary, family=family),
         codex_auth_path=_codex_profile_auth_path(env or {}) if family == "codex" else "",
+        injected_env=injected_env,
+        allow_all_tools=policy.allow_all_tools,
     )
 
 
@@ -86,8 +92,12 @@ def sandbox_agent_env(
     workspace_id: str,
     run_id: str,
 ) -> dict[str, str]:
+    from app.workspace_service_connections import resolve_workspace_live_env
+
+    bridge_env = resolve_workspace_live_env(workspace_id)
     return {
         **env,
+        **bridge_env,
         "AXON_AGENT_SOURCE_WORKSPACE_ID": workspace_id,
         "AXON_WATCH_WORKSPACE_ID": workspace_id,
         "AXON_WATCH_RUN_ID": run_id,
@@ -102,15 +112,23 @@ def prepare_execution_sandbox(
     env: dict[str, str],
     workspace_id: str,
     run_id: str,
+    workspace_root: Path | str | None = None,
 ) -> tuple[dict[str, str], AgentSandboxPolicy | None]:
     if policy is None:
         return env, None
     sandbox_env = sandbox_agent_env(env, workspace_id=workspace_id, run_id=run_id)
+    bridge_env = {
+        key: value
+        for key, value in sandbox_env.items()
+        if key.startswith(("SUPABASE_", "YEDC_", "EXPO_PUBLIC_SUPABASE_"))
+    }
+    injected_env = tuple(sorted(bridge_env.items()))
     policy_value = adapt_execution_policy(
         policy,
         runtime_binary=runtime_binary,
         family=family,
         env=sandbox_env,
+        injected_env=injected_env,
     )
     if family == "codex":
         # Bubblewrap hides host paths, including the persistent Axon-X profile.
@@ -123,6 +141,8 @@ def prepare_execution_sandbox(
         runtime_binary=runtime_binary,
         sandbox_policy=policy_value,
     )
+    if policy is not None:
+        validate_sandbox_workspace_toolchain(workspace_root)
     return sandbox_env, policy_value
 
 

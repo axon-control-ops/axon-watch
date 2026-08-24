@@ -17,6 +17,13 @@ _EXEMPT_SUFFIXES = (
     "/internal/watch/health",
     "/internal/watch/readiness",
 )
+_CONFIDENTIAL_GET_PREFIXES = (
+    "/internal/watch/vault/secrets",
+    "/internal/watch/vault/export",
+    "/internal/watch/vault/provider-keys",
+    "/internal/watch/vault/runtime-env",
+    "/internal/watch/data/snapshot",
+)
 
 
 def internal_service_token() -> str:
@@ -106,6 +113,11 @@ def _is_exempt(path: str) -> bool:
     return any(cleaned == suffix or cleaned.endswith(suffix) for suffix in _EXEMPT_SUFFIXES)
 
 
+def _is_confidential_get(path: str) -> bool:
+    cleaned = path.rstrip("/") or "/"
+    return any(cleaned == prefix or cleaned.startswith(prefix + "/") for prefix in _CONFIDENTIAL_GET_PREFIXES)
+
+
 def extract_internal_token(headers: dict[str, str]) -> str:
     for key, value in headers.items():
         if key.lower() == _HEADER:
@@ -115,7 +127,7 @@ def extract_internal_token(headers: dict[str, str]) -> str:
 
 class InternalServiceTokenMiddleware(BaseHTTPMiddleware):
     """
-    Gate mutating /internal/watch/* routes.
+    Gate mutating /internal/watch/* routes and confidential GET reads.
 
     - Remotely reachable deployments require AXON_WATCH_INTERNAL_SERVICE_TOKEN.
     - When configured, the shared token must match.
@@ -125,7 +137,10 @@ class InternalServiceTokenMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next: Callable) -> Response:
         method = request.method.upper()
         path = request.url.path
-        if method not in _MUTATING or _is_exempt(path):
+        gated = (method in _MUTATING and not _is_exempt(path)) or (
+            method == "GET" and _is_confidential_get(path)
+        )
+        if not gated:
             return await call_next(request)
 
         token = internal_service_token()

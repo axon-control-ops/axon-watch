@@ -8,7 +8,11 @@
   "tunnel_mode": "named",
   "public_base_url": "https://axon.edudashpro.org.za",
   "stable_domain": "axon.edudashpro.org.za",
-  "binary_candidates": ["${AXON_WATCH_STATE_DIR}/cloudflared", "cloudflared"],
+  "binary_candidates": [
+    "${HOME}/.local/lib/axon/cloudflared/current/cloudflared",
+    "${AXON_WATCH_STATE_DIR}/cloudflared",
+    "cloudflared"
+  ],
   "native_process_state_path": "${AXON_WATCH_STATE_DIR}/tunnel/cloudflared-process.json",
   "native_log_path": "${AXON_WATCH_STATE_DIR}/tunnel/cloudflared.log",
   "tunnel_log_paths": [

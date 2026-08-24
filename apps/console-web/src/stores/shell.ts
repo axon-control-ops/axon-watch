@@ -13,6 +13,7 @@ import {
   fetchWorkspaceFiles,
   markRunReviewReady,
   createWorkspaceChatThread,
+  deleteChatThread,
   fetchWorkspaceChatThreads,
   uploadChatAttachment,
   postChatMessage,
@@ -153,6 +154,7 @@ import {
 import { resolveComposerContextPayload } from '../lib/ide-composer-context-tokens';
 import {
   appendIdeComposerQueueEntry,
+  ideComposerQueueScopeKey,
   ideComposerQueueLabel as buildIdeComposerQueueLabel,
   removeIdeComposerQueueEntry,
   shiftIdeComposerQueue,
@@ -456,7 +458,7 @@ export const useShellStore = defineStore('shell', () => {
   const kairoSpeechQueueActive = ref(false);
   const kairoVoiceEngineActive = ref(false);
   const kairoVoicePaused = ref(false);
-  const ideComposerQueueByWorkspaceId = ref<Record<string, IdeComposerQueuedMessage[]>>({});
+  const ideComposerQueueByScopeKey = ref<Record<string, IdeComposerQueuedMessage[]>>({});
   let flushingIdeComposerQueue = false;
   const autoRunRecoveryInFlight = { value: false };
   const agentExecutionAccess = ref<AgentExecutionAccess>(resolveAgentExecutionAccess());
@@ -724,10 +726,11 @@ export const useShellStore = defineStore('shell', () => {
 
   const ideComposerQueue = computed(() => {
     const workspaceId = currentWorkspace.value?.workspace_id;
-    if (!workspaceId) {
+    const scopeKey = ideComposerQueueScopeKey(workspaceId, activeIdeThreadId.value);
+    if (!scopeKey) {
       return [];
     }
-    return ideComposerQueueByWorkspaceId.value[workspaceId] ?? [];
+    return ideComposerQueueByScopeKey.value[scopeKey] ?? [];
   });
 
   const ideComposerQueueSummary = computed(() =>
@@ -898,8 +901,8 @@ export const useShellStore = defineStore('shell', () => {
 
   async function restoreWorkspaceIdeView(workspaceId: string): Promise<void> {
     await loadIdeThreads(workspaceId);
-    const threadId =
-      getWorkspaceSurfaceThreadId(workspaceId, 'ide') ?? bootstrapIdeActiveThreadId(workspaceId);
+    bootstrapIdeActiveThreadId(workspaceId);
+    const threadId = getWorkspaceSurfaceThreadId(workspaceId, 'ide');
     if (threadId) {
       setWorkspaceSurfaceThreadId(workspaceId, 'ide', threadId);
     }
@@ -997,6 +1000,9 @@ export const useShellStore = defineStore('shell', () => {
       ideStreamFocusThreadId.value = threadId;
       if (threadId) {
         applyWorkspaceStreamUiToGlobals(threadId);
+        queueMicrotask(() => {
+          void flushIdeComposerQueueIfIdle();
+        });
       }
     },
     { immediate: true },
@@ -1173,17 +1179,89 @@ export const useShellStore = defineStore('shell', () => {
     }
   }
 
+  /** Permanently delete a chat thread (history + messages), then focus a neighbor or new chat. */
+  async function deleteIdeThread(threadId: string): Promise<boolean> {
+    const workspaceId = currentWorkspace.value?.workspace_id;
+    const cleaned = threadId.trim();
+    if (!workspaceId || !cleaned) {
+      return false;
+    }
+
+    try {
+      await deleteChatThread(cleaned);
+    } catch (error) {
+      commandMutationError.value =
+        error instanceof Error ? error.message : 'Failed to delete chat';
+      return false;
+    }
+
+    const remaining = (ideThreadsByWorkspaceId.value[workspaceId] ?? []).filter(
+      (thread) => thread.thread_id !== cleaned,
+    );
+    ideThreadsByWorkspaceId.value = {
+      ...ideThreadsByWorkspaceId.value,
+      [workspaceId]: remaining,
+    };
+
+    disconnectChatStreamSession(cleaned);
+    setWorkspaceStreamUi(cleaned, {
+      active: false,
+      messageId: null,
+      activity: null,
+      ideAgentRunId: null,
+    });
+    const nextCache = { ...workspaceIdeThreadMessagesById.value };
+    delete nextCache[cleaned];
+    workspaceIdeThreadMessagesById.value = nextCache;
+    persistIdeComposerDraft(workspaceId, '', cleaned);
+
+    const currentOpen = openIdeThreadIdsByWorkspaceId.value[workspaceId] ?? [];
+    const wasActive = activeIdeThreadId.value === cleaned;
+    const nextOpen = currentOpen.filter((id) => id !== cleaned);
+    persistOpenIdeThreadTabs(workspaceId, nextOpen);
+
+    if (!wasActive) {
+      return true;
+    }
+
+    const nextActive =
+      resolveIdeThreadTabAfterClose({
+        openIds: currentOpen.length ? currentOpen : remaining.map((thread) => thread.thread_id),
+        closedId: cleaned,
+        activeId: cleaned,
+      }) ??
+      remaining[0]?.thread_id ??
+      null;
+
+    if (nextActive) {
+      if (!nextOpen.includes(nextActive)) {
+        persistOpenIdeThreadTabs(workspaceId, openIdeThreadTab(nextOpen, nextActive));
+      }
+      await selectIdeThread(nextActive);
+      return true;
+    }
+
+    clearWorkspaceSurfaceThreadId(workspaceId, 'ide');
+    const created = await createIdeThread();
+    return created != null;
+  }
+
   const workspaceThreadLoadQueue = createWorkspaceThreadLoadQueue();
   const ideThreadsLoadPromises = new Map<string, Promise<void>>();
   const ideChatHydratePromises = new Map<string, Promise<void>>();
 
   function bootstrapIdeActiveThreadId(workspaceId: string): string | null {
+    const threads = ideThreadsByWorkspaceId.value[workspaceId] ?? [];
+    const knownIds = new Set(threads.map((thread) => thread.thread_id));
+    let selectedThreadId = getWorkspaceSurfaceThreadId(workspaceId, 'ide');
+    if (selectedThreadId && !knownIds.has(selectedThreadId)) {
+      clearWorkspaceSurfaceThreadId(workspaceId, 'ide');
+      selectedThreadId = null;
+    }
     const resolved = resolveBootstrapIdeThreadId({
-      selectedThreadId: getWorkspaceSurfaceThreadId(workspaceId, 'ide'),
+      selectedThreadId,
       openTabIds: openIdeThreadIdsByWorkspaceId.value[workspaceId] ?? [],
-      threadListIds: (ideThreadsByWorkspaceId.value[workspaceId] ?? []).map(
-        (thread) => thread.thread_id,
-      ),
+      threads,
     });
     if (resolved && resolved !== getWorkspaceSurfaceThreadId(workspaceId, 'ide')) {
       setWorkspaceSurfaceThreadId(workspaceId, 'ide', resolved);
@@ -1303,6 +1381,27 @@ export const useShellStore = defineStore('shell', () => {
     ideChatHydratePromises.set(cleaned, promise);
     return promise;
   }
+
+  let runtimeLaneWasReady = false;
+  watch(
+    () => Boolean(runtimeSummary.value?.watch.connected),
+    async (connected) => {
+      const wasReady = runtimeLaneWasReady;
+      runtimeLaneWasReady = connected;
+      if (!connected || wasReady) {
+        return;
+      }
+      const workspaceId = currentWorkspace.value?.workspace_id;
+      if (!workspaceId || layoutMode.value !== 'ide') {
+        return;
+      }
+      if (threadMessages.value.length > 0) {
+        return;
+      }
+      commandMutationError.value = null;
+      await hydrateWorkspaceIdeChat(workspaceId);
+    },
+  );
 
   async function createIdeThread(): Promise<string | null> {
     const workspaceId = currentWorkspace.value?.workspace_id;
@@ -2163,7 +2262,6 @@ export const useShellStore = defineStore('shell', () => {
     const askRewrite = rewriteComposerAskOptionAnswer(content, threadMessages.value);
     if (askRewrite) {
       content = askRewrite.content;
-      markQuestionAnswered(askRewrite.ask.messageId, askRewrite.ask.prompt);
     }
     const blockedReason = composerSubmitBlockReason(workspaceId, content, commandMutationState.value, agentStreamActive.value);
     if (blockedReason) {
@@ -2249,6 +2347,9 @@ export const useShellStore = defineStore('shell', () => {
         response.messages.map((message) => mapChatMessageRecord(message)),
       );
       threadMessages.value = filterThreadMessagesForSurface(merged, 'ide');
+      if (askRewrite) {
+        markQuestionAnswered(askRewrite.ask.messageId, askRewrite.ask.prompt);
+      }
       if (options.clearDraftOnSuccess !== false) {
         ideComposerDraft.value = '';
         // Persist synchronously: a force-refresh can cancel the debounced watcher
@@ -2381,8 +2482,10 @@ export const useShellStore = defineStore('shell', () => {
     content: string,
   ): void {
     const workspaceId = currentWorkspace.value?.workspace_id;
+    const threadId = activeIdeThreadId.value;
+    const scopeKey = ideComposerQueueScopeKey(workspaceId, threadId);
     const trimmed = content.trim();
-    if (!workspaceId || !trimmed) {
+    if (!scopeKey || !trimmed) {
       return;
     }
 
@@ -2391,11 +2494,12 @@ export const useShellStore = defineStore('shell', () => {
       content: trimmed,
       composerMode,
       createdAt: new Date().toISOString(),
+      threadId,
     };
-    ideComposerQueueByWorkspaceId.value = {
-      ...ideComposerQueueByWorkspaceId.value,
-      [workspaceId]: appendIdeComposerQueueEntry(
-        ideComposerQueueByWorkspaceId.value[workspaceId] ?? [],
+    ideComposerQueueByScopeKey.value = {
+      ...ideComposerQueueByScopeKey.value,
+      [scopeKey]: appendIdeComposerQueueEntry(
+        ideComposerQueueByScopeKey.value[scopeKey] ?? [],
         entry,
       ),
     };
@@ -2403,13 +2507,14 @@ export const useShellStore = defineStore('shell', () => {
 
   function removeIdeComposerQueuedMessage(messageId: string): void {
     const workspaceId = currentWorkspace.value?.workspace_id;
-    if (!workspaceId) {
+    const scopeKey = ideComposerQueueScopeKey(workspaceId, activeIdeThreadId.value);
+    if (!scopeKey) {
       return;
     }
-    ideComposerQueueByWorkspaceId.value = {
-      ...ideComposerQueueByWorkspaceId.value,
-      [workspaceId]: removeIdeComposerQueueEntry(
-        ideComposerQueueByWorkspaceId.value[workspaceId] ?? [],
+    ideComposerQueueByScopeKey.value = {
+      ...ideComposerQueueByScopeKey.value,
+      [scopeKey]: removeIdeComposerQueueEntry(
+        ideComposerQueueByScopeKey.value[scopeKey] ?? [],
         messageId,
       ),
     };
@@ -2424,25 +2529,27 @@ export const useShellStore = defineStore('shell', () => {
     }
 
     const workspaceId = currentWorkspace.value?.workspace_id;
-    if (!workspaceId) {
+    const scopeKey = ideComposerQueueScopeKey(workspaceId, activeIdeThreadId.value);
+    if (!scopeKey) {
       return;
     }
 
-    const queue = ideComposerQueueByWorkspaceId.value[workspaceId] ?? [];
+    const queue = ideComposerQueueByScopeKey.value[scopeKey] ?? [];
     const { next, remaining } = shiftIdeComposerQueue(queue);
     if (!next) {
       return;
     }
 
     flushingIdeComposerQueue = true;
-    ideComposerQueueByWorkspaceId.value = {
-      ...ideComposerQueueByWorkspaceId.value,
-      [workspaceId]: remaining,
+    ideComposerQueueByScopeKey.value = {
+      ...ideComposerQueueByScopeKey.value,
+      [scopeKey]: remaining,
     };
 
     try {
       await dispatchIdeComposerMessage(next.composerMode, {
         contentOverride: next.content,
+        threadIdOverride: next.threadId,
       });
     } finally {
       flushingIdeComposerQueue = false;
@@ -2468,19 +2575,20 @@ export const useShellStore = defineStore('shell', () => {
 
   async function steerQueuedIdeComposerMessage(messageId: string): Promise<void> {
     const workspaceId = currentWorkspace.value?.workspace_id;
-    if (!workspaceId) {
+    const scopeKey = ideComposerQueueScopeKey(workspaceId, activeIdeThreadId.value);
+    if (!scopeKey) {
       return;
     }
 
-    const queue = ideComposerQueueByWorkspaceId.value[workspaceId] ?? [];
+    const queue = ideComposerQueueByScopeKey.value[scopeKey] ?? [];
     const entry = queue.find((item) => item.id === messageId);
     if (!entry) {
       return;
     }
 
-    ideComposerQueueByWorkspaceId.value = {
-      ...ideComposerQueueByWorkspaceId.value,
-      [workspaceId]: removeIdeComposerQueueEntry(queue, messageId),
+    ideComposerQueueByScopeKey.value = {
+      ...ideComposerQueueByScopeKey.value,
+      [scopeKey]: removeIdeComposerQueueEntry(queue, messageId),
     };
 
     if (composerAgentBusy.value) {
@@ -2489,13 +2597,14 @@ export const useShellStore = defineStore('shell', () => {
 
     await dispatchIdeComposerMessage(entry.composerMode, {
       contentOverride: entry.content,
+      threadIdOverride: entry.threadId,
     });
   }
 
   async function submitIdeComposer(
     composerMode: IdeComposerMode,
     options: { attachmentFiles?: File[]; contentOverride?: string } = {},
-  ): Promise<boolean> {
+  ): Promise<boolean | 'queued'> {
     const content = (options.contentOverride ?? ideComposerDraft.value).trim();
     const blockedReason = composerSubmitBlockReason(currentWorkspace.value?.workspace_id, content);
     if (blockedReason) {
@@ -2518,7 +2627,10 @@ export const useShellStore = defineStore('shell', () => {
         activeIdeThreadId.value || null,
       );
       commandMutationError.value = null;
-      return true;
+      // Distinct from a true dispatch: callers that need to know whether the
+      // agent actually received the message yet (e.g. an answered ask card)
+      // must not treat "queued behind the current stream" as "delivered".
+      return 'queued';
     }
 
     return dispatchIdeComposerMessage(composerMode, options);
@@ -3211,7 +3323,6 @@ export const useShellStore = defineStore('shell', () => {
     cursorRuntimeStatus,
     claudeRuntimeStatus,
     codexRuntimeStatus,
-    operatorPresenceSettings,
     composerRuntimePrefsRevision,
     cursorPickerVisibleRevision,
   });
@@ -3361,8 +3472,6 @@ export const useShellStore = defineStore('shell', () => {
     operatorPresenceSettingsError,
     operatorPresenceSettingsSavedAt,
     loadOperatorBriefing: () => loadOperatorBriefing(),
-    agentExecutionAccess,
-    setAgentExecutionAccess,
   });
   const {
     loadInbox,
@@ -3977,6 +4086,7 @@ export const useShellStore = defineStore('shell', () => {
     rehydrateWorkspaceIdeStreams,
     selectIdeThread,
     closeIdeThreadTab,
+    deleteIdeThread,
     loadTerminalSessions,
     setActiveTerminalSession,
     createTerminalSession,

@@ -11,6 +11,7 @@ import {
   employeeFailureBannerAriaLabel,
   employeeFailureBannerCopy,
   employeeFailureBeatAriaLabel,
+  employeeFailureBlocksRetry,
   employeeFailureDetailTooltip,
   employeeFailureLine,
   employeeFailurePeekKey,
@@ -159,13 +160,13 @@ describe('company-roster-failure-view', () => {
         }),
       ),
     ).toMatch(/usage/i);
-
     const codexBlocked = employee({
       status: 'idle',
       last_outcome: 'failed',
       last_outcome_detail: 'Codex usage limit is still active',
     });
-    expect(employeeFailureLine(codexBlocked)).toMatch(/signed-in Codex account is quota-limited/i);
+    expect(employeeFailureLine(codexBlocked)).toMatch(/Codex CLI reported a usage-limit block/i);
+    expect(employeeFailureLine(codexBlocked)).toMatch(/cannot verify the live account quota/i);
     expect(employeeFailureLine(codexBlocked)).not.toMatch(/Cursor usage signal/i);
   });
 
@@ -633,6 +634,46 @@ describe('company-roster-failure-view', () => {
         label: '2 interrupted',
         tone: 'interrupted',
       });
+    });
+  });
+
+  describe('private-material blocks are non-retriable', () => {
+    const blockedDetail =
+      'Workspace delivery blocked: private_company_material: assets/TPS-PACK.zip matches ' +
+      'a private-document rule (financial records, RFQ packs, exports, and office-document ' +
+      'formats never leave a workspace automatically) -- this is expected, working-as-intended ' +
+      'behavior, not an error to retry. To actually deliver this run\'s other changes, an ' +
+      'operator must remove or relocate this file from the task\'s working tree first.';
+
+    it('flags employeeFailureBlocksRetry for a private-material block', () => {
+      const blocked = employee({
+        status: 'idle',
+        last_outcome: 'failed',
+        last_outcome_detail: blockedDetail,
+      });
+      expect(employeeFailureBlocksRetry(blocked)).toBe(true);
+
+      const ordinary = employee({
+        status: 'idle',
+        last_outcome: 'failed',
+        last_outcome_detail: 'Cursor CLI exited with status 143.',
+      });
+      expect(employeeFailureBlocksRetry(ordinary)).toBe(false);
+    });
+
+    it('does not flag employees with no failure at all', () => {
+      expect(employeeFailureBlocksRetry(employee({ status: 'idle' }))).toBe(false);
+    });
+
+    it('labels the failure line as working-as-intended, not a bare failure', () => {
+      const blocked = employee({
+        status: 'idle',
+        last_outcome: 'failed',
+        last_outcome_detail: blockedDetail,
+      });
+      const line = employeeFailureLine(blocked);
+      expect(line).toContain('working as intended');
+      expect(line).toContain('operator must remove or relocate the file first');
     });
   });
 });

@@ -16,18 +16,12 @@ from app.routes.schemas import (
     CreateTerminalSessionRequest,
     CreateWorkspaceChatThreadRequest,
     CreateWorkspaceHandoffRequest,
-    EnqueueAgentTerminalJobRequest,
     RegisterWorkspaceBindingRequest,
     RenameTerminalSessionRequest,
     RenameWorkspaceFileRequest,
     RouteTeammateRequest,
     WorkspaceComposerPrefsRequest,
     WriteWorkspaceFileRequest,
-)
-from app.terminal.agent_jobs import (
-    enqueue_agent_terminal_job,
-    get_agent_terminal_job,
-    list_agent_terminal_jobs,
 )
 from app.terminal.session_handler import handle_terminal_session
 from app.terminal.session_registry import (
@@ -37,6 +31,7 @@ from app.terminal.session_registry import (
     list_sessions,
     rename_session,
     serialize_session,
+    serialize_session_with_context,
 )
 from app.terminal.session_runtime import terminate_runtime
 from app.workspace_catalog import WorkspaceNotFoundError, get_workspace_record, list_workspace_records
@@ -107,12 +102,36 @@ def workspaces_register(body: RegisterWorkspaceBindingRequest) -> dict[str, Any]
     return {"workspace": record, "created": True}
 
 
+@router.get("/api/workspaces/project-root-suggestions")
+def workspaces_project_root_suggestions(query: str = "") -> dict[str, Any]:
+    """Candidate project_root paths for the Add Workspace form.
+
+    Must be registered before /api/workspaces/{workspace_id} so this literal
+    path is not swallowed as a workspace_id.
+    """
+    from app.workspace_project_root_suggestions import suggest_project_roots
+
+    items = suggest_project_roots(query)
+    return {"items": items, "count": len(items)}
+
+
 @router.get("/api/workspaces/{workspace_id}")
 def workspaces_show(workspace_id: str) -> dict[str, Any]:
     try:
         return get_workspace_record(workspace_id)
     except WorkspaceNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@router.get("/api/workspaces/{workspace_id}/service-connection")
+def workspace_service_connection(workspace_id: str) -> dict[str, Any]:
+    try:
+        get_workspace_record(workspace_id)
+    except WorkspaceNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    from app.workspace_service_connections import workspace_service_connection_posture
+
+    return workspace_service_connection_posture(workspace_id)
 
 
 @router.get("/api/workspaces/{workspace_id}/composer-prefs")
@@ -148,42 +167,6 @@ def workspace_composer_prefs_put(
         max_concurrent_runtimes=body.max_concurrent_runtimes,
     )
     return {"workspace_id": workspace_id, **prefs}
-
-
-@router.get("/api/workspaces/{workspace_id}/sandbox")
-def workspace_sandbox_status(workspace_id: str) -> dict[str, Any]:
-    try:
-        get_workspace_record(workspace_id)
-    except WorkspaceNotFoundError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
-    from app.cli_runtime.composer_sandbox import sandbox_status
-
-    return sandbox_status(workspace_id)
-
-
-@router.post("/api/workspaces/{workspace_id}/sandbox/enable")
-def workspace_sandbox_enable(workspace_id: str) -> dict[str, Any]:
-    try:
-        get_workspace_record(workspace_id)
-    except WorkspaceNotFoundError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
-    from app.cli_runtime.composer_sandbox import IsolationError, WorkspaceRootError, enable_sandbox
-
-    try:
-        return enable_sandbox(workspace_id)
-    except (IsolationError, WorkspaceRootError) as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
-
-
-@router.post("/api/workspaces/{workspace_id}/sandbox/disable")
-def workspace_sandbox_disable(workspace_id: str) -> dict[str, Any]:
-    try:
-        get_workspace_record(workspace_id)
-    except WorkspaceNotFoundError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
-    from app.cli_runtime.composer_sandbox import disable_sandbox
-
-    return disable_sandbox(workspace_id)
 
 
 @router.get("/api/agents")
@@ -329,7 +312,7 @@ def workspace_terminal_sessions(workspace_id: str) -> dict[str, object]:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 
     ensure_operator_session(workspace_id)
-    items = [serialize_session(record) for record in list_sessions(workspace_id)]
+    items = [serialize_session_with_context(record) for record in list_sessions(workspace_id)]
     return {"workspace_id": workspace_id, "items": items, "count": len(items)}
 
 
@@ -382,57 +365,8 @@ def workspace_terminal_sessions_delete(workspace_id: str, session_id: str) -> di
     if not deleted and session_id != "terminal-operator":
         raise HTTPException(status_code=404, detail="terminal session not found")
     ensure_operator_session(workspace_id)
-    items = [serialize_session(record) for record in list_sessions(workspace_id)]
+    items = [serialize_session_with_context(record) for record in list_sessions(workspace_id)]
     return {"workspace_id": workspace_id, "deleted": deleted, "items": items, "count": len(items)}
-
-
-@router.post("/api/workspaces/{workspace_id}/terminal/agent-jobs")
-def workspace_terminal_agent_jobs_enqueue(
-    workspace_id: str,
-    body: EnqueueAgentTerminalJobRequest,
-) -> dict[str, object]:
-    """Enqueue a command into the Axon agent PTY (operator/agent callable)."""
-    try:
-        get_workspace_record(workspace_id)
-    except WorkspaceNotFoundError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
-    try:
-        return enqueue_agent_terminal_job(
-            workspace_id=workspace_id,
-            command=body.command,
-            run_id=body.run_id,
-            stream_to_chat=body.stream_to_chat,
-            thread_id=body.thread_id,
-            message_id=body.message_id,
-            source_workspace_id=body.source_workspace_id,
-        )
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
-
-
-@router.get("/api/workspaces/{workspace_id}/terminal/agent-jobs")
-def workspace_terminal_agent_jobs_list(
-    workspace_id: str,
-    limit: int = Query(default=20, ge=1, le=100),
-) -> dict[str, object]:
-    try:
-        get_workspace_record(workspace_id)
-    except WorkspaceNotFoundError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
-    items = list_agent_terminal_jobs(workspace_id, limit=limit)
-    return {"workspace_id": workspace_id, "items": items, "count": len(items)}
-
-
-@router.get("/api/workspaces/{workspace_id}/terminal/agent-jobs/{job_id}")
-def workspace_terminal_agent_job_get(workspace_id: str, job_id: str) -> dict[str, object]:
-    try:
-        get_workspace_record(workspace_id)
-    except WorkspaceNotFoundError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
-    record = get_agent_terminal_job(job_id)
-    if record is None or str(record.get("workspace_id") or "") != str(workspace_id).strip():
-        raise HTTPException(status_code=404, detail="agent terminal job not found")
-    return record
 
 
 @router.get("/api/workspaces/{workspace_id}/files")

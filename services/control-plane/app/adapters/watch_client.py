@@ -8,6 +8,7 @@ import os
 import threading
 import time
 from urllib.error import HTTPError, URLError
+from urllib.parse import urlencode
 from urllib.request import Request
 
 from app.adapters.watch_http import watch_base_url, watch_request_headers, watch_urlopen, watch_urlopen
@@ -57,8 +58,14 @@ def _read_watch_inbox_cache() -> tuple[float, dict[str, object] | None]:
         return fetched_at, None
 
 
-def _fetch_watch_inbox_uncached(timeout_seconds: float) -> dict[str, object] | None:
+def _fetch_watch_inbox_uncached(
+    timeout_seconds: float,
+    *,
+    force: bool = False,
+) -> dict[str, object] | None:
     url = f"{watch_base_url()}/internal/watch/inbox"
+    if force:
+        url += "?force=true"
 
     try:
         request = Request(url, headers=watch_request_headers())
@@ -153,7 +160,7 @@ def fetch_watch_inbox(
             _schedule_inbox_refresh_if_idle(timeout_seconds)
             return cached
 
-        payload = _fetch_watch_inbox_uncached(timeout_seconds)
+        payload = _fetch_watch_inbox_uncached(timeout_seconds, force=force_refresh)
         if payload is not None:
             _store_watch_inbox_cache(payload)
             return payload
@@ -442,6 +449,47 @@ def post_watch_sentry_probe_write(timeout_seconds: float = 15.0) -> dict[str, ob
         error_payload = _parse_watch_error_payload(exc)
         if error_payload is not None:
             return error_payload
+        return None
+
+    if not isinstance(payload, dict):
+        return None
+    return payload
+
+
+def fetch_watch_email_folders(
+    account_id: str,
+    timeout_seconds: float = 15.0,
+) -> dict[str, object] | None:
+    query = urlencode({"account_id": account_id})
+    url = f"{watch_base_url()}/internal/watch/email/folders?{query}"
+
+    try:
+        request = Request(url, headers=watch_request_headers())
+        with watch_urlopen(request, timeout=timeout_seconds) as response:
+            payload = json.loads(response.read().decode("utf-8"))
+    except (HTTPError, URLError, TimeoutError, json.JSONDecodeError, OSError, ValueError):
+        return None
+
+    if not isinstance(payload, dict):
+        return None
+    return payload
+
+
+def fetch_watch_email_messages(
+    account_id: str,
+    role: str = "inbox",
+    *,
+    limit: int = 25,
+    timeout_seconds: float = 20.0,
+) -> dict[str, object] | None:
+    query = urlencode({"account_id": account_id, "role": role, "limit": limit})
+    url = f"{watch_base_url()}/internal/watch/email/messages?{query}"
+
+    try:
+        request = Request(url, headers=watch_request_headers())
+        with watch_urlopen(request, timeout=timeout_seconds) as response:
+            payload = json.loads(response.read().decode("utf-8"))
+    except (HTTPError, URLError, TimeoutError, json.JSONDecodeError, OSError, ValueError):
         return None
 
     if not isinstance(payload, dict):

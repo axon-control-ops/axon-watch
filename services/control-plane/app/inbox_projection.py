@@ -146,10 +146,19 @@ def build_inbox_response(
     *,
     inbox_fetcher: WatchInboxFetcher | None = None,
     allow_empty_unavailable: bool = False,
+    force_refresh: bool = False,
 ) -> dict[str, object]:
-    fetcher = inbox_fetcher or fetch_watch_inbox
+    if inbox_fetcher is not None:
+        raw = inbox_fetcher()
+    elif force_refresh:
+        # Bypass both this control-plane's short cache and the watch
+        # service's own ~45s IMAP-poll cache -- an operator-triggered
+        # "Refresh" must reach real IMAP, not project a stale snapshot.
+        raw = fetch_watch_inbox(force_refresh=True)
+    else:
+        raw = fetch_watch_inbox()
     projected = project_watch_inbox(
-        fetcher(),
+        raw,
         allow_empty_unavailable=allow_empty_unavailable,
     )
     projected = _merge_ci_remediation_items(projected)

@@ -68,8 +68,13 @@ def usage_limit_blocks_auto_start(workspace_id: str, role: str) -> bool:
             from app.cli_runtime.cursor_usage_probe import (
                 cursor_usage_allows_agent_retry,
                 probe_cursor_usage,
+                record_cursor_usage_limit_hit,
             )
 
+            # Mirror the claude/codex branches: remember the CLI's own
+            # "out of usage" reply so the gate still holds when the live pool
+            # cannot be read (that probe deliberately fails open).
+            record_cursor_usage_limit_hit(detail)
             if cursor_usage_allows_agent_retry(probe_cursor_usage()):
                 return False
     except Exception:

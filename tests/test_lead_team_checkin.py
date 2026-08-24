@@ -19,12 +19,18 @@ from app.runs.service import create_run, fail_run  # noqa: E402
 from app.workspace_agents.company_work_sources import list_enabled_work_sources  # noqa: E402
 from app.workspace_agents.lead_team_checkin import (  # noqa: E402
     ASSIGN_GOAL_PREFIX,
+    ATTEND_GOAL_PREFIX,
     LeadCheckinFinding,
     assign_owner_role_for_failed_shift,
     assign_owner_role_for_monitor,
     enqueue_lead_assignments,
+    escalate_operator_blockers_to_vaxon,
     run_lead_team_checkin,
     workspace_due_for_checkin,
+)
+from app.workspace_agents.lead_checkin_report import (  # noqa: E402
+    format_lead_checkin_message,
+    humanize_lead_failure_detail,
 )
 
 
@@ -223,6 +229,73 @@ class LeadTeamCheckinTests(unittest.TestCase):
         self.assertEqual("operator_blocker", receipt["kind"])
         self.assertIn("lead", receipt["title"].lower())
         self.assertIn("must not remain stuck", receipt["detail"])
+
+    def test_leased_approved_recovery_task_suppresses_repeat_lead_failure_card(self) -> None:
+        dedupe_key = "failed_shift:workspace_axon_watch:lead"
+        recovery = task_store.create_task(
+            workspace_id="workspace_axon_watch",
+            goal=(
+                f"{ATTEND_GOAL_PREFIX} Operator approved: "
+                f"Mira (lead) last shift failed. [{dedupe_key}]"
+            ),
+            acceptance_criteria=(
+                "Exact approved effect: recover the lead failure. "
+                f"dedupe={dedupe_key}"
+            ),
+            risk="approved",
+            owner_role="watcher",
+            attempt_budget=1,
+        )
+        recovery = task_store.lease_task(
+            str(recovery["task_id"]),
+            lease_holder="worker-test",
+            lease_seconds=300,
+            run_id="run_recovery",
+        )
+
+        findings = [
+            LeadCheckinFinding(
+                kind="operator_blocker",
+                workspace_id="workspace_axon_watch",
+                owner_role="watcher",
+                title="Mira (lead) last shift failed",
+                detail="acceptance_evidence did not pass (Gate 6) [run=run_failed]",
+                dedupe_key=dedupe_key,
+                escalate_only=True,
+            )
+        ]
+
+        escalated = escalate_operator_blockers_to_vaxon(
+            workspace_id="workspace_axon_watch",
+            findings=findings,
+        )
+
+        self.assertEqual([], escalated)
+        self.assertEqual([], autonomous_attention_store.list_pending_decisions(limit=50))
+        self.assertEqual("leased", task_store.get_task(str(recovery["task_id"]))["status"])
+
+
+class LeadCheckinReportTests(unittest.TestCase):
+    def test_formats_gate6_finding_with_next_steps(self) -> None:
+        findings = [
+            LeadCheckinFinding(
+                kind="failed_shift",
+                workspace_id="workspace_dashpro",
+                owner_role="frontend",
+                title="Priya (frontend) last shift failed",
+                detail=(
+                    "Lane B finalization failed: acceptance_evidence did not pass "
+                    "[Gate 6] | policy=out_of_scope [run=run_abc]"
+                ),
+                dedupe_key="failed_shift:workspace_dashpro:frontend",
+            )
+        ]
+        body = format_lead_checkin_message(findings, [])
+        self.assertIn("Lead check-in:", body)
+        self.assertIn("[failed_shift] Priya (frontend) last shift failed (→ frontend)", body)
+        self.assertIn("out of scope", humanize_lead_failure_detail(findings[0].detail).lower())
+        self.assertIn("## Next steps", body)
+        self.assertIn("Inspect Priya", body)
 
 
 if __name__ == "__main__":

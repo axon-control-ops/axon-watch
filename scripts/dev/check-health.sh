@@ -120,6 +120,11 @@ if command -v node >/dev/null 2>&1; then
 else
   bad "node missing from PATH — workflow scripts and CI tooling need node"
 fi
+if command -v npm >/dev/null 2>&1; then
+  ok "npm on PATH ($(npm -v 2>/dev/null || echo unknown))"
+else
+  bad "npm missing from PATH — sandbox jest/tsc validation requires npm"
+fi
 if command -v python3 >/dev/null 2>&1; then
   ok "python3 on PATH"
 else

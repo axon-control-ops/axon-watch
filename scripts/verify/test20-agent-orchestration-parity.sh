@@ -38,6 +38,7 @@ PYTHONPATH=services/control-plane "${python_bin}" -m unittest \
   tests.test_cli_runtime_process_registry \
   tests.test_control_plane_runtime_status \
   tests.test_control_plane_chat \
+  tests.test_fleet_self_heal_gate6_enforcement \
   -v
 echo
 

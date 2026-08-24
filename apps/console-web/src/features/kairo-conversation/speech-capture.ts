@@ -8,6 +8,30 @@ export type SpeechCaptureCallbacks = {
   onEnd?: () => void;
 };
 
+type BrowserSpeechRecognitionAlternative = {
+  transcript?: string;
+};
+
+type BrowserSpeechRecognitionResult = {
+  readonly isFinal: boolean;
+  readonly length: number;
+  [index: number]: BrowserSpeechRecognitionAlternative | undefined;
+};
+
+type BrowserSpeechRecognitionResultList = {
+  readonly length: number;
+  [index: number]: BrowserSpeechRecognitionResult | undefined;
+};
+
+type BrowserSpeechRecognitionEvent = {
+  readonly resultIndex: number;
+  readonly results: BrowserSpeechRecognitionResultList;
+};
+
+type BrowserSpeechRecognitionErrorEvent = {
+  readonly error?: string;
+};
+
 type BrowserSpeechRecognition = {
   lang: string;
   interimResults: boolean;
@@ -15,8 +39,8 @@ type BrowserSpeechRecognition = {
   continuous?: boolean;
   start: () => void;
   stop: () => void;
-  onresult: ((event: SpeechRecognitionEvent) => void) | null;
-  onerror: ((event: SpeechRecognitionErrorEvent) => void) | null;
+  onresult: ((event: BrowserSpeechRecognitionEvent) => void) | null;
+  onerror: ((event: BrowserSpeechRecognitionErrorEvent) => void) | null;
   onend: (() => void) | null;
 };
 
@@ -79,7 +103,7 @@ export function speechRecognitionLangCandidates(preferred?: string | null): stri
   return out;
 }
 
-function transcriptFromResult(result: SpeechRecognitionResult): string {
+function transcriptFromResult(result: BrowserSpeechRecognitionResult): string {
   const alternatives: string[] = [];
   for (let index = 0; index < result.length; index += 1) {
     const transcript = result[index]?.transcript?.trim();
@@ -165,7 +189,7 @@ export class SpeechCaptureSession {
       callbacks.onEnd?.();
     };
 
-    recognition.onresult = (event: SpeechRecognitionEvent) => {
+    recognition.onresult = (event: BrowserSpeechRecognitionEvent) => {
       if (epoch !== this.sessionEpoch || this.recognition !== recognition) {
         return;
       }
@@ -196,7 +220,7 @@ export class SpeechCaptureSession {
       }
     };
 
-    recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
+    recognition.onerror = (event: BrowserSpeechRecognitionErrorEvent) => {
       if (epoch !== this.sessionEpoch || this.recognition !== recognition) {
         return;
       }

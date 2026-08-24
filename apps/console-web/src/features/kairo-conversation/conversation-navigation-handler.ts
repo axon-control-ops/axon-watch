@@ -21,9 +21,9 @@ function workspaceLabel(shell: ShellStore, workspaceId: string): string {
 
 function focusWorkspaceOnOperator(shell: ShellStore, workspaceId: string): void {
   shell.setCurrentWorkspace(workspaceId);
-  // Keep Mission Control (grid) when already there so Live Ops stays the reply surface.
-  if (shell.operatorCenterView !== 'grid') {
-    shell.setOperatorCenterView('grid');
+  // Keep Mission Control when already there; otherwise open the VAXON tab.
+  if (shell.operatorCenterView !== 'mission' && shell.operatorCenterView !== 'vaxon') {
+    shell.setOperatorCenterView('vaxon');
   }
   const label = workspaceLabel(shell, workspaceId);
   setBrainGalaxyConversationFocus({

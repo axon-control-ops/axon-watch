@@ -12,6 +12,13 @@ import {
 import { navigateToAppSurface } from '../../lib/app-surface-route';
 import { useShellStore } from '../../stores/shell';
 
+export type MailboxTestTone = 'ok' | 'error' | 'pending';
+
+export type MailboxTestResult = {
+  tone: MailboxTestTone;
+  message: string;
+};
+
 export function useEmailSettingsMailbox() {
   const shell = useShellStore();
   const snapshot = ref<EmailSettingsSnapshot | null>(null);
@@ -19,6 +26,7 @@ export function useEmailSettingsMailbox() {
   const actionTone = ref<'idle' | 'ok' | 'error' | 'pending' | 'warn'>('idle');
   const saving = ref(false);
   const testingKey = ref<string | null>(null);
+  const testResults = reactive<Record<string, MailboxTestResult>>({});
 
   const form = reactive({
     account_id: '',
@@ -202,29 +210,40 @@ export function useEmailSettingsMailbox() {
     }
   }
 
+  function setTestResult(accountId: string, tone: MailboxTestTone, message: string): void {
+    testResults[accountId] = { tone, message };
+  }
+
   async function runTest(accountId: string): Promise<void> {
     const account = accounts.value.find((row) => row.account_id === accountId);
     if (account && !accountHasSecrets(account) && !form.password_imap.trim() && !form.password_smtp.trim()) {
-      actionTone.value = 'error';
-      actionMessage.value =
-        'Test failed: no passwords saved for this mailbox yet. Edit it, enter IMAP password (Vault is unlocked), Save, then Test again.';
+      setTestResult(
+        accountId,
+        'error',
+        'No passwords saved yet. Edit, enter IMAP password (Vault unlocked), Save, then Test again.',
+      );
       prefill(account);
       return;
     }
     testingKey.value = accountId;
-    actionTone.value = 'pending';
-    actionMessage.value = 'Testing IMAP/SMTP…';
+    setTestResult(accountId, 'pending', 'Testing IMAP/SMTP…');
     try {
       const result = await testEmailAccount({
         account_id: accountId,
         password_imap: form.account_id === accountId ? form.password_imap : '',
         password_smtp: form.account_id === accountId ? form.password_smtp : '',
       });
-      actionTone.value = result.ok ? 'ok' : 'error';
-      actionMessage.value = `${result.imap.detail} · ${result.smtp.detail}`;
+      setTestResult(
+        accountId,
+        result.ok ? 'ok' : 'error',
+        `${result.imap.detail} · ${result.smtp.detail}`,
+      );
     } catch (error) {
-      actionTone.value = 'error';
-      actionMessage.value = error instanceof Error ? error.message : 'Mailbox test failed';
+      setTestResult(
+        accountId,
+        'error',
+        error instanceof Error ? error.message : 'Mailbox test failed',
+      );
     } finally {
       testingKey.value = null;
     }
@@ -236,6 +255,7 @@ export function useEmailSettingsMailbox() {
     actionMessage.value = 'Removing mailbox…';
     try {
       snapshot.value = await deleteEmailAccount(accountId);
+      delete testResults[accountId];
       if (form.account_id === accountId) {
         blankForm(form.workspace_id);
       }
@@ -271,6 +291,7 @@ export function useEmailSettingsMailbox() {
     actionTone,
     saving,
     testingKey,
+    testResults,
     form,
     workspaces,
     accounts,

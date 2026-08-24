@@ -14,13 +14,19 @@ from app.persistence import run_store
 
 logger = logging.getLogger(__name__)
 
-# Cursor agent turns time out around 240s; keep headroom for finalize + retries.
-DEFAULT_STALE_SECONDS = 720.0
+# Sized for Cursor, whose agent turns time out around 240s. Claude/Codex shifts
+# routinely run longer, and three worker runs were stale-failed at 752-766s while
+# still doing real work — the reaper was killing progress, not hangs. 1200s keeps
+# genuine hang detection well inside the 1800s lead cutoff.
+# Override per host with AXON_WATCH_WORKER_RUN_STALE_SECONDS.
+DEFAULT_STALE_SECONDS = 1200.0
 # Lead shifts coordinate specialists and often run longer than a single CLI turn.
 DEFAULT_LEAD_STALE_SECONDS = 1800.0
 # Canary/production OTA (expo export + eas update) regularly exceeds 30 minutes when
 # Dana blocks on Cursor shellToolCall — do not stale-fail Mid-export.
 DEFAULT_OTA_LEAD_STALE_SECONDS = 5400.0
+# Full-suite npm/jest verification shifts routinely exceed the default 1200s worker TTL.
+DEFAULT_VERIFICATION_STALE_SECONDS = 3600.0
 _STALE_SUMMARY = "Continuous worker run exceeded stale timeout"
 _PAUSED_ABANDON_SUMMARY = "Paused continuous worker run abandoned after stale timeout"
 _OTA_RUN_TEXT_RE = re.compile(
@@ -30,6 +36,7 @@ _HOST_SHIP_CMDLINE_RE = re.compile(
     r"(?i)(?:npm\s+run\s+ota(?::[\w-]*)?|ota:(?:canary|production)|"
     r"eas(?:-wrapper)?\s+update|expo\s+export)"
 )
+_HOST_VERIFY_CMDLINE_RE = re.compile(r"(?i)(?:\bjest\b|npm\s+test\b|\bvitest\b)")
 
 # Phases that mean a role is still doing (or waiting on) in-flight work.
 BUSY_EMPLOYEE_PHASES = frozenset(
@@ -40,6 +47,37 @@ _EARLY_BUSY_PHASES = frozenset({"queued", "starting", "planning"})
 _STALE_IDLE_SKIP_RECEIPT_TYPES = frozenset({"worker_heartbeat"})
 # Executing runs without worker_dispatch_started are operator-visible zombies.
 DEFAULT_UNDISPATCHED_WORKER_SECONDS = 90.0
+# Executing runs that recorded worker_dispatch_started but never reached isolation
+# or any other progress receipt — dispatch thread died or hung after claiming.
+DEFAULT_GHOST_DISPATCH_SECONDS = 90.0
+_GHOST_DISPATCH_PROGRESS_RECEIPT_TYPES = frozenset(
+    {
+        "worker_isolation_created",
+        "worker_heartbeat",
+        "worker_progress",
+        "worker_delivery",
+        "verification_terminal_enqueued",
+        "verification_terminal_unrunnable",
+        "worker_delivery_verification_receipt",
+        "auto_ask_resolution",
+        "worker_ask_block",
+        "runtime_dispatch",
+    }
+)
+# Receipts that mean Lane B or verify-enqueue progressed after isolation was recorded.
+_POST_ISOLATION_LANE_B_RECEIPT_TYPES = frozenset(
+    {
+        "agent_sandbox_started",
+        "agent_sandbox_skipped",
+        "runtime_dispatch",
+        "lane_b_invoke_started",
+        "worker_progress",
+        "worker_heartbeat",
+        "verification_terminal_enqueued",
+        "verification_terminal_unrunnable",
+        "verification_terminal_enqueue_failed",
+    }
+)
 
 
 def undispatched_worker_seconds() -> float:
@@ -50,6 +88,212 @@ def undispatched_worker_seconds() -> float:
         return max(30.0, float(raw))
     except ValueError:
         return DEFAULT_UNDISPATCHED_WORKER_SECONDS
+
+
+def ghost_dispatch_seconds() -> float:
+    raw = os.environ.get("AXON_WATCH_GHOST_DISPATCH_SECONDS", "").strip()
+    if not raw:
+        return DEFAULT_GHOST_DISPATCH_SECONDS
+    try:
+        return max(30.0, float(raw))
+    except ValueError:
+        return DEFAULT_GHOST_DISPATCH_SECONDS
+
+
+def _run_has_any_receipt_type(record: dict[str, Any], receipt_types: frozenset[str]) -> bool:
+    history_ref = str(record.get("history_ref") or "").strip()
+    if not history_ref:
+        return False
+    for item in run_store.list_history(history_ref):
+        receipt = item.get("receipt")
+        if not isinstance(receipt, dict):
+            continue
+        if str(receipt.get("type") or "").strip() in receipt_types:
+            return True
+    return False
+
+
+def run_has_dispatch_progress(record: dict[str, Any]) -> bool:
+    return _run_has_any_receipt_type(record, _GHOST_DISPATCH_PROGRESS_RECEIPT_TYPES)
+
+
+def post_isolation_stall_seconds(record: dict[str, Any]) -> float:
+    """Lead / Cursor cold starts can exceed 90s before the first stream token."""
+    role = str(record.get("employee_role") or "").strip().lower()
+    if role == "lead":
+        return 240.0
+    return ghost_dispatch_seconds()
+
+
+def run_has_post_isolation_lane_b_stall(
+    record: dict[str, Any],
+    *,
+    now: datetime | None = None,
+) -> bool:
+    """True when isolation was recorded but Lane B / verify enqueue never started."""
+    phase = str(record.get("phase") or "").strip()
+    if phase not in {"executing", "starting", "planning"}:
+        return False
+    if not str(record.get("task_id") or "").strip():
+        return False
+    if not _run_has_receipt_type(record, "worker_isolation_created"):
+        return False
+    if _run_has_any_receipt_type(record, _POST_ISOLATION_LANE_B_RECEIPT_TYPES):
+        return False
+    age = _isolation_created_age_seconds(record, now=now or datetime.now(timezone.utc))
+    if age is None:
+        return False
+    return age >= post_isolation_stall_seconds(record)
+
+
+def _isolation_created_age_seconds(
+    record: dict[str, Any],
+    *,
+    now: datetime,
+) -> float | None:
+    history_ref = str(record.get("history_ref") or "").strip()
+    if not history_ref:
+        return None
+    for item in run_store.list_history(history_ref):
+        receipt = item.get("receipt")
+        if not isinstance(receipt, dict):
+            continue
+        if str(receipt.get("type") or "").strip() != "worker_isolation_created":
+            continue
+        stamp = _parse_iso(item.get("timestamp"))
+        if stamp is None:
+            stamp = _parse_iso(record.get("updated_at"))
+        if stamp is None:
+            return None
+        if stamp.tzinfo is None:
+            stamp = stamp.replace(tzinfo=timezone.utc)
+        return max(0.0, (now - stamp).total_seconds())
+    return None
+
+
+def run_has_ghost_dispatch(record: dict[str, Any], *, now: datetime | None = None) -> bool:
+    """True when dispatch claimed a run but never produced isolation/progress."""
+    phase = str(record.get("phase") or "").strip()
+    if phase not in {"executing", "starting", "planning"}:
+        return False
+    if not str(record.get("task_id") or "").strip():
+        return False
+    if not _run_has_receipt_type(record, "worker_dispatch_started"):
+        return False
+    if _run_has_any_receipt_type(record, _GHOST_DISPATCH_PROGRESS_RECEIPT_TYPES):
+        return False
+    age = _run_idle_age_seconds(record, now=now or datetime.now(timezone.utc))
+    if age is None:
+        return False
+    return age >= ghost_dispatch_seconds()
+
+
+def recover_ghost_dispatch_run(
+    run_id: str,
+    *,
+    actor: str = "workspace_scheduler",
+    receipt_summary: str | None = None,
+) -> bool:
+    """Release the in-memory dispatch claim, fail the run, and reopen its leased task."""
+    from app.persistence import task_store
+    from app.runs.service import RunLifecycleError, RunNotFoundError, fail_run
+    from app.workspace_agents.worker_dispatch_support import release_worker_dispatch
+
+    cleaned = str(run_id or "").strip()
+    if not cleaned:
+        return False
+    record = run_store.get_run(cleaned)
+    if record is None or not run_has_ghost_dispatch(record):
+        return False
+    release_worker_dispatch(cleaned)
+    summary = receipt_summary or (
+        "Continuous worker dispatch never reached isolation/progress after "
+        f"worker_dispatch_started (>{int(ghost_dispatch_seconds())}s); task reopened"
+    )
+    try:
+        fail_run(cleaned, receipt_summary=summary, actor=actor)
+    except (RunLifecycleError, RunNotFoundError):
+        logger.exception("ghost dispatch recover failed for %s", cleaned)
+        return False
+    task_store.reopen_orphaned_leased_tasks(
+        terminal_run_ids=[cleaned],
+        terminal_outcome="ghost worker dispatch auto-unlocked; retry Run verification",
+        refund_attempts=True,
+    )
+    return True
+
+
+def recover_post_isolation_lane_b_stall_run(
+    run_id: str,
+    *,
+    actor: str = "workspace_scheduler",
+    receipt_summary: str | None = None,
+) -> bool:
+    """Fail/reopen a worker run stuck after isolation without Lane B progress."""
+    from app.persistence import task_store
+    from app.runs.service import RunLifecycleError, RunNotFoundError, fail_run
+    from app.workspace_agents.worker_dispatch_support import release_worker_dispatch
+
+    cleaned = str(run_id or "").strip()
+    if not cleaned:
+        return False
+    record = run_store.get_run(cleaned)
+    if record is None or not run_has_post_isolation_lane_b_stall(record):
+        return False
+    release_worker_dispatch(cleaned)
+    summary = receipt_summary or (
+        "Continuous worker dispatch stalled after worker_isolation_created without "
+        f"Lane B or verify progress (>{int(ghost_dispatch_seconds())}s); task reopened"
+    )
+    try:
+        fail_run(cleaned, receipt_summary=summary, actor=actor)
+    except (RunLifecycleError, RunNotFoundError):
+        logger.exception("post-isolation lane B stall recover failed for %s", cleaned)
+        return False
+    task_store.reopen_orphaned_leased_tasks(
+        terminal_run_ids=[cleaned],
+        terminal_outcome="worker dispatch stalled after isolation; retry Run verification",
+        refund_attempts=True,
+    )
+    return True
+
+
+def host_verification_test_active() -> bool:
+    """True when a local jest/npm-test process is still running."""
+    proc = Path("/proc")
+    if not proc.is_dir():
+        return False
+    try:
+        entries = list(proc.iterdir())
+    except OSError:
+        return False
+    for entry in entries:
+        name = entry.name
+        if not name.isdigit():
+            continue
+        try:
+            raw = (entry / "cmdline").read_bytes()
+        except OSError:
+            continue
+        if not raw:
+            continue
+        cmdline = raw.replace(b"\x00", b" ").decode("utf-8", errors="ignore")
+        if _HOST_VERIFY_CMDLINE_RE.search(cmdline):
+            return True
+    return False
+
+
+def _record_is_verification_shift(record: dict[str, Any] | None) -> bool:
+    if not isinstance(record, dict):
+        return False
+    task_id = str(record.get("task_id") or "").strip()
+    if not task_id:
+        return False
+    from app.persistence import task_store
+    from app.workspace_agents.verification_execution import is_verification_task
+
+    task = task_store.get_task(task_id)
+    return is_verification_task(task)
 
 
 def _run_has_receipt_type(record: dict[str, Any], receipt_type: str) -> bool:
@@ -102,9 +346,17 @@ def run_looks_like_ota_ship(record: dict[str, Any] | None) -> bool:
 
 
 def employee_run_stale_seconds_for_record(record: dict[str, Any] | None) -> float:
-    """TTL for a concrete run — OTA Lead ships get a longer default than board work."""
+    """TTL for a concrete run — OTA Lead ships and verification get longer defaults."""
     role = str((record or {}).get("employee_role") or "").strip().lower()
     base = employee_run_stale_seconds_for_role(role)
+    if _record_is_verification_shift(record):
+        raw = os.environ.get("AXON_WATCH_VERIFICATION_RUN_STALE_SECONDS", "").strip()
+        if raw:
+            try:
+                return max(base, float(raw))
+            except ValueError:
+                pass
+        return max(base, DEFAULT_VERIFICATION_STALE_SECONDS)
     if role != "lead" or not run_looks_like_ota_ship(record):
         return base
     raw = os.environ.get("AXON_WATCH_OTA_LEAD_RUN_STALE_SECONDS", "").strip()
@@ -293,6 +545,90 @@ def _cancel_stale_early_busy_employee_run(
     )
 
 
+# Interactive (untagged) runs are correctly exempt from the employee reaper --
+# an operator composer turn can legitimately run long. But that exemption's
+# other half was missing: nothing ever revisited them if genuinely abandoned
+# (browser closed mid-turn, composer tab left open), and the only code that
+# could resolve them ran once, at process boot. A run could sit `executing`
+# indefinitely until someone restarted the control plane. Default matches the
+# lead cutoff: long enough for real work, not so long a dead run looks live
+# for the rest of the day.
+DEFAULT_INTERACTIVE_RUN_STALE_SECONDS = 1800.0
+
+
+def interactive_run_stale_seconds() -> float:
+    raw = os.environ.get("AXON_WATCH_INTERACTIVE_RUN_STALE_SECONDS", "").strip()
+    if not raw:
+        return DEFAULT_INTERACTIVE_RUN_STALE_SECONDS
+    try:
+        return max(60.0, float(raw))
+    except ValueError:
+        return DEFAULT_INTERACTIVE_RUN_STALE_SECONDS
+
+
+def reap_stale_interactive_runs(
+    *, now: datetime | None = None, stale_seconds: float | None = None
+) -> list[str]:
+    """Resolve abandoned non-employee runs on the normal tick, not just at boot.
+
+    Mirrors ``interrupt_run_on_restart``'s phase handling exactly -- executing
+    fails, a waiting phase cancels -- but is gated by idle age instead of a
+    process restart, so an operator does not have to restart the service to
+    unstick a composer thread nobody is coming back to.
+    """
+    from app.runs.service import (
+        RunLifecycleError,
+        RunNotFoundError,
+        _transition_record,
+        fail_run,
+    )
+
+    moment = now or datetime.now(timezone.utc)
+    if moment.tzinfo is None:
+        moment = moment.replace(tzinfo=timezone.utc)
+    cutoff = max(60.0, float(stale_seconds)) if stale_seconds is not None else interactive_run_stale_seconds()
+
+    reaped: list[str] = []
+    for record in run_store.list_runs():
+        if str(record.get("employee_role") or "").strip():
+            continue
+        phase = str(record.get("phase") or "").strip()
+        if is_terminal_phase(phase) or phase == "review_ready":
+            continue
+        age = _run_idle_age_seconds(record, now=moment)
+        if age is None or age < cutoff:
+            continue
+        run_id = str(record.get("run_id") or "").strip()
+        if not run_id:
+            continue
+        try:
+            if phase == "executing":
+                fail_run(
+                    run_id,
+                    receipt_summary=(
+                        f"Interactive run abandoned: idle {int(age)}s with no activity"
+                    ),
+                    actor="workspace_scheduler",
+                )
+                reaped.append(run_id)
+            elif phase in {"awaiting_approval", "awaiting_input", "waiting_external", "paused"}:
+                _transition_record(
+                    record,
+                    to_phase="cancelled",
+                    current_step=f"Run cancelled: idle {int(age)}s waiting for input nobody gave",
+                    actor="workspace_scheduler",
+                    receipt_type="interactive_run_abandoned",
+                    receipt_summary=(
+                        f"Interactive run abandoned in {phase}: idle {int(age)}s"
+                    ),
+                )
+                reaped.append(run_id)
+        except (RunLifecycleError, RunNotFoundError):
+            logger.exception("interactive run reap failed for %s", run_id)
+            continue
+    return reaped
+
+
 def reap_stale_employee_runs(
     *,
     now: datetime | None = None,
@@ -335,32 +671,88 @@ def reap_stale_employee_runs(
             and not _run_has_receipt_type(record, "worker_dispatch_started")
             and age >= undispatch_cutoff
         ):
-            from app.persistence import task_store
+            from app.workspace_agents.worker_dispatch_support import is_worker_dispatch_active
 
-            try:
-                fail_run(
-                    run_id,
-                    receipt_summary=(
-                        "Continuous worker run never received worker_dispatch_started "
-                        f"({int(age)}s > {int(undispatch_cutoff)}s)"
-                    ),
-                    actor="workspace_scheduler",
+            # Both dispatch producers (scheduler.py's continuous tick via create_run's
+            # auto-execute, and scheduler_queued_fan_out.py's begin_execution) persist
+            # phase="executing"/"starting" — starting this age clock — synchronously,
+            # then spawn the dispatch thread afterward. That thread still has to clear
+            # claim + task/lease I/O before it can post worker_dispatch_started, and
+            # under load that can outrun 90s while the thread is alive and fine. Only
+            # treat this as a zombie when nothing actually claimed the run; fall through
+            # otherwise — the general stale-run cutoff further down still catches a
+            # claim that hangs forever.
+            if not is_worker_dispatch_active(run_id):
+                from app.persistence import task_store
+
+                try:
+                    fail_run(
+                        run_id,
+                        receipt_summary=(
+                            "Continuous worker run never received worker_dispatch_started "
+                            f"({int(age)}s > {int(undispatch_cutoff)}s)"
+                        ),
+                        actor="workspace_scheduler",
+                    )
+                except (RunLifecycleError, RunNotFoundError):
+                    logger.exception("undispatched employee-run reap skipped for %s", run_id)
+                    continue
+                task_store.reopen_orphaned_leased_tasks(
+                    terminal_run_ids=[run_id],
+                    terminal_outcome="run failed without worker dispatch; task reopened",
+                    refund_attempts=True,
                 )
-            except (RunLifecycleError, RunNotFoundError):
-                logger.exception("undispatched employee-run reap skipped for %s", run_id)
+                reaped.append(run_id)
+                logger.warning(
+                    "reaped undispatched employee run %s role=%s idle_s=%.0f",
+                    run_id,
+                    role,
+                    age,
+                )
                 continue
-            task_store.reopen_orphaned_leased_tasks(
-                terminal_run_ids=[run_id],
-                terminal_outcome="run failed without worker dispatch; task reopened",
-                refund_attempts=True,
-            )
-            reaped.append(run_id)
-            logger.warning(
-                "reaped undispatched employee run %s role=%s idle_s=%.0f",
+
+        ghost_cutoff = ghost_dispatch_seconds()
+        if (
+            phase in {"executing", "starting", "planning"}
+            and run_has_ghost_dispatch(record, now=moment)
+            and age >= ghost_cutoff
+        ):
+            if recover_ghost_dispatch_run(
                 run_id,
-                role,
-                age,
-            )
+                receipt_summary=(
+                    "Ghost worker dispatch auto-unlocked: dispatch started but never "
+                    f"reached isolation/progress ({int(age)}s > {int(ghost_cutoff)}s)"
+                ),
+            ):
+                reaped.append(run_id)
+                logger.warning(
+                    "reaped ghost-dispatch employee run %s role=%s idle_s=%.0f",
+                    run_id,
+                    role,
+                    age,
+                )
+            continue
+
+        if (
+            phase in {"executing", "starting", "planning"}
+            and run_has_post_isolation_lane_b_stall(record, now=moment)
+        ):
+            isolation_age = _isolation_created_age_seconds(record, now=moment) or age
+            if recover_post_isolation_lane_b_stall_run(
+                run_id,
+                receipt_summary=(
+                    "Continuous worker dispatch stalled after worker_isolation_created "
+                    f"without Lane B progress ({int(isolation_age)}s > "
+                    f"{int(ghost_dispatch_seconds())}s)"
+                ),
+            ):
+                reaped.append(run_id)
+                logger.warning(
+                    "reaped post-isolation lane B stall for %s role=%s idle_s=%.0f",
+                    run_id,
+                    role,
+                    isolation_age,
+                )
             continue
 
         if age < cutoff:
@@ -375,6 +767,20 @@ def reap_stale_employee_runs(
         ):
             logger.info(
                 "skipping stale reap for OTA lead run %s — host ship process still active "
+                "(idle_s=%.0f cutoff_s=%.0f)",
+                run_id,
+                age,
+                cutoff,
+            )
+            continue
+
+        if (
+            phase == "executing"
+            and _record_is_verification_shift(record)
+            and host_verification_test_active()
+        ):
+            logger.info(
+                "skipping stale reap for verification run %s — host test process still active "
                 "(idle_s=%.0f cutoff_s=%.0f)",
                 run_id,
                 age,
@@ -423,6 +829,14 @@ def reap_stale_employee_runs(
         except (RunLifecycleError, RunNotFoundError):
             logger.exception("stale employee-run reap skipped for %s", run_id)
             continue
+        if str(record.get("task_id") or "").strip():
+            from app.persistence import task_store
+
+            task_store.reopen_orphaned_leased_tasks(
+                terminal_run_ids=[run_id],
+                terminal_outcome="stale worker run; task reopened for retry",
+                refund_attempts=True,
+            )
         reaped.append(run_id)
         logger.warning(
             "reaped stale employee run %s role=%s idle_s=%.0f",
@@ -441,7 +855,14 @@ __all__ = [
     "employee_run_stale_seconds",
     "employee_run_stale_seconds_for_record",
     "employee_run_stale_seconds_for_role",
+    "ghost_dispatch_seconds",
     "host_long_running_ship_active",
+    "host_verification_test_active",
+    "recover_ghost_dispatch_run",
+    "recover_post_isolation_lane_b_stall_run",
     "reap_stale_employee_runs",
+    "run_has_dispatch_progress",
+    "run_has_ghost_dispatch",
+    "run_has_post_isolation_lane_b_stall",
     "run_looks_like_ota_ship",
 ]

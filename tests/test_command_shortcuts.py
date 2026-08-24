@@ -29,6 +29,12 @@ class CommandShortcutTests(unittest.TestCase):
             "run npm run verify:production-operator",
         )
 
+    def test_expand_mobile_dev_shortcut(self) -> None:
+        self.assertEqual(
+            expand_command_shortcuts("mobile dev"),
+            "run npm run dev:console-mobile",
+        )
+
     def test_expand_dashpro_ota_shortcut(self) -> None:
         self.assertEqual(
             expand_command_shortcuts("ota canary"),
@@ -38,6 +44,7 @@ class CommandShortcutTests(unittest.TestCase):
     def test_classify_shortcuts_as_shell_command(self) -> None:
         self.assertEqual(classify_command("check-health"), "shell_command")
         self.assertEqual(classify_command("verify"), "shell_command")
+        self.assertEqual(classify_command("mobile dev"), "shell_command")
         self.assertEqual(classify_command("ota canary"), "shell_command")
 
     def test_check_health_does_not_require_confirmation(self) -> None:

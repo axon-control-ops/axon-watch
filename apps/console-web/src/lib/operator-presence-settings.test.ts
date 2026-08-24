@@ -6,7 +6,7 @@ import {
   OPERATOR_PRESENCE_SETTINGS_KEY,
   persistOperatorPresenceSettings,
   readPersistedOperatorPresenceSettings,
-  resolveAutoComposerRuntimeOverride,
+  resolveAutoWorkerRuntimeFallback,
 } from './operator-presence-settings';
 
 class MemoryStorage implements Storage {
@@ -131,23 +131,23 @@ describe('operator-presence-settings', () => {
     ).toBe('composer-2');
   });
 
-  it('only applies the composer runtime override while Full Auto is active', () => {
+  it('only applies the worker runtime fallback while Full Auto is active', () => {
     expect(
-      resolveAutoComposerRuntimeOverride({
+      resolveAutoWorkerRuntimeFallback({
         autonomy_mode: 'semi',
         auto_composer_runtime_override_enabled: true,
         auto_composer_runtime_target: 'claude_local',
       }),
     ).toBe('');
     expect(
-      resolveAutoComposerRuntimeOverride({
+      resolveAutoWorkerRuntimeFallback({
         autonomy_mode: 'full',
         auto_composer_runtime_override_enabled: false,
         auto_composer_runtime_target: 'claude_local',
       }),
     ).toBe('');
     expect(
-      resolveAutoComposerRuntimeOverride({
+      resolveAutoWorkerRuntimeFallback({
         autonomy_mode: 'full',
         auto_composer_runtime_override_enabled: true,
         auto_composer_runtime_target: 'claude_local',
@@ -162,6 +162,6 @@ describe('operator-presence-settings', () => {
       auto_composer_runtime_target: '../claude',
     });
     expect(normalized.auto_composer_runtime_target).toBe('');
-    expect(resolveAutoComposerRuntimeOverride(normalized)).toBe('');
+    expect(resolveAutoWorkerRuntimeFallback(normalized)).toBe('');
   });
 });

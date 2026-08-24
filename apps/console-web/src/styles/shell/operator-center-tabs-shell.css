@@ -1,0 +1,230 @@
+/* Operator center tab shell — matches mockup: title row, full-width tabs, filled tab body. */
+
+.operator-center-shell {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  flex-shrink: 0;
+}
+
+.operator-center-shell__top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.operator-center-shell__title-block {
+  min-width: 0;
+}
+
+.operator-center-shell__eyebrow {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: 0.48rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: rgba(0, 242, 255, 0.58);
+}
+
+.operator-center-shell__title {
+  margin: 0.18rem 0 0;
+  font-family: var(--font-mono);
+  font-size: 0.82rem;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-hud);
+}
+
+.operator-center-shell__top-actions {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.55rem;
+  flex-shrink: 0;
+}
+
+.operator-center-shell__tabs-scroll {
+  width: 100%;
+  min-width: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  overscroll-behavior-x: contain;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(72, 196, 255, 0.35) transparent;
+}
+
+.operator-center-shell__tabs-scroll::-webkit-scrollbar {
+  height: 6px;
+}
+
+.operator-center-shell__tabs-scroll::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: rgba(72, 196, 255, 0.35);
+}
+
+.operator-center-shell__tabs {
+  display: inline-flex;
+  align-items: stretch;
+  flex-wrap: nowrap;
+  gap: 0.22rem;
+  width: max-content;
+  min-width: 100%;
+  padding: 0.12rem 0 0;
+  border-bottom: 1px solid rgba(72, 196, 255, 0.16);
+}
+
+.operator-center-shell__tab {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.32rem;
+  flex: 0 0 auto;
+  min-height: 2rem;
+  padding: 0.42rem 0.85rem 0.52rem;
+  border: 0;
+  border-radius: 0.35rem 0.35rem 0 0;
+  background: transparent;
+  color: rgba(127, 168, 188, 0.88);
+  font-family: var(--font-mono);
+  font-size: 0.58rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    color 140ms ease,
+    background 140ms ease;
+}
+
+.operator-center-shell__tab:hover {
+  color: rgba(196, 236, 255, 0.94);
+  background: rgba(72, 196, 255, 0.06);
+}
+
+.operator-center-shell__tab--active {
+  color: rgba(224, 252, 255, 0.98);
+  background: rgba(72, 196, 255, 0.1);
+  box-shadow: inset 0 -2px 0 rgba(72, 220, 255, 0.92);
+}
+
+.operator-center-shell__tab-badge {
+  display: inline-grid;
+  min-width: 0.95rem;
+  height: 0.95rem;
+  padding: 0 0.22rem;
+  place-items: center;
+  border-radius: 999px;
+  background: rgba(255, 120, 130, 0.88);
+  color: rgba(255, 245, 248, 0.98);
+  font-size: 0.46rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.operator-status-radar-panel--tabbed {
+  overflow: hidden;
+}
+
+.operator-status-radar-panel--tabbed:not(.operator-status-radar-panel--galaxy-only) {
+  gap: 0.55rem;
+  padding-bottom: 0.45rem;
+}
+
+.operator-status-radar-panel__tab-body {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 0.55rem;
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+
+.operator-status-radar-panel__tab-body--vaxon {
+  overflow: hidden;
+  padding-top: 0.15rem;
+}
+
+.operator-status-radar-panel__tab-body--vaxon > .mc-live-ops {
+  flex: 1 1 auto;
+  min-height: 0;
+  height: 100%;
+}
+
+.operator-status-radar-panel__attention--tab {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.operator-status-radar-panel__tab-body--dispatch {
+  overflow: hidden;
+}
+
+.operator-status-radar-panel__tab-body--dispatch > .operator-task-board-panel,
+.operator-status-radar-panel__tab-body--dispatch > [class*='operator-task-board'] {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+}
+
+.console-shell--mockup.console-shell--operator.console-shell--mission-control .dock-stack--live-ops-glance {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  height: 100%;
+  padding: 0.45rem;
+  background:
+    linear-gradient(180deg, rgba(0, 28, 42, 0.55), rgba(0, 10, 18, 0.72)),
+    rgba(2, 8, 14, 0.92);
+}
+
+.console-shell--mockup.console-shell--operator.console-shell--mission-control
+  .dock-stack--live-ops-glance
+  .operator-live-ops-glance--vaxon {
+  padding: 0.45rem 0.5rem 0.55rem;
+}
+
+.console-shell--mockup.console-shell--operator.console-shell--mission-control
+  .dock-stack--live-ops-glance
+  .operator-live-ops-glance--vaxon
+  .mc-vaxon-hero {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.console-shell--mockup.console-shell--operator.console-shell--mission-control
+  .dock-stack--live-ops-glance
+  .operator-live-ops-glance__vaxon-card {
+  flex: 1 1 58%;
+  min-height: 20rem;
+}
+
+.console-shell--mockup.console-shell--operator.console-shell--mission-control
+  .dock-stack--live-ops-glance
+  .operator-live-ops-glance {
+  height: 100%;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  padding: 0.35rem 0.25rem;
+}
+
+.console-shell--mockup.console-shell--operator.console-shell--mission-control
+  .dock-stack--live-ops-glance.right-dock--resizable {
+  position: relative;
+}
+
+.console-shell--mockup.console-shell--operator.console-shell--mission-control
+  .dock-stack--live-ops-glance
+  .right-dock__resize-handle {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 40;
+  width: 0.55rem;
+  transform: translateX(-50%);
+  cursor: col-resize;
+}

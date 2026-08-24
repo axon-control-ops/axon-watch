@@ -115,6 +115,44 @@ class AutonomousAttentionRecoveryTests(unittest.TestCase):
         remaining = autonomous_attention_store.list_pending_decisions(limit=50)
         self.assertEqual(1, len(remaining))
 
+    def test_newer_completed_run_reconciles_decision_on_completion_event(self) -> None:
+        from app.persistence import autonomous_attention_store
+        from app.runs.service import complete_run, create_run, fail_run
+
+        failed = create_run(
+            workspace_id="workspace_dashpro",
+            mode="agent",
+            summary="Dana failed shift",
+            employee_role="lead",
+        )
+        fail_run(str(failed["run_id"]), receipt_summary="runtime failed")
+        autonomous_attention_store.append_receipt(
+            kind="operator_blocker",
+            decision="escalate",
+            tier="operator_gated",
+            risk="high",
+            title="Dana (lead) last shift failed",
+            detail=f"runtime failed [run={failed['run_id']}]",
+            dedupe_key="failed_shift:workspace_dashpro:lead",
+            workspace_id="workspace_dashpro",
+            ask_operator=True,
+            payload={
+                "owner_role": "watcher",
+                "subject_role": "lead",
+                "subject_run_id": failed["run_id"],
+            },
+        )
+
+        recovered = create_run(
+            workspace_id="workspace_dashpro",
+            mode="agent",
+            summary="Dana recovered shift",
+            employee_role="lead",
+        )
+        complete_run(str(recovered["run_id"]))
+
+        self.assertEqual([], autonomous_attention_store.list_pending_decisions(limit=50))
+
 
 if __name__ == "__main__":
     unittest.main()

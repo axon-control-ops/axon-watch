@@ -64,7 +64,14 @@ def list_changed_paths(workspace_root: Path) -> list[str]:
         cleaned = rest.strip().strip('"')
         if cleaned:
             paths.append(cleaned)
-    return paths
+    # Gate 6 reads this list, and it is a second implementation of "what
+    # changed" that does not go through workspace_delivery. Borrowed toolchain
+    # links (node_modules/*, env copies) are infrastructure the agent never
+    # wrote; counting them failed acceptance with paths=255 on runs whose agent
+    # was read-only and had changed nothing at all.
+    from app.workspace_delivery.changed_paths import is_borrowed_toolchain_path
+
+    return [path for path in paths if not is_borrowed_toolchain_path(root, path)]
 
 
 def read_path_texts(
