@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  FLOATING_PANEL_DESIGN_MAX_HEIGHT_PX,
   FLOATING_PANEL_GAP_PX,
   FLOATING_VIEWPORT_MARGIN_PX,
   floatingPanelPlacement,
@@ -46,10 +47,24 @@ describe('floatingPanelPlacement', () => {
     expect(placement.maxHeight).toBeGreaterThanOrEqual(160);
   });
 
-  it('shrinks maxHeight as the trigger moves down the viewport', () => {
-    const high = floatingPanelPlacement({ right: 800, bottom: 100 }, PANEL_WIDTH, VIEWPORT);
-    const low = floatingPanelPlacement({ right: 800, bottom: 700 }, PANEL_WIDTH, VIEWPORT);
-    expect(low.maxHeight).toBeLessThan(high.maxHeight);
+  it('never exceeds the designed max-height when there is ample room', () => {
+    // Regression: an inline max-height beats the stylesheet's 13rem cap, so
+    // without clamping the teleported panel grew to fill the viewport and the
+    // 18-workspace list ran down the whole screen instead of scrolling.
+    const placement = floatingPanelPlacement({ right: 800, bottom: 100 }, PANEL_WIDTH, VIEWPORT);
+    expect(placement.maxHeight).toBe(FLOATING_PANEL_DESIGN_MAX_HEIGHT_PX);
+  });
+
+  it('shrinks below the design cap only when the trigger sits too low', () => {
+    const roomy = floatingPanelPlacement({ right: 800, bottom: 100 }, PANEL_WIDTH, VIEWPORT);
+    const tight = floatingPanelPlacement(
+      { right: 800, bottom: VIEWPORT.height - 190 },
+      PANEL_WIDTH,
+      VIEWPORT,
+    );
+    expect(roomy.maxHeight).toBe(FLOATING_PANEL_DESIGN_MAX_HEIGHT_PX);
+    expect(tight.maxHeight).toBeLessThan(roomy.maxHeight);
+    expect(tight.maxHeight).toBeGreaterThanOrEqual(160);
   });
 
   it('handles a panel wider than the viewport without going off-screen left', () => {

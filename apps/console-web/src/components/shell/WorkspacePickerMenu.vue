@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue';
+import { computed, nextTick, onMounted, onUnmounted, ref, useId } from 'vue';
 
 import WorkspaceIcon from '../WorkspaceIcon.vue';
 import WorkspaceAddForm from './WorkspaceAddForm.vue';
@@ -35,6 +35,10 @@ const menuRef = ref<HTMLElement | null>(null);
 // trigger's viewport rect instead.
 const panelRef = ref<HTMLElement | null>(null);
 const panelStyle = ref<Record<string, string>>({});
+// Teleporting the panel to <body> puts it far from its trigger in DOM order,
+// so the implicit adjacency a screen reader would otherwise rely on is gone.
+// aria-controls restores that link explicitly.
+const panelId = useId();
 
 const DEFAULT_PANEL_WIDTH_PX = 216;
 
@@ -181,6 +185,7 @@ onUnmounted(() => {
       class="workspace-picker-menu__trigger"
       :class="{ 'workspace-picker-menu__trigger--active': Boolean(currentWorkspace) }"
       :aria-expanded="menuOpen ? 'true' : 'false'"
+      :aria-controls="menuOpen ? panelId : undefined"
       aria-haspopup="listbox"
       aria-label="Select workspace"
       :title="currentWorkspaceMeta || currentWorkspaceLabel"
@@ -214,6 +219,7 @@ onUnmounted(() => {
     <Teleport to="body">
     <div
       v-if="menuOpen"
+      :id="panelId"
       ref="panelRef"
       class="workspace-picker-menu__panel workspace-picker-menu__panel--floating"
       :class="{ 'workspace-picker-menu__panel--compact': compact }"
