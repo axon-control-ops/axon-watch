@@ -70,6 +70,23 @@ class RunStateTransitionTests(unittest.TestCase):
         self.assertTrue(can_transition("review_ready", "completed"))
         self.assertTrue(can_transition("review_ready", "executing"))
 
+    def test_every_phase_fail_run_accepts_can_reach_failed(self) -> None:
+        """fail_run() accepts executing/review_ready/paused as input phases.
+
+        Regression: the table only allowed executing -> failed, so failing a
+        paused or review_ready run raised RunLifecycleError inside
+        _transition_record. fail_worker_run swallows that error, leaving the
+        run stuck in a non-terminal phase forever instead of failing cleanly.
+        """
+        for phase in ("executing", "review_ready", "paused"):
+            with self.subTest(phase=phase):
+                self.assertTrue(can_transition(phase, "failed"))
+
+    def test_terminal_phases_still_cannot_be_failed(self) -> None:
+        for phase in ("completed", "failed", "cancelled"):
+            with self.subTest(phase=phase):
+                self.assertFalse(can_transition(phase, "failed"))
+
     def test_disallowed_transitions(self) -> None:
         self.assertFalse(can_transition("queued", "executing"))
         self.assertFalse(can_transition("completed", "executing"))

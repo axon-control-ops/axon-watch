@@ -506,6 +506,12 @@ def dispatch_ide_composer(
                     record_claude_usage_limit_hit(detail)
                 elif family == "codex":
                     record_codex_usage_limit_hit(detail)
+                elif family == "cursor":
+                    from app.cli_runtime.cursor_usage_probe import (
+                        record_cursor_usage_limit_hit,
+                    )
+
+                    record_cursor_usage_limit_hit(detail)
             logger.exception(
                 "lane_b_dispatch_failed runtime_id=%s family=%s composer_mode=%s "
                 "workspace_id=%s exc_type=%s",

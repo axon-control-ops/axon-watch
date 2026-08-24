@@ -96,6 +96,34 @@ def _npm_project_needs_install(project_root: Path) -> bool:
         return True
 
 
+_NPM_NOISE_PREFIXES = ("npm warn", "npm notice", "npm WARN", "npm notice ")
+
+
+def npm_failure_detail(stderr: str, stdout: str, *, limit: int = 400) -> str:
+    """Pick the line(s) that actually explain an npm failure.
+
+    npm writes deprecation warnings to stderr on a *successful* install too, so
+    taking the head of stderr surfaced e.g. "npm warn deprecated uuid@7.0.3..."
+    as the reason dispatch was blocked. That sent operators chasing an
+    unrelated transitive dependency while the real error -- which npm prints
+    last, as "npm error ..." -- was truncated away entirely.
+    """
+    lines = [line.rstrip() for line in f"{stderr}\n{stdout}".splitlines() if line.strip()]
+    real_errors = [
+        line
+        for line in lines
+        if not line.lstrip().startswith(_NPM_NOISE_PREFIXES)
+    ]
+    chosen = real_errors or lines
+    if not chosen:
+        return "npm install failed"
+    # npm prints the actionable error last; keep the tail, not the head.
+    detail = "\n".join(chosen[-12:]).strip()
+    if len(detail) <= limit:
+        return detail
+    return f"…{detail[-(limit - 1):]}"
+
+
 def ensure_npm_toolchain(project_root: Path) -> dict[str, Any]:
     """Install npm dependencies when package.json exists but node_modules is absent."""
     root = project_root.expanduser().resolve()
@@ -125,7 +153,7 @@ def ensure_npm_toolchain(project_root: Path) -> dict[str, Any]:
         return {
             "status": "failed",
             "project_root": str(root),
-            "detail": (completed.stderr or completed.stdout or "npm install failed")[:400],
+            "detail": npm_failure_detail(completed.stderr, completed.stdout),
         }
     return {"status": "installed", "project_root": str(root)}
 
@@ -289,6 +317,7 @@ __all__ = [
     "check_host_runtime_tools",
     "ensure_bound_python_venv",
     "ensure_npm_toolchain",
+    "npm_failure_detail",
     "ensure_project_contract",
     "ensure_workspace_runtime_ready",
     "provision_workspace_runtime",
