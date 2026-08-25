@@ -150,7 +150,7 @@ class OperatorDeterministicReportTests(unittest.TestCase):
         self.assertIn("Work in flight:", text)
         self.assertIn("Marco (Backend) is executing", text)
         self.assertIn("Priya (Frontend) just completed", text)
-        self.assertIn("Lead rollups:", text)
+        self.assertIn("Stored Lead evidence:", text)
         self.assertIn("graduation survey", text.lower())
         self.assertIn("Plan:", text)
         self.assertNotIn("Confidence:", text)
@@ -180,7 +180,7 @@ class OperatorDeterministicReportTests(unittest.TestCase):
         )
         self.assertIn("nothing screaming", empty["text"].lower())
         self.assertIn("idle", empty["text"].lower())
-        self.assertIn("standing by", empty["text"].lower())
+        self.assertIn("no verified receipt found", empty["text"].lower())
 
     def test_lead_rollup_scrubs_cli_dump_into_operator_line(self) -> None:
         from app.kairo.operator_deterministic_report import compose_operator_report
