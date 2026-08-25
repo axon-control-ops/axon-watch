@@ -6,6 +6,8 @@ from typing import Any
 
 from fastapi import APIRouter, HTTPException, Query, WebSocket
 
+from app.auth.identity import bind_request_identity, reset_identity_token
+from app.auth.websocket import authorize_operator_websocket
 from app.chat.service import (
     ChatValidationError,
     create_workspace_chat_thread,
@@ -71,12 +73,20 @@ async def workspace_terminal(
     session_id: str = Query("terminal-operator"),
     role: str = Query("operator"),
 ) -> None:
-    await handle_terminal_session(
-        websocket,
-        workspace_id,
-        session_id=session_id,
-        role=role,
-    )
+    identity = await authorize_operator_websocket(websocket, resource="terminal websocket")
+    if identity is None:
+        return
+
+    token = bind_request_identity(identity)
+    try:
+        await handle_terminal_session(
+            websocket,
+            workspace_id,
+            session_id=session_id,
+            role=role,
+        )
+    finally:
+        reset_identity_token(token)
 
 
 @router.get("/api/workspaces")
