@@ -172,7 +172,7 @@ class LeadTeamCheckinTests(unittest.TestCase):
                 )
             ],
         ), patch(
-            "app.workspace_agents.lead_team_checkin._post_lead_checkin_message",
+            "app.workspace_agents.lead_team_checkin.post_lead_checkin_message",
             return_value="message_test",
         ):
             result = run_lead_team_checkin(
@@ -198,7 +198,11 @@ class LeadTeamCheckinTests(unittest.TestCase):
         )
         self.assertIn("workspace_axon_watch", again["skipped_cooldown"])
 
-    def test_failed_lead_shift_escalates_to_vaxon_without_specialist_task(self) -> None:
+    def test_failed_lead_shift_with_operator_gate_escalates_to_vaxon_without_specialist_task(
+        self,
+    ) -> None:
+        """A genuine operator-only gate (usage limit) still escalates, with no
+        specialist task created — the Lead has no authority to raise a limit."""
         run = create_run(
             workspace_id="workspace_dashpro",
             mode="agent",
@@ -207,11 +211,11 @@ class LeadTeamCheckinTests(unittest.TestCase):
         )
         fail_run(
             str(run["run_id"]),
-            receipt_summary="Workspace delivery blocked: no publishable changes",
+            receipt_summary="ActionRequiredError: You're out of usage. Increase limits to continue.",
         )
 
         with patch(
-            "app.workspace_agents.lead_team_checkin._post_lead_checkin_message",
+            "app.workspace_agents.lead_team_checkin.post_lead_checkin_message",
             return_value="message_test",
         ):
             result = run_lead_team_checkin(
@@ -229,6 +233,45 @@ class LeadTeamCheckinTests(unittest.TestCase):
         self.assertEqual("operator_blocker", receipt["kind"])
         self.assertIn("lead", receipt["title"].lower())
         self.assertIn("must not remain stuck", receipt["detail"])
+        # Structured decision (no invented options menu) travels with the escalation.
+        self.assertIn(":::decision", receipt["detail"])
+        self.assertIn('"card_type":"blocked"', receipt["detail"])
+        self.assertIn('"choices":[]', receipt["detail"])
+
+    def test_failed_lead_shift_with_routable_failure_creates_specialist_task_not_escalation(
+        self,
+    ) -> None:
+        """Root-cause fix: a Lead failure that isn't a genuine operator gate must be
+        diagnosed and routed to a specialist automatically, not unconditionally
+        escalated to VAXON with no diagnosis (the reported premature-Ask-card bug)."""
+        run = create_run(
+            workspace_id="workspace_dashpro",
+            mode="agent",
+            summary="Dana lead shift",
+            employee_role="lead",
+        )
+        fail_run(
+            str(run["run_id"]),
+            receipt_summary="Workspace delivery blocked: no publishable changes",
+        )
+
+        with patch(
+            "app.workspace_agents.lead_team_checkin.post_lead_checkin_message",
+            return_value="message_test",
+        ):
+            result = run_lead_team_checkin(
+                min_interval_seconds=0,
+                max_assignments_per_workspace=2,
+                workspace_ids=["workspace_dashpro"],
+                state_path=self.state_path,
+                post_lead_message=True,
+            )
+
+        self.assertEqual([], result["escalated"])
+        self.assertEqual(1, len(result["created_tasks"]))
+        task = result["created_tasks"][0]
+        self.assertEqual("watcher", task["owner_role"])
+        self.assertTrue(task["goal"].startswith(ASSIGN_GOAL_PREFIX))
 
     def test_leased_approved_recovery_task_suppresses_repeat_lead_failure_card(self) -> None:
         dedupe_key = "failed_shift:workspace_axon_watch:lead"
