@@ -49,31 +49,30 @@ def _is_sensitive_get(path: str) -> bool:
     return any(path == prefix or path.startswith(prefix + "/") for prefix in _SENSITIVE_GET_PREFIXES)
 
 
-def _extract_bearer(request: Request) -> str:
-    header = request.headers.get("authorization") or request.headers.get("Authorization") or ""
+def _extract_bearer_from_headers(headers) -> str:
+    header = headers.get("authorization") or headers.get("Authorization") or ""
     parts = header.split(None, 1)
     if len(parts) == 2 and parts[0].lower() == "bearer":
         return parts[1].strip()
     # Same-origin console can also send a dedicated header once wired.
-    return (request.headers.get("x-axon-operator-token") or "").strip()
+    return (headers.get("x-axon-operator-token") or "").strip()
 
 
-def resolve_mutating_identity(request: Request) -> tuple[str | None, str | None]:
+def resolve_operator_identity(headers, cookies, client_host: str | None) -> tuple[str | None, str | None]:
     """Return (identity, error_detail). identity None means reject."""
     mode = auth_mode()
     if mode == "off":
         return "anonymous", None
 
     token = operator_token()
-    presented = _extract_bearer(request)
+    presented = _extract_bearer_from_headers(headers)
     if token and presented and secrets.compare_digest(presented, token):
         return "operator", None
 
-    session = extract_session_token(request.cookies, request.headers)
+    session = extract_session_token(cookies, headers)
     if validate_session_token(session):
         return "desktop_session", None
 
-    client_host = request.client.host if request.client else None
     if allow_loopback_bypass() and client_is_loopback(client_host):
         return "loopback", None
 
@@ -83,6 +82,11 @@ def resolve_mutating_identity(request: Request) -> tuple[str | None, str | None]
         return None, "mutating API requires Authorization: Bearer <operator token>"
 
     return "anonymous", None
+
+
+def resolve_mutating_identity(request: Request) -> tuple[str | None, str | None]:
+    client_host = request.client.host if request.client else None
+    return resolve_operator_identity(request.headers, request.cookies, client_host)
 
 
 class MutatingAuthMiddleware(BaseHTTPMiddleware):
