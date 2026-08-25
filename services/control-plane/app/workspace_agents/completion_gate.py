@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Iterable
 
@@ -16,6 +15,10 @@ from app.workspace_agents.lead_verification_handoff import (
 )
 from app.workspace_agents.ops_delivery import no_change_delivery_is_successful_ops_task
 from app.chat.reply_verification import extract_edit_paths
+from app.workspace_agents.completion_gate_types import (
+    CompletionGateResult,
+    WorkerDeliveryGateOutcome,
+)
 
 
 _IMPLEMENTATION_ROLES = frozenset({"frontend", "backend", "integrations"})
@@ -81,25 +84,6 @@ _STOP_WORDS = frozenset(
 
 def _has_intent_word(text: str, words: Iterable[str]) -> bool:
     return any(re.search(rf"\b{re.escape(word)}\b", text) for word in words)
-
-
-@dataclass(frozen=True)
-class CompletionGateResult:
-    passed: bool
-    reason: str
-    changed_paths: list[str]
-    expected_files: list[str]
-    validation_status: str
-    commit_sha: str = ""
-
-
-@dataclass(frozen=True)
-class WorkerDeliveryGateOutcome:
-    passed: bool
-    reason: str
-    publish: Any | None = None
-    preserve_isolation: bool = False
-    preflight_reason: str = ""
 
 
 def implementation_requested(task: dict[str, Any] | None) -> bool:
