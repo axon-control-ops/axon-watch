@@ -157,6 +157,21 @@ class RecoveryDecisionInvariantTests(unittest.TestCase):
                 ),
             )
 
+    def test_invalid_card_type_is_rejected_even_with_no_choices(self) -> None:
+        # Literal[...] isn't enforced at runtime. Without an explicit check,
+        # an invalid card_type matches neither the "without choices" set nor
+        # "decision_required", so it would silently bypass every invariant
+        # below it — this must fail loudly instead.
+        with self.assertRaisesRegex(ValueError, "invalid card_type"):
+            RecoveryDecision(
+                card_type="not_a_real_card_type",  # type: ignore[arg-type]
+                summary="x",
+                classification="x",
+                operator_action_required=False,
+                recommended_action="x",
+                automatic_next_action=None,
+            )
+
     def test_confidence_out_of_range_rejected(self) -> None:
         with self.assertRaisesRegex(ValueError, "confidence"):
             RecoveryDecision(

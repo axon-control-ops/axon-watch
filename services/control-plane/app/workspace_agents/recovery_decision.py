@@ -32,6 +32,10 @@ from typing import Literal
 
 CardType = Literal["working", "recovered", "blocked", "decision_required", "completed", "failed"]
 
+_VALID_CARD_TYPES: frozenset[str] = frozenset(
+    {"working", "recovered", "blocked", "decision_required", "completed", "failed"}
+)
+
 # card types that must never carry an interactive options menu -- rendering
 # choices on these would recreate the exact "invented decision" bug this
 # contract exists to prevent.
@@ -82,6 +86,12 @@ class RecoveryDecision:
     choices: tuple[RecoveryChoice, ...] = ()
 
     def __post_init__(self) -> None:
+        # Literal[...] is not enforced at runtime — without this explicit
+        # check, an invalid card_type (e.g. from a corrupted/future fence
+        # payload via decision_from_payload) would match neither branch below
+        # and silently bypass every invariant this contract exists to enforce.
+        if self.card_type not in _VALID_CARD_TYPES:
+            raise ValueError(f"invalid card_type {self.card_type!r}, must be one of {sorted(_VALID_CARD_TYPES)}")
         if self.card_type in _CARD_TYPES_WITHOUT_CHOICES and self.choices:
             raise ValueError(
                 f"card_type={self.card_type!r} must not carry choices "
