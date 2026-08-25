@@ -172,7 +172,7 @@ class LeadTeamCheckinTests(unittest.TestCase):
                 )
             ],
         ), patch(
-            "app.workspace_agents.lead_team_checkin._post_lead_checkin_message",
+            "app.workspace_agents.lead_team_checkin.post_lead_checkin_message",
             return_value="message_test",
         ):
             result = run_lead_team_checkin(
@@ -215,7 +215,7 @@ class LeadTeamCheckinTests(unittest.TestCase):
         )
 
         with patch(
-            "app.workspace_agents.lead_team_checkin._post_lead_checkin_message",
+            "app.workspace_agents.lead_team_checkin.post_lead_checkin_message",
             return_value="message_test",
         ):
             result = run_lead_team_checkin(
@@ -256,7 +256,7 @@ class LeadTeamCheckinTests(unittest.TestCase):
         )
 
         with patch(
-            "app.workspace_agents.lead_team_checkin._post_lead_checkin_message",
+            "app.workspace_agents.lead_team_checkin.post_lead_checkin_message",
             return_value="message_test",
         ):
             result = run_lead_team_checkin(
