@@ -58,7 +58,6 @@ describe('mockup shell view helpers', () => {
 
   it('maps workspace ids to icon kinds for sidebar glyphs', () => {
     expect(workspaceIconKind('workspace_axon_watch')).toBe('cube');
-    expect(workspaceIconKind('workspace_axon_local')).toBe('tower');
     expect(workspaceIconKind('workspace_dashpro')).toBe('building');
     expect(workspaceIconKind('workspace_smoke')).toBe('cube');
     expect(workspaceIconKind('workspace_recsys')).toBe('cube');

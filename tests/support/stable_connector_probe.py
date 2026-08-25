@@ -28,17 +28,6 @@ STABLE_OK_CONNECTOR_RECORDS: list[dict[str, object]] = [
         "latency_ms": 1,
     },
     {
-        "connector_id": "axon_local",
-        "display_name": "axon-local (legacy)",
-        "health_url": "http://127.0.0.1:7734/api/health",
-        "required": False,
-        "workspace_id": "workspace_axon_local",
-        "status": "unavailable",
-        "detail": "optional probe skipped in tests",
-        "last_checked_at": "2026-07-05T08:00:00Z",
-        "latency_ms": 1,
-    },
-    {
         "connector_id": "cloudflare_tunnel",
         "display_name": "Cloudflare tunnel",
         "health_url": "https://example.test/",

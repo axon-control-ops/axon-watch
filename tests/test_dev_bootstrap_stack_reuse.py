@@ -9,9 +9,6 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[1]
 COMMON_SH = REPO_ROOT / "scripts" / "dev" / "lib" / "common.sh"
 UP_SH = REPO_ROOT / "scripts" / "dev" / "up.sh"
-SOFT_CUTOVER_SH = REPO_ROOT / "scripts" / "ops" / "soft-public-cutover.sh"
-PROXY_SCRIPT = REPO_ROOT / "scripts" / "ops" / "public-origin-proxy.py"
-PROXY_UNIT = REPO_ROOT / "infra" / "systemd" / "user" / "axon-public-origin-proxy.service"
 
 
 class DevBootstrapStackReuseContractTests(unittest.TestCase):
@@ -23,28 +20,29 @@ class DevBootstrapStackReuseContractTests(unittest.TestCase):
         pid_guard_index = up_script.index("assert_no_live_pid_files")
         self.assertLess(reuse_index, pid_guard_index)
 
-    def test_up_sh_ensures_soft_public_tunnel_instead_of_legacy_7734(self) -> None:
+    def test_up_sh_ensures_managed_tunnel_without_legacy_axon_local(self) -> None:
         up_script = UP_SH.read_text(encoding="utf-8")
+        common_script = COMMON_SH.read_text(encoding="utf-8")
 
-        self.assertIn("ensure_soft_public_tunnel", up_script)
-        self.assertIn("soft-public-cutover.sh", up_script)
-        self.assertIn("AXON_WATCH_ENSURE_LEGACY_7734", up_script)
-        self.assertNotIn(
-            'echo "Ensuring sibling axon-local server on :7734..."',
-            up_script,
-        )
+        self.assertIn("ensure_managed_tunnel", up_script)
+        self.assertIn("/api/tunnel/start", up_script)
+        self.assertIn("--no-public-tunnel", up_script)
+        self.assertNotIn("soft-public-cutover.sh", up_script)
+        self.assertNotIn("AXON_WATCH_ENSURE_LEGACY_7734", up_script)
+        self.assertNotIn("AXON_LOCAL_ROOT", up_script)
+        self.assertNotIn("7734", up_script)
+        self.assertIn("DEV_SKIP_PUBLIC_TUNNEL", common_script)
+        self.assertIn("AXON_WATCH_SKIP_PUBLIC_TUNNEL", common_script)
 
-    def test_soft_cutover_prefers_restartable_systemd_proxy(self) -> None:
-        cutover = SOFT_CUTOVER_SH.read_text(encoding="utf-8")
-        proxy = PROXY_SCRIPT.read_text(encoding="utf-8")
-        unit = PROXY_UNIT.read_text(encoding="utf-8")
+    def test_legacy_public_origin_proxy_files_are_retired(self) -> None:
+        retired_paths = [
+            REPO_ROOT / "scripts" / "ops" / "soft-public-cutover.sh",
+            REPO_ROOT / "scripts" / "ops" / "public-origin-proxy.py",
+            REPO_ROOT / "infra" / "systemd" / "user" / "axon-public-origin-proxy.service",
+        ]
 
-        self.assertIn("axon-public-origin-proxy.service", cutover)
-        self.assertIn("systemctl --user restart", cutover)
-        self.assertIn("Restart=always", unit)
-        self.assertIn("After=network.target console-web.service", unit)
-        self.assertIn("socket.AF_INET6", proxy)
-        self.assertIn("socket.IPV6_V6ONLY, 0", proxy)
+        for path in retired_paths:
+            self.assertFalse(path.exists(), f"{path.relative_to(REPO_ROOT)} should stay retired")
 
     def test_common_sh_skips_systemd_listeners_during_orphan_cleanup(self) -> None:
         common_script = COMMON_SH.read_text(encoding="utf-8")

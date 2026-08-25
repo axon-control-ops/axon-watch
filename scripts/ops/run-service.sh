@@ -102,7 +102,7 @@ case "${service_name}" in
     ;;
   console-web)
     # Always use vite preview so /api proxies to control-plane (same-origin operator UI).
-    # Plain http.server on dist/ breaks soft-cutover health and the SPA API client.
+    # Plain http.server on dist/ breaks health checks and the SPA API client.
     cd "${AXON_WATCH_REPO_ROOT}/apps/console-web"
     if [[ ! -d dist ]]; then
       echo "console-web dist missing; run: npm run build -w @axon-watch/console-web" >&2

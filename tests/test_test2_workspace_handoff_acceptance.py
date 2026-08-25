@@ -15,8 +15,13 @@ import unittest
 import urllib.error
 import urllib.request
 
+from tests.support.live_chat_mutations import (
+    LIVE_CHAT_MUTATION_SKIP_REASON,
+    live_chat_mutations_allowed,
+)
+
 SOURCE_WORKSPACE_ID = "workspace_smoke"
-TARGET_WORKSPACE_ID = "workspace_axon_local"
+TARGET_WORKSPACE_ID = "workspace_dashpro"
 CONTROL_PLANE_BASE = os.environ.get(
     "AXON_WATCH_CONTROL_PLANE_BASE",
     "http://127.0.0.1:8787",
@@ -50,14 +55,15 @@ def _stack_available() -> bool:
 
 
 @unittest.skipUnless(_stack_available(), "dev stack not running on control-plane base URL")
+@unittest.skipUnless(live_chat_mutations_allowed(), LIVE_CHAT_MUTATION_SKIP_REASON)
 class Test2WorkspaceHandoffAcceptance(unittest.TestCase):
-    def test_create_handoff_from_smoke_to_axon_local(self) -> None:
+    def test_create_handoff_from_smoke_to_dashpro(self) -> None:
         status, payload = _request(
             "POST",
             f"{CONTROL_PLANE_BASE}/api/workspaces/{SOURCE_WORKSPACE_ID}/handoffs",
             {
                 "target_workspace_id": TARGET_WORKSPACE_ID,
-                "task": "Verify cross-workspace handoff summary for axon-local",
+                "task": "Verify cross-workspace handoff summary for DashPro",
                 "reason": "TEST-2 acceptance",
             },
         )
@@ -78,7 +84,7 @@ class Test2WorkspaceHandoffAcceptance(unittest.TestCase):
         assert isinstance(summary, dict)
         self.assertEqual(TARGET_WORKSPACE_ID, summary.get("workspace_id"))
         self.assertEqual("project_path", summary.get("connection_kind"))
-        self.assertTrue(str(summary.get("project_root", "")).endswith("axon-local"))
+        self.assertTrue(str(summary.get("project_root", "")).endswith("dashpro"))
         self.assertIn("run_count", summary)
         self.assertIn("active_run_count", summary)
         self.assertIn("active_runs", summary)

@@ -515,10 +515,10 @@ restart_systemd_stack() {
 }
 
 parse_dev_stack_args() {
-  # Sets: DEV_FORCE_RESTART DEV_INCLUDE_SYSTEMD DEV_SKIP_SOFT_CUTOVER
+  # Sets: DEV_FORCE_RESTART DEV_INCLUDE_SYSTEMD DEV_SKIP_PUBLIC_TUNNEL
   DEV_FORCE_RESTART=0
   DEV_INCLUDE_SYSTEMD=0
-  DEV_SKIP_SOFT_CUTOVER=0
+  DEV_SKIP_PUBLIC_TUNNEL=0
   local arg
   for arg in "$@"; do
     case "${arg}" in
@@ -529,10 +529,10 @@ parse_dev_stack_args() {
       --systemd|--all)
         DEV_INCLUDE_SYSTEMD=1
         ;;
-      --no-soft-cutover)
-        DEV_SKIP_SOFT_CUTOVER=1
-        AXON_WATCH_SKIP_SOFT_PUBLIC_CUTOVER=1
-        export AXON_WATCH_SKIP_SOFT_PUBLIC_CUTOVER
+      --no-public-tunnel)
+        DEV_SKIP_PUBLIC_TUNNEL=1
+        AXON_WATCH_SKIP_PUBLIC_TUNNEL=1
+        export AXON_WATCH_SKIP_PUBLIC_TUNNEL
         ;;
       -h|--help)
         return 2

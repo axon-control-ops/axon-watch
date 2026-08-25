@@ -44,15 +44,15 @@ describe('buildConnectorIdeQuickGuide', () => {
     ]);
   });
 
-  it('surfaces legacy connector guidance when optional Axon Local is offline', () => {
+  it('surfaces optional connector guidance when a non-required connector is offline', () => {
     const guide = buildConnectorIdeQuickGuide({
       ...base,
       terminalVisible: true,
       legacyConnectorGlanceVisible: true,
     });
 
-    expect(guide?.title).toContain('Legacy Axon Local');
-    expect(guide?.steps.join(' ')).toContain('LEGACY OFFLINE');
+    expect(guide?.title).toContain('Optional connector');
+    expect(guide?.steps.join(' ')).toContain('Optional connector only');
     expect(guide?.actions).toEqual([{ id: 'open-connectors', label: 'Open connectors' }]);
   });
 

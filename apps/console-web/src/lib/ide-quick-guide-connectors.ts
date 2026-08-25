@@ -65,12 +65,12 @@ export function buildConnectorIdeQuickGuide(input: {
     }
 
     return {
-      title: 'Legacy Axon Local is offline — Axon-X stack is healthy',
+      title: 'Optional connector is offline — Axon-X stack is healthy',
       tone: 'neutral',
       actions,
       steps: [
         'Editor status bar LEGACY OFFLINE chip · footer chip · quick guide Open connectors.',
-        'Optional connector only — reprobe or open the :7734 fallback when you still need classic Axon Local.',
+        'Optional connector only — reprobe after fixing credentials, network, or the downstream service.',
         ...(input.terminalVisible
           ? []
           : ['Ctrl/Cmd+J opens the terminal when you need shell output in the workbench.']),

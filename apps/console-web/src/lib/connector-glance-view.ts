@@ -37,7 +37,7 @@ export type ConnectorStatusBarChipInput = {
   layoutMode: 'operator' | 'ide';
 };
 
-/** Whether the optional legacy Axon Local glance chip would appear in the status bar. */
+/** Whether the optional connector glance chip would appear in the status bar. */
 export function isLegacyConnectorGlanceVisible(input: ConnectorStatusBarChipInput): boolean {
   return buildConnectorGlanceChip(input) !== null;
 }
@@ -106,20 +106,7 @@ export function buildRequiredConnectorAlertChip(
   };
 }
 
-const LEGACY_CONNECTOR_ID = 'axon_local';
-
-function legacyConnectorLabel(status: string): string {
-  const normalized = status.trim().toLowerCase();
-  if (normalized === 'unavailable') {
-    return 'LEGACY AXON LOCAL OFFLINE';
-  }
-  if (normalized === 'degraded') {
-    return 'LEGACY AXON LOCAL DEGRADED';
-  }
-  return `LEGACY AXON LOCAL ${status.toUpperCase()}`;
-}
-
-/** Low-severity status-bar chip when optional legacy Axon Local is down but required connectors are ok. */
+/** Low-severity status-bar chip reserved for optional connector notices. */
 export function buildConnectorGlanceChip(
   input: ConnectorStatusBarChipInput,
 ): ConnectorGlanceChip | null {
@@ -135,21 +122,5 @@ export function buildConnectorGlanceChip(
     return null;
   }
 
-  const legacy = input.items.find(
-    (item) => String(item.connector_id ?? '').trim() === LEGACY_CONNECTOR_ID,
-  );
-  if (!legacy || legacy.required) {
-    return null;
-  }
-
-  const status = String(legacy.status ?? '').trim().toLowerCase();
-  if (!status || status === 'ok') {
-    return null;
-  }
-
-  return {
-    id: 'connector-glance',
-    label: legacyConnectorLabel(status),
-    tone: 'default',
-  };
+  return null;
 }

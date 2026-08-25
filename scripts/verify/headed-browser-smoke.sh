@@ -19,7 +19,7 @@ echo
 echo "[3/3] Manual operator reminder"
 echo "  For Phase G6 dry-run, also verify in a visible browser when needed:"
 echo "  - composer ArrowUp history, Resend, markdown Copy, Resume after error"
-echo "  - log any forced :7734 fallback with blocker ID in docs/PHASE_G6_RETIREMENT_READINESS.md"
+echo "  - log any stale :7734 origin as an Axon-X tunnel/config issue"
 echo
 
 echo "HEADED-BROWSER-SMOKE PASS"

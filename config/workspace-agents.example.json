@@ -50,11 +50,5 @@
       ]
     }
   },
-  "agents": {
-    "workspace_axon_local": {
-      "agent_name": "Axon Local Lead",
-      "role": "lead",
-      "owns": "legacy axon-local reference and donor patterns"
-    }
-  }
+  "agents": {}
 }

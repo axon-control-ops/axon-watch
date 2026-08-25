@@ -51,7 +51,7 @@ CONNECTOR_DEGRADED_WATCH_INBOX = {
 
 OPTIONAL_TUNNEL_LEGACY_INGRESS_SIGNAL_ID = "signal_connector_cloudflare_tunnel_degraded"
 OPTIONAL_TUNNEL_LEGACY_INGRESS_DETAIL = (
-    "ingress still targets legacy Axon Local; expected http://127.0.0.1:4173"
+    "ingress still targets stale origin; expected http://127.0.0.1:4173"
 )
 
 OPTIONAL_TUNNEL_LEGACY_INGRESS_INBOX_ITEM = {

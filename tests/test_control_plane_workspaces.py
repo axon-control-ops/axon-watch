@@ -117,7 +117,7 @@ class ControlPlaneWorkspacesTests(unittest.TestCase):
         by_id = {item["workspace_id"]: item for item in response.json()["items"]}
 
         self.assertTrue(by_id["workspace_axon_watch"]["auto_enabled"])
-        self.assertFalse(by_id["workspace_axon_local"]["auto_enabled"])
+        self.assertFalse(by_id["workspace_dashpro"]["auto_enabled"])
 
         agents_response = self.client.get("/api/agents?scope=operator")
         self.assertEqual(200, agents_response.status_code)

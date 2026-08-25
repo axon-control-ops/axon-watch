@@ -18,6 +18,7 @@ class ProductionOperatorSurfaceTests(unittest.TestCase):
         spec = json.loads(spec_path.read_text(encoding="utf-8"))
         self.assertEqual("axon_x", spec["status"])
         self.assertIn(":4173", spec["primary_url"])
+        self.assertIsNone(spec["fallback_url"])
 
     def test_snapshot_declares_axon_x_production(self) -> None:
         snapshot = json.loads(
@@ -28,11 +29,9 @@ class ProductionOperatorSurfaceTests(unittest.TestCase):
         assert isinstance(production, dict)
         self.assertEqual("axon_x", production.get("status"))
         self.assertIn(":4173", str(production.get("primary_url", "")))
+        self.assertIsNone(production.get("fallback_url"))
         blockers = snapshot.get("blockers_for_full_retirement", [])
-        self.assertFalse(
-            any("7734 remains production operator reference" in item for item in blockers),
-            msg="operator sign-off blocker should be cleared",
-        )
+        self.assertEqual([], blockers)
 
     def test_production_operator_checker_passes(self) -> None:
         result = subprocess.run(

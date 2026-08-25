@@ -114,7 +114,7 @@ export function ideActivityBarRunAttentionHint(
   }
 
   if (input.legacyConnectorGlanceVisible) {
-    return 'Legacy Axon Local offline';
+    return 'Optional connector offline';
   }
 
   return null;

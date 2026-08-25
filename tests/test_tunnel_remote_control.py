@@ -198,14 +198,14 @@ class TunnelProbeWatchTests(WatchTunnelTestCase):
             log_path.write_text(
                 'INF Updated to new configuration config="{\\"ingress\\":['
                 '{\\"hostname\\":\\"axon.edudashpro.org.za\\",'
-                '\\"service\\":\\"http://localhost:7734\\"},'
+                '\\"service\\":\\"http://localhost:4173\\"},'
                 '{\\"service\\":\\"http_status:404\\"}],'
                 '\\"warp-routing\\":{\\"enabled\\":false}}" version=1\n',
                 encoding="utf-8",
             )
             hostname, service = self._remote_ingress_from_logs([str(log_path)])
         self.assertEqual("axon.edudashpro.org.za", hostname)
-        self.assertEqual("http://localhost:7734", service)
+        self.assertEqual("http://localhost:4173", service)
 
     def test_classifies_control_plane_health_as_axon_x(self) -> None:
         ok, detail = self._classify_public_health_body(
@@ -221,7 +221,7 @@ class TunnelProbeWatchTests(WatchTunnelTestCase):
         self.assertFalse(ok)
         self.assertIn("axon-local", detail)
 
-    def test_soft_origin_cutover_ok_when_public_is_axon_x(self) -> None:
+    def test_stale_7734_remote_ingress_is_degraded(self) -> None:
         with tempfile.TemporaryDirectory() as tempdir:
             log_path = Path(tempdir) / "cloudflared.log"
             log_path.write_text(
@@ -272,9 +272,13 @@ class TunnelProbeWatchTests(WatchTunnelTestCase):
                         "tunnel_log_paths": [str(log_path)],
                     }
                 )
-        self.assertEqual("ok", diagnostics["status"])
-        self.assertTrue(diagnostics["tunnel"]["soft_origin_cutover"])
-        self.assertIn("soft cutover", diagnostics["detail"])
+        self.assertEqual("degraded", diagnostics["status"])
+        self.assertEqual(
+            "http://localhost:7734",
+            diagnostics["tunnel"]["remote_ingress_service"],
+        )
+        self.assertFalse(diagnostics["tunnel"]["ingress_matches_axon"])
+        self.assertIn("remote ingress still points at http://localhost:7734", diagnostics["detail"])
 
 
 class NativeTunnelControlTests(WatchTunnelTestCase):

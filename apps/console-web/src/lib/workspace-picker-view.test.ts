@@ -33,11 +33,11 @@ describe('workspace picker view', () => {
 
   it('falls back to workspace id when no project root exists', () => {
     const workspace: WorkspaceRecord = {
-      workspace_id: 'workspace_axon_local',
-      display_name: 'Axon Local',
+      workspace_id: 'workspace_tps',
+      display_name: 'TPS',
     };
 
-    expect(workspacePickerMetaLabel(workspace)).toBe('workspace_axon_local');
+    expect(workspacePickerMetaLabel(workspace)).toBe('workspace_tps');
   });
 
   it('shortens deep paths to the last two segments', () => {
@@ -89,7 +89,7 @@ describe('workspace picker view', () => {
         auto_enabled: true,
       };
       const autoOffWithStaff: WorkspaceRecord = {
-        workspace_id: 'workspace_axon_local',
+        workspace_id: 'workspace_dashpro',
         has_active_team: true,
         auto_enabled: false,
       };
@@ -104,12 +104,12 @@ describe('workspace picker view', () => {
     it('can overlay live AUTO prefs onto stale workspace records before filtering', () => {
       const staleRecords: WorkspaceRecord[] = [
         { workspace_id: 'MoveIT', has_active_team: false },
-        { workspace_id: 'workspace_axon_local', has_active_team: true },
+        { workspace_id: 'workspace_dashpro', has_active_team: true },
       ];
 
       const withLiveState = applyWorkspacePickerAutoState(staleRecords, {
         MoveIT: true,
-        workspace_axon_local: false,
+        workspace_dashpro: false,
       });
 
       expect(visibleWorkspacePickerEntries(withLiveState, null).map((w) => w.workspace_id)).toEqual([

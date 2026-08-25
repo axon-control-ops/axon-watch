@@ -17,7 +17,6 @@ export const SPEECH_RECOGNITION_BIAS_PHRASES: readonly SpeechRecognitionBiasPhra
   { phrase: 'Vaxon', boost: 4.5 },
   { phrase: 'Axon', boost: 3.5 },
   { phrase: 'Axon Watch', boost: 3.5 },
-  { phrase: 'Axon Local', boost: 3.5 },
   { phrase: 'Axon-X', boost: 3.5 },
   { phrase: 'DashPro', boost: 3.5 },
   { phrase: 'briefing', boost: 2.5 },

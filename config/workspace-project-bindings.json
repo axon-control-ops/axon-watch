@@ -8,10 +8,6 @@
       "display_name": "audio-transcribe",
       "project_root": "/run/media/vaxon/axon-data/projectx/product/audio-transcribe"
     },
-    "workspace_axon_local": {
-      "display_name": "axon-local",
-      "project_root": "/run/media/vaxon/axon-data/repos/axon-nvme/repos/axon-local"
-    },
     "workspace_axon_online": {
       "display_name": "axon-online",
       "project_root": "/run/media/vaxon/axon-data/projectx/internal/axon-online"

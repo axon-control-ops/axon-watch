@@ -26,18 +26,19 @@ class ParitySnapshotTests(unittest.TestCase):
         )
         self.assertEqual(0, result.returncode, msg=result.stderr or result.stdout)
 
-    def test_bounded_cutover_not_full_retirement(self) -> None:
+    def test_axon_local_runtime_retired(self) -> None:
         payload = json.loads(SNAPSHOT_FILE.read_text(encoding="utf-8"))
-        self.assertEqual("bounded_cutover_approved", payload["decision"])
-        self.assertFalse(payload["full_axon_local_retirement"])
+        self.assertEqual("axon_local_runtime_retired", payload["decision"])
+        self.assertTrue(payload["full_axon_local_retirement"])
         self.assertEqual(0, payload["summary"]["partially_verified"])
         self.assertEqual(19, payload["summary"]["verified_v1"])
-        self.assertGreaterEqual(len(payload["blockers_for_full_retirement"]), 1)
+        self.assertEqual([], payload["blockers_for_full_retirement"])
         production = payload.get("production_operator")
         self.assertIsInstance(production, dict)
         assert isinstance(production, dict)
         self.assertEqual("axon_x", production.get("status"))
         self.assertIn(":4173", str(production.get("primary_url", "")))
+        self.assertIsNone(production.get("fallback_url"))
 
     def test_all_test_gates_listed_through_test9(self) -> None:
         payload = json.loads(SNAPSHOT_FILE.read_text(encoding="utf-8"))
@@ -45,10 +46,11 @@ class ParitySnapshotTests(unittest.TestCase):
         for index in range(10):
             self.assertIn(f"TEST-{index}", gates)
 
-    def test_decision_doc_declares_not_approved_retirement(self) -> None:
+    def test_decision_doc_declares_retirement(self) -> None:
         text = DECISION_FILE.read_text(encoding="utf-8")
-        self.assertIn("NOT APPROVED", text)
+        self.assertIn("APPROVED", text)
         self.assertIn("Bounded Axon-X cutover", text)
+        self.assertIn("axon-local runtime retirement", text)
 
 
 if __name__ == "__main__":

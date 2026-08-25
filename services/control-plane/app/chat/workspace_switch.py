@@ -41,8 +41,6 @@ def _workspace_aliases(workspace_id: str, display_name: str | None) -> set[str]:
         aliases.update({"dashpro", "dash pro"})
     if workspace_id == "workspace_axon_watch":
         aliases.update({"axon watch", "axon-watch", "axon x", "axon x watch"})
-    if workspace_id == "workspace_axon_local":
-        aliases.update({"axon local"})
     return {alias for alias in aliases if alias}
 
 

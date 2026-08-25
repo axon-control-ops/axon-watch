@@ -35,12 +35,12 @@ def validate_production_operator(*, spec: dict[str, object] | None = None) -> Ch
             message="primary_url must target console-web on port 4173",
         )
 
-    fallback_url = str(spec.get("fallback_url", "")).strip()
-    if not fallback_url.startswith("http"):
+    fallback_url = spec.get("fallback_url")
+    if fallback_url is not None and not str(fallback_url).strip().startswith("http"):
         return CheckResult(
             name="production_operator_surface",
             status="fail",
-            message="fallback_url must be an http(s) URL",
+            message="fallback_url must be null or an http(s) URL",
         )
 
     if not SNAPSHOT_FILE.is_file():
@@ -64,6 +64,13 @@ def validate_production_operator(*, spec: dict[str, object] | None = None) -> Ch
             name="production_operator_surface",
             status="fail",
             message="snapshot production_operator.primary_url mismatch",
+        )
+
+    if production.get("fallback_url") != fallback_url:
+        return CheckResult(
+            name="production_operator_surface",
+            status="fail",
+            message="snapshot production_operator.fallback_url mismatch",
         )
 
     doc_path = REPO_ROOT / "docs" / "PRODUCTION_OPERATOR_SURFACE.md"

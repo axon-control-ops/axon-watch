@@ -50,12 +50,12 @@ _CONNECTORS = {
             "detail": "ok",
         },
         {
-            "connector_id": "axon_local",
-            "display_name": "axon-local (legacy)",
+            "connector_id": "cloudflare_tunnel",
+            "display_name": "Cloudflare tunnel",
             "required": False,
-            "workspace_id": "workspace_axon_local",
-            "status": "unavailable",
-            "detail": "connection refused",
+            "workspace_id": "workspace_axon_watch",
+            "status": "ok",
+            "detail": "active https://axon.example",
         },
     ],
     "count": 2,
@@ -90,7 +90,7 @@ class OperatorBrainGraphTests(unittest.TestCase):
         self.assertIn("core_kairo", node_ids)
         self.assertIn("sig_signal_sentry_spike", node_ids)
         self.assertIn("conn_control_plane", node_ids)
-        self.assertIn("conn_axon_local", node_ids)
+        self.assertIn("conn_cloudflare_tunnel", node_ids)
         self.assertEqual(payload["node_count"], len(payload["nodes"]))
         self.assertEqual(payload["edge_count"], len(payload["edges"]))
 

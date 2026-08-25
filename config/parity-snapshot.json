@@ -1,9 +1,9 @@
 {
   "schema_version": 1,
-  "assessed_on": "2026-07-07",
-  "assessment_scope": "Axon-X v1 parity (Phases A–D, TEST-0–TEST-10) plus Phase G gates TEST-18–TEST-26 on axon-watch/dev",
-  "decision": "bounded_cutover_approved",
-  "full_axon_local_retirement": false,
+  "assessed_on": "2026-08-25",
+  "assessment_scope": "Axon-X v1 parity (Phases A–D, TEST-0–TEST-10) plus Phase G gates TEST-18–TEST-26 on axon-watch/dev; axon-local runtime fallback retired by operator direction",
+  "decision": "axon_local_runtime_retired",
+  "full_axon_local_retirement": true,
   "summary": {
     "total_behaviors": 19,
     "verified_v1": 19,
@@ -69,7 +69,7 @@
       "evidence_gates": ["TEST-2", "P-D4"],
       "evidence": [
         "tests/test_test2_workspace_handoff_acceptance.py",
-        "tests/test_parity_d4_multi_project.py watch→local handoff proof",
+        "tests/test_parity_d4_multi_project.py watch-to-DashPro handoff proof",
         "docs/WORKSPACE_HANDOFF.md"
       ],
       "gap": null
@@ -82,7 +82,7 @@
         "tests/test_test1_workspace_project_connection_acceptance.py",
         "tests/test_parity_d4_multi_project.py bindings + git status proof",
         "config/multi-project-bindings-contract.json",
-        "live git status in workspace_axon_local and workspace_axon_watch"
+        "live git status in workspace_axon_watch and workspace_dashpro"
       ],
       "gap": null
     },
@@ -251,18 +251,12 @@
       "gap": null
     }
   ],
-  "blockers_for_full_retirement": [
-    "WhatsApp Web monitor unmigrated (G4.2 deferred)",
-    "Legacy settings paths without Axon-X owner (G5.1 partial rows)",
-    "Tunnel start/stop dependency on axon-local script (G4.3 partial)",
-    "Operator has not completed one-week :4173-only dry-run (G6.2)",
-    "Operator has not signed PHASE_G5_INTENTIONAL_DISCARDS.md acknowledgments (G5.4)"
-  ],
+  "blockers_for_full_retirement": [],
   "production_operator": {
     "status": "axon_x",
     "declared_on": "2026-07-05",
     "primary_url": "http://127.0.0.1:4173",
-    "fallback_url": "http://127.0.0.1:7734",
+    "fallback_url": null,
     "evidence_gates": ["production-operator"],
     "evidence": [
       "config/operator-production.json",
@@ -275,10 +269,8 @@
     "axon-watch control-plane and axon-watch service thin slices",
     "Cutover verification and planning on axon-watch/docs/planning/"
   ],
-  "axon_local_remains_required_for": [
-    "Explicit fallback when Axon-X capability regresses (see docs/PHASE_G6_RETIREMENT_READINESS.md rollback criteria)",
-    "WhatsApp Web monitor until G4.2 ships or operator signs discard",
-    "Tunnel start/stop when AXON_LOCAL_ROOT script path is required",
-    "Legacy settings/storage paths not yet owned by Axon-X"
+  "axon_local_remains_required_for": [],
+  "future_revisit_notes": [
+    "WhatsApp may be revisited later as a new Axon-X feature; no axon-local runtime, port, workspace binding, or startup fallback is required now."
   ]
 }

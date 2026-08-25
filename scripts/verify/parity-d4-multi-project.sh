@@ -40,7 +40,7 @@ import json
 from pathlib import Path
 
 bindings = json.loads(Path("config/workspace-project-bindings.json").read_text())
-for workspace_id in ("workspace_axon_local", "workspace_axon_watch"):
+for workspace_id in ("workspace_axon_watch", "workspace_dashpro"):
     if workspace_id not in bindings.get("bindings", {}):
         raise SystemExit(f"missing binding: {workspace_id}")
 print("watch + local bindings present")

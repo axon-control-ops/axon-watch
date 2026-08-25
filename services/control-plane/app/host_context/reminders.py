@@ -7,8 +7,12 @@ from typing import Any
 
 from app.persistence import operator_memory_store
 
-WHATSAPP_G42_TITLE = "Revisit WhatsApp soft-cutover (G4.2)"
-WHATSAPP_G42_CONTENT_MARKER = "WhatsApp soft-cutover"
+WHATSAPP_G42_TITLE = "Revisit WhatsApp native slice (G4.2)"
+WHATSAPP_G42_CONTENT_MARKER = "WhatsApp native slice"
+WHATSAPP_G42_LEGACY_MARKERS = (
+    "Revisit WhatsApp soft-cutover (G4.2)",
+    "WhatsApp soft-cutover",
+)
 
 
 def _parse_iso(value: str | None) -> datetime | None:
@@ -138,7 +142,9 @@ def migrate_whatsapp_g42_reminder(*, due_hours: int = 24) -> dict[str, Any] | No
     for item in matches:
         title = str(item.get("title") or "")
         content = str(item.get("content") or "")
-        if WHATSAPP_G42_TITLE.lower() in title.lower() or WHATSAPP_G42_CONTENT_MARKER.lower() in content.lower():
+        haystack = f"{title}\n{content}".lower()
+        markers = (WHATSAPP_G42_TITLE, WHATSAPP_G42_CONTENT_MARKER, *WHATSAPP_G42_LEGACY_MARKERS)
+        if any(marker.lower() in haystack for marker in markers):
             target = item
             break
     due_at = (_utc_now() + timedelta(hours=max(1, int(due_hours)))).replace(microsecond=0).isoformat().replace(
@@ -151,8 +157,8 @@ def migrate_whatsapp_g42_reminder(*, due_hours: int = 24) -> dict[str, Any] | No
             kind="reminder",
             title=WHATSAPP_G42_TITLE,
             content=(
-                "Revisit WhatsApp soft-cutover (G4.2): decide when to re-enable "
-                "axon-local :7735 rollback path alongside Axon-X :7734 proxy."
+                "Revisit WhatsApp native slice (G4.2): decide when to build "
+                "Axon-X WhatsApp monitoring without axon-local fallback."
             ),
             source_refs=[{"kind": "migration", "id": "whatsapp_g42"}],
             created_at=_utc_now().replace(microsecond=0).isoformat().replace("+00:00", "Z"),
@@ -171,5 +177,9 @@ def migrate_whatsapp_g42_reminder(*, due_hours: int = 24) -> dict[str, Any] | No
             "priority": "high",
             "status": "open" if str(target.get("status") or "open") in {"", "open"} else target.get("status"),
             "title": WHATSAPP_G42_TITLE,
+            "content": (
+                "Revisit WhatsApp native slice (G4.2): decide when to build "
+                "Axon-X WhatsApp monitoring without axon-local fallback."
+            ),
         },
     )

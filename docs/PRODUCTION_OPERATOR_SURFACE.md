@@ -2,7 +2,7 @@
 
 **Declared:** 2026-07-05  
 **Primary URL:** http://127.0.0.1:4173  
-**Fallback URL:** http://127.0.0.1:7734 (axon-local, legacy connectors only)
+**Fallback URL:** none (`axon-local` runtime retired in this repo)
 
 ## Decision
 
@@ -25,22 +25,19 @@ Open: **http://127.0.0.1:4173**
 | axon-local `:7734` = production reference | Axon-X `:4173` = production operator surface |
 | Axon-X = primary **development** only | Axon-X = primary **operator** surface |
 | Parity blocker: operator sign-off pending | **Resolved** — production declared |
+| axon-local fallback / soft proxy | **Removed** — no `:7734` startup path |
 
-## Fallback (axon-local :7734)
+## Fallback
 
-Keep axon-local available for:
-
-- Legacy connector paths not yet bound in Axon-X
-- Child-project integration surfaces not migrated
-- Capability-scoped rollback per `docs/planning/TRANSITION_ARCHITECTURE.md`
-
-axon-local is **not** the default starting point for operator work anymore.
+There is no active `axon-local` fallback from this repo. If a capability regresses,
+fix or disable the Axon-X capability directly. WhatsApp can be revisited later as
+a fresh Axon-X-native feature.
 
 ## How to use it (5 minutes)
 
 ### 1. Pick your real workspace
 
-After refresh, the left sidebar shows **axon-watch**, **axon-local**, and **DashPro**
+After refresh, the left sidebar shows **axon-watch** and **DashPro**
 (not the old demo names like `workspace_nlp`). Start with **axon-watch**.
 
 If you still see demo workspaces, hard-refresh the browser (`Ctrl+Shift+R`) to load
@@ -52,7 +49,7 @@ Use this for day-to-day ops:
 
 | Region | What to do |
 |---|---|
-| **Left → Workspaces** | Select `axon-watch`, `axon-local`, or `DashPro` |
+| **Left → Workspaces** | Select `axon-watch` or `DashPro` |
 | **Left → Attention** | Signals, approvals, delivery badges |
 | **Center** | Mission control — run phase, live feed, **Resume / Complete** |
 | **Right → Conversation** | Type **commands** (see below) — not free-form chat yet |
@@ -75,8 +72,8 @@ The command seam accepts **exact commands** only. Natural language will fail.
 
 **Footer → Commands** opens the supported-command list. **Run** submits immediately.
 
-Mission Control includes a **Connectors** rail (`GET /api/connectors`) with **Reprobe**,
-**Refresh summary**, and **Open :7734 fallback** for the legacy axon-local connector.
+Mission Control includes a **Connectors** rail (`GET /api/connectors`) with
+**Reprobe**, **Refresh summary**, and native Cloudflare tunnel start/stop actions.
 
 Full guide: `docs/HOW-TO-HANDBOOK.md` → **Quick Start**.
 
@@ -109,16 +106,15 @@ Checks:
 
 1. `./scripts/dev/check-health.sh` — all three services + key APIs
 2. TEST-0 live acceptance (`workspace_smoke`)
-3. TEST-1 live acceptance (dual-workspace bindings + `git status`)
+3. TEST-1 live acceptance (Axon-X/DashPro bindings + `git status`)
 4. Production config contract (`config/operator-production.json`)
 
 Full regression still available via `npm run verify:phase-d`.
 
-## Stop / switch back
+## Stop
 
 ```bash
 ./scripts/dev/down.sh        # stop Axon-X stack
-cd ../axon-local && ./start.sh --no-open   # fallback only if needed
 ```
 
 ## Machine-readable config

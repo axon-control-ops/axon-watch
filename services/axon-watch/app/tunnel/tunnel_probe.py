@@ -276,17 +276,6 @@ def build_tunnel_diagnostics(config: dict[str, object] | None = None) -> dict[st
     if public_health_url and process_running and tunnel_mode == "named":
         public_ok, public_latency_ms, public_detail = _probe_public_axon_x(public_health_url)
 
-    soft_origin_cutover = bool(
-        public_ok
-        and remote_service
-        and not ingress_matches_axon
-        and remote_service.rstrip("/")
-        in {
-            "http://localhost:7734",
-            "http://127.0.0.1:7734",
-        }
-    )
-
     if not binary_path:
         status = "unavailable"
         detail = "cloudflared binary not found"
@@ -306,7 +295,6 @@ def build_tunnel_diagnostics(config: dict[str, object] | None = None) -> dict[st
             tunnel_mode == "named"
             and remote_service
             and not ingress_matches_axon
-            and not soft_origin_cutover
         ):
             detail = (
                 f"{detail}; remote ingress still points at {remote_service}; "
@@ -330,7 +318,6 @@ def build_tunnel_diagnostics(config: dict[str, object] | None = None) -> dict[st
         tunnel_mode == "named"
         and remote_service
         and not ingress_matches_axon
-        and not soft_origin_cutover
     ):
         status = "degraded"
         detail = (
@@ -342,12 +329,7 @@ def build_tunnel_diagnostics(config: dict[str, object] | None = None) -> dict[st
         detail = "tunnel process up; trycloudflare URL not found in logs"
     else:
         status = "ok"
-        if soft_origin_cutover:
-            detail = (
-                f"active soft cutover (remote={remote_service}; "
-                f"public={public_detail})"
-            )
-        elif tunnel_url:
+        if tunnel_url:
             detail = f"active {tunnel_url}"
         else:
             detail = "tunnel process running"
@@ -383,7 +365,6 @@ def build_tunnel_diagnostics(config: dict[str, object] | None = None) -> dict[st
             "remote_ingress_hostname": remote_hostname,
             "remote_ingress_service": remote_service,
             "ingress_matches_axon": ingress_matches_axon,
-            "soft_origin_cutover": soft_origin_cutover,
             "control_backend": "native",
             "managed_process": bool(managed_process["managed"]),
             "managed_pid": managed_process["pid"],

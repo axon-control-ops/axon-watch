@@ -105,8 +105,8 @@ export function buildIdeRunPanelConnectorNotice(input: {
     return {
       tone: 'neutral',
       lines: [
-        'Legacy Axon Local is offline — Axon-X stack is healthy.',
-        'Optional connector only — reprobe or open :7734 fallback when needed.',
+        'Optional connector is offline — Axon-X stack is healthy.',
+        'Optional connector only — reprobe after fixing credentials, network, or the downstream service.',
         'Editor status bar LEGACY OFFLINE chip · footer chip · quick guide Open connectors.',
       ],
       actionLabel: 'Open connectors',
