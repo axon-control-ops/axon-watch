@@ -110,6 +110,28 @@ describe('terminal-scrollback', () => {
     expect(cleaned).toBe('PASS tests/unit/foo.test.ts');
   });
 
+  it('shows the final carriage-return frame in chat terminal cards', () => {
+    const noisy = [
+      'Installing 10%',
+      'Downloading 20%\rDownloading 70%\rDownloaded 100%',
+      'Done',
+    ].join('\n');
+
+    const cleaned = sanitizeTerminalDisplayOutput(noisy, 'npm run build');
+
+    expect(cleaned).toContain('Downloaded 100%');
+    expect(cleaned).not.toContain('Downloading 20%');
+    expect(cleaned).not.toContain('Downloading 70%');
+  });
+
+  it('applies backspace overstrikes before rendering terminal card output', () => {
+    const cleaned = sanitizeTerminalDisplayOutput('error\b\b ok\nnext', 'npm test');
+
+    expect(cleaned).toContain('err ok');
+    expect(cleaned).toContain('next');
+    expect(cleaned).not.toContain('\b');
+  });
+
   it('does not eat the leading letter of ordinary bracketed words', () => {
     // Regression: the orphan-CSI pattern matched "[o" inside "[operator_blocker]"
     // (zero digits before a letter looks the same as a real zero-param CSI final

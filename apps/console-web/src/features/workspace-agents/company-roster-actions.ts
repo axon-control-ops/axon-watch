@@ -363,7 +363,7 @@ export function employeeQuickActions(
   } else if (surface === 'briefing') {
     actions.push({
       id: 'briefing',
-      label: 'Briefing',
+      label: 'Lead report',
       kind: 'surface',
       surface: 'briefing',
     });

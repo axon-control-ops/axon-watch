@@ -53,7 +53,7 @@ function dismiss(): void {
   <article
     class="vaxon-roster-voice-dock"
     :data-speaking="speaking ? 'true' : 'false'"
-    aria-label="Reply to VAXON"
+    aria-label="VAXON voice and report panel"
   >
     <header class="vaxon-roster-voice-dock__header">
       <div class="vaxon-roster-voice-dock__avatar-wrap" aria-hidden="true">
@@ -67,27 +67,33 @@ function dismiss(): void {
         >
         <span class="vaxon-roster-voice-dock__orb-ring" />
       </div>
-      <div>
+      <div class="vaxon-roster-voice-dock__heading">
         <p class="vaxon-roster-voice-dock__eyebrow">
           {{
             speaking
               ? 'VAXON · speaking'
               : remainingSeconds > 0
                 ? `VAXON · reply window · ${remainingSeconds}s`
-                : 'VAXON · briefing'
+                : 'VAXON · report ready'
           }}
         </p>
         <h4 class="vaxon-roster-voice-dock__title">
-          {{ speaking ? 'Briefing you now' : 'Your response' }}
+          {{ speaking ? 'Live voice briefing' : 'VAXON report channel' }}
         </h4>
       </div>
+      <span class="vaxon-roster-voice-dock__status-pill">
+        {{ pending ? 'Sending' : speaking ? 'Live' : remainingSeconds > 0 ? 'Reply' : 'Ready' }}
+      </span>
     </header>
 
-    <p v-if="line" class="vaxon-roster-voice-dock__line">{{ line }}</p>
+    <section v-if="line" class="vaxon-roster-voice-dock__transcript" aria-label="Latest VAXON message">
+      <p class="vaxon-roster-voice-dock__transcript-label">Latest signal</p>
+      <p class="vaxon-roster-voice-dock__line">{{ line }}</p>
+    </section>
 
-    <div class="vaxon-roster-voice-dock__quick-actions">
-      <button type="button" :disabled="pending" @click="openBriefing">
-        Open briefing
+    <div class="vaxon-roster-voice-dock__quick-actions vaxon-roster-voice-dock__quick-actions--primary">
+      <button type="button" class="vaxon-roster-voice-dock__primary-action" :disabled="pending" @click="openBriefing">
+        Open VAXON report
       </button>
       <button type="button" :disabled="pending" @click="dismiss">
         Dismiss

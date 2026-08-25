@@ -315,14 +315,14 @@ onUnmounted(() => {
             'status-bar-mockup__chip--kairo-warning':
               shell.kairoBriefingAttention.severity === 'warning',
           }"
-          :aria-label="`${shell.kairoBriefingAttentionLabel}. Open operator briefing.`"
-          :title="shell.kairoBriefingAttentionLabel"
+          :aria-label="`${shell.kairoBriefingAttentionLabel}. Open VAXON report.`"
+          :title="`${shell.kairoBriefingAttentionLabel}. Opens the VAXON report panel.`"
           @click="shell.focusKairoBriefing()"
         >
           <span class="status-bar-mockup__kairo-pulse" aria-hidden="true" />
           <span class="status-bar-mockup__icon status-bar-mockup__icon--kairo" aria-hidden="true" />
           <span class="status-bar-mockup__chip-label">
-            Open <PersonaTitle suffix="Briefing" mark-size="xs" />
+            Open <PersonaTitle suffix="Report" mark-size="xs" />
           </span>
           <span class="status-bar-mockup__chip-badge" aria-hidden="true">
             {{ shell.kairoBriefingAttention.badgeCount }}

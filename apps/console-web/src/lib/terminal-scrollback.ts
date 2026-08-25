@@ -25,6 +25,29 @@ const SINGLE_SHELL_PROMPT_LINE = /^[^\s]+@[^\s:]+:.*\$\s*$/;
 
 const CONCATENATED_SHELL_PROMPT_LINE = /^([^\s]+@[^\s:]+:.*\$\s*)+$/;
 
+function applyBackspaceOverstrikes(text: string): string {
+  const out: string[] = [];
+  for (const char of String(text || '')) {
+    if (char === '\b' || char === '\u007f') {
+      out.pop();
+      continue;
+    }
+    out.push(char);
+  }
+  return out.join('');
+}
+
+function normalizeCarriageReturnFrames(text: string): string {
+  return String(text || '')
+    .replace(/\r\n/g, '\n')
+    .split('\n')
+    .map((line) => {
+      const frames = line.split('\r');
+      return frames[frames.length - 1] ?? '';
+    })
+    .join('\n');
+}
+
 export function stripAnsi(text: string): string {
   return String(text || '')
     .replace(OSC_SEQUENCE_PATTERN, '')
@@ -116,7 +139,7 @@ export function compactTestRunnerOutput(text: string): string {
 }
 
 export function sanitizeTerminalDisplayOutput(text: string, command = ''): string {
-  const normalized = String(text || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+  const normalized = normalizeCarriageReturnFrames(applyBackspaceOverstrikes(text));
   const cleaned = normalized
     .split('\n')
     .map((line) => cleanTerminalDisplayLine(line))

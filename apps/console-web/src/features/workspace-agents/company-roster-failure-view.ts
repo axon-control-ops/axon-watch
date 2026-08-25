@@ -99,7 +99,7 @@ export function employeeFailureLine(
       return usageFailureCopy(employee.last_outcome_detail);
     }
     if (isMissingConfidenceFailure(employee.last_outcome_detail)) {
-      return 'Last job almost finished — the closing Confidence line was missing. Tap Try again to close it out.';
+      return 'Last job reply was generated, but acceptance failed because the closing Confidence line was missing. Tap Try again to close it out.';
     }
     if (isRuntimeAuthProbeFailure(employee.last_outcome_detail)) {
       return 'Last job could not run — Cursor CLI auth timed out. Check runtime on the host, then tap Try again.';
@@ -161,7 +161,7 @@ export function employeeFailureDetailTooltip(
     return `Signed-in ${runtime} account quota blocked this shift — switch runtime or enable Auto failover, then retry.`;
   }
   if (isMissingConfidenceFailure(employee.last_outcome_detail)) {
-    return 'Closing Confidence line was missing after real work. Retry to close the Critical Review.';
+    return 'The agent runtime produced a reply, but Gate 6/Critical Review rejected it because the final line was not `Confidence: N/10`. Retry should only close the report format.';
   }
   const detail = employeeResolvedFailureDetail(employee);
   return detail || undefined;
