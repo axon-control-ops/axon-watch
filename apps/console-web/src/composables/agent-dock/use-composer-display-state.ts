@@ -198,6 +198,7 @@ export function useComposerDisplayState(options: UseComposerDisplayStateOptions)
     },
   });
   const instructionsGenerating = ref(false);
+  const instructionsGenerationId = ref(0);
   const instructionsSpecialistLabel = computed(() => {
     return formatInstructionsSpecialistLabel(shell.activeIdeEmployeeRecord);
   });
@@ -213,6 +214,10 @@ export function useComposerDisplayState(options: UseComposerDisplayStateOptions)
     const workspaceId = workspace?.workspace_id;
     const source = composerDraftModel.value.trim();
     if (!workspaceId || !source || instructionsGenerating.value) return;
+    const generationId = instructionsGenerationId.value + 1;
+    const originEmployeeId = shell.activeIdeEmployeeRecord?.employee_id ?? null;
+    const originMode = composerMode.value;
+    instructionsGenerationId.value = generationId;
     instructionsGenerating.value = true;
     try {
       const result = await generateInstructions({
@@ -230,8 +235,16 @@ export function useComposerDisplayState(options: UseComposerDisplayStateOptions)
       if (!markdown) {
         throw new Error('Instruction generation returned empty markdown');
       }
-      composerDraftModel.value = markdown.endsWith('\n') ? markdown : `${markdown}\n`;
-      await nextTick(syncComposerHeight);
+      const stillCurrent =
+        instructionsGenerationId.value === generationId &&
+        shell.currentWorkspace?.workspace_id === workspaceId &&
+        (shell.activeIdeEmployeeRecord?.employee_id ?? null) === originEmployeeId &&
+        composerMode.value === originMode &&
+        composerDraftModel.value.trim() === source;
+      if (stillCurrent) {
+        composerDraftModel.value = markdown.endsWith('\n') ? markdown : `${markdown}\n`;
+        await nextTick(syncComposerHeight);
+      }
     } catch (error) {
       shell.commandMutationError = error instanceof Error
         ? error.message
