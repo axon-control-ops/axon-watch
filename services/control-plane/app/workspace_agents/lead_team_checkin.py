@@ -29,6 +29,8 @@ from app.workspace_agents.lead_checkin_assign import (
 )
 from app.workspace_agents.lead_checkin_report import format_lead_checkin_message
 from app.workspace_agents.autonomous_attention_policy import attention_finding_auto_dispatches
+from app.workspace_agents.lead_failure_diagnosis import diagnose_lead_failure
+from app.workspace_agents.recovery_decision import render_decision_fence
 from app.workspace_agents.run_outcome import latest_role_run_outcome
 
 logger = logging.getLogger(__name__)
@@ -198,12 +200,25 @@ def collect_failed_shift_findings(workspace_id: str) -> list[LeadCheckinFinding]
         # latest_role_run_outcome already ran normalize_operator_failure_detail +
         # truncation — re-normalizing here was redundant work on already-clean text.
         detail = str(outcome.get("detail") or "")
-        if role == "lead":
-            owner_role, escalate_only = "watcher", True
-        else:
-            owner_role, escalate_only = assign_owner_role_for_failed_shift(role, detail)
         run_id = str(outcome.get("run_id") or "").strip() or "unknown"
         name = str(employee.name or role).strip() or role
+        decision_fence = ""
+        if role == "lead":
+            # Diagnose instead of unconditionally escalating: a Lead has no
+            # peer specialist of its own, so a routable/transient failure is
+            # sent to watcher to investigate; only a genuine operator-only
+            # gate (blocked/decision_required/failed) escalates. See
+            # lead_failure_diagnosis.py for the root-cause writeup.
+            decision = diagnose_lead_failure(
+                workspace_id=workspace_id,
+                run_id=run_id,
+                detail=detail,
+            )
+            owner_role = "watcher"
+            escalate_only = decision.operator_action_required
+            decision_fence = render_decision_fence(decision)
+        else:
+            owner_role, escalate_only = assign_owner_role_for_failed_shift(role, detail)
         # Soft key omits run_id so the same role failure does not stack Needs-you cards.
         findings.append(
             LeadCheckinFinding(
@@ -220,6 +235,7 @@ def collect_failed_shift_findings(workspace_id: str) -> list[LeadCheckinFinding]
                         if role == "lead"
                         else ""
                     )
+                    + decision_fence
                 ),
                 dedupe_key=f"failed_shift:{workspace_id}:{role}",
                 escalate_only=escalate_only,
