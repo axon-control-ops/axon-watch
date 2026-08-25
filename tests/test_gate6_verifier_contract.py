@@ -22,6 +22,7 @@ from app.runs.service import (  # noqa: E402
 from app.workspace_agents.verifier_contract import (  # noqa: E402
     ensure_acceptance_before_publish,
     has_passing_acceptance_evidence,
+    latest_acceptance_evidence,
     record_acceptance_evidence,
 )
 
@@ -95,14 +96,46 @@ class Gate6VerifierContractTests(unittest.TestCase):
         reviewed = mark_review_ready(str(created["run_id"]))
         self.assertEqual("review_ready", reviewed["phase"])
 
-    def test_ensure_acceptance_records_inspect_fallback_for_empty_root(self) -> None:
+    def test_ensure_acceptance_records_inconclusive_for_empty_root(self) -> None:
         created = self._leased_executing_run()
         run_id = str(created["run_id"])
         with tempfile.TemporaryDirectory() as tmp:
             ensure_acceptance_before_publish(run_id, workspace_root=tmp)
-        self.assertTrue(has_passing_acceptance_evidence(run_id))
-        completed = complete_run(run_id)
-        self.assertEqual("completed", completed["phase"])
+        latest = latest_acceptance_evidence(run_id)
+        self.assertIsNotNone(latest)
+        self.assertFalse(has_passing_acceptance_evidence(run_id))
+        self.assertIn("proof=INCONCLUSIVE", latest["receipt"]["summary"])
+        self.assertIn("project_contract_unavailable", latest["receipt"]["summary"])
+        with self.assertRaises(RunLifecycleError):
+            complete_run(run_id)
+
+    def test_ensure_acceptance_records_inconclusive_for_missing_root(self) -> None:
+        created = self._leased_executing_run()
+        run_id = str(created["run_id"])
+        ensure_acceptance_before_publish(run_id, workspace_root="/definitely/not/axon")
+        latest = latest_acceptance_evidence(run_id)
+
+        self.assertIsNotNone(latest)
+        self.assertFalse(has_passing_acceptance_evidence(run_id))
+        self.assertIn("proof=INCONCLUSIVE", latest["receipt"]["summary"])
+
+    def test_ensure_acceptance_records_inconclusive_for_missing_contract(self) -> None:
+        created = self._leased_executing_run()
+        run_id = str(created["run_id"])
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / ".git").mkdir()
+            ensure_acceptance_before_publish(
+                run_id,
+                workspace_root=root,
+                changed_paths=[],
+            )
+        latest = latest_acceptance_evidence(run_id)
+
+        self.assertIsNotNone(latest)
+        self.assertFalse(has_passing_acceptance_evidence(run_id))
+        self.assertIn("proof=INCONCLUSIVE", latest["receipt"]["summary"])
+        self.assertIn("project_contract_unavailable", latest["receipt"]["summary"])
 
     def test_ensure_acceptance_fails_closed_on_secrets(self) -> None:
         created = self._leased_executing_run()
@@ -175,6 +208,9 @@ class Gate6VerifierContractTests(unittest.TestCase):
                 changed_paths=["src/unrelated.ts"],
             )
         self.assertTrue(has_passing_acceptance_evidence(run_id))
+        latest = latest_acceptance_evidence(run_id)
+        self.assertIsNotNone(latest)
+        self.assertIn("proof=VERIFIED", latest["receipt"]["summary"])
         completed = complete_run(run_id)
         self.assertEqual("completed", completed["phase"])
 

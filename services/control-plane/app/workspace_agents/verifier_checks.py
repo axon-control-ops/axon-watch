@@ -15,6 +15,10 @@ from app.workspace_agents.diff_policy import (
 
 VERIFIER_IDENTITY = "verifier"
 IMPLEMENTER_ROLES = frozenset({"implementer", "worker", "coder", "agent"})
+PROOF_VERIFIED = "VERIFIED"
+PROOF_INSPECTED_ONLY = "INSPECTED_ONLY"
+PROOF_INCONCLUSIVE = "INCONCLUSIVE"
+PROOF_REJECTED = "REJECTED"
 
 
 @dataclass
@@ -24,6 +28,7 @@ class CheckResult:
     command: str = ""
     output_excerpt: str = ""
     actor: str = VERIFIER_IDENTITY
+    executed: bool = False
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -36,12 +41,14 @@ class AcceptanceEvaluation:
     checks: list[CheckResult] = field(default_factory=list)
     policy_findings: list[DiffPolicyFinding] = field(default_factory=list)
     actor: str = VERIFIER_IDENTITY
+    proof_strength: str = PROOF_INCONCLUSIVE
 
     def to_dict(self) -> dict[str, Any]:
         return {
             "passed": self.passed,
             "summary": self.summary,
             "actor": self.actor,
+            "proof_strength": self.proof_strength,
             "checks": [check.to_dict() for check in self.checks],
             "policy_findings": [
                 {"code": f.code, "path": f.path, "detail": f.detail}
@@ -85,6 +92,13 @@ def evaluate_check_outputs(
         result = results_by_name.get(name) or {}
         passed = bool(result.get("passed"))
         excerpt = str(result.get("output_excerpt") or result.get("output") or "")[:2000]
+        executed = bool(result.get("executed"))
+        if "executed" not in result:
+            executed = bool(
+                command
+                and not command.startswith("<missing command:")
+                and name in results_by_name
+            )
         checks.append(
             CheckResult(
                 name=name,
@@ -92,6 +106,7 @@ def evaluate_check_outputs(
                 command=command,
                 output_excerpt=excerpt,
                 actor=actor,
+                executed=executed,
             )
         )
     return checks
@@ -130,17 +145,36 @@ def evaluate_acceptance(
         findings.extend(evaluate_diff_texts(path_to_text))
 
     failed_checks = [c.name for c in checks if not c.passed]
-    passed = not failed_checks and not findings
+    executed_checks = [c.name for c in checks if c.executed]
+    unavailable_reason = str(contract.get("verification_unavailable_reason") or "").strip()
+    inspect_only = bool(contract.get("inspect_only"))
+    if failed_checks or findings:
+        proof_strength = PROOF_REJECTED
+    elif unavailable_reason:
+        proof_strength = PROOF_INCONCLUSIVE
+    elif inspect_only:
+        proof_strength = PROOF_INSPECTED_ONLY
+    elif executed_checks:
+        proof_strength = PROOF_VERIFIED
+    else:
+        proof_strength = PROOF_INCONCLUSIVE
+
+    passed = proof_strength == PROOF_VERIFIED
     if passed:
-        summary = "acceptance=pass · " + ",".join(c.name for c in checks) or "checks"
+        summary = "acceptance=pass · proof=VERIFIED · checks=" + ",".join(executed_checks)
     else:
         parts = []
+        parts.append(f"proof={proof_strength}")
         if failed_checks:
             parts.append("failed_checks=" + ",".join(failed_checks))
         if findings:
             parts.append(
                 "policy=" + ",".join(sorted({f.code for f in findings}))
             )
+        if unavailable_reason:
+            parts.append(f"reason={unavailable_reason}")
+        if not failed_checks and not findings and not executed_checks:
+            parts.append("checks=none")
         summary = "acceptance=fail · " + "; ".join(parts)
     return AcceptanceEvaluation(
         passed=passed,
@@ -148,6 +182,7 @@ def evaluate_acceptance(
         checks=checks,
         policy_findings=findings,
         actor=actor,
+        proof_strength=proof_strength,
     )
 
 

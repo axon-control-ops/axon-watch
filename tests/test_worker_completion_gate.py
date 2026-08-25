@@ -64,13 +64,13 @@ class WorkerCompletionGateTests(unittest.TestCase):
         return str(run["run_id"])
 
     def _pass_acceptance(self, run_id: str, *, with_checks: bool = False) -> None:
-        append_run_execution_receipt(
+        from app.workspace_agents.verifier_contract import record_acceptance_evidence
+
+        record_acceptance_evidence(
             run_id,
-            receipt_type="acceptance_evidence",
-            receipt_summary="acceptance=pass · targeted checks passed",
+            passed=True,
+            summary="targeted checks passed",
             actor="verifier",
-            success=True,
-            intent="gate6_acceptance",
         )
         if with_checks:
             append_run_execution_receipt(

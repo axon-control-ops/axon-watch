@@ -332,7 +332,12 @@ def build_verification_acceptance_evaluation(
     """Build Gate 6 evidence from terminal receipts rather than source diffs."""
     from app.persistence import run_store
     from app.runs.service import get_run
-    from app.workspace_agents.verifier_checks import VERIFIER_IDENTITY
+    from app.workspace_agents.verifier_checks import (
+        PROOF_INCONCLUSIVE,
+        PROOF_REJECTED,
+        PROOF_VERIFIED,
+        VERIFIER_IDENTITY,
+    )
 
     commands = verification_commands_for_task(task)
     jobs = verification_terminal_jobs_for_run(str(task.get("workspace_id") or ""), run_id)
@@ -352,6 +357,7 @@ def build_verification_acceptance_evaluation(
         {
             "name": "verification_terminal_job",
             "passed": True,
+            "executed": True,
             "detail": str(job.get("command") or job.get("job_id") or "terminal job"),
         }
         for job in passed
@@ -362,21 +368,26 @@ def build_verification_acceptance_evaluation(
             f"{describe_failed_jobs(failed)}"
         )
         passed_gate = False
+        proof_strength = PROOF_REJECTED
     elif len(passed) >= required and required > 0:
-        summary = f"acceptance=pass · verification jobs={len(passed)}/{required}"
+        summary = f"acceptance=pass · proof=VERIFIED · verification jobs={len(passed)}/{required}"
         passed_gate = True
+        proof_strength = PROOF_VERIFIED
     elif not jobs and enqueued == 0:
         summary = "acceptance=fail · no verification terminal jobs recorded"
         checks = []
         passed_gate = False
+        proof_strength = PROOF_INCONCLUSIVE
     else:
         summary = f"acceptance=fail · verification jobs incomplete ok={len(passed)}/{required}"
         passed_gate = False
+        proof_strength = PROOF_INCONCLUSIVE
     return {
         "passed": passed_gate,
         "summary": summary,
         "checks": checks,
         "actor": VERIFIER_IDENTITY,
+        "proof_strength": proof_strength,
     }
 
 

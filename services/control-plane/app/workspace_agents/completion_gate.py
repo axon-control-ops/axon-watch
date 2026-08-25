@@ -270,22 +270,22 @@ def _validation_status(run_id: str, task: dict[str, Any]) -> tuple[bool, str]:
         return False, "missing verification terminal job receipts"
 
     history = run_store.list_history(str(run.get("history_ref") or ""))
-    latest_acceptance = None
     has_check_outputs = False
     for item in history:
         receipt = item.get("receipt") if isinstance(item, dict) else None
         if not isinstance(receipt, dict):
             continue
         receipt_type = str(receipt.get("type") or "")
-        summary = str(receipt.get("summary") or "")
-        if receipt_type == "acceptance_evidence":
-            latest_acceptance = receipt
         if receipt_type == "acceptance_check_outputs" and bool(receipt.get("success", True)):
             has_check_outputs = True
+    from app.workspace_agents.verifier_contract import latest_acceptance_evidence
+
+    latest_acceptance = latest_acceptance_evidence(run_id)
     if latest_acceptance is None:
         return False, "missing acceptance_evidence receipt"
-    if "acceptance=pass" not in str(latest_acceptance.get("summary") or ""):
-        return False, str(latest_acceptance.get("summary") or "acceptance did not pass")
+    receipt = latest_acceptance.get("receipt") if isinstance(latest_acceptance, dict) else {}
+    if not latest_acceptance.get("passed"):
+        return False, str((receipt or {}).get("summary") or "acceptance did not pass")
 
     blob = " ".join(
         str(task.get(key) or "") for key in ("goal", "acceptance_criteria")

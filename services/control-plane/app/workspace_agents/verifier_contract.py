@@ -18,6 +18,7 @@ logger = logging.getLogger(__name__)
 ACCEPTANCE_RECEIPT_TYPE = "acceptance_evidence"
 ACCEPTANCE_PASS_MARKER = "acceptance=pass"
 ACCEPTANCE_FAIL_MARKER = "acceptance=fail"
+ACCEPTANCE_VERIFIED_MARKER = "proof=VERIFIED"
 
 
 def record_acceptance_evidence(
@@ -26,14 +27,22 @@ def record_acceptance_evidence(
     passed: bool,
     summary: str,
     actor: str = "verifier",
+    proof_strength: str | None = None,
 ) -> dict[str, Any]:
     """Persist a machine-checkable acceptance receipt on the run history."""
     from app.runs.service import append_run_execution_receipt
-    from app.workspace_agents.verifier_checks import assert_verifier_identity
+    from app.workspace_agents.verifier_checks import (
+        PROOF_REJECTED,
+        PROOF_VERIFIED,
+        assert_verifier_identity,
+    )
 
     assert_verifier_identity(actor)
     marker = ACCEPTANCE_PASS_MARKER if passed else ACCEPTANCE_FAIL_MARKER
+    proof = str(proof_strength or (PROOF_VERIFIED if passed else PROOF_REJECTED)).strip()
     cleaned = " ".join(str(summary or "").split()) or "acceptance evidence"
+    if "proof=" not in cleaned:
+        cleaned = f"proof={proof} · {cleaned}"
     return append_run_execution_receipt(
         run_id,
         receipt_type=ACCEPTANCE_RECEIPT_TYPE,
@@ -58,6 +67,7 @@ def record_acceptance_evaluation(run_id: str, evaluation: dict[str, Any]) -> dic
         passed=passed,
         summary=summary,
         actor=actor,
+        proof_strength=str(evaluation.get("proof_strength") or ""),
     )
     checks = evaluation.get("checks") or []
     if checks:
@@ -89,7 +99,10 @@ def latest_acceptance_evidence(run_id: str) -> dict[str, Any] | None:
         return {
             "receipt": receipt,
             "entry": entry,
-            "passed": ACCEPTANCE_PASS_MARKER in str(receipt.get("summary") or ""),
+            "passed": (
+                ACCEPTANCE_PASS_MARKER in str(receipt.get("summary") or "")
+                and ACCEPTANCE_VERIFIED_MARKER in str(receipt.get("summary") or "")
+            ),
         }
     return None
 
@@ -216,7 +229,7 @@ def ensure_acceptance_before_publish(
                 ]
 
     if root is None:
-        contract = inspect_fallback_contract()
+        contract = inspect_fallback_contract("workspace_root_unavailable")
         mode = "inspect_fallback_no_root"
         check_results: dict[str, dict[str, Any]] = {}
         path_to_text: dict[str, str] = {}
@@ -232,7 +245,7 @@ def ensure_acceptance_before_publish(
             mode = "contract"
         except ProjectContractError as exc:
             logger.info("Gate 6 using inspect fallback for %s: %s", run_id, exc)
-            contract = inspect_fallback_contract()
+            contract = inspect_fallback_contract("project_contract_unavailable")
             mode = "inspect_fallback_no_contract"
             check_results = {}
             path_to_text = read_path_texts(root, paths)

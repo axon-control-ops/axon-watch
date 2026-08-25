@@ -19,6 +19,10 @@ from app.project_contract.loader import (  # noqa: E402
 )
 from app.workspace_agents.diff_policy import evaluate_changed_paths, evaluate_diff_texts  # noqa: E402
 from app.workspace_agents.verifier_checks import (  # noqa: E402
+    PROOF_INCONCLUSIVE,
+    PROOF_INSPECTED_ONLY,
+    PROOF_REJECTED,
+    PROOF_VERIFIED,
     evaluate_acceptance,
 )
 
@@ -147,14 +151,98 @@ class Gate6VerifierCheckEvalTests(unittest.TestCase):
         passed = evaluate_acceptance(
             contract=contract,
             check_results={
-                "lint": {"passed": True, "output_excerpt": "ok"},
-                "test": {"passed": True, "output_excerpt": "ok"},
+                "lint": {"passed": True, "executed": True, "output_excerpt": "ok"},
+                "test": {"passed": True, "executed": True, "output_excerpt": "ok"},
             },
             changed_paths=["apps/console-web/src/App.vue"],
             task_allowed_paths=task_scope,
             path_to_text={"apps/console-web/src/App.vue": "export const ok = true"},
         )
         self.assertTrue(passed.passed)
+        self.assertEqual(PROOF_VERIFIED, passed.proof_strength)
+
+    def test_zero_check_inspect_only_never_verifies(self) -> None:
+        evaluated = evaluate_acceptance(
+            contract={
+                "project_id": "inspect",
+                "certification_level": "inspect_only",
+                "inspect_only": True,
+                "commands": {},
+                "allowed_paths": [],
+                "forbidden_path_globs": [],
+                "verifier": {"required_checks": []},
+            },
+            check_results={},
+            changed_paths=[],
+        )
+
+        self.assertFalse(evaluated.passed)
+        self.assertEqual(PROOF_INSPECTED_ONLY, evaluated.proof_strength)
+        self.assertIn("proof=INSPECTED_ONLY", evaluated.summary)
+
+    def test_missing_contract_fallback_is_inconclusive_without_policy_failure(self) -> None:
+        evaluated = evaluate_acceptance(
+            contract={
+                "project_id": "inspect",
+                "certification_level": "inspect_only",
+                "inspect_only": True,
+                "verification_unavailable_reason": "project_contract_unavailable",
+                "commands": {},
+                "allowed_paths": [],
+                "forbidden_path_globs": [],
+                "verifier": {"required_checks": []},
+            },
+            check_results={},
+            changed_paths=[],
+        )
+
+        self.assertFalse(evaluated.passed)
+        self.assertEqual(PROOF_INCONCLUSIVE, evaluated.proof_strength)
+        self.assertIn("project_contract_unavailable", evaluated.summary)
+
+    def test_skipped_only_checks_are_inconclusive(self) -> None:
+        evaluated = evaluate_acceptance(
+            contract={
+                "project_id": "demo",
+                "certification_level": "build",
+                "inspect_only": False,
+                "commands": {"build": ["npm run build"]},
+                "allowed_paths": ["services/"],
+                "forbidden_path_globs": [],
+                "verifier": {"required_checks": ["build"]},
+            },
+            check_results={
+                "build": {
+                    "passed": True,
+                    "executed": False,
+                    "output_excerpt": "skipped: no console-web changes",
+                }
+            },
+            changed_paths=["services/control-plane/app/example.py"],
+        )
+
+        self.assertFalse(evaluated.passed)
+        self.assertEqual(PROOF_INCONCLUSIVE, evaluated.proof_strength)
+        self.assertIn("checks=none", evaluated.summary)
+
+    def test_policy_findings_reject_even_without_checks(self) -> None:
+        evaluated = evaluate_acceptance(
+            contract={
+                "project_id": "inspect",
+                "certification_level": "inspect_only",
+                "inspect_only": True,
+                "commands": {},
+                "allowed_paths": [],
+                "forbidden_path_globs": ["**/secrets/**"],
+                "verifier": {"required_checks": []},
+            },
+            check_results={},
+            changed_paths=["secrets/token"],
+        )
+
+        self.assertFalse(evaluated.passed)
+        self.assertEqual(PROOF_REJECTED, evaluated.proof_strength)
+        self.assertIn("policy=", evaluated.summary)
 
     def test_implementer_cannot_act_as_verifier(self) -> None:
         contract = load_project_contract(resolve_default_contract(REPO_ROOT))
