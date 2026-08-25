@@ -224,6 +224,12 @@ class Gate2MutatingAuthMiddlewareTests(unittest.TestCase):
         response = self.client.get("/api/health")
         self.assertEqual(200, response.status_code)
 
+    def test_auth_session_exemption_is_not_a_prefix(self) -> None:
+        response = self.client.post("/api/auth/session/extra", json={})
+
+        self.assertEqual(401, response.status_code)
+        self.assertTrue(response.json().get("auth_required"))
+
     def test_resolve_identity_loopback_bypass(self) -> None:
         with patch.dict(
             os.environ,

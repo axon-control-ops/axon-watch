@@ -75,7 +75,12 @@ class DesktopSessionTests(unittest.TestCase):
             json={"operator_token": "wrong-token"},
         )
         self.assertEqual(rejected.status_code, 401)
+        self.assertEqual(rejected.json()["detail"], "invalid operator credentials")
         self.assertNotIn("axon_desktop_session", rejected.cookies)
+
+        anonymous_logout = self.client.delete("/api/auth/session")
+        self.assertEqual(anonymous_logout.status_code, 200)
+        self.assertEqual(anonymous_logout.json()["authenticated"], False)
 
         login = self.client.post(
             "/api/auth/session",

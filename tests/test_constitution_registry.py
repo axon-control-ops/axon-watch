@@ -224,6 +224,21 @@ class ConstitutionRegistryTests(unittest.TestCase):
         ids_after = {item["capability_id"] for item in registry.list_capabilities(limit=50)}
         self.assertEqual(ids, ids_after)
 
+    def test_auth_session_mutation_exemption_is_exact(self) -> None:
+        from scripts.verify import check_constitution_gates
+
+        exact = check_constitution_gates._exempt_paths(  # noqa: SLF001
+            check_constitution_gates.EXEMPT_EXACT_NAME
+        )
+        prefixes = check_constitution_gates._exempt_paths(  # noqa: SLF001
+            check_constitution_gates.EXEMPT_PREFIX_NAME
+        )
+        results = {result.name: result for result in check_constitution_gates.run_check()}
+
+        self.assertIn("/api/auth/session", exact)
+        self.assertNotIn("/api/auth/session", prefixes)
+        self.assertEqual("pass", results["mutating_methods_guarded"].status)
+
     def test_backfill_adrs_reads_canonical_adr_markdown(self) -> None:
         from tempfile import TemporaryDirectory
 
