@@ -10,6 +10,19 @@ _GATE6_RE = re.compile(r"gate 6|acceptance_evidence|acceptance evidence", re.IGN
 _SCOPE_RE = re.compile(r"out_of_scope|out of scope", re.IGNORECASE)
 _LANE_B_RE = re.compile(r"^Lane B finalization failed:\s*", re.IGNORECASE)
 _RUN_TAIL_RE = re.compile(r"\s*\[[^\]]*run[^\]]*\]\s*$", re.IGNORECASE)
+_DECISION_FENCE_RE = re.compile(r"\n?:::decision\n.*?\n:::\n?", re.DOTALL)
+
+
+def _split_decision_fence(detail: str) -> tuple[str, str]:
+    """Pull a :::decision fence out of a finding's detail before it gets
+    whitespace-collapsed by humanize_lead_failure_detail — the fence's JSON
+    body must stay on its own line to remain parseable by the frontend's
+    fence scanner (see parse-transcript-blocks.ts's ':::'-exact-match convention)."""
+    raw = detail or ""
+    match = _DECISION_FENCE_RE.search(raw)
+    if not match:
+        return raw, ""
+    return raw[: match.start()] + raw[match.end() :], match.group(0).strip("\n")
 
 
 def humanize_lead_failure_detail(detail: str) -> str:
@@ -69,8 +82,11 @@ def format_lead_checkin_message(
     for index, finding in enumerate(findings[:12], start=1):
         flag = "ESCALATE" if finding.escalate_only else f"→ {finding.owner_role}"
         lines.append(f"{index}. [{finding.kind}] {finding.title} ({flag})")
-        if finding.detail:
-            lines.append(f"   {humanize_lead_failure_detail(finding.detail)}")
+        prose, fence = _split_decision_fence(finding.detail)
+        if prose.strip():
+            lines.append(f"   {humanize_lead_failure_detail(prose)}")
+        if fence:
+            lines.append(fence)
     if not findings:
         lines.append("No failed shifts or degraded third-party signals this pass.")
     steps = _next_steps(findings)
