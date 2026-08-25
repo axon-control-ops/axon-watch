@@ -6,14 +6,14 @@ source "${repo_root}/scripts/dev/lib/common.sh"
 
 usage() {
   cat <<EOF
-Usage: ./scripts/dev/up.sh [--force|--restart] [--systemd] [--no-soft-cutover]
+Usage: ./scripts/dev/up.sh [--force|--restart] [--systemd] [--no-public-tunnel]
 
 Start (or reuse) Axon-X console + control-plane + watch.
 
   (default)          Reuse healthy listeners on :4173/:8787/:8788 (systemd or bootstrap).
   --force|--restart  Bounce always-on systemd units (or start bootstrap if none), wait healthy.
   --systemd          Prefer systemd restart path when units exist.
-  --no-soft-cutover  Skip :7734→:4173 soft public cutover / tunnel start.
+  --no-public-tunnel Skip managed Cloudflare tunnel start.
 
 Preferred full bounce:
   ./scripts/dev/restart.sh
@@ -36,19 +36,15 @@ rollback_stack() {
   rm -f "${stack_manifest}"
 }
 
-# Soft public cutover: CF remote ingress stays on :7734, local proxy → Axon-X :4173,
-# and the managed Axon-X cloudflared process is started. Do not bind axon-local to :7734.
-ensure_soft_public_tunnel() {
-  if [[ "${AXON_WATCH_SKIP_SOFT_PUBLIC_CUTOVER:-0}" == "1" || "${DEV_SKIP_SOFT_CUTOVER}" == "1" ]]; then
+# Axon-X owns the public path directly. No axon-local soft proxy or legacy
+# rollback process is started from this repo.
+ensure_managed_tunnel() {
+  if [[ "${AXON_WATCH_SKIP_PUBLIC_TUNNEL:-0}" == "1" || "${DEV_SKIP_PUBLIC_TUNNEL}" == "1" ]]; then
     return 0
   fi
 
   local cp_url="${AXON_WATCH_CONTROL_PLANE_BASE_URL:-http://127.0.0.1:${AXON_WATCH_CONTROL_PLANE_PORT:-8787}}"
-  echo "Ensuring soft public cutover (:7734 -> :4173) and managed tunnel..."
-  if ! "${repo_root}/scripts/ops/soft-public-cutover.sh"; then
-    echo "WARN: soft-public-cutover failed; public hostname may stay degraded." >&2
-    return 0
-  fi
+  echo "Ensuring managed Axon-X tunnel..."
   if ! curl -sS --max-time 10 -X POST "${cp_url}/api/tunnel/start" >/dev/null; then
     echo "WARN: managed tunnel start failed; check connectors rail /api/tunnel/status." >&2
   fi
@@ -89,7 +85,7 @@ if [[ "${DEV_FORCE_RESTART}" == "1" ]]; then
   if systemd_user_available \
     && systemctl --user list-unit-files control-plane.service >/dev/null 2>&1; then
     restart_systemd_stack
-    ensure_soft_public_tunnel
+    ensure_managed_tunnel
     finish_ok
     exit 0
   fi
@@ -99,22 +95,11 @@ fi
 
 if [[ "${DEV_FORCE_RESTART}" != "1" ]] && try_reuse_healthy_bootstrap_stack; then
   print_stack_ownership
-  ensure_soft_public_tunnel
+  ensure_managed_tunnel
   exit 0
 fi
 
 assert_no_live_pid_files
-
-# Opt-in only: ensuring axon-local on :7734 fights soft public cutover.
-if [[ "${AXON_WATCH_ENSURE_LEGACY_7734:-0}" == "1" ]]; then
-  axon_local_dir="${AXON_LOCAL_ROOT:-${repo_root}/../axon-local}"
-  if [[ -x "${axon_local_dir}/scripts/ops/ensure-server-running.sh" ]]; then
-    echo "Ensuring sibling axon-local server on :7734 (AXON_WATCH_ENSURE_LEGACY_7734=1)..."
-    if ! "${axon_local_dir}/scripts/ops/ensure-server-running.sh"; then
-      echo "WARN: axon-local ensure failed; optional :7734 connector may stay unavailable." >&2
-    fi
-  fi
-fi
 
 assert_port_free "${AXON_WATCH_CONSOLE_WEB_PORT}" "console-web"
 assert_port_free "${AXON_WATCH_CONTROL_PLANE_PORT}" "control-plane"
@@ -157,7 +142,7 @@ wait_for_http \
 
 trap - ERR
 
-ensure_soft_public_tunnel
+ensure_managed_tunnel
 
 echo "Started bootstrap services:"
 echo "  console-web   $(service_health_url "console-web")"

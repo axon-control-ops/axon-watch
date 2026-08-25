@@ -323,7 +323,6 @@ def _core_evidence() -> dict[str, Any]:
     primary_workspace_id = ""
     preferred_ids = (
         "workspace_axon_watch",
-        "workspace_axon_local",
         "workspace_axon",
     )
     by_id = {
@@ -487,4 +486,3 @@ def build_operator_evidence(node_id: str) -> dict[str, Any]:
     if clean.startswith("mail_"):
         return _mailbox_evidence(clean.removeprefix("mail_"))
     raise ValueError(f"unsupported node id: {clean}")
-

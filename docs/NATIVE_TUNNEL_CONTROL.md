@@ -18,14 +18,9 @@ passed through the child environment and are never included in process
 arguments or process-state files.
 
 The local tunnel origin is the Axon-X operator at `http://127.0.0.1:4173`; it
-does not route through the legacy `:7734` service.
-
-The current Cloudflare remote ingress still targets `http://localhost:7734`.
-Axon-X owns that compatibility hop through
-`axon-public-origin-proxy.service`, which forwards `:7734` to `:4173`, listens
-on IPv4 and IPv6 localhost, and restarts automatically after a process crash.
-`scripts/ops/soft-public-cutover.sh` uses the service when installed and only
-falls back to a detached process for development checkouts.
+does not route through the legacy `:7734` service. Cloudflare remote ingress is
+expected to point at `http://localhost:4173` or `http://127.0.0.1:4173`. A
+remote ingress that still targets `:7734` is reported as degraded.
 
 Axon-X writes a process ownership record and log under
 `AXON_WATCH_STATE_DIR/tunnel/`. Start is idempotent. Stop only signals the exact
@@ -44,7 +39,7 @@ already-running unmanaged process should not prevent the watch stack from bootin
 
 ## Migration note
 
-If an old tunnel is still owned by `axon-local`, stop that legacy process once
+If an old tunnel is still owned by another process, stop that process once
 before using Axon-X Start. Axon-X reports an unmanaged running process instead
 of taking destructive ownership.
 
@@ -59,5 +54,4 @@ redaction from arguments, control delegation, unmanaged-process protection,
 startup autostart (disable / slice-off / success / error swallowing),
 the control-plane proxy, and connector-inventory consistency.
 
-WhatsApp monitoring is a separate retirement item and remains explicitly
-deferred.
+WhatsApp monitoring is deferred for a future Axon-X-native revisit.

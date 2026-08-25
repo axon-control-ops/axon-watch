@@ -7,8 +7,8 @@ This slice adds configured HTTP health probes in the watch service, surfaces the
 through watch summary/connectors routes, projects counts into runtime summary, and
 raises inbox signals when **required** connectors fail.
 
-Optional connectors (for example legacy `axon-local` on `:7734`) appear in probe
-results but do not block runtime degradation unless marked `required: true`.
+Optional connectors appear in probe results but do not block runtime degradation
+unless marked `required: true`.
 
 ## Configuration
 
@@ -103,12 +103,9 @@ summary, connectors, and inbox reads do not re-hit every health URL on each requ
 
 - Source: `connector`
 - Emitted for **required** connectors with status `degraded` or `unavailable`
-- Also emitted for optional connectors when tunnel ingress still targets a
-  legacy origin (`ingress_matches_axon: false`) and status is `degraded` or
-  `unavailable` — for example legacy `axon_local` on `:7734`
-- **Not** emitted when status is `ok`, including Cloudflare tunnel soft cutover
-  (`soft_origin_cutover: true`) where public health passes on Axon-X while
-  remote ingress still points at legacy `:7734`
+- Also emitted for optional connectors when tunnel ingress still targets a stale
+  origin (`ingress_matches_axon: false`) and status is `degraded` or `unavailable`
+- **Not** emitted when status is `ok`
 - Other optional connector failures (no ingress mismatch) remain visible in
   `/api/connectors` only (v1)
 

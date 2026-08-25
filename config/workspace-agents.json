@@ -265,47 +265,6 @@
           "azure_voice_id": "en-GB-HollieNeural"
         }
       ]
-    },
-    "workspace_axon_local": {
-      "company_name": "Axon Local",
-      "employees": [
-        {
-          "name": "Avery",
-          "role": "lead",
-          "owns": "axon-local donor patterns, priorities, and handoffs",
-          "schedule": "on_demand",
-          "primary": true,
-          "azure_voice_id": "en-GB-SoniaNeural"
-        },
-        {
-          "name": "Remy",
-          "role": "watcher",
-          "owns": "axon-local signals and runtime health",
-          "schedule": "always_on",
-          "azure_voice_id": "en-GB-ThomasNeural"
-        },
-        {
-          "name": "Sable",
-          "role": "frontend",
-          "owns": "axon-local UI reference surfaces",
-          "schedule": "continuous",
-          "azure_voice_id": "en-GB-LibbyNeural"
-        },
-        {
-          "name": "Mina",
-          "role": "backend",
-          "owns": "axon-local API and persistence donor patterns",
-          "schedule": "continuous",
-          "azure_voice_id": "en-GB-ElliotNeural"
-        },
-        {
-          "name": "Drew",
-          "role": "integrations",
-          "owns": "axon-local connector and packaging wiring",
-          "schedule": "continuous",
-          "azure_voice_id": "en-GB-HollieNeural"
-        }
-      ]
     }
   },
   "agents": {}

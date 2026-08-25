@@ -51,8 +51,8 @@ class ConnectorSignalTests(unittest.TestCase):
     def test_optional_failure_emits_no_inbox_item(self) -> None:
         item = self.connector_signal.connector_inbox_item(
             {
-                "connector_id": "axon_local",
-                "display_name": "axon-local (legacy)",
+                "connector_id": "github_api",
+                "display_name": "GitHub API",
                 "status": "unavailable",
                 "required": False,
                 "detail": "connection refused",
@@ -96,60 +96,60 @@ class ConnectorSignalTests(unittest.TestCase):
         self.assertIn("Control plane", item["title"])
         self.assertIn("unavailable", item["title"])
 
-    def test_soft_cutover_tunnel_ok_emits_no_inbox_item(self) -> None:
+    def test_tunnel_ok_emits_no_inbox_item(self) -> None:
         item = self.connector_signal.connector_inbox_item(
             {
                 "connector_id": "cloudflare_tunnel",
                 "display_name": "Cloudflare tunnel",
                 "status": "ok",
                 "required": False,
-                "detail": "active soft cutover (public=axon-x control-plane)",
+                "detail": "active https://axon.example",
                 "tunnel": {
-                    "ingress_matches_axon": False,
-                    "soft_origin_cutover": True,
-                    "remote_ingress_service": "http://localhost:7734",
+                    "ingress_matches_axon": True,
+                    "remote_ingress_service": "http://localhost:4173",
                 },
             }
         )
         self.assertIsNone(item)
 
-    def test_soft_cutover_tunnel_degraded_emits_no_inbox_item(self) -> None:
+    def test_stale_tunnel_ingress_emits_signal(self) -> None:
         item = self.connector_signal.connector_inbox_item(
             {
                 "connector_id": "cloudflare_tunnel",
                 "display_name": "Cloudflare tunnel",
                 "status": "degraded",
                 "required": False,
-                "detail": (
-                    "active soft cutover (remote=http://localhost:7734; "
-                    "public=axon-x control-plane)"
-                ),
+                "detail": "remote ingress still points at http://localhost:7734; expected http://127.0.0.1:4173",
                 "tunnel": {
                     "ingress_matches_axon": False,
-                    "soft_origin_cutover": True,
                     "remote_ingress_service": "http://localhost:7734",
                 },
             }
         )
-        self.assertIsNone(item)
+        self.assertIsNotNone(item)
+        assert item is not None
+        self.assertEqual("signal_connector_cloudflare_tunnel_degraded", item["signal_id"])
+        self.assertEqual("high", item["severity"])
 
-    def test_soft_cutover_detail_without_tunnel_block_emits_no_inbox_item(self) -> None:
+    def test_required_stale_tunnel_detail_emits_signal(self) -> None:
         item = self.connector_signal.connector_inbox_item(
             {
                 "connector_id": "cloudflare_tunnel",
                 "display_name": "Cloudflare tunnel",
                 "status": "degraded",
                 "required": True,
-                "detail": "soft cutover",
+                "detail": "remote ingress still points at http://localhost:7734",
             }
         )
-        self.assertIsNone(item)
+        self.assertIsNotNone(item)
+        assert item is not None
+        self.assertEqual("signal_connector_cloudflare_tunnel_degraded", item["signal_id"])
 
-    def test_optional_legacy_unavailable_with_ingress_mismatch_emits_signal(self) -> None:
+    def test_optional_tunnel_unavailable_with_ingress_mismatch_emits_signal(self) -> None:
         item = self.connector_signal.connector_inbox_item(
             {
-                "connector_id": "axon_local",
-                "display_name": "axon-local (legacy)",
+                "connector_id": "cloudflare_tunnel",
+                "display_name": "Cloudflare tunnel",
                 "status": "unavailable",
                 "required": False,
                 "detail": "connection refused",
@@ -158,7 +158,7 @@ class ConnectorSignalTests(unittest.TestCase):
         )
         self.assertIsNotNone(item)
         assert item is not None
-        self.assertEqual("signal_connector_axon_local_unavailable", item["signal_id"])
+        self.assertEqual("signal_connector_cloudflare_tunnel_unavailable", item["signal_id"])
         self.assertEqual("critical", item["severity"])
         self.assertEqual("connection refused", item["summary"])
 
@@ -172,8 +172,8 @@ class ConnectorSignalTests(unittest.TestCase):
                     "required": True,
                 },
                 {
-                    "connector_id": "axon_local",
-                    "display_name": "axon-local (legacy)",
+                    "connector_id": "github_api",
+                    "display_name": "GitHub API",
                     "status": "unavailable",
                     "required": False,
                 },

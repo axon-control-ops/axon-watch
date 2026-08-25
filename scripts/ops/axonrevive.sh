@@ -4,7 +4,7 @@
 # No workspace selected / Briefing unavailable).
 #
 # Soft systemctl restart can hang when the control-plane worker is stuck.
-# This force-kills control-plane, restarts the stack and public proxy, then checks health.
+# This force-kills control-plane, restarts the stack, then checks health.
 set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
@@ -16,15 +16,8 @@ echo "  Force-stopping control-plane (SIGKILL) if needed..."
 systemctl --user kill -s SIGKILL control-plane.service 2>/dev/null || true
 sleep 1
 
-echo "  Restarting axon-watch + control-plane + console-web + public proxy..."
+echo "  Restarting axon-watch + control-plane + console-web..."
 revive_units=(axon-watch.service control-plane.service console-web.service)
-# axon-public-origin-proxy.service is legacy (superseded by soft-public-cutover.sh's
-# managed tunnel) and is not installed on hosts that ran install-user-always-on.sh's
-# cleanup step. Only restart it if it actually exists, or `set -e` aborts this script
-# before the health check below ever runs.
-if systemctl --user cat axon-public-origin-proxy.service >/dev/null 2>&1; then
-  revive_units+=(axon-public-origin-proxy.service)
-fi
 systemctl --user restart "${revive_units[@]}"
 
 # Give uvicorn a moment past "Waiting for application startup".

@@ -38,6 +38,7 @@ describe('projectLiveOperationsStream', () => {
       items.some(
         (item) =>
           item.text.includes('Last job failed') ||
+          item.text.includes('Last job reply was generated') ||
           item.text.includes('closing Confidence line was missing'),
       ),
     ).toBe(true);

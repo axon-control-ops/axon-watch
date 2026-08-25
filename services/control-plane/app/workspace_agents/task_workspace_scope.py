@@ -5,7 +5,7 @@ from __future__ import annotations
 import re
 
 
-_AXON_WORKSPACES = {"workspace_axon_local", "workspace_axon_online", "workspace_axon_watch"}
+_AXON_WORKSPACES = {"workspace_axon_online", "workspace_axon_watch"}
 _CONTROL_PLANE_TARGET = re.compile(
     r"\b(?:axon[- ]?x|control[- ]?plane|dispatcher|scoped[- ]task gate)\b", re.IGNORECASE
 )

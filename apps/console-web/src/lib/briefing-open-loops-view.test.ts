@@ -256,7 +256,7 @@ describe('briefing-open-loops-view', () => {
       fleetActiveRuns: [
         {
           run_id: 'run_elsewhere',
-          workspace_id: 'workspace_axon_local',
+          workspace_id: 'workspace_tps',
           phase: 'executing',
           title: 'Elsewhere',
         },

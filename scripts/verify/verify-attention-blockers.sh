@@ -8,7 +8,6 @@ cd "${repo_root}"
 CP="${AXON_WATCH_CONTROL_PLANE_BASE_URL:-http://127.0.0.1:8787}"
 WATCH="${AXON_WATCH_WATCH_SERVICE_BASE_URL:-http://127.0.0.1:8788}"
 PUBLIC="${AXON_PUBLIC_URL:-https://axon.edudashpro.org.za}"
-LEGACY="${AXON_LEGACY_URL:-http://127.0.0.1:7735}"
 fail=0
 tmp="$(mktemp -d)"
 trap 'rm -rf "${tmp}"' EXIT
@@ -84,22 +83,12 @@ if [[ "${pub_code}" == "200" ]] && rg -q '"service"\s*:\s*"control-plane"' "${tm
   if [[ "${ingress}" == "http://127.0.0.1:4173" || "${ingress}" == "http://localhost:4173" ]]; then
     pass "remote ingress targets Axon-X :4173"
   elif [[ "${ingress}" == "http://localhost:7734" || "${ingress}" == "http://127.0.0.1:7734" ]]; then
-    pass "soft cutover active (CF :7734 origin proxies Axon-X)"
+    fail_item "remote ingress still targets retired :7734 origin"
   else
     warn_item "unexpected remote ingress '${ingress}' but public Axon-X OK"
   fi
 else
   fail_item "public /api/health not Axon-X (HTTP ${pub_code}); body=$(head -c 120 "${tmp}/public-health.json" 2>/dev/null | tr '\n' ' ')"
-fi
-
-if curl -sS --max-time 5 "${LEGACY}/api/health" -o "${tmp}/legacy-health.json"; then
-  if rg -qi 'axon-local|"port"\s*:\s*7735' "${tmp}/legacy-health.json"; then
-    pass "legacy axon-local soft-rollback on :7735"
-  else
-    warn_item "legacy :7735 responded but body unexpected"
-  fi
-else
-  warn_item "legacy soft-rollback :7735 not reachable (WhatsApp local path)"
 fi
 
 watch_count="$(curl -sS --max-time 20 "${WATCH}/internal/watch/inbox" | python3 -c 'import sys,json; print(json.load(sys.stdin).get("count",0))')"

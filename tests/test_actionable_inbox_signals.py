@@ -513,7 +513,7 @@ class WatchInboxFilterTests(unittest.TestCase):
     @patch("app.signals.store.is_signal_acknowledged", return_value=False)
     @patch("app.signals.store.email_inbox_items", return_value=[])
     @patch("app.signals.store.probe_monitor_records", return_value=[])
-    def test_inbox_omits_bootstrap_when_optional_tunnel_legacy_ingress_degraded(
+    def test_inbox_omits_bootstrap_when_optional_tunnel_stale_ingress_degraded(
         self, _monitors, _email_items, _acked
     ) -> None:
         payload = self.get_inbox_snapshot(
@@ -529,7 +529,7 @@ class WatchInboxFilterTests(unittest.TestCase):
                     "display_name": "Cloudflare tunnel",
                     "status": "degraded",
                     "required": False,
-                    "detail": "ingress still targets legacy Axon Local",
+                    "detail": "ingress still targets stale local origin",
                     "tunnel": {"ingress_matches_axon": False},
                 },
             ]

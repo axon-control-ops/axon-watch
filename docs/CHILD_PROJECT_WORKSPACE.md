@@ -42,4 +42,6 @@ Live checks:
 
 ## Retirement note
 
-Binding DashPro does **not** migrate DashPro-specific axon-local connectors (WhatsApp, tunnel, mobile cockpit). See `docs/LEGACY_CONNECTOR_INVENTORY.md`.
+Binding DashPro does **not** automatically add every DashPro-specific integration.
+WhatsApp is deferred for a future Axon-X-native revisit. See
+`docs/LEGACY_CONNECTOR_INVENTORY.md`.

@@ -169,20 +169,33 @@ def validate_legacy_connector_inventory(
                 message=f"watch connector {connector_id} missing from inventory",
             )
 
+    full_retired = bool(parity_snapshot.get("full_axon_local_retirement"))
     blocker_map = spec.get("retirement_blocker_map")
-    if not isinstance(blocker_map, dict) or not blocker_map:
+    if not isinstance(blocker_map, dict):
         return CheckResult(
             name="legacy_connector_inventory",
             status="fail",
-            message="retirement_blocker_map must be a non-empty object",
+            message="retirement_blocker_map must be an object",
+        )
+    if not full_retired and not blocker_map:
+        return CheckResult(
+            name="legacy_connector_inventory",
+            status="fail",
+            message="retirement_blocker_map must be non-empty before full retirement",
         )
 
     snapshot_blockers = parity_snapshot.get("blockers_for_full_retirement")
-    if not isinstance(snapshot_blockers, list) or not snapshot_blockers:
+    if not isinstance(snapshot_blockers, list):
         return CheckResult(
             name="legacy_connector_inventory",
             status="fail",
-            message="parity-snapshot blockers_for_full_retirement must be non-empty",
+            message="parity-snapshot blockers_for_full_retirement must be a list",
+        )
+    if not full_retired and not snapshot_blockers:
+        return CheckResult(
+            name="legacy_connector_inventory",
+            status="fail",
+            message="parity-snapshot blockers_for_full_retirement must be non-empty before full retirement",
         )
 
     for blocker_text, mapped_ids in blocker_map.items():
@@ -205,6 +218,13 @@ def validate_legacy_connector_inventory(
                 status="fail",
                 message=f"retirement_blocker_map references unknown ids: {unknown}",
             )
+
+    if full_retired and blocker_map:
+        return CheckResult(
+            name="legacy_connector_inventory",
+            status="fail",
+            message="retirement_blocker_map must be empty once axon-local retirement is signed",
+        )
 
     doc_path = REPO_ROOT / "docs" / "LEGACY_CONNECTOR_INVENTORY.md"
     if not doc_path.is_file():

@@ -35,10 +35,6 @@ const probeActionsPaused = computed(
   () => !watchConnected.value || shell.connectorMutationPending,
 );
 
-function openLegacyFallback(url: string): void {
-  window.open(url, '_blank', 'noopener,noreferrer');
-}
-
 function openTunnelUrl(url: string): void {
   window.open(url, '_blank', 'noopener,noreferrer');
 }
@@ -162,14 +158,6 @@ onMounted(() => {
             @click="openTunnelUrl(row.tunnelUrl)"
           >
             Open tunnel URL
-          </button>
-          <button
-            v-if="row.isLegacyFallback && row.fallbackUrl"
-            type="button"
-            class="connectors-rail-panel__action connectors-rail-panel__action--fallback"
-            @click="openLegacyFallback(row.fallbackUrl)"
-          >
-            Open :7734 fallback
           </button>
         </div>
       </li>

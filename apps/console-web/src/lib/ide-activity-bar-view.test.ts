@@ -90,7 +90,7 @@ describe('ide activity bar view', () => {
       legacyConnectorGlanceVisible: true,
     };
     expect(ideActivityBarRunNeedsAttention(legacy)).toBe(true);
-    expect(ideActivityBarRunTitle(false, legacy)).toContain('Legacy Axon Local offline');
+    expect(ideActivityBarRunTitle(false, legacy)).toContain('Optional connector offline');
 
     const healthy = {
       watchConnected: true,

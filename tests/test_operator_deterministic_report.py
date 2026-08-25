@@ -66,6 +66,8 @@ class OperatorDeterministicReportTests(unittest.TestCase):
         self.assertTrue(is_operator_report_request("REPORT"))
         self.assertTrue(is_operator_report_request("status"))
         self.assertTrue(is_operator_report_request("where do we stand"))
+        self.assertTrue(is_operator_report_request("give me a detailed report"))
+        self.assertTrue(is_operator_report_request("summarise all workspace work"))
         self.assertTrue(
             is_operator_report_request(
                 "REPORT — give me a JARVIS-style second-brain stand-up in plain English."
@@ -81,9 +83,7 @@ class OperatorDeterministicReportTests(unittest.TestCase):
         self.assertFalse(is_operator_report_request("report back when done"))
 
     def test_compose_names_busy_and_completed_and_receipt_handoffs(self) -> None:
-        from app.kairo.operator_deterministic_report import (
-            compose_operator_report,
-        )
+        from app.kairo.operator_deterministic_report import compose_operator_report
         from app.workspace_agents.lead_vaxon_handoff import post_ad_hoc_lead_takeover_to_vaxon
 
         with patch("app.live_events.broadcast_material_change"):
@@ -150,7 +150,7 @@ class OperatorDeterministicReportTests(unittest.TestCase):
         self.assertIn("Work in flight:", text)
         self.assertIn("Marco (Backend) is executing", text)
         self.assertIn("Priya (Frontend) just completed", text)
-        self.assertIn("Lead rollups:", text)
+        self.assertIn("Stored Lead evidence:", text)
         self.assertIn("graduation survey", text.lower())
         self.assertIn("Plan:", text)
         self.assertNotIn("Confidence:", text)
@@ -180,7 +180,7 @@ class OperatorDeterministicReportTests(unittest.TestCase):
         )
         self.assertIn("nothing screaming", empty["text"].lower())
         self.assertIn("idle", empty["text"].lower())
-        self.assertIn("standing by", empty["text"].lower())
+        self.assertIn("no verified receipt found", empty["text"].lower())
 
     def test_lead_rollup_scrubs_cli_dump_into_operator_line(self) -> None:
         from app.kairo.operator_deterministic_report import compose_operator_report

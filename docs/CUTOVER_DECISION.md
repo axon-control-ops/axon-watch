@@ -1,7 +1,7 @@
 # Axon-X Cutover Decision
 
 **Date:** 2026-07-05  
-**Last amended:** 2026-07-05 (Phase A–D parity closure complete)  
+**Last amended:** 2026-08-25 (axon-local runtime retirement)
 **Branch:** `axon-watch/dev`  
 **Inputs:** `docs/FINAL_PARITY_VERIFICATION.md`, `config/parity-snapshot.json`, TEST-0 … TEST-10 gates, Phase A–D parity gates
 
@@ -18,15 +18,16 @@ Axon-X is approved as the **primary development surface** for:
 Day-to-day Axon-X development should happen on **`axon-watch/dev`**, not by
 expanding axon-local monolith hotspots for the same surfaces.
 
-### Full axon-local retirement — **NOT APPROVED**
+### Full axon-local runtime retirement — **APPROVED**
 
-`axon-local` (port **7734**) is the **fallback** operator surface for legacy
-connectors and unmigrated child-project paths — not the primary production console.
+`axon-local` is no longer an active fallback, workspace binding, proxy target, or
+startup dependency from this repo. Axon-X owns day-to-day operator work directly.
 
 **Production operator surface (declared 2026-07-05):** Axon-X console-web at
 **http://127.0.0.1:4173**. See `docs/PRODUCTION_OPERATOR_SURFACE.md`.
 
-This follows the strangler model in `docs/planning/TRANSITION_ARCHITECTURE.md`.
+WhatsApp can be revisited later as a fresh Axon-X feature. That future work must
+not require restarting `axon-local` from this repo.
 
 ## Parity summary
 
@@ -38,22 +39,22 @@ This follows the strangler model in `docs/planning/TRANSITION_ARCHITECTURE.md`.
 | Full parity (unlimited axon-local equivalence) | 0 |
 
 All must-keep behaviors meet **v1 verification** within documented acceptable
-degradation. That is not the same as unlimited axon-local replacement.
+degradation. The remaining accepted degradations are Axon-X-owned or future work,
+not `axon-local` fallback obligations.
 
 ## Operating rules after cutover
 
 1. **Implementation truth** lives in `axon-watch` (`docs/`, `docs/planning/`, code).
-2. **axon-local** is fallback owner for unmigrated capabilities per transition table.
+2. **axon-local** must not be started, proxied, or listed as an active fallback by this repo.
 3. New console/operator features land in Axon-X bounded modules — not axon-local hotspots.
 4. Promote a parity row to `verified` only with contract + focused E2E + UI proof.
-5. Do not mark `full_axon_local_retirement` until all blockers in the parity snapshot are resolved **and** the operator signs off on production switch from port 7734.
+5. Reopen WhatsApp later as an Axon-X feature, not as a hidden dependency on the retired runtime.
 
 ## Rollback
 
 Rollback is **capability-scoped**, not system-wide:
 
-- If an Axon-X surface regresses, route that capability back to axon-local per
-  `docs/planning/TRANSITION_ARCHITECTURE.md` rollback table.
+- If an Axon-X surface regresses, fix or disable that Axon-X capability directly.
 - Keep TEST-0 … TEST-10 and `npm run verify:phase-d` green before re-attempting a migrated capability.
 
 ## Blockers for full retirement
@@ -64,9 +65,9 @@ As of production operator declaration (2026-07-05):
 
 - **Resolved:** operator sign-off — Axon-X `:4173` is the production operator surface
 
-Remaining for **full** axon-local retirement:
+Remaining for **full** axon-local runtime retirement:
 
-- Child-project integration and legacy connector surfaces not yet migrated to Axon-X
+- None. `config/parity-snapshot.json` has `full_axon_local_retirement: true`.
 
 Resolved since initial TEST-10 assessment (no longer blockers):
 
@@ -96,8 +97,11 @@ Initial decision recorded by TEST-10 passing on 2026-07-05 (bounded cutover,
 honest partial snapshot at that time).
 
 **Amendment (2026-07-05):** Production operator surface declared — Axon-X
-`:4173` is primary; `:7734` is fallback only. Full axon-local retirement remains
-**NOT APPROVED** pending child-project / legacy connector migration.
+`:4173` is primary; `:7734` was fallback only.
+
+**Amendment (2026-08-25):** axon-local runtime retirement approved. This repo no
+longer starts, proxies, binds, or documents `axon-local` as an active fallback.
+WhatsApp is deferred for a future Axon-X-native revisit.
 
 Human operator may override operating rules but should not treat v1 parity
-closure as unlimited axon-local retirement without explicit switch declaration.
+closure as permission to reintroduce a hidden `axon-local` runtime dependency.

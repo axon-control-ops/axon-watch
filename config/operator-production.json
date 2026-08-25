@@ -3,7 +3,7 @@
   "status": "axon_x",
   "declared_on": "2026-07-05",
   "primary_url": "http://127.0.0.1:4173",
-  "fallback_url": "http://127.0.0.1:7734",
+  "fallback_url": null,
   "stack_ports": {
     "console_web": 4173,
     "control_plane": 8787,
@@ -12,5 +12,5 @@
   "bootstrap_command": "./scripts/dev/up.sh",
   "health_command": "./scripts/dev/check-health.sh",
   "smoke_gate": "npm run verify:production-operator",
-  "notes": "Operator declared Axon-X console-web the primary production operator surface. axon-local :7734 remains optional fallback for legacy connectors and unmigrated child-project paths."
+  "notes": "Operator declared Axon-X console-web the primary production operator surface. axon-local is no longer started, proxied, or listed as an active fallback from this repo; WhatsApp can be revisited later as a fresh Axon-X feature."
 }

@@ -11,7 +11,6 @@ import {
 export const PRODUCTION_OPERATOR_WORKSPACE_IDS = [
   'workspace_axon_watch',
   'workspace_edudashpro_school',
-  'workspace_axon_local',
   'workspace_dashpro',
 ] as const;
 

@@ -300,45 +300,30 @@ class EmailTriageTests(unittest.TestCase):
             "workspace_custom",
         )
 
-    def test_messages_from_live_bridge_parses_fixture_without_network(self) -> None:
-        from io import BytesIO
-
+    def test_messages_from_live_bridge_is_retired(self) -> None:
         email_signal = self.email_signal
-        fixture = Path(__file__).resolve().parents[0] / "fixtures" / "email-bridge-analysis.json"
-        payload = fixture.read_bytes()
 
-        class _Response:
-            def __enter__(self):
-                return BytesIO(payload)
-
-            def __exit__(self, exc_type, exc, tb):
-                return False
-
-        with patch.object(email_signal, "_email_bridge_enabled", return_value=True), patch.object(
-            email_signal,
-            "_axon_local_base_url",
-            return_value="http://127.0.0.1:7734",
-        ), patch.object(email_signal, "urlopen", return_value=_Response()):
+        with patch.object(email_signal, "_email_bridge_enabled", return_value=True):
             messages = email_signal._messages_from_live_bridge()
 
-        self.assertIsNotNone(messages)
-        assert messages is not None
-        self.assertEqual(1, len(messages))
-        self.assertEqual("<bridge-urgent@example.com>", messages[0]["message_id"])
-        self.assertIn("investigate the failing deploy", messages[0]["text"].lower())
+        self.assertIsNone(messages)
 
         with patch.object(email_signal, "_email_bridge_enabled", return_value=True), patch.object(
-            email_signal,
-            "_axon_local_base_url",
-            return_value="http://127.0.0.1:7734",
-        ), patch.object(email_signal, "urlopen", return_value=_Response()), patch.object(
             email_signal,
             "_load_stub_config",
             return_value={
                 "enabled": True,
                 "workspace_id": "workspace_axon_watch",
                 "workspace_names": ["DashPro"],
-                "messages": [],
+                "messages": [
+                    {
+                        "message_id": "<stub-dashpro@example.com>",
+                        "from": "CTO <cto@example.com>",
+                        "subject": "Urgent: DashPro deploy failed",
+                        "text": "Please investigate the failing deploy today.",
+                        "snippet": "Please investigate the failing deploy today.",
+                    }
+                ],
             },
         ):
             items = email_signal.email_inbox_items()

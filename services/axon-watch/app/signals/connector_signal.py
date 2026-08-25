@@ -5,17 +5,8 @@ from __future__ import annotations
 from app.signals.iso_time import utc_now_iso
 
 
-def _soft_origin_cutover_active(record: dict[str, object]) -> bool:
-    """Public tunnel still serves Axon-X while remote ingress targets legacy :7734."""
-    tunnel = record.get("tunnel")
-    if isinstance(tunnel, dict) and tunnel.get("soft_origin_cutover") is True:
-        return True
-    detail = str(record.get("detail", "")).strip().lower()
-    return "soft cutover" in detail
-
-
 def _optional_connector_actionable(record: dict[str, object]) -> bool:
-    """Optional connectors only emit when tunnel ingress still targets a legacy origin."""
+    """Optional connectors only emit when tunnel ingress targets a stale origin."""
     tunnel = record.get("tunnel")
     if not isinstance(tunnel, dict):
         return False
@@ -27,9 +18,6 @@ def _optional_connector_actionable(record: dict[str, object]) -> bool:
 def connector_inbox_item(record: dict[str, object]) -> dict[str, object] | None:
     status = str(record.get("status", "")).strip()
     if status == "ok":
-        return None
-
-    if _soft_origin_cutover_active(record):
         return None
 
     if not bool(record.get("required")) and not _optional_connector_actionable(record):

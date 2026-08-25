@@ -21,7 +21,6 @@ _DEFAULT_HINT_MAP: dict[str, str] = {
     "DashPro": "workspace_dashpro",
     "Axon": "workspace_axon_watch",
     "Axon Watch": "workspace_axon_watch",
-    "Axon Local": "workspace_axon_local",
 }
 
 

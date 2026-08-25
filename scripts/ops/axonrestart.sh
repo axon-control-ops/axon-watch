@@ -19,7 +19,7 @@ wait_cp_health() {
   return 1
 }
 
-echo "Restarting Axon-X user services (watch → control-plane → console → proxy)..."
+echo "Restarting Axon-X user services (watch → control-plane → console)..."
 # Soft restart is safe now: uvicorn --timeout-graceful-shutdown 5 + TimeoutStopSec=8
 # prevent speak/SSE from holding :8787 dead for ~90s (Vite ECONNREFUSED spam).
 # Restart sequentially and wait for CP health so :5173 does not sit in a dead window.
@@ -29,19 +29,9 @@ if ! wait_cp_health; then
   echo "WARN: control-plane :8787 did not become healthy within ~12s" >&2
 fi
 systemctl --user restart console-web.service
-# axon-public-origin-proxy.service is legacy (superseded by soft-public-cutover.sh's
-# managed tunnel) and is not installed on hosts that ran install-user-always-on.sh's
-# cleanup step. Only restart it if it actually exists, or `set -e` aborts this script
-# before the health check below ever runs.
-if systemctl --user cat axon-public-origin-proxy.service >/dev/null 2>&1; then
-  systemctl --user restart axon-public-origin-proxy.service
-fi
 
 echo
 active_units=(axon-watch.service control-plane.service console-web.service)
-if systemctl --user cat axon-public-origin-proxy.service >/dev/null 2>&1; then
-  active_units+=(axon-public-origin-proxy.service)
-fi
 systemctl --user --no-pager --full is-active "${active_units[@]}"
 echo
 exec "${repo_root}/scripts/dev/check-health.sh"
