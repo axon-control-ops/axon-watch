@@ -66,11 +66,49 @@ class OperatorFleetReportTests(unittest.TestCase):
         text = composed["text"]
         self.assertIn("Workspaces checked: three", text)
         self.assertIn("DashPro — busy: Priya (Frontend)", text)
-        self.assertIn("Axon Watch — recently completed: Reed (Backend)", text)
+        self.assertIn("Axon Watch — last recorded completion: Reed (Backend)", text)
         self.assertIn("DashPro — Dana: The dashboard fix is verified", text)
         self.assertIn("Axon Watch — Mira: The reporting lane is ready", text)
-        self.assertIn("\n\nLead rollups:\n- ", text)
+        self.assertIn("\n\nStored Lead evidence:\n- ", text)
         self.assertNotEqual(text, composed["spoken"])
+
+    def test_does_not_invent_lead_evidence_without_a_receipt(self) -> None:
+        from app.kairo.operator_deterministic_report import compose_operator_report
+
+        workspace = self._workspace(
+            workspace_id="workspace_dashpro",
+            display_name="DashPro",
+            roster={
+                "busy": [],
+                "completed": [{"name": "Priya", "role_label": "Frontend"}],
+                "failed": [],
+                "employees": [{"name": "Dana", "role": "lead", "primary": True}],
+            },
+            handoff={},
+            active_runs=0,
+        )
+        workspace["handoffs"] = []
+        composed = compose_operator_report(
+            {
+                "workspace_id": "workspace_dashpro",
+                "briefing": {"advise": "", "degraded": {"active": False}},
+                "fleet": {"count": 1, "critical_count": 0, "attention_count": 0},
+                "roster": {"busy": [], "completed": [], "failed": [], "employees": []},
+                "handoffs": [],
+                "workspace_reports": [workspace],
+                "top_signals": [],
+                "active_runs": [],
+                "pending_approvals": 0,
+                "awaiting_engagement_count": 0,
+                "next_safe_actions": [],
+                "fingerprint": "completion-only",
+            }
+        )
+
+        self.assertIn("Workspace evidence:", composed["text"])
+        self.assertIn("last recorded completion: Priya (Frontend)", composed["text"])
+        self.assertIn("Stored Lead evidence: no verified receipt found.", composed["text"])
+        self.assertNotIn("Dana:", composed["text"])
 
     @staticmethod
     def _workspace(
