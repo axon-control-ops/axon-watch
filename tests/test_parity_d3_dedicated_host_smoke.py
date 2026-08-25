@@ -54,11 +54,15 @@ class ParityD3DedicatedHostSmokeTests(unittest.TestCase):
                 "AXON_WATCH_STATE_DIR": str(state_dir),
                 "AXON_WATCH_PUBLIC_BASE_URL": "https://axon.example.com",
                 "AXON_WATCH_WATCH_SERVICE_BASE_URL": "http://127.0.0.1:8788",
+                "AXON_WATCH_OPERATOR_TOKEN": "dedicated-readiness-token",
             }
             with patch.dict(os.environ, env, clear=False):
                 client = TestClient(app)
                 self.addCleanup(client.close)
-                response = client.get("/api/readiness")
+                response = client.get(
+                    "/api/readiness",
+                    headers={"Authorization": "Bearer dedicated-readiness-token"},
+                )
             self.assertEqual(200, response.status_code)
             payload = response.json()
             self.assertEqual("dedicated", payload["mode"])
