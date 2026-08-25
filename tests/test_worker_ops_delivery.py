@@ -11,7 +11,7 @@ CONTROL_PLANE_ROOT = Path(__file__).resolve().parents[1] / "services" / "control
 sys.path.insert(0, str(CONTROL_PLANE_ROOT))
 
 from app.persistence import run_store, task_store  # noqa: E402
-from app.runs.service import create_run, get_run  # noqa: E402
+from app.runs.service import append_run_execution_receipt, create_run, get_run  # noqa: E402
 from app.workspace_agents.config_loader import EmployeeConfig  # noqa: E402
 from app.workspace_agents.execution_policy import role_execution_policy  # noqa: E402
 from app.workspace_agents.ops_delivery import no_change_delivery_is_successful_ops_task  # noqa: E402
@@ -106,6 +106,110 @@ class WorkerOpsDeliveryTests(unittest.TestCase):
         history = run_store.list_history(get_run(str(created["run_id"]))["history_ref"])
         summaries = [str(item.get("receipt", {}).get("summary") or "").lower() for item in history]
         self.assertTrue(any("receipt-backed ops/coordination task" in summary for summary in summaries), summaries)
+
+    def test_full_access_no_change_non_implementation_task_completes_after_validation(self) -> None:
+        opened = task_store.create_task(
+            workspace_id="workspace_worker_report_noop",
+            goal=(
+                "Diagnose why the integration task continues to fail, rerun checks, "
+                "and produce a concrete actionable failure explanation based on receipts."
+            ),
+            owner_role="integrations",
+            acceptance_criteria="Report command outputs and the actionable explanation.",
+            allowed_paths=["node_modules", "package.json", "package-lock.json", ".github", "docs/ops", "scripts", "infra"],
+        )
+        leased = task_store.lease_task(
+            opened["task_id"],
+            lease_holder="employee-workspace_worker_report_noop-integrations",
+        )
+        created = create_run(
+            workspace_id="workspace_worker_report_noop",
+            mode="agent",
+            summary="Integrations diagnostic shift",
+            employee_role="integrations",
+            task_id=leased["task_id"],
+            require_leased_task=True,
+        )
+        run_id = str(created["run_id"])
+        append_run_execution_receipt(
+            run_id,
+            receipt_type="acceptance_evidence",
+            receipt_summary="acceptance=pass · diagnostic evidence captured",
+            actor="verifier",
+            success=True,
+            intent="gate6_acceptance",
+        )
+        append_run_execution_receipt(
+            run_id,
+            receipt_type="acceptance_check_outputs",
+            receipt_summary="checks=diagnostic count=2 passed=True",
+            actor="verifier",
+            success=True,
+            intent="gate6_check_outputs",
+        )
+
+        with patch.object(
+            worker_dispatch,
+            "generate_lane_b_result",
+            return_value={
+                "dispatched": True,
+                "runtime_label": "test",
+                "content": (
+                    "No code changes were needed. The terminal checks passed and "
+                    "the failure was a stale delivery-state mismatch.\n\nConfidence: 9/10"
+                ),
+            },
+        ), patch.object(
+            worker_dispatch,
+            "resolve_worker_execution_policy",
+            return_value=role_execution_policy("integrations"),
+        ), patch.object(
+            worker_dispatch,
+            "prepare_worker_ide_stream",
+            return_value=None,
+        ), patch.object(
+            worker_dispatch,
+            "finalize_lane_b_agent_run",
+            return_value=(True, {"phase": "executing"}),
+        ), patch(
+            "app.workspace_agents.verifier_contract.run_requires_acceptance_evidence",
+            return_value=True,
+        ), patch(
+            "app.workspace_agents.verifier_contract.has_passing_acceptance_evidence",
+            return_value=True,
+        ), patch(
+            "app.workspace_delivery.publish_worker_isolation",
+            return_value=PublishResult(
+                ok=True,
+                stage="no_change",
+                delivery={"delivery_id": "delivery-report-noop"},
+                detail="no changes",
+                cleanup_isolation=True,
+            ),
+        ), patch(
+            "app.workspace_agents.lead_replan.notify_lead_after_worker_task",
+            return_value=None,
+        ):
+            dispatched, finalized = worker_dispatch.dispatch_continuous_worker_run(
+                workspace_id="workspace_worker_report_noop",
+                employee=EmployeeConfig(
+                    name="Soren",
+                    role="integrations",
+                    owns="Integrations diagnostics",
+                    schedule="continuous",
+                ),
+                run_record=created,
+            )
+
+        self.assertTrue(dispatched)
+        self.assertIsNotNone(finalized)
+        self.assertEqual("completed", finalized["phase"])  # type: ignore[index]
+        task = task_store.get_task(leased["task_id"])
+        self.assertEqual("completed", task["status"])  # type: ignore[index]
+        history = run_store.list_history(get_run(run_id)["history_ref"])
+        summaries = [str(item.get("receipt", {}).get("summary") or "").lower() for item in history]
+        self.assertTrue(any(summary.startswith("preflight=pass") for summary in summaries), summaries)
+        self.assertFalse(any("no publishable changes" in summary for summary in summaries), summaries)
 
     def test_no_change_lead_plan_coordination_task_is_successful_delivery(self) -> None:
         task = {

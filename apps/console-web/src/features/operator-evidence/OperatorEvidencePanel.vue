@@ -9,6 +9,7 @@ import {
   type OperatorMemoryRecord,
 } from '../../api/operator-api';
 import { fetchWorkspaceComposerPrefs, saveWorkspaceComposerPrefs } from '../../api/workspace-api';
+import { useShellStore } from '../../stores/shell';
 import {
   evidenceKindLabel,
   projectEmailTriageHandoffMeta,
@@ -54,6 +55,7 @@ const memoryExpanded = ref(false);
 const memoryTitle = ref('');
 const memoryContent = ref('');
 const statusLine = ref('');
+const shell = useShellStore();
 
 const workspaceId = computed(() => {
   const source = evidence.value?.sources.find((item) => item.workspace_id?.trim());
@@ -91,6 +93,7 @@ async function toggleWorkspaceAutonomy(): Promise<void> {
   try {
     const saved = await saveWorkspaceComposerPrefs(id, { auto_allowed_runtimes: nextRuntimes });
     workspaceAutoAllowed.value = saved.auto_allowed_runtimes ?? nextRuntimes;
+    await shell.loadWorkspaces({ sync: false });
   } catch (toggleError) {
     statusLine.value = toggleError instanceof Error ? toggleError.message : 'Autonomy toggle failed.';
   } finally {

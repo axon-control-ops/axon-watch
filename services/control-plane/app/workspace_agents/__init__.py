@@ -232,6 +232,8 @@ def build_company_roster(
         payload["display_name"] = workspace_record["display_name"]
     if workspace_record.get("project_root"):
         payload["project_root"] = workspace_record["project_root"]
+    if "auto_enabled" in workspace_record:
+        payload["auto_enabled"] = bool(workspace_record.get("auto_enabled"))
     return payload
 
 
@@ -317,6 +319,8 @@ def build_workspace_agent_record(
         payload["display_name"] = workspace_record["display_name"]
     if workspace_record.get("project_root"):
         payload["project_root"] = workspace_record["project_root"]
+    if "auto_enabled" in workspace_record:
+        payload["auto_enabled"] = bool(workspace_record.get("auto_enabled"))
     return payload
 
 

@@ -578,6 +578,34 @@ class WorkspaceWorkerPromptTests(unittest.TestCase):
         self.assertIn("scripts/guardrails/hotspot_budgets.json", prompt)
         self.assertNotIn("Hard scope anchors", prompt)
 
+    def test_prompt_surfaces_effective_write_scope_over_task_hints(self) -> None:
+        policy = type("Policy", (), {"write_paths": ("command-centre", "components")})()
+        with patch(
+            "app.workspace_agents.worker_prompt.build_team_roster_context",
+            return_value="",
+        ):
+            prompt = build_continuous_worker_prompt(
+                workspace_id="workspace_young_eagles_day_care",
+                employee=EmployeeConfig(
+                    name="Lila",
+                    role="frontend",
+                    owns="Command-centre frontend",
+                    schedule="continuous",
+                ),
+                task={
+                    "task_id": "task-register-gender-toggle",
+                    "goal": "Add a boy/girl toggle to the Daily Register UI in command-centre/assets/app.js.",
+                    "acceptance_criteria": "The Daily Register can filter boys and girls.",
+                    "allowed_paths": ["components"],
+                },
+                execution_policy=policy,
+            )
+        self.assertIn("Effective write scope from the runtime policy", prompt)
+        self.assertIn("`command-centre`", prompt)
+        self.assertIn("not the task's starting path hints", prompt)
+        self.assertIn("Starting path hints for this leased task", prompt)
+        self.assertIn("`components`", prompt)
+
 
 if __name__ == "__main__":
     unittest.main()

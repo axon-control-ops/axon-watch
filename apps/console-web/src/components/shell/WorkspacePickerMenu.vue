@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, ref, useId } from 'vue';
 
+import { fetchWorkspaceComposerPrefs } from '../../api/workspace-api';
+import type { WorkspaceRecord } from '../../contracts/canonical';
 import WorkspaceIcon from '../WorkspaceIcon.vue';
 import WorkspaceAddForm from './WorkspaceAddForm.vue';
 import { useWorkspaceAgents } from '../../features/workspace-agents/use-workspace-agents';
@@ -8,6 +10,7 @@ import { workspaceAgentLabel } from '../../features/workspace-agents/workspace-a
 import { floatingPanelPlacement } from '../../lib/floating-menu-position';
 import { workspaceIconKind } from '../../lib/mockup-workspace-icons';
 import {
+  applyWorkspacePickerAutoState,
   visibleWorkspacePickerEntries,
   workspacePickerMetaLabel,
   workspacePickerPrimaryLabel,
@@ -35,6 +38,8 @@ const menuRef = ref<HTMLElement | null>(null);
 // trigger's viewport rect instead.
 const panelRef = ref<HTMLElement | null>(null);
 const panelStyle = ref<Record<string, string>>({});
+const pickerAutoEnabledById = ref<Record<string, boolean>>({});
+let pickerAutoStateRequestId = 0;
 // Teleporting the panel to <body> puts it far from its trigger in DOM order,
 // so the implicit adjacency a screen reader would otherwise rely on is gone.
 // aria-controls restores that link explicitly.
@@ -66,6 +71,7 @@ async function openMenu(): Promise<void> {
   menuOpen.value = true;
   await nextTick();
   updatePanelPosition();
+  void refreshPickerCatalog();
 }
 
 function closeMenu(): void {
@@ -109,8 +115,12 @@ const currentWorkspaceKind = computed(() =>
   currentWorkspace.value ? workspaceIconKind(currentWorkspace.value.workspace_id) : 'hex',
 );
 
+const workspacesWithLiveAutoState = computed<WorkspaceRecord[]>(() =>
+  applyWorkspacePickerAutoState(shell.workspaces, pickerAutoEnabledById.value),
+);
+
 const visibleWorkspaces = computed(() =>
-  visibleWorkspacePickerEntries(shell.workspaces, currentWorkspaceId.value),
+  visibleWorkspacePickerEntries(workspacesWithLiveAutoState.value, currentWorkspaceId.value),
 );
 
 function workspaceRowMeta(workspaceId: string): string {
@@ -120,6 +130,33 @@ function workspaceRowMeta(workspaceId: string): string {
   }
   const workspace = shell.workspaces.find((entry) => entry.workspace_id === workspaceId);
   return workspace ? workspacePickerMetaLabel(workspace) : '';
+}
+
+async function refreshPickerAutoState(): Promise<void> {
+  const requestId = ++pickerAutoStateRequestId;
+  const workspaces = shell.workspaces.slice();
+  const results = await Promise.allSettled(
+    workspaces.map((workspace) => fetchWorkspaceComposerPrefs(workspace.workspace_id)),
+  );
+  if (requestId !== pickerAutoStateRequestId) {
+    return;
+  }
+  const next: Record<string, boolean> = {};
+  workspaces.forEach((workspace, index) => {
+    const result = results[index];
+    if (result?.status !== 'fulfilled') {
+      return;
+    }
+    next[workspace.workspace_id] = (result.value.auto_allowed_runtimes ?? []).length > 0;
+  });
+  pickerAutoEnabledById.value = next;
+}
+
+async function refreshPickerCatalog(): Promise<void> {
+  await shell.loadWorkspaces({ sync: false }).catch(() => undefined);
+  await refreshPickerAutoState().catch(() => undefined);
+  await nextTick();
+  updatePanelPosition();
 }
 
 function toggleMenu(event: MouseEvent): void {

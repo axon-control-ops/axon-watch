@@ -268,6 +268,7 @@ def dispatch_continuous_worker_run(
             workspace_id=workspace_id,
             employee=employee,
             task=task,
+            execution_policy=execution_policy,
         )
         ensure_agent_session(workspace_id=workspace_id, run_id=run_id)
         context = LaneBContext(workspace_id=workspace_id, composer_mode="agent")
@@ -397,9 +398,10 @@ def dispatch_continuous_worker_run(
                         and publish.delivery is not None
                         and execution_policy.execution_access == "full"
                     ):
-                        if no_change_delivery_is_successful_ops_task(task):
-                            finalized = complete_ops_no_change_delivery(
-                                run_id,
+                        if is_verification_task(task):
+                            finalized = complete_verification_no_change_delivery(
+                                run_id=run_id,
+                                task=task,
                                 fail_worker_run=lambda summary: fail_worker_run(
                                     run_id,
                                     receipt_summary=summary,
@@ -409,10 +411,12 @@ def dispatch_continuous_worker_run(
                                 finalized is not None
                                 and finalized.get("phase") == "completed"
                             )
-                        elif is_verification_task(task):
-                            finalized = complete_verification_no_change_delivery(
-                                run_id=run_id,
-                                task=task,
+                        elif (
+                            no_change_delivery_is_successful_ops_task(task)
+                            or gate.preflight_reason == "non-implementation task"
+                        ):
+                            finalized = complete_ops_no_change_delivery(
+                                run_id,
                                 fail_worker_run=lambda summary: fail_worker_run(
                                     run_id,
                                     receipt_summary=summary,

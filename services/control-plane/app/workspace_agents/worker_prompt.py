@@ -277,6 +277,29 @@ def _current_task_packet(
     )
 
 
+def _effective_write_scope_clause(execution_policy: Any | None) -> str:
+    if execution_policy is None:
+        return ""
+    raw_paths = getattr(execution_policy, "write_paths", ()) or ()
+    paths = [str(path).strip() for path in raw_paths if str(path).strip()]
+    if not paths:
+        return (
+            " Effective write scope: read-only for this run. If the objective requires "
+            "implementation, stop and report the missing writable roots instead of "
+            "pretending the task landed."
+        )
+    joined = ", ".join(f"`{path}`" for path in paths[:24])
+    suffix = "…" if len(paths) > 24 else ""
+    return (
+        f" Effective write scope from the runtime policy: {joined}{suffix}. "
+        "This list, not the task's starting path hints, is the authoritative write "
+        "surface for this shift. You may edit any directly relevant file inside these "
+        "roots for your professional role, and your receipt must name the exact files "
+        "changed. If a needed path is not listed here, assign that piece to the colleague "
+        "whose role owns it or ask Lead to re-scope the run."
+    )
+
+
 def parse_out_of_scope_guard(reply_text: str) -> str | None:
     match = _OUT_OF_SCOPE_GUARD_RE.search(str(reply_text or ""))
     if match is None:
@@ -409,6 +432,7 @@ def build_continuous_worker_prompt(
     workspace_id: str,
     employee: EmployeeConfig,
     task: dict[str, Any] | None = None,
+    execution_policy: Any | None = None,
 ) -> str:
     role = str(employee.role or "").strip().lower() or "workspace_agent"
     owns = str(employee.owns or "").strip() or _DEFAULT_OWNS.get(role, "assigned workspace work")
@@ -567,6 +591,7 @@ def build_continuous_worker_prompt(
         allowed_paths=allowed_paths,
         exclusive_paths=exclusive_paths,
     )
+    write_scope_clause = _effective_write_scope_clause(execution_policy)
     roster_block = build_team_roster_context(workspace_id, viewer_role=role)
     roster_clause = f"\n\n{roster_block}" if roster_block else ""
     # Receipts live in the project root, unreachable from the isolation checkout;
@@ -638,6 +663,7 @@ def build_continuous_worker_prompt(
         f"Execute only this leased task — do not invent, assume, or self-select other work. "
         f"The leased goal is the sole truth for this shift's scope. "
         f"{task_packet}"
+        f"{write_scope_clause}"
         f"Goal: {goal}.{acceptance_clause} "
         "Do it with verified receipts and summarize what changed. "
         "Stay inside your role boundary. Never hallucinate outcomes."

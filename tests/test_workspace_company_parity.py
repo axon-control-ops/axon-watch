@@ -28,6 +28,22 @@ class WorkspaceCompanyParityTests(unittest.TestCase):
         self.assertEqual(["Noor", "Blair", "Vera", "Hugo", "Tess"], names)
         self.assertTrue(all(row.get("azure_voice_id") for row in roster["employees"]))  # type: ignore[index]
 
+    def test_moveit_named_company_uses_requested_personas(self) -> None:
+        configs, defaults, companies, staffing = load_workspace_agent_configs()
+        roster = build_company_roster(
+            "MoveIT",
+            configs=configs,
+            defaults=defaults,
+            companies=companies,
+            staffing_template=staffing,
+        )
+        names_by_role = {
+            str(row["role"]): str(row["name"])
+            for row in roster["employees"]  # type: ignore[index]
+        }
+        self.assertEqual("Jabulani", names_by_role["lead"])
+        self.assertEqual("Ayesha", names_by_role["frontend"])
+
     def test_template_staffing_is_stable_per_workspace(self) -> None:
         first, _ = stable_role_persona("workspace_audio_transcribe", "lead")
         second, voice = stable_role_persona("workspace_audio_transcribe", "lead")

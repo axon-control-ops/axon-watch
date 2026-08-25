@@ -3,6 +3,7 @@ import { onMounted, ref } from 'vue';
 
 import { fetchWorkspaces, fetchWorkspaceComposerPrefs, saveWorkspaceComposerPrefs } from '../../api/workspace-api';
 import type { WorkspaceRecord } from '../../contracts/canonical';
+import { useShellStore } from '../../stores/shell';
 
 const ALL_RUNTIMES = ['codex', 'claude', 'cursor'];
 
@@ -17,6 +18,7 @@ interface WorkspaceAutonomyRow {
 const loadState = ref<'idle' | 'loading' | 'loaded' | 'error'>('idle');
 const errorMessage = ref<string | null>(null);
 const rows = ref<WorkspaceAutonomyRow[]>([]);
+const shell = useShellStore();
 
 function isOn(row: WorkspaceAutonomyRow): boolean {
   return row.autoAllowedRuntimes.length > 0;
@@ -61,6 +63,7 @@ async function toggleAutonomy(row: WorkspaceAutonomyRow): Promise<void> {
       auto_allowed_runtimes: nextRuntimes,
     });
     row.autoAllowedRuntimes = saved.auto_allowed_runtimes ?? nextRuntimes;
+    await shell.loadWorkspaces({ sync: false });
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : 'Toggle failed.';
   } finally {

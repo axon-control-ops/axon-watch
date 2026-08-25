@@ -107,6 +107,16 @@ class EffectiveExecutionPolicyTests(unittest.TestCase):
         self.assertEqual("full", policy.execution_access)
         self.assertTrue(policy.allow_all_tools)
 
+    def test_frontend_task_hint_does_not_remove_command_centre_scope(self) -> None:
+        policy = resolve_effective_policy(
+            role="frontend",
+            workspace_allowed_paths=("command-centre/", "components/", "docs/ops/"),
+            task_allowed_paths=("components/",),
+        )
+        self.assertIn("command-centre", policy.write_paths)
+        self.assertIn("components", policy.write_paths)
+        self.assertEqual("full", policy.execution_access)
+
     def test_missing_project_contract_fails_closed_for_write_mounts(self) -> None:
         policy = resolve_effective_policy(
             role="backend",

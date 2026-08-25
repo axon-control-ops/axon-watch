@@ -99,6 +99,7 @@ class WorkerDeliveryGateOutcome:
     reason: str
     publish: Any | None = None
     preserve_isolation: bool = False
+    preflight_reason: str = ""
 
 
 def implementation_requested(task: dict[str, Any] | None) -> bool:
@@ -556,4 +557,9 @@ def run_worker_delivery_gate(
                 f"Workspace delivery blocked by completion gate: {final.reason}",
                 preserve_isolation=True,
             )
-    return WorkerDeliveryGateOutcome(True, "completion gate passed", publish=publish)
+    return WorkerDeliveryGateOutcome(
+        True,
+        "completion gate passed",
+        publish=publish,
+        preflight_reason=preflight.reason,
+    )
