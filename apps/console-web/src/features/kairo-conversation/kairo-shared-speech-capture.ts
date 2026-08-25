@@ -88,7 +88,7 @@ function mapCaptureError(code: string): string | null {
     return null;
   }
   if (code === 'not-allowed') {
-    return 'Microphone permission denied — allow mic access for this site.';
+    return 'Microphone blocked — enable it in browser site controls. You can still type and use Ask or Dispatch.';
   }
   if (code === 'network') {
     return 'Speech recognition needs network access.';

@@ -299,12 +299,12 @@ onUnmounted(() => {
         <button
           type="button"
           class="status-bar-mockup__chip status-bar-mockup__chip--standup"
-          aria-label="Open VAXON stand-up report"
-          title="Open stand-up (REPORT) from anywhere"
+          aria-label="Generate a fresh VAXON fleet report"
+          title="Generate a fresh fleet report (REPORT)"
           @click="onOpenStandup"
         >
           <span class="status-bar-mockup__icon status-bar-mockup__icon--kairo" aria-hidden="true" />
-          <span class="status-bar-mockup__chip-label">Stand-up</span>
+          <span class="status-bar-mockup__chip-label">Fleet report</span>
         </button>
 
         <button
@@ -315,14 +315,14 @@ onUnmounted(() => {
             'status-bar-mockup__chip--kairo-warning':
               shell.kairoBriefingAttention.severity === 'warning',
           }"
-          :aria-label="`${shell.kairoBriefingAttentionLabel}. Open VAXON report.`"
-          :title="`${shell.kairoBriefingAttentionLabel}. Opens the VAXON report panel.`"
+          :aria-label="`${shell.kairoBriefingAttentionLabel}. View the latest operator briefing; this does not generate a new report.`"
+          :title="`${shell.kairoBriefingAttentionLabel} · View latest briefing (no new report)`"
           @click="shell.focusKairoBriefing()"
         >
           <span class="status-bar-mockup__kairo-pulse" aria-hidden="true" />
           <span class="status-bar-mockup__icon status-bar-mockup__icon--kairo" aria-hidden="true" />
           <span class="status-bar-mockup__chip-label">
-            Open <PersonaTitle suffix="Report" mark-size="xs" />
+            View <PersonaTitle suffix="Briefing" mark-size="xs" />
           </span>
           <span class="status-bar-mockup__chip-badge" aria-hidden="true">
             {{ shell.kairoBriefingAttention.badgeCount }}
