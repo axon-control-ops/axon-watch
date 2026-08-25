@@ -522,7 +522,9 @@ def compose_operator_report(snapshot: dict[str, Any]) -> dict[str, Any]:
     work = _work_bits(snapshot)
     reports = [row for row in snapshot.get("workspace_reports") or [] if isinstance(row, dict)]
     workspace_updates = workspace_update_bits(reports, _spell_count)
-    rollups = fleet_lead_rollup_bits(snapshot, reports, _lead_rollup_bits) or _lead_rollup_bits(snapshot)
+    rollups = fleet_lead_rollup_bits(snapshot, reports, _lead_rollup_bits)
+    if not reports and snapshot.get("handoffs"):
+        rollups = _lead_rollup_bits(snapshot)
     fleet = _fleet_bits(snapshot)
     nxt = _next_move(snapshot)
 
