@@ -7,13 +7,21 @@ from __future__ import annotations
 
 import hashlib
 import json
-import re
 from typing import Any
 
 from app.kairo.report_next_move import (
     degraded_reasons as _degraded_reasons,
     next_move as _next_move,
     remote_ingress_soft as _remote_ingress_soft,
+)
+from app.kairo.operator_report_intent import is_operator_report_request
+from app.kairo.operator_fleet_report import (
+    collect_workspace_reports,
+    fingerprint_rows,
+    fleet_lead_rollup_bits,
+    live_fleet_health,
+    render_report_text,
+    workspace_update_bits,
 )
 from app.kairo.report_text import (
     _scrub_operator_line,
@@ -33,38 +41,6 @@ _BUSY_STATUSES = frozenset(
     }
 )
 
-_REPORT_HOTWORD_RE = re.compile(
-    r"^(?:report|status(?:\s+report)?|update|stand[\s-]?up|"
-    r"where\s+do\s+we\s+stand|where\s+are\s+we(?:\s+now)?|"
-    r"what(?:'?s| is)\s+(?:going\s+on|happening))\s*[.!]?\s*$",
-    re.IGNORECASE,
-)
-
-# Fleet stand-up phrases — avoid matching "report back when done" completion asks.
-_REPORT_PHRASE_RE = re.compile(
-    r"\b("
-    r"status report|"
-    r"stand[\s-]?up|"
-    r"where things stand|"
-    r"where do we stand|"
-    r"roll.?up|"
-    r"brief(?:ing)? me|"
-    r"jarvis-style second-brain stand-up|"
-    r"what each teammate|"
-    r"team status|"
-    r"single best next move|"
-    r"work in flight|"
-    r"lead rollups?"
-    r")\b",
-    re.IGNORECASE,
-)
-
-# Bare "report" only when it is the ask — not "report back", "reporting", etc.
-_REPORT_WORD_ASK_RE = re.compile(
-    r"(?:^|[—\-,:;]\s*)report(?:\s*[—\-:]|\s+on\b|\s*$)",
-    re.IGNORECASE,
-)
-
 _NUMBER_WORDS = {
     0: "zero",
     1: "one",
@@ -82,24 +58,6 @@ _NUMBER_WORDS = {
 
 def _spell_count(n: int) -> str:
     return _NUMBER_WORDS.get(int(n), str(int(n)))
-
-
-def is_operator_report_request(content: str) -> bool:
-    """True when the operator asked for a fleet stand-up / REPORT."""
-    trimmed = str(content or "").strip()
-    if not trimmed:
-        return False
-    if _REPORT_HOTWORD_RE.match(trimmed):
-        return True
-    lower = trimmed.lower()
-    # Completion instructions ("handle X and report back") are not stand-ups.
-    if re.search(r"\breport\s+back\b", lower):
-        return False
-    if lower.startswith("report —") or lower.startswith("report -"):
-        return True
-    if _REPORT_PHRASE_RE.search(trimmed):
-        return True
-    return bool(_REPORT_WORD_ASK_RE.search(trimmed))
 
 
 def _employee_rows(company: dict[str, Any] | None) -> list[dict[str, Any]]:
@@ -283,6 +241,8 @@ def build_operator_report_snapshot(
     fleet = (pack or {}).get("fleet") if isinstance(pack, dict) else {}
     if not isinstance(fleet, dict):
         fleet = {}
+    # REPORT is the explicit request that expands count-only context fleet data.
+    fleet = live_fleet_health(fleet)
 
     scoped = str(workspace_id or "").strip() or str(
         (briefing.get("scope") or {}).get("workspace_id") or ""
@@ -292,6 +252,20 @@ def build_operator_report_snapshot(
     handoffs = _fresh_handoffs(
         list_verified_lead_handoffs(workspace_id=scoped or None, limit=8),
         dispatch_ready=dispatch_ready,
+    )
+
+    workspace_reports = collect_workspace_reports(
+        fleet=fleet,
+        scoped_workspace_id=scoped,
+        scoped_roster=roster,
+        scoped_handoffs=handoffs,
+        roster_loader=lambda workspace: _roster_snapshot(
+            workspace, dispatch_ready=dispatch_ready
+        ),
+        handoff_loader=lambda workspace: _fresh_handoffs(
+            list_verified_lead_handoffs(workspace_id=workspace, limit=4),
+            dispatch_ready=dispatch_ready,
+        ),
     )
 
     top_signals = [
@@ -333,6 +307,7 @@ def build_operator_report_snapshot(
             for row in handoffs
             if str(row.get("receipt_id") or "").strip()
         ],
+        "workspace_reports": fingerprint_rows(workspace_reports),
         "notice": str(briefing.get("notice") or "").strip(),
         "advise": str(briefing.get("advise") or "").strip(),
     }
@@ -351,6 +326,7 @@ def build_operator_report_snapshot(
         "pending_approvals": pending,
         "awaiting_engagement_count": awaiting,
         "next_safe_actions": next_actions,
+        "workspace_reports": workspace_reports,
         "fingerprint": fingerprint,
     }
 
@@ -523,7 +499,7 @@ def _lead_rollup_bits(snapshot: dict[str, Any]) -> list[str]:
 
 def _fleet_bits(snapshot: dict[str, Any]) -> list[str]:
     fleet = snapshot.get("fleet") or {}
-    total = int(fleet.get("workspace_count") or 0)
+    total = int(fleet.get("workspace_count") or fleet.get("count") or 0)
     critical = int(fleet.get("critical_count") or 0)
     attention = int(fleet.get("attention_count") or 0)
     bits: list[str] = []
@@ -544,42 +520,30 @@ def compose_operator_report(snapshot: dict[str, Any]) -> dict[str, Any]:
     """Compose fixed-section REPORT text from a snapshot."""
     attention = _attention_bits(snapshot)
     work = _work_bits(snapshot)
-    rollups = _lead_rollup_bits(snapshot)
+    reports = [row for row in snapshot.get("workspace_reports") or [] if isinstance(row, dict)]
+    workspace_updates = workspace_update_bits(reports, _spell_count)
+    rollups = fleet_lead_rollup_bits(snapshot, reports, _lead_rollup_bits) or _lead_rollup_bits(snapshot)
     fleet = _fleet_bits(snapshot)
     nxt = _next_move(snapshot)
 
     sections = {
         "attention": attention,
         "work_in_flight": work,
+        "workspace_updates": workspace_updates,
         "lead_rollups": rollups,
         "fleet": fleet,
         "next_move": nxt,
     }
 
-    if not attention and not work and not rollups:
-        text = (
-            "Here's the stand-up. Attention: nothing screaming. "
-            "Work in flight: idle. "
-            f"Fleet: {', '.join(fleet)}. "
-            f"Next move: {nxt}."
-        )
-    else:
-        parts = [
-            "Here's the stand-up.",
-            f"Attention: {', '.join(attention) if attention else 'nothing screaming'}.",
-            f"Work in flight: {', '.join(work) if work else 'idle'}.",
-        ]
-        if rollups:
-            parts.append(f"Lead rollups: {'; '.join(rollups)}.")
-        else:
-            parts.append("Lead rollups: none verified yet.")
-        parts.append(f"Fleet: {', '.join(fleet)}.")
-        parts.append(f"Next move: {nxt}.")
-        text = " ".join(parts)
+    text, spoken = render_report_text(
+        snapshot=snapshot, attention=attention, work=work,
+        workspace_updates=workspace_updates, rollups=rollups, fleet=fleet,
+        next_move=nxt, spell_count=_spell_count,
+    )
 
     return {
         "text": text,
-        "spoken": text,
+        "spoken": spoken,
         "sections": sections,
         "fingerprint": snapshot.get("fingerprint"),
         "lane": "deterministic_report",
