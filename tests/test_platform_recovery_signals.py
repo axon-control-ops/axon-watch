@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import sys
 import unittest
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 CONTROL_PLANE_ROOT = Path(__file__).resolve().parents[1] / "services" / "control-plane"
@@ -99,6 +99,84 @@ class StaleSignalTests(unittest.TestCase):
         record_failure("provider.ai")
         opened = record_failure("provider.ai")
         self.assertEqual("OPEN", opened["state"])
+        self.assertFalse(allow_request("provider.ai"))
+
+    def test_circuit_allows_one_half_open_probe_after_cooldown(self) -> None:
+        from app.platform_recovery.circuit_breaker import allow_request, get_circuit, record_failure
+        from app.platform_recovery.store import reset_store
+
+        base = datetime(2026, 8, 25, 12, 0, tzinfo=timezone.utc)
+        reset_store()
+        self.addCleanup(reset_store)
+
+        for _ in range(3):
+            record_failure("provider.ai", clock=lambda: base)
+
+        before_cooldown = base + timedelta(seconds=59)
+        self.assertFalse(allow_request("provider.ai", clock=lambda: before_cooldown))
+
+        after_cooldown = base + timedelta(seconds=60)
+        self.assertTrue(allow_request("provider.ai", clock=lambda: after_cooldown))
+        self.assertEqual("HALF_OPEN", get_circuit("provider.ai")["state"])
+        self.assertFalse(allow_request("provider.ai", clock=lambda: after_cooldown))
+
+    def test_half_open_success_closes_circuit(self) -> None:
+        from app.platform_recovery.circuit_breaker import allow_request, get_circuit, record_failure, record_success
+        from app.platform_recovery.store import reset_store
+
+        base = datetime(2026, 8, 25, 12, 0, tzinfo=timezone.utc)
+        reset_store()
+        self.addCleanup(reset_store)
+
+        for _ in range(3):
+            record_failure("provider.ai", clock=lambda: base)
+        self.assertTrue(
+            allow_request("provider.ai", clock=lambda: base + timedelta(seconds=60))
+        )
+
+        closed = record_success("provider.ai", clock=lambda: base + timedelta(seconds=61))
+        self.assertEqual("CLOSED", closed["state"])
+        self.assertEqual(0, closed["failure_count"])
+        self.assertIsNone(closed["opened_at"])
+        self.assertTrue(allow_request("provider.ai", clock=lambda: base + timedelta(seconds=62)))
+        self.assertEqual("CLOSED", get_circuit("provider.ai")["state"])
+
+    def test_failed_half_open_probe_reopens_and_restarts_cooldown(self) -> None:
+        from app.platform_recovery.circuit_breaker import allow_request, get_circuit, record_failure
+        from app.platform_recovery.store import reset_store
+
+        base = datetime(2026, 8, 25, 12, 0, tzinfo=timezone.utc)
+        reset_store()
+        self.addCleanup(reset_store)
+
+        for _ in range(3):
+            record_failure("provider.ai", clock=lambda: base)
+        self.assertTrue(
+            allow_request("provider.ai", clock=lambda: base + timedelta(seconds=60))
+        )
+
+        reopened = record_failure("provider.ai", clock=lambda: base + timedelta(seconds=61))
+        self.assertEqual("OPEN", reopened["state"])
+        self.assertFalse(allow_request("provider.ai", clock=lambda: base + timedelta(seconds=120)))
+        self.assertTrue(allow_request("provider.ai", clock=lambda: base + timedelta(seconds=121)))
+        self.assertEqual("HALF_OPEN", get_circuit("provider.ai")["state"])
+
+    def test_open_circuit_without_timestamp_fails_closed(self) -> None:
+        from app.platform_recovery.circuit_breaker import allow_request
+        from app.platform_recovery.store import managed_connection, reset_store
+
+        reset_store()
+        self.addCleanup(reset_store)
+        with managed_connection() as conn:
+            conn.execute(
+                """
+                INSERT INTO circuit_breakers (name, state, failure_count)
+                VALUES (?, ?, ?)
+                """,
+                ("provider.ai", "OPEN", 3),
+            )
+            conn.commit()
+
         self.assertFalse(allow_request("provider.ai"))
 
 
