@@ -39,6 +39,8 @@ export interface WorkspaceAgentRecord {
   display_name?: string;
   project_root?: string;
   company_name?: string;
+  /** Mirrors the workspace AUTO dispatch/runtime toggle for agent surfaces. */
+  auto_enabled?: boolean;
 }
 
 export interface WorkspaceAgentListSnapshot {

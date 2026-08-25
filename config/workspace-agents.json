@@ -225,6 +225,47 @@
         }
       ]
     },
+    "MoveIT": {
+      "company_name": "move-it",
+      "employees": [
+        {
+          "name": "Jabulani",
+          "role": "lead",
+          "owns": "MoveIT priorities, handoffs, and product direction",
+          "schedule": "on_demand",
+          "primary": true,
+          "azure_voice_id": "en-ZA-LeahNeural"
+        },
+        {
+          "name": "Remy",
+          "role": "watcher",
+          "owns": "MoveIT signals, connectors, and runtime health",
+          "schedule": "always_on",
+          "azure_voice_id": "en-GB-ThomasNeural"
+        },
+        {
+          "name": "Ayesha",
+          "role": "frontend",
+          "owns": "MoveIT UI/UX, shell, and frontend polish",
+          "schedule": "continuous",
+          "azure_voice_id": "en-GB-LibbyNeural"
+        },
+        {
+          "name": "Reed",
+          "role": "backend",
+          "owns": "MoveIT APIs, control plane, and persistence",
+          "schedule": "continuous",
+          "azure_voice_id": "en-GB-ElliotNeural"
+        },
+        {
+          "name": "Sol",
+          "role": "integrations",
+          "owns": "MoveIT connectors and integrated services",
+          "schedule": "continuous",
+          "azure_voice_id": "en-GB-HollieNeural"
+        }
+      ]
+    },
     "workspace_axon_local": {
       "company_name": "Axon Local",
       "employees": [

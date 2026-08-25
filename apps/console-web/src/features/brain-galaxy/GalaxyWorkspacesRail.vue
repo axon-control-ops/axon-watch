@@ -6,6 +6,7 @@ import { fetchWorkspaceComposerPrefs, saveWorkspaceComposerPrefs } from '../../a
 import type { BrainGraphSnapshot } from '../../lib/operator-brain-graph-view';
 import type { FleetHealthSnapshot } from '../../lib/operator-fleet-health-view';
 import type { WorkspaceRecord } from '../../contracts/canonical';
+import { useShellStore } from '../../stores/shell';
 import type { GalaxyMockupRailItem } from './galaxy-mockup-rail-view';
 import { galaxyMockupRailItemsWithChips } from './galaxy-workspaces-rail-view';
 
@@ -28,6 +29,7 @@ const emit = defineEmits<{
 
 const query = ref('');
 const showAddForm = ref(false);
+const shell = useShellStore();
 
 const items = computed(() =>
   galaxyMockupRailItemsWithChips(
@@ -92,6 +94,7 @@ async function toggleAutonomy(event: Event, workspaceId: string): Promise<void> 
       ...autonomyByWorkspace.value,
       [workspaceId]: saved.auto_allowed_runtimes ?? nextRuntimes,
     };
+    await shell.loadWorkspaces({ sync: false });
   } finally {
     autonomySaving.value = { ...autonomySaving.value, [workspaceId]: false };
   }

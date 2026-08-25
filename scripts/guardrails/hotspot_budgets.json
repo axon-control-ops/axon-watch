@@ -135,7 +135,7 @@
       "note": "Sandbox launch and policy materialization; ratcheted to current dirty baseline while constitution/runtime policy work is committed; extract policy helpers next."
     },
     "services/control-plane/app/workspace_agents/worker_prompt.py": {
-      "max_lines": 669,
+      "max_lines": 577,
       "soft_limit": 350,
       "hard_limit": 650,
       "target": "services/control-plane/app/workspace_agents/worker_prompt_*.py",
@@ -786,7 +786,7 @@
       "note": "Ratchet added on 2026-08-24 so the global file-size guard reflects the current fleet baseline; extract before increasing."
     },
     "tests/test_workspace_worker_prompt.py": {
-      "max_lines": 583,
+      "max_lines": 516,
       "soft_limit": 350,
       "hard_limit": 500,
       "target": "extract into focused modules before further growth",

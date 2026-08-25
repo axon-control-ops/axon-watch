@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import type { WorkspaceRecord } from '../contracts/canonical';
 
 import {
+  applyWorkspacePickerAutoState,
   shortenWorkspacePath,
   visibleWorkspacePickerEntries,
   workspacePickerMetaLabel,
@@ -79,6 +80,41 @@ describe('workspace picker view', () => {
 
     it('returns an empty list when every entry is inactive and none is selected', () => {
       expect(visibleWorkspacePickerEntries([unstaffed], null)).toEqual([]);
+    });
+
+    it('uses auto_enabled as the operator on/off source of truth when present', () => {
+      const autoOnWithoutStaff: WorkspaceRecord = {
+        workspace_id: 'MoveIT',
+        has_active_team: false,
+        auto_enabled: true,
+      };
+      const autoOffWithStaff: WorkspaceRecord = {
+        workspace_id: 'workspace_axon_local',
+        has_active_team: true,
+        auto_enabled: false,
+      };
+
+      expect(
+        visibleWorkspacePickerEntries([autoOnWithoutStaff, autoOffWithStaff], null).map(
+          (workspace) => workspace.workspace_id,
+        ),
+      ).toEqual(['MoveIT']);
+    });
+
+    it('can overlay live AUTO prefs onto stale workspace records before filtering', () => {
+      const staleRecords: WorkspaceRecord[] = [
+        { workspace_id: 'MoveIT', has_active_team: false },
+        { workspace_id: 'workspace_axon_local', has_active_team: true },
+      ];
+
+      const withLiveState = applyWorkspacePickerAutoState(staleRecords, {
+        MoveIT: true,
+        workspace_axon_local: false,
+      });
+
+      expect(visibleWorkspacePickerEntries(withLiveState, null).map((w) => w.workspace_id)).toEqual([
+        'MoveIT',
+      ]);
     });
   });
 });

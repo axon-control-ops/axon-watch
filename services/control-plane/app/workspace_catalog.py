@@ -47,6 +47,23 @@ def _staffed_workspace_ids() -> frozenset[str]:
     )
 
 
+def _workspace_auto_enabled(workspace_id: str) -> bool | None:
+    """Whether the operator has switched AUTO dispatch on for this workspace.
+
+    The workspace picker is an operator surface, so "on/off" should follow the
+    same per-workspace AUTO toggle used by Mission Control instead of inferring
+    activity from whether a hand-authored company roster exists.
+    """
+    try:
+        from app.persistence.workspace_composer_prefs_store import get_workspace_composer_prefs
+
+        prefs = get_workspace_composer_prefs(workspace_id)
+    except Exception:  # noqa: BLE001 - catalog listings must remain best-effort
+        return None
+    allowed = prefs.get("auto_allowed_runtimes")
+    return isinstance(allowed, list) and any(isinstance(item, str) and item.strip() for item in allowed)
+
+
 def _workspace_record(
     workspace_id: str,
     binding: WorkspaceProjectBinding | None = None,
@@ -54,11 +71,14 @@ def _workspace_record(
     staffed_ids: frozenset[str] | None = None,
 ) -> dict[str, str | bool]:
     staffed = staffed_ids if staffed_ids is not None else _staffed_workspace_ids()
+    auto_enabled = _workspace_auto_enabled(workspace_id)
     record: dict[str, str | bool] = {
         "workspace_id": workspace_id,
         "connection_kind": "project_path" if binding else "isolated_root",
         "has_active_team": workspace_id in staffed,
     }
+    if auto_enabled is not None:
+        record["auto_enabled"] = auto_enabled
     if binding is not None:
         record["project_root"] = str(binding.project_root)
         if binding.display_name:

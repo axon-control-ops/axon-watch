@@ -115,6 +115,7 @@ async function save(): Promise<void> {
       claude_cli_model: runtimeModels.value.claude,
       codex_cli_model: runtimeModels.value.codex,
     });
+    await shell.loadWorkspaces({ sync: false });
     actionTone.value = 'ok';
     actionMessage.value = 'Runtime policy saved.';
   } catch (error) {

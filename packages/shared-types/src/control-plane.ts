@@ -13,6 +13,8 @@ export interface WorkspaceRecord {
    * workspace with at least one enabled employee — i.e. someone is
    * actually staffed to work here right now. */
   has_active_team?: boolean;
+  /** True when this workspace's AUTO dispatch/runtime toggle is switched on. */
+  auto_enabled?: boolean;
 }
 
 export interface WorkspaceHandoffRecord {
