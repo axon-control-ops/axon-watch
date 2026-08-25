@@ -66,6 +66,8 @@ class OperatorDeterministicReportTests(unittest.TestCase):
         self.assertTrue(is_operator_report_request("REPORT"))
         self.assertTrue(is_operator_report_request("status"))
         self.assertTrue(is_operator_report_request("where do we stand"))
+        self.assertTrue(is_operator_report_request("give me a detailed report"))
+        self.assertTrue(is_operator_report_request("summarise all workspace work"))
         self.assertTrue(
             is_operator_report_request(
                 "REPORT — give me a JARVIS-style second-brain stand-up in plain English."
@@ -81,9 +83,7 @@ class OperatorDeterministicReportTests(unittest.TestCase):
         self.assertFalse(is_operator_report_request("report back when done"))
 
     def test_compose_names_busy_and_completed_and_receipt_handoffs(self) -> None:
-        from app.kairo.operator_deterministic_report import (
-            compose_operator_report,
-        )
+        from app.kairo.operator_deterministic_report import compose_operator_report
         from app.workspace_agents.lead_vaxon_handoff import post_ad_hoc_lead_takeover_to_vaxon
 
         with patch("app.live_events.broadcast_material_change"):
