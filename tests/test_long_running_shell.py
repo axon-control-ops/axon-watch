@@ -10,6 +10,7 @@ CONTROL_PLANE_ROOT = Path(__file__).resolve().parents[1] / "services" / "control
 sys.path.insert(0, str(CONTROL_PLANE_ROOT))
 
 from app.cli_runtime.long_running_shell import is_long_running_ship_shell  # noqa: E402
+from app.cli_runtime.long_running_shell_prompt import LONG_RUNNING_SHELL_CLAUSE  # noqa: E402
 from app.cli_runtime.stream_blocks.terminal_blocks import (  # noqa: E402
     render_axon_job_terminal_fence,
     upsert_axon_job_terminal_fence,
@@ -24,10 +25,24 @@ from app.terminal.agent_job_chat import (  # noqa: E402
 
 
 class LongRunningShellTests(unittest.TestCase):
+    def test_prompt_clause_does_not_block_on_disposable_git(self) -> None:
+        self.assertIn("missing `.git`", LONG_RUNNING_SHELL_CLAUSE)
+        self.assertIn("real workspace by `--workspace`", LONG_RUNNING_SHELL_CLAUSE)
+        self.assertIn("`--no-stream`", LONG_RUNNING_SHELL_CLAUSE)
+
     def test_classifier_matches_ota_eas_expo(self) -> None:
         self.assertTrue(is_long_running_ship_shell("npm run ota:canary"))
         self.assertTrue(is_long_running_ship_shell("eas update --branch operator-canary"))
         self.assertTrue(is_long_running_ship_shell("npx expo export --platform android"))
+        self.assertTrue(is_long_running_ship_shell("vercel deploy --prod --yes"))
+        self.assertTrue(
+            is_long_running_ship_shell(
+                "node scripts/ops/deploy-vercel-production.mjs --method=cli"
+            )
+        )
+        self.assertTrue(is_long_running_ship_shell("npm run vercel-build"))
+        self.assertTrue(is_long_running_ship_shell("bash scripts/deploy/prod"))
+        self.assertTrue(is_long_running_ship_shell("bash scripts/deploy --prod"))
         self.assertFalse(is_long_running_ship_shell("git status"))
         self.assertFalse(is_long_running_ship_shell("npm test"))
         self.assertFalse(is_long_running_ship_shell("npm run export"))

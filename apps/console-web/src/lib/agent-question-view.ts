@@ -152,17 +152,22 @@ export function tryParseClarifyingMarkdown(text: string): AgentQuestionView | nu
   if (!trimmed || trimmed.length > MAX_CLARIFYING_SOURCE_CHARS) {
     return null;
   }
+  const lines = trimmed.split('\n');
   const lower = trimmed.toLowerCase();
+  const hasExplicitQuestion = lines.some((line) => {
+    const candidate = line.trim();
+    return candidate.endsWith('?') && candidate.length <= MAX_CLARIFYING_PROMPT_CHARS;
+  });
   // Use word boundaries — "picking" / "chosen" in status dumps must not promote asks.
   const looksLikeAsk =
     /\breply with\b/.test(lower)
     || lower.includes('what should this plan focus')
-    || (/\b[123]\b/.test(trimmed) && /\b(?:pick|choose)\b/.test(lower));
+    || (/\b[123]\b/.test(trimmed) && /\b(?:pick|choose)\b/.test(lower))
+    || hasExplicitQuestion;
   if (!looksLikeAsk) {
     return null;
   }
 
-  const lines = trimmed.split('\n');
   const options = parseAskOptions(lines);
   if (options.length < 2 || options.length > MAX_CLARIFYING_OPTIONS) {
     return null;

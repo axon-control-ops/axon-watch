@@ -17,7 +17,7 @@ import { groupIdeConversationTurns } from '../../lib/group-ide-conversation-turn
 import { operatorArtifactRecords } from '../../lib/operator-artifact-view';
 import type { OperatorThreadEntry, ThreadMessageAttachment } from '../../lib/operator-thread';
 import { agentContentHasTranscriptBlocks } from '../../lib/agent-transcript-blocks';
-import { createTranscriptSegmentCache } from '../../lib/conversation-transcript-segment-cache';
+import { sharedTranscriptSegmentCache } from '../../lib/conversation-transcript-segment-cache';
 import { sanitizeAgentThinkingForOperator, THINKING_SPEECH_FALLBACK } from '../../lib/agent-live-line-view';
 import { prepareAgentTerminalOpen } from '../../lib/agent-terminal-open';
 import {
@@ -86,7 +86,7 @@ export function useConversationSeamPanel(rootRef: Ref<HTMLElement | null>, listR
   const expandedErrorByMessageId = ref<Record<string, boolean>>({});
   const expandedSystemByMessageId = ref<Record<string, boolean>>({});
   const expandedThinkingKeys = ref<Record<string, boolean>>({});
-  const { transcriptSegments } = createTranscriptSegmentCache();
+  const { transcriptSegments } = sharedTranscriptSegmentCache();
 
   function toggleErrorExpanded(messageId: string): void {
     expandedErrorByMessageId.value = {

@@ -28,7 +28,6 @@ import {
 import type { WorkspaceDocumentDescriptor } from '../../lib/workspace-documents';
 import { editorDocumentResourcePath } from '../../lib/editor-tab-labels';
 import {
-  buildIdeAgentSidebarStub,
   buildIdeRunPanelConnectorNotice,
   buildIdeTerminalSidebarStub,
   ideSidebarStubActionAriaLabel,
@@ -37,10 +36,9 @@ import {
 import {
   ensureWatchConnectorsLoaded,
   ensureWorkspaceFilesLoaded,
-  openEmployeeShiftRetry,
   openWatchConnectors,
 } from '../../composables/useIdeEditorStatusBar';
-import { employeeFailureRetryActionLabel } from '../../features/workspace-agents/company-roster-view';
+import { shouldOfferRunStop } from '../../lib/run-lifecycle-ui';
 import { useShellStore } from '../../stores/shell';
 
 const shell = useShellStore();
@@ -139,21 +137,6 @@ const gitPanelListAriaLabel = computed(() => ideGitPanelListAriaLabel(dirtyFileC
 
 const gitCaptionLive = computed(() => ideGitPanelCaptionUsesLiveRegion(dirtyFileCount.value));
 
-const agentSidebarStub = computed(() => {
-  const failureLine = (shell.activeIdeEmployeeFailureLine ?? '').trim();
-  const employee = shell.activeIdeEmployeeRecord;
-  return buildIdeAgentSidebarStub({
-    agentDockCollapsed: shell.agentDockCollapsed,
-    streaming: shell.agentStreamActive,
-    pendingApprovals: shell.pendingApprovalsCount,
-    runPhase: shell.primaryActiveRun?.phase ?? null,
-    employeeFailureLine: shell.activeIdeEmployeeFailureLine,
-    employeeShiftInterrupted: shell.activeIdeEmployeeShiftInterrupted,
-    employeeRetryActionLabel:
-      employee && failureLine ? employeeFailureRetryActionLabel(employee) : null,
-  });
-});
-
 const terminalSidebarStub = computed(() =>
   buildIdeTerminalSidebarStub({
     terminalVisible: shell.workbenchTerminalPanelVisible,
@@ -180,24 +163,7 @@ const runConnectorNotice = computed(() =>
   }),
 );
 
-function toggleAgentDockFromStub(): void {
-  shell.toggleAgentDock();
-}
-
-function retryEmployeeShiftFromStub(): void {
-  openEmployeeShiftRetry({
-    shell,
-    showAgentDock: () => {
-      if (shell.agentDockCollapsed) {
-        shell.toggleAgentDock();
-      }
-    },
-  });
-}
-
-function toggleTerminalFromStub(): void {
-  shell.toggleIdeTerminalPanel();
-}
+function toggleTerminalFromStub(): void { shell.toggleIdeTerminalPanel(); }
 
 function openConnectorsFromRunNotice(): void {
   openWatchConnectors(shell);
@@ -553,75 +519,14 @@ watch(
         {{ shell.primaryActiveRun.summary }}
       </p>
       <button
-        v-if="shell.primaryActiveRun && (shell.canStopPrimaryRun || shell.primaryActiveRun.phase === 'executing')"
+        v-if="shouldOfferRunStop(shell.primaryActiveRun?.can_stop)"
         type="button"
         class="ide-panel-action"
-        :disabled="!shell.canStopPrimaryRun && shell.primaryActiveRun.phase !== 'executing'"
+        :disabled="!shell.canStopPrimaryRun"
         @click="shell.stopPrimaryRun()"
       >
         {{ shell.runMutationState === 'stopping' ? 'STOPPING…' : 'STOP RUN' }}
       </button>
-    </div>
-  </section>
-
-  <section
-    v-else-if="shell.ideActivityView === 'agent'"
-    class="ide-explorer-panel ide-explorer-panel--stub hud-panel-frame"
-    :class="`ide-explorer-panel--stub-${agentSidebarStub.tone}`"
-  >
-    <div class="panel-heading ide-explorer-panel__heading">
-      <p class="panel-heading__title">AGENT</p>
-      <button
-        type="button"
-        class="panel-heading__action ide-explorer-panel__collapse"
-        :aria-label="ideActivityPanelCollapseAriaLabel('agent')"
-        :title="ideActivityPanelCollapseAriaLabel('agent')"
-        @click="shell.toggleIdeExplorer()"
-      >
-        ‹
-      </button>
-    </div>
-    <div
-      class="ide-explorer-panel__stub-body"
-      :role="ideSidebarStubUsesLiveRegion(agentSidebarStub.tone, 'agent') ? 'status' : undefined"
-      :aria-live="
-        ideSidebarStubUsesLiveRegion(agentSidebarStub.tone, 'agent') ? 'polite' : undefined
-      "
-    >
-      <p
-        v-for="(line, index) in agentSidebarStub.lines"
-        :key="index"
-        class="region-copy ide-explorer-panel__stub-copy"
-      >
-        {{ line }}
-      </p>
-      <div
-        v-if="agentSidebarStub.actionLabel || agentSidebarStub.secondaryActionLabel"
-        class="ide-explorer-panel__stub-actions"
-      >
-        <button
-          v-if="agentSidebarStub.actionLabel"
-          type="button"
-          class="ide-explorer-panel__stub-action"
-          :aria-label="
-            ideSidebarStubActionAriaLabel(agentSidebarStub.actionLabel, 'agent')
-          "
-          @click="toggleAgentDockFromStub"
-        >
-          {{ agentSidebarStub.actionLabel }}
-        </button>
-        <button
-          v-if="agentSidebarStub.secondaryActionLabel"
-          type="button"
-          class="ide-explorer-panel__stub-action ide-explorer-panel__stub-action--secondary"
-          :aria-label="
-            ideSidebarStubActionAriaLabel(agentSidebarStub.secondaryActionLabel, 'agent')
-          "
-          @click="retryEmployeeShiftFromStub"
-        >
-          {{ agentSidebarStub.secondaryActionLabel }}
-        </button>
-      </div>
     </div>
   </section>
 

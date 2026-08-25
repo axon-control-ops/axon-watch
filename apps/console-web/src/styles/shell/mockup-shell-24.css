@@ -134,6 +134,55 @@
   color: rgba(0, 210, 255, 0.92);
 }
 
+.conversation-seam__speaker-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.26rem;
+  max-width: 14rem;
+  min-height: 1.12rem;
+  padding: 0.08rem 0.42rem;
+  border: 1px solid var(--thread-speaker-border, rgba(96, 190, 230, 0.58));
+  border-radius: 999px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.06), transparent),
+    color-mix(in srgb, var(--thread-speaker-bg, #1f4f6e) 48%, rgba(2, 12, 22, 0.9));
+  color: var(--thread-speaker-fg, rgba(0, 210, 255, 0.92));
+  font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, Consolas, monospace);
+  font-size: 0.56rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  line-height: 1;
+  text-transform: uppercase;
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.035),
+    0 0 10px color-mix(in srgb, var(--thread-speaker-bg, #1f4f6e) 38%, transparent);
+}
+
+.conversation-seam__speaker-chip > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.conversation-seam__embedded-reports {
+  display: grid;
+  gap: 0.42rem;
+  white-space: normal;
+}
+
+.conversation-seam__embedded-report-line {
+  display: grid;
+  gap: 0.22rem;
+}
+
+.conversation-seam__embedded-report-line pre {
+  margin: 0;
+  color: inherit;
+  font: inherit;
+  line-height: inherit;
+  white-space: pre-wrap;
+}
+
 .conversation-seam__resend-button,
 .conversation-seam__edit-button {
   flex-shrink: 0;
@@ -338,4 +387,3 @@
   max-width: 100%;
   min-width: 0;
 }
-

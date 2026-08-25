@@ -16,6 +16,9 @@ export function employeeIsActivelyBusy(employee: CompanyEmployeeRecord): boolean
   if (!employee.enabled) {
     return false;
   }
+  if (employee.pending_decision_id && !employee.active_run_id?.trim()) {
+    return false;
+  }
   // Own role-tagged run is personal busy once dispatched. Continuous workers often
   // stay `watching` with an active_run_id while the IDE stream is live — count them.
   // Lead fan-out `assigned` (queued, not started) must not light "N BUSY".
@@ -46,6 +49,43 @@ export function companyBusyEmployeesCount(
   return companyBusyEmployees(employees).length;
 }
 
+export type ReportingEmployeeResolutionInput = {
+  agentStreamActive: boolean;
+  /** Employee owning the currently-focused IDE thread, when a stream is live. */
+  activeThreadEmployeeId?: string | null;
+  /** Thread ids with an active IDE chat stream (including background tabs). */
+  streamingThreadIds?: readonly string[] | null;
+  threads?: readonly { thread_id: string; employee_id?: string | null }[] | null;
+};
+
+/**
+ * The single employee (if any) whose thread has live text streaming in right
+ * now — narrower than "busy" (which also covers queued/mid-shift-but-quiet
+ * work). This is the signal that expands that teammate's persona-dock card
+ * over the roster grid so the operator can read the report without the
+ * roster competing for space, then collapses back once the stream ends.
+ */
+export function resolveReportingEmployeeId(
+  input: ReportingEmployeeResolutionInput,
+): string | null {
+  const focused = input.activeThreadEmployeeId?.trim();
+  if (input.agentStreamActive && focused) {
+    return focused;
+  }
+  const streaming = new Set(
+    (input.streamingThreadIds ?? []).map((id) => id.trim()).filter(Boolean),
+  );
+  if (streaming.size && input.threads?.length) {
+    for (const thread of input.threads) {
+      const employeeId = thread.employee_id?.trim();
+      if (streaming.has(thread.thread_id) && employeeId) {
+        return employeeId;
+      }
+    }
+  }
+  return null;
+}
+
 export type LiveBusyEmployeeResolutionInput = {
   employees: readonly CompanyEmployeeRecord[] | null | undefined;
   /** Thread ids with an active IDE chat stream (including background tabs). */
@@ -63,6 +103,18 @@ export function resolveLiveBusyEmployeeIds(
   input: LiveBusyEmployeeResolutionInput,
 ): string[] {
   const ids = new Set<string>();
+  const employeeById = new Map(
+    (input.employees ?? []).map((employee) => [employee.employee_id, employee]),
+  );
+  const addStreamingEmployee = (employeeId: string): void => {
+    const employee = employeeById.get(employeeId);
+    // An Ask/approval stream may remain attached while its worker is already
+    // terminal. Backend roster truth wins: waiting for the operator is not busy.
+    if (employee?.pending_decision_id && !employee.active_run_id?.trim()) {
+      return;
+    }
+    ids.add(employeeId);
+  };
   for (const row of input.employees ?? []) {
     if (employeeIsActivelyBusy(row)) {
       ids.add(row.employee_id);
@@ -78,13 +130,13 @@ export function resolveLiveBusyEmployeeIds(
       }
       const employeeId = thread.employee_id?.trim();
       if (employeeId) {
-        ids.add(employeeId);
+        addStreamingEmployee(employeeId);
       }
     }
   }
   const focused = input.focusedStreamEmployeeId?.trim();
   if (focused) {
-    ids.add(focused);
+    addStreamingEmployee(focused);
   }
   return [...ids];
 }

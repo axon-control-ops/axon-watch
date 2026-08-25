@@ -213,12 +213,18 @@ def _collect_changed_paths(workspace_id: str) -> list[str]:
 
 
 def _summarize_diff_stat(workspace_id: str, files: list[str]) -> str | None:
-    """Build a subject from ``git diff --stat`` (+ untracked basenames)."""
+    """Build a subject from ``git diff --stat`` (+ untracked basenames).
+
+    Scoped to ``files`` via pathspec so the +/- counts describe only the
+    files this subject is actually being built for — otherwise a caller
+    passing a subset (e.g. the files staged for this specific commit) would
+    get insertion/deletion totals from the whole dirty tree instead.
+    """
     if not files:
         return None
 
-    stat = run_git(workspace_id, ["git", "diff", "--stat", "HEAD"])
-    cached = run_git(workspace_id, ["git", "diff", "--cached", "--stat"])
+    stat = run_git(workspace_id, ["git", "diff", "--stat", "HEAD", "--", *files])
+    cached = run_git(workspace_id, ["git", "diff", "--cached", "--stat", "--", *files])
     stat_blob = "\n".join(
         part
         for part in (stat.output if stat.success else "", cached.output if cached.success else "")
@@ -276,22 +282,49 @@ def _summarize_diff_stat(workspace_id: str, files: list[str]) -> str | None:
     return subject
 
 
-def derive_commit_message(workspace_id: str, turn_subject: str | None = None) -> str:
+def _topic_corroborated_by_files(topic: str | None, files: list[str]) -> bool:
+    """True when the changed files actually relate to a turn-derived topic.
+
+    A task can carry a fixed topic tag (e.g. a standing ``canary:ota`` label)
+    across many turns and many unrelated commits. Trusting it unconditionally
+    means every commit from that task reads "Fix OTA canary — …" even when
+    that specific diff has nothing to do with OTA or canary — the label
+    becomes generic noise instead of describing the real change.
+    """
+    if not topic or not files:
+        return False
+    needle = topic.lower()
+    return any(needle in path.lower() for path in files)
+
+
+def derive_commit_message(
+    workspace_id: str,
+    turn_subject: str | None = None,
+    *,
+    scoped_paths: list[str] | None = None,
+) -> str:
     """Build a commit subject from the turn text and/or ``git diff --stat``.
+
+    ``scoped_paths``, when given, is exactly the set of files this commit is
+    staging — the subject is derived from those, not the whole dirty tree,
+    so a commit that only touches a few mentioned files doesn't get a
+    subject describing unrelated pending changes elsewhere in the workspace.
 
     Preference order:
     1. Descriptive operator/agent turn subject (plan title / change summary —
        never raw task instructions like "you should make sure to…")
-    2. Intent + topic from the turn (e.g. Unblock OTA canary) + path areas
-    3. Work topic + path-area / diff summary
+    2. Intent + topic from the turn (e.g. Unblock OTA canary) + path areas —
+       topic only used when the changed files corroborate it
+    3. Work topic + path-area / diff summary — same corroboration rule
     4. Multi-file path-area summary
     5. Diff-stat basename summary
     6. Generic fallback
     """
     from_turn = _normalize_turn_subject(turn_subject)
-    topic = extract_work_topic(turn_subject)
+    files = list(scoped_paths) if scoped_paths is not None else _collect_changed_paths(workspace_id)
+    raw_topic = extract_work_topic(turn_subject)
+    topic = raw_topic if _topic_corroborated_by_files(raw_topic, files) else None
     intent = extract_work_intent(turn_subject)
-    files = _collect_changed_paths(workspace_id)
     from_areas = summarize_change_areas(files)
     from_diff = _summarize_diff_stat(workspace_id, files)
     from_intent = compose_intent_subject(

@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import threading
 from typing import Any, Callable
 
 from app.chat.lead_fan_out_transcript import format_lead_fan_out_agent_message
@@ -11,6 +10,7 @@ from app.workspace_agents.lead_handoff_receipt import record_lead_handoff_run
 from app.workspace_agents.lead_task_plan import (
     detect_fan_out_intent,
     is_employee_shift_retry_request,
+    should_execute_lead_fast_path,
 )
 
 
@@ -18,6 +18,7 @@ def _format_fan_out_reply(
     *,
     lead_name: str,
     materialize: dict[str, Any],
+    kick_started: int = 0,
 ) -> str:
     receipt = materialize.get("receipt") or {}
     summary = str(receipt.get("summary") or "").strip()
@@ -29,7 +30,13 @@ def _format_fan_out_reply(
             f"Materialized {len(materialize.get('tasks') or [])} tasks; "
             f"queued {len(materialize.get('runs') or [])} ready runs."
         )
-    notes.append("Continuous worker owns the start — I did not write kickoff markdown.")
+    if kick_started > 0:
+        notes.append(f"Dispatch kick started {kick_started} specialist run(s) just now.")
+    else:
+        notes.append(
+            "Specialist runs are queued. The scheduler will retry explicit Lead handoffs "
+            "on its watcher tick if a restart interrupts the first kick."
+        )
     return format_lead_fan_out_agent_message(
         lead_name=lead_name,
         materialize=materialize,
@@ -39,13 +46,14 @@ def _format_fan_out_reply(
     )
 
 
-def _kick_continuous_dispatch() -> None:
+def _kick_continuous_dispatch() -> int:
     try:
         from app.workspace_agents.scheduler import kick_lead_fan_out_dispatch
 
-        kick_lead_fan_out_dispatch(starts_bound=3)
+        started = kick_lead_fan_out_dispatch(starts_bound=3)
+        return len(started or [])
     except Exception:
-        pass
+        return 0
 
 
 def maybe_post_lead_fan_out_message(
@@ -66,7 +74,7 @@ def maybe_post_lead_fan_out_message(
     if is_employee_shift_retry_request(content):
         return None
     intent = detect_fan_out_intent(content)
-    if composer_mode != "agent" or role != "lead" or not intent:
+    if role != "lead" or not should_execute_lead_fast_path(composer_mode, content) or not intent:
         return None
 
     try:
@@ -81,12 +89,7 @@ def maybe_post_lead_fan_out_message(
     except Exception:
         return None
 
-
-    threading.Thread(
-        target=_kick_continuous_dispatch,
-        daemon=True,
-        name="lead-fan-out-dispatch-kick",
-    ).start()
+    kick_started = _kick_continuous_dispatch()
 
     plan_id = str(materialize.get("plan_id") or "").strip()
     handoff_run = record_lead_handoff_run(
@@ -103,6 +106,7 @@ def maybe_post_lead_fan_out_message(
     agent_content = _format_fan_out_reply(
         lead_name=lead_name.strip() or "Lead",
         materialize=materialize,
+        kick_started=kick_started,
     )
     operator_message = save_message(
         {

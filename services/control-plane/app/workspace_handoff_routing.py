@@ -393,3 +393,138 @@ def route_cross_workspace_ticket(handoff: dict[str, Any]) -> dict[str, Any]:
         source_communication_thread_id=source_communication_thread_id,
     )
     return updated or handoff
+
+
+def _post_source_completion_notice(
+    *,
+    workspace_id: str,
+    target_workspace_id: str,
+    task_text: str,
+    outcome: str,
+    detail: str,
+) -> str | None:
+    """Tell the source Lead how the delegated work at the target workspace ended.
+
+    Cross-workspace handoffs previously stopped at one ack: the source Lead
+    learned a ticket was routed, and never heard anything again -- not
+    completion, not failure. The target workspace's own findings sweep
+    (collect_handoff_findings) already surfaces a *stuck* handoff to the
+    target Lead, but nothing closed the loop on a *finished* one back to
+    whoever asked for it, which is the actual point of a Lead-to-Lead handoff.
+    """
+    lead = _lead_employee(workspace_id)
+    if lead is None:
+        return None
+    created_at = _utc_now_iso()
+    thread = chat_store.find_thread_for_employee(
+        workspace_id,
+        employee_id=lead["employee_id"],
+        thread_kind="ide",
+    )
+    if thread is None:
+        thread = chat_store.create_thread(
+            workspace_id=workspace_id,
+            run_id=None,
+            created_at=created_at,
+            thread_kind="ide",
+            title=f"{lead['name']} · handoff sent",
+            employee_id=lead["employee_id"],
+            employee_role="lead",
+        )
+    thread_id = str(thread["thread_id"])
+    target_label = _workspace_label(target_workspace_id)
+    tone = "completed" if outcome == "completed" else "did not complete"
+    body = (
+        f"Update from {target_label}: the handoff \"{_truncate(task_text, max_len=140)}\" "
+        f"{tone}."
+    )
+    if detail:
+        body = f"{body} {_truncate(detail, max_len=200)}"
+    chat_store.save_message(
+        {
+            "message_id": f"message_system_{uuid4().hex}",
+            "thread_id": thread_id,
+            "workspace_id": workspace_id,
+            "run_id": None,
+            "role": "system",
+            "content": body,
+            "created_at": created_at,
+        }
+    )
+    return thread_id
+
+
+def notify_completed_handoffs(*, limit: int = 20) -> list[dict[str, Any]]:
+    """Close the loop: tell each source Lead how its routed handoff ended.
+
+    Never raises -- one bad handoff or message-post failure must not stop the
+    sweep or the scheduler tick it runs on. A handoff whose target task never
+    got a task_id (never actually routed) is not this function's concern;
+    collect_handoff_findings already flags that case to the target Lead.
+    """
+    notified: list[dict[str, Any]] = []
+    try:
+        candidates = handoff_store.list_recent_handoffs(limit=max(1, min(int(limit), 100)))
+    except Exception:  # noqa: BLE001 — tick must stay alive
+        logger.exception("handoff completion notice: list handoffs failed")
+        return notified
+
+    for handoff in candidates:
+        if not isinstance(handoff, dict):
+            continue
+        if str(handoff.get("status") or "").strip().lower() != "routed":
+            continue
+        task_id = str(handoff.get("target_task_id") or "").strip()
+        if not task_id:
+            continue
+        handoff_id = str(handoff.get("handoff_id") or "").strip()
+        source_id = str(handoff.get("source_workspace_id") or "").strip()
+        target_id = str(handoff.get("target_workspace_id") or "").strip()
+        task_text = str(handoff.get("task") or "").strip()
+        if not handoff_id or not source_id or not target_id:
+            continue
+        try:
+            task = task_store.get_task(task_id)
+        except Exception:  # noqa: BLE001
+            logger.exception("handoff completion notice: get_task failed for %s", task_id)
+            continue
+        if task is None:
+            continue
+        status = str(task.get("status") or "").strip().lower()
+        if status not in {"completed", "failed", "cancelled"}:
+            continue
+        outcome = "completed" if status == "completed" else status
+        detail = str(task.get("terminal_outcome") or "").strip()
+        try:
+            thread_id = _post_source_completion_notice(
+                workspace_id=source_id,
+                target_workspace_id=target_id,
+                task_text=task_text,
+                outcome=outcome,
+                detail=detail if detail and detail != status else "",
+            )
+        except Exception:  # noqa: BLE001 — still mark handled, do not retry forever on a bad thread
+            logger.exception("handoff completion notice: post failed for %s", handoff_id)
+            thread_id = None
+        try:
+            update_fields: dict[str, Any] = {"status": outcome}
+            if thread_id:
+                # Same field _post_source_ack already writes: the source
+                # workspace's one durable thread for this handoff's chatter.
+                update_fields["source_communication_thread_id"] = thread_id
+            handoff_store.update_handoff(handoff_id, **update_fields)
+        except Exception:  # noqa: BLE001
+            logger.exception("handoff completion notice: update_handoff failed for %s", handoff_id)
+            continue
+        notified.append(
+            {
+                "handoff_id": handoff_id,
+                "task_id": task_id,
+                "source_workspace_id": source_id,
+                "target_workspace_id": target_id,
+                "outcome": outcome,
+            }
+        )
+    if notified:
+        logger.info("handoff completion notice closed %s handoff(s)", len(notified))
+    return notified

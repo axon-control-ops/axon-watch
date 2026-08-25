@@ -41,6 +41,8 @@ export function defaultOperatorPresenceSettings(): OperatorPresenceSettings {
     stt_mode: DEFAULT_STT_MODE,
     voice_routing_mode: DEFAULT_VOICE_ROUTING_MODE,
     vaxon_model_id: DEFAULT_VAXON_MODEL_ID,
+    auto_composer_runtime_override_enabled: false,
+    auto_composer_runtime_target: '',
     narrate_tool_progress: false,
   };
 }
@@ -102,12 +104,36 @@ function normalizeVaxonModelId(raw: unknown): string {
   return DEFAULT_VAXON_MODEL_ID;
 }
 
+function normalizeRuntimeTargetId(raw: unknown): string {
+  const value = String(raw ?? '').trim();
+  if (!value) {
+    return '';
+  }
+  if (/^[a-z0-9][a-z0-9._-]{0,119}$/i.test(value)) {
+    return value.slice(0, 120);
+  }
+  return '';
+}
+
 export function normalizeAutonomyMode(raw: unknown): AutonomyMode {
   const value = String(raw ?? '').trim().toLowerCase();
   if (value === 'manual' || value === 'semi' || value === 'full') {
     return value;
   }
   return DEFAULT_AUTONOMY_MODE;
+}
+
+export function resolveAutoWorkerRuntimeFallback(
+  raw: Partial<OperatorPresenceSettings> | null | undefined,
+): string {
+  const settings = normalizeOperatorPresenceSettings(raw);
+  if (
+    settings.autonomy_mode !== 'full' ||
+    !settings.auto_composer_runtime_override_enabled
+  ) {
+    return '';
+  }
+  return settings.auto_composer_runtime_target.trim();
 }
 
 export function normalizeOperatorPresenceSettings(
@@ -141,6 +167,12 @@ export function normalizeOperatorPresenceSettings(
       raw.voice_routing_mode ?? defaults.voice_routing_mode,
     ),
     vaxon_model_id: normalizeVaxonModelId(raw.vaxon_model_id ?? defaults.vaxon_model_id),
+    auto_composer_runtime_override_enabled:
+      raw.auto_composer_runtime_override_enabled ??
+      defaults.auto_composer_runtime_override_enabled,
+    auto_composer_runtime_target: normalizeRuntimeTargetId(
+      raw.auto_composer_runtime_target ?? defaults.auto_composer_runtime_target,
+    ),
     narrate_tool_progress: raw.narrate_tool_progress ?? defaults.narrate_tool_progress,
   };
 }

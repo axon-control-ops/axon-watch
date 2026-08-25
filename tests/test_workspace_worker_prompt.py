@@ -9,7 +9,10 @@ from unittest.mock import patch
 CONTROL_PLANE_ROOT = Path(__file__).resolve().parents[1] / "services" / "control-plane"
 sys.path.insert(0, str(CONTROL_PLANE_ROOT))
 
+from tests.support.control_plane_db import isolate_control_plane_db  # noqa: E402
+
 from app.workspace_agents.config_loader import EmployeeConfig  # noqa: E402
+from app.workspace_agents import worker_prompt as worker_prompt_module  # noqa: E402
 from app.workspace_agents.worker_prompt import (  # noqa: E402
     OUT_OF_SCOPE_GUARD_MARKER,
     build_continuous_worker_prompt,
@@ -37,6 +40,107 @@ class WorkspaceWorkerPromptTests(unittest.TestCase):
         self.assertIn("Shell Craft", prompt)
         self.assertIn("Vue shell and IDE polish", prompt)
         self.assertIn("busy-poll", prompt)
+        self.assertIn("one missing optional documentation/playbook path", prompt)
+        self.assertIn("Avoid a combined multi-file read", prompt)
+
+    def test_axon_x_jules_worker_prompt_teaches_vaxon_mobile_cockpit(self) -> None:
+        with patch(
+            "app.workspace_agents.worker_prompt.build_team_roster_context",
+            return_value="",
+        ):
+            prompt = build_continuous_worker_prompt(
+                workspace_id="workspace_axon_watch",
+                employee=EmployeeConfig(
+                    name="Jules",
+                    role="frontend",
+                    owns="Axon-X mobile VAXON control-plane cockpit and console UI/UX",
+                    schedule="continuous",
+                ),
+                task={
+                    "task_id": "task-jules-vaxon-mobile",
+                    "goal": "Move the mobile cockpit from basic control to advanced VAXON control.",
+                    "acceptance_criteria": "Uses orb/glass command UX and real control-plane state.",
+                },
+            )
+        self.assertIn("Axon-X/Jules advanced UI/UX doctrine", prompt)
+        self.assertIn("Observe (health, signals, fleet, live run state)", prompt)
+        self.assertIn("VAXON command surface", prompt)
+        self.assertIn("Overview, Command, Fleet, and Data", prompt)
+        self.assertIn("Do not collapse the mobile control-plane into one long tab", prompt)
+        self.assertIn("never let a poster-like background carry the product", prompt)
+        self.assertIn("radial/segmented quick actions", prompt)
+        self.assertIn("npm run typecheck -w @axon-watch/console-mobile", prompt)
+
+    def test_prompt_includes_cross_role_receipts_for_specialist_handoffs(self) -> None:
+        with patch.object(
+            worker_prompt_module,
+            "build_team_roster_context",
+            return_value="",
+        ), patch.object(
+            worker_prompt_module,
+            "_workspace_continuity_clause",
+            return_value=(
+                "Recent cross-role continuity packet (receipt summaries, not proof that your task is done):\n"
+                "- backend completed (run-marco-1) — parent assignment query fixed\n"
+                "Inspect the actual implementation and rerun the acceptance checks; report any contradiction to Lead."
+            ),
+        ):
+            prompt = build_continuous_worker_prompt(
+                workspace_id="workspace_dashpro",
+                employee=EmployeeConfig(
+                    name="Priya",
+                    role="frontend",
+                    owns="DashPro mobile UI",
+                    schedule="on_demand",
+                ),
+                task={"task_id": "task-priya-1", "goal": "Align the parent carousel."},
+            )
+        self.assertIn("Recent cross-role continuity packet", prompt)
+        self.assertIn("parent assignment query fixed", prompt)
+        self.assertIn("not proof that your task is done", prompt)
+
+    def test_dashpro_ship_prompt_does_not_block_on_disposable_git(self) -> None:
+        with patch(
+            "app.workspace_agents.worker_prompt.build_team_roster_context",
+            return_value="",
+        ):
+            prompt = build_continuous_worker_prompt(
+                workspace_id="workspace_dashpro",
+                employee=EmployeeConfig(
+                    name="Soren",
+                    role="integrations",
+                    owns="DashPro OTA and release guardrails",
+                    schedule="continuous",
+                ),
+                task={
+                    "task_id": "task-ota",
+                    "goal": "Publish the verified DashPro fix to canary using npm run ota:canary.",
+                },
+            )
+        self.assertIn("Disposable worker checkouts may intentionally lack usable `.git` metadata", prompt)
+        self.assertIn("real workspace by `--workspace`", prompt)
+        self.assertIn("retry the helper with `--no-stream`", prompt)
+        self.assertIn("own branch, dirty-tree, and auth guards", prompt)
+
+    def test_prompt_teaches_safe_worker_delivery(self) -> None:
+        with patch(
+            "app.workspace_agents.worker_prompt.build_team_roster_context",
+            return_value="",
+        ):
+            prompt = build_continuous_worker_prompt(
+                workspace_id="workspace_axon_watch",
+                employee=EmployeeConfig(
+                    name="Reed",
+                    role="backend",
+                    owns="Control-plane APIs and persistence",
+                    schedule="continuous",
+                ),
+            )
+        self.assertIn("Delivery discipline", prompt)
+        self.assertIn("Do not run `git add -A`, commit, push, merge, force-push", prompt)
+        self.assertIn("stages only your verified changed paths", prompt)
+        self.assertIn("inside your role-owned write surface", prompt)
+        self.assertIn("directly serve the leased objective", prompt)
 
     def test_backend_prompt_includes_ci_review_clause(self) -> None:
         with patch(
@@ -53,8 +157,76 @@ class WorkspaceWorkerPromptTests(unittest.TestCase):
                 ),
             )
         self.assertIn("verify:contracts", prompt)
-        self.assertIn("Confidence: X/10", prompt)
         self.assertNotIn("bare FAILED", prompt.replace("never a bare FAILED", ""))
+
+    def test_integrations_prompt_includes_full_access_tools_clause(self) -> None:
+        with patch(
+            "app.workspace_agents.worker_prompt.build_team_roster_context",
+            return_value="",
+        ):
+            prompt = build_continuous_worker_prompt(
+                workspace_id="workspace_young_eagles_day_care",
+                employee=EmployeeConfig(
+                    name="Sol",
+                    role="integrations",
+                    owns="Document export hooks and EduDash linkage",
+                    schedule="continuous",
+                ),
+            )
+        self.assertIn("Full Access for project Shell", prompt)
+        self.assertIn("verification scripts", prompt)
+        self.assertNotIn("spin on Task/MCP workarounds", prompt.replace(
+            "Do not spin on Task/MCP workarounds for basic ls/node/npm checks.",
+            "",
+        ))
+        self.assertIn("Do not spin on Task/MCP workarounds", prompt)
+
+    def test_young_eagles_document_artifact_prompt_teaches_visual_fallback_verification(self) -> None:
+        agents = [
+            EmployeeConfig(
+                name="Lila",
+                role="frontend",
+                owns="Letters, printable packs, and parent-facing layouts",
+                schedule="continuous",
+            ),
+            EmployeeConfig(
+                name="Sol",
+                role="integrations",
+                owns="Document export hooks, EduDash/chat POP delivery wiring, and smoke-script verification",
+                schedule="continuous",
+            ),
+        ]
+        for employee in agents:
+            with self.subTest(role=employee.role), patch(
+                "app.workspace_agents.worker_prompt.build_team_roster_context",
+                return_value="",
+            ):
+                prompt = build_continuous_worker_prompt(
+                    workspace_id="workspace_young_eagles_day_care",
+                    employee=employee,
+                    task={
+                        "task_id": "task-register-restore",
+                        "goal": (
+                            "Restore the five daily register PDFs so they match the "
+                            "operator's IDE PDF style and layout."
+                        ),
+                        "acceptance_criteria": (
+                            "If reportlab is unavailable, use the active fallback renderer "
+                            "and prove the rendered PDFs match the reference."
+                        ),
+                    },
+                )
+
+                self.assertIn("Document/PDF artifact quality contract", prompt)
+                self.assertIn("assignment-document-quality.md", prompt)
+                self.assertIn("Do not treat a missing optional package", prompt)
+                self.assertIn("active fallback path", prompt)
+                self.assertIn("operator-named screenshot, IDE PDF, or reference file", prompt)
+                self.assertIn("PDF viewer, `pdftoppm`, `mutool`, `convert`", prompt)
+                self.assertIn("page size, page count, first-page layout", prompt)
+                self.assertIn("Add or update a targeted regression test", prompt)
+                self.assertIn("force the fallback in the test", prompt)
+                self.assertIn("visual parity evidence", prompt)
 
     def test_dashpro_prompt_locks_self_hosted_ci(self) -> None:
         with patch(
@@ -74,9 +246,50 @@ class WorkspaceWorkerPromptTests(unittest.TestCase):
         self.assertIn("ubuntu-latest", prompt)
         self.assertIn("billing-blocked", prompt)
 
+    def test_dashpro_prompt_teaches_supabase_vault_self_heal(self) -> None:
+        with patch(
+            "app.workspace_agents.worker_prompt.build_team_roster_context",
+            return_value="",
+        ):
+            prompt = build_continuous_worker_prompt(
+                workspace_id="workspace_dashpro",
+                employee=EmployeeConfig(
+                    name="Marco",
+                    role="backend",
+                    owns="DashPro Supabase and assignment data",
+                    schedule="continuous",
+                ),
+                task={
+                    "task_id": "task-migration-audit",
+                    "goal": "Audit Supabase migration history without deploying.",
+                },
+            )
+        self.assertIn("Supabase CLI self-heal", prompt)
+        self.assertIn("SUPABASE_ACCESS_TOKEN", prompt)
+        self.assertIn("never ask for pasted tokens in chat", prompt)
+        self.assertIn("Do not run `supabase db push` without separate operator deployment approval", prompt)
+
+    def test_dashpro_prompt_teaches_homework_submit_triage(self) -> None:
+        with patch(
+            "app.workspace_agents.worker_prompt.build_team_roster_context",
+            return_value="",
+        ):
+            prompt = build_continuous_worker_prompt(
+                workspace_id="workspace_dashpro",
+                employee=EmployeeConfig(
+                    name="Marco",
+                    role="backend",
+                    owns="DashPro Supabase and assignment data",
+                    schedule="continuous",
+                ),
+            )
+        self.assertIn("parent homework submit triage", prompt)
+        self.assertIn("homework_submissions_content_type_check", prompt)
+        self.assertIn("resolveHomeworkSubmissionTypes", prompt)
+
     def test_prompt_includes_prior_failure_detail_for_retry(self) -> None:
         with patch(
-            "app.workspace_agents.worker_prompt.latest_role_run_outcome",
+            "app.workspace_agents.run_outcome.latest_role_run_outcome",
             return_value={
                 "run_id": "run_failed_backend",
                 "outcome": "failed",
@@ -101,9 +314,45 @@ class WorkspaceWorkerPromptTests(unittest.TestCase):
         self.assertIn("assertion failed", prompt)
         self.assertIn("Prefer fixing or clearing that failure", prompt)
 
+    def test_leased_prompt_uses_current_task_packet_not_prior_failure(self) -> None:
+        with patch(
+            "app.workspace_agents.run_outcome.latest_role_run_outcome",
+            return_value={
+                "run_id": "run_stale_frontend",
+                "outcome": "failed",
+                "detail": "continue after server restart",
+                "phase": "failed",
+                "terminal": "1",
+            },
+        ), patch(
+            "app.workspace_agents.worker_prompt.build_team_roster_context",
+            return_value="",
+        ):
+            prompt = build_continuous_worker_prompt(
+                workspace_id="workspace_dashpro",
+                employee=EmployeeConfig(
+                    name="Priya",
+                    role="frontend",
+                    owns="DashPro UI",
+                    schedule="continuous",
+                ),
+                task={
+                    "task_id": "task-current-student-ui",
+                    "goal": "Redesign the Student Management header UI.",
+                    "acceptance_criteria": "Changed files and targeted validation required.",
+                    "allowed_paths": ["app", "components"],
+                },
+            )
+        self.assertIn("Current task packet", prompt)
+        self.assertIn("task-current-student-ui", prompt)
+        self.assertIn("Redesign the Student Management header UI", prompt)
+        self.assertIn("ignore stale thread context", prompt)
+        self.assertNotIn("Prior shift failed", prompt)
+        self.assertNotIn("continue after server restart", prompt)
+
     def test_prompt_omits_prior_failure_when_last_shift_completed(self) -> None:
         with patch(
-            "app.workspace_agents.worker_prompt.latest_role_run_outcome",
+            "app.workspace_agents.run_outcome.latest_role_run_outcome",
             return_value={
                 "run_id": "run_ok_backend",
                 "outcome": "completed",
@@ -128,7 +377,7 @@ class WorkspaceWorkerPromptTests(unittest.TestCase):
 
     def test_prompt_omits_prior_failure_for_control_plane_restart(self) -> None:
         with patch(
-            "app.workspace_agents.worker_prompt.latest_role_run_outcome",
+            "app.workspace_agents.run_outcome.latest_role_run_outcome",
             return_value=None,
         ), patch(
             "app.workspace_agents.worker_prompt.build_team_roster_context",
@@ -148,7 +397,7 @@ class WorkspaceWorkerPromptTests(unittest.TestCase):
 
     def test_lead_prompt_includes_authoritative_team_roster(self) -> None:
         with patch(
-            "app.workspace_agents.worker_prompt.latest_role_run_outcome",
+            "app.workspace_agents.run_outcome.latest_role_run_outcome",
             return_value=None,
         ), patch(
             "app.workspace_agents.worker_prompt.build_team_roster_context",
@@ -177,6 +426,99 @@ class WorkspaceWorkerPromptTests(unittest.TestCase):
         self.assertIn("do not Glob/Grep/Read the tree to discover staffing", prompt)
         self.assertIn("Priya (Frontend / frontend)", prompt)
         self.assertIn("Do NOT Glob, Grep, or Read", prompt)
+
+    def test_lead_plan_follow_up_prompt_embeds_plan_evidence(self) -> None:
+        from app.persistence import run_store, task_store
+        from app.workspace_agents import lead_plan_store
+
+        isolate_control_plane_db(self, run_store)
+        task_store.reset_store()
+        lead_plan_store.reset_store()
+        self.addCleanup(task_store.reset_store)
+        self.addCleanup(lead_plan_store.reset_store)
+
+        watcher = task_store.create_task(
+            workspace_id="workspace_dashpro",
+            goal="Check DashPro health after restart.",
+            owner_role="watcher",
+            acceptance_criteria="Health receipt captured.",
+        )
+        watcher = task_store.complete_task(
+            str(watcher["task_id"]),
+            terminal_outcome="completed",
+            run_id="run_cass_health_1",
+        )
+        integrations = task_store.create_task(
+            workspace_id="workspace_dashpro",
+            goal="Fix deployment linkage after watcher evidence.",
+            owner_role="integrations",
+            acceptance_criteria="Deployment evidence captured.",
+        )
+        plan = lead_plan_store.persist_plan(
+            workspace_id="workspace_dashpro",
+            plan={
+                "goal": "Please check this and fix",
+                "mode": "decompose",
+                "items": [
+                    {
+                        "id": "plan-01-watcher",
+                        "owner_role": "watcher",
+                        "title": "Check current DashPro service health.",
+                    },
+                    {
+                        "id": "plan-02-integrations",
+                        "owner_role": "integrations",
+                        "title": "Continue from watcher evidence.",
+                    },
+                ],
+            },
+            plan_key_to_task_id={
+                "plan-01-watcher": str(watcher["task_id"]),
+                "plan-02-integrations": str(integrations["task_id"]),
+            },
+        )
+        lead_plan_store.append_receipt(
+            plan_id=str(plan["plan_id"]),
+            workspace_id="workspace_dashpro",
+            kind="lead_specialist_status_posted",
+            payload={
+                "run_id": "run_cass_health_1",
+                "task_id": str(watcher["task_id"]),
+                "phase": "completed",
+            },
+        )
+
+        with patch(
+            "app.workspace_agents.worker_prompt.build_team_roster_context",
+            return_value="",
+        ):
+            prompt = build_continuous_worker_prompt(
+                workspace_id="workspace_dashpro",
+                employee=EmployeeConfig(
+                    name="Dana",
+                    role="lead",
+                    owns="DashPro product priorities and handoffs",
+                    schedule="on_demand",
+                ),
+                task={
+                    "task_id": "task-lead-followup",
+                    "goal": (
+                        'Lead: advance "Please check this and fix" toward Done '
+                        f"[plan {plan['plan_id']}] — after Cass (watcher) completed."
+                    ),
+                    "acceptance_criteria": (
+                        f"Sole truth: advance plan {plan['plan_id']} — "
+                        "Please check this and fix."
+                    ),
+                },
+            )
+
+        self.assertIn("Lead plan evidence packet", prompt)
+        self.assertIn(str(plan["plan_id"]), prompt)
+        self.assertIn("plan-01-watcher: watcher completed", prompt)
+        self.assertIn("run=run_cass_health_1", prompt)
+        self.assertIn("plan-02-integrations: integrations open", prompt)
+        self.assertIn("lead_specialist_status_posted", prompt)
 
     def test_prompt_includes_scope_guard_for_leased_tasks(self) -> None:
         with patch(
@@ -232,9 +574,37 @@ class WorkspaceWorkerPromptTests(unittest.TestCase):
                     "allowed_paths": ["scripts/guardrails/hotspot_budgets.json"],
                 },
             )
-        self.assertIn("Explicit allowed write paths", prompt)
+        self.assertIn("Starting path hints for this leased task", prompt)
         self.assertIn("scripts/guardrails/hotspot_budgets.json", prompt)
         self.assertNotIn("Hard scope anchors", prompt)
+
+    def test_prompt_surfaces_effective_write_scope_over_task_hints(self) -> None:
+        policy = type("Policy", (), {"write_paths": ("command-centre", "components")})()
+        with patch(
+            "app.workspace_agents.worker_prompt.build_team_roster_context",
+            return_value="",
+        ):
+            prompt = build_continuous_worker_prompt(
+                workspace_id="workspace_young_eagles_day_care",
+                employee=EmployeeConfig(
+                    name="Lila",
+                    role="frontend",
+                    owns="Command-centre frontend",
+                    schedule="continuous",
+                ),
+                task={
+                    "task_id": "task-register-gender-toggle",
+                    "goal": "Add a boy/girl toggle to the Daily Register UI in command-centre/assets/app.js.",
+                    "acceptance_criteria": "The Daily Register can filter boys and girls.",
+                    "allowed_paths": ["components"],
+                },
+                execution_policy=policy,
+            )
+        self.assertIn("Effective write scope from the runtime policy", prompt)
+        self.assertIn("`command-centre`", prompt)
+        self.assertIn("not the task's starting path hints", prompt)
+        self.assertIn("Starting path hints for this leased task", prompt)
+        self.assertIn("`components`", prompt)
 
 
 if __name__ == "__main__":

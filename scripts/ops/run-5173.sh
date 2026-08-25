@@ -28,9 +28,10 @@ if (($#)); then
 fi
 export AXON_WATCH_VITE_HMR="$HMR"
 
-# Gate 2: local_token + AUTH_ALLOW_LOOPBACK=0 means the Vite /api proxy must
-# inject AXON_WATCH_OPERATOR_TOKEN. Always-on :4173 gets this via systemd
-# EnvironmentFile; load the same deployment.env for the :5173 edit window.
+# Load deployment settings so Vite and the control-plane agree on auth mode.
+# Browser mutations use the HttpOnly operator session by default. A trusted
+# local developer may explicitly restore legacy proxy injection with
+# AXON_WATCH_VITE_INJECT_OPERATOR_TOKEN=1.
 env_file="${AXON_WATCH_DEPLOYMENT_ENV:-${HOME}/.config/axon-watch/deployment.env}"
 if [[ ! -f "${env_file}" && -f /etc/axon-watch/deployment.env ]]; then
   env_file=/etc/axon-watch/deployment.env
@@ -85,4 +86,12 @@ else
   echo "run-5173: stability mode — HMR disabled; refresh manually to load source edits."
 fi
 echo "run-5173: daily driver stays on http://127.0.0.1:4173/ (same API :8787)"
-exec npm run dev -w @axon-watch/console-web -- --host "$HOST" --port "$PORT" --strictPort
+vite_bin="${ROOT}/node_modules/.bin/vite"
+if [[ ! -x "$vite_bin" ]]; then
+  echo "run-5173: Vite is not installed in ${ROOT}/node_modules." >&2
+  echo "Install repo dependencies first: npm install" >&2
+  exit 127
+fi
+
+cd "${ROOT}/apps/console-web"
+exec "$vite_bin" --host "$HOST" --port "$PORT" --strictPort

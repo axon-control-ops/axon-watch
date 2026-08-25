@@ -36,7 +36,7 @@ type HandoffSliceInput = {
   }) => Promise<string | null>;
   selectIdeThread: (threadId: string) => Promise<void>;
   createIdeThread: () => Promise<string | null>;
-  submitIdeComposer: (mode: 'agent') => Promise<boolean | void>;
+  submitIdeComposer: (mode: 'agent') => Promise<boolean | 'queued' | void>;
 };
 
 export function createSignalHandoffSlice(input: HandoffSliceInput) {

@@ -12,7 +12,7 @@ export type ConversationNavigationIntent = {
     | 'focus_briefing'
     | 'switch_center_view';
   workspaceId?: string;
-  centerView?: 'graph' | 'grid';
+  centerView?: 'graph' | 'mission';
   reply: string;
 };
 
@@ -108,7 +108,7 @@ export function resolveConversationNavigationIntent(
   if (GRID_NAV_RE.test(trimmed)) {
     return {
       kind: 'switch_center_view',
-      centerView: 'grid',
+      centerView: 'mission',
       reply: 'Switching to fleet grid view.',
     };
   }
@@ -122,7 +122,7 @@ export function resolveConversationNavigationIntent(
   if (FEED_NAV_RE.test(trimmed)) {
     return {
       kind: 'switch_center_view',
-      centerView: 'grid',
+      centerView: 'mission',
       reply: 'Opening fleet grid — check the dock for incident detail.',
     };
   }

@@ -12,11 +12,20 @@ from pydantic import BaseModel, Field
 
 from app.auth.desktop_session import (
     SESSION_COOKIE,
+    SESSION_COOKIE_MAX_AGE_SECONDS,
     consume_bootstrap_code,
+    extract_session_token,
     issue_session_token,
     mint_bootstrap_code,
+    validate_session_token,
 )
-from app.auth.settings import operator_token
+from app.auth.settings import (
+    allow_loopback_bypass,
+    auth_mode,
+    client_is_loopback,
+    operator_password,
+    operator_token,
+)
 
 router = APIRouter()
 spa_router = APIRouter()
@@ -25,6 +34,12 @@ spa_router = APIRouter()
 class DesktopBootstrapRequest(BaseModel):
     bootstrap_code: str | None = Field(default=None, min_length=8)
     operator_token: str | None = None
+
+
+class OperatorSessionRequest(BaseModel):
+    operator_token: str | None = Field(default=None, min_length=1)
+    operator_password: str | None = Field(default=None, min_length=1)
+    return_session_token: bool = False
 
 
 def console_dist_dir() -> Path | None:
@@ -40,6 +55,110 @@ def console_dist_dir() -> Path | None:
 def _token_matches(presented: str) -> bool:
     expected = (operator_token() or "").strip()
     return bool(expected and presented and secrets.compare_digest(presented, expected))
+
+
+def _password_matches(presented: str) -> bool:
+    expected = (operator_password() or "").strip()
+    return bool(expected and presented and secrets.compare_digest(presented, expected))
+
+
+def _operator_credentials_configured() -> bool:
+    return bool(operator_token() or operator_password())
+
+
+def _request_bearer(request: Request) -> str:
+    header = request.headers.get("authorization") or ""
+    parts = header.split(None, 1)
+    if len(parts) == 2 and parts[0].lower() == "bearer":
+        return parts[1].strip()
+    return (request.headers.get("x-axon-operator-token") or "").strip()
+
+
+def _session_meta() -> dict[str, object]:
+    return {
+        "auth_mode": auth_mode(),
+        "loopback_bypass": allow_loopback_bypass(),
+        "cookie_max_age_seconds": SESSION_COOKIE_MAX_AGE_SECONDS,
+        "password_enabled": bool(operator_password()),
+        "token_enabled": bool(operator_token()),
+    }
+
+
+def _session_status(request: Request) -> dict[str, object]:
+    meta = _session_meta()
+    mode = str(meta["auth_mode"])
+    if mode == "off":
+        return {"authenticated": True, "auth_required": False, "identity": "local", **meta}
+    if _token_matches(_request_bearer(request)):
+        return {"authenticated": True, "auth_required": True, "identity": "operator", **meta}
+    if validate_session_token(extract_session_token(request.cookies, request.headers)):
+        return {"authenticated": True, "auth_required": True, "identity": "session", **meta}
+    client_host = request.client.host if request.client else None
+    if meta["loopback_bypass"] and client_is_loopback(client_host):
+        return {"authenticated": True, "auth_required": False, "identity": "loopback", **meta}
+    return {"authenticated": False, "auth_required": True, "identity": None, **meta}
+
+
+def _request_is_secure(request: Request) -> bool:
+    forwarded = (request.headers.get("x-forwarded-proto") or "").split(",", 1)[0].strip()
+    return forwarded == "https" or request.url.scheme == "https"
+
+
+def _set_session_cookie(response: Response, *, secure: bool, same_site: str) -> str:
+    session_token = issue_session_token()
+    response.set_cookie(
+        key=SESSION_COOKIE,
+        value=session_token,
+        httponly=True,
+        samesite=same_site,
+        secure=secure,
+        max_age=SESSION_COOKIE_MAX_AGE_SECONDS,
+        path="/",
+    )
+    return session_token
+
+
+@router.get("/api/auth/session")
+def operator_session_status(request: Request) -> dict[str, object]:
+    """Report whether this browser may use protected operator actions."""
+    return _session_status(request)
+
+
+@router.post("/api/auth/session")
+def operator_session_login(
+    body: OperatorSessionRequest,
+    request: Request,
+    response: Response,
+) -> dict[str, object]:
+    """Exchange an operator token or password for a browser/mobile session."""
+    if not _operator_credentials_configured():
+        raise HTTPException(status_code=503, detail="operator credentials are not configured")
+    presented_token = (body.operator_token or "").strip()
+    presented_password = (body.operator_password or "").strip()
+    if not (_token_matches(presented_token) or _password_matches(presented_password)):
+        raise HTTPException(status_code=401, detail="invalid operator credentials")
+    session_token = _set_session_cookie(
+        response,
+        secure=_request_is_secure(request),
+        same_site="strict",
+    )
+    status = _session_status(request)
+    status.update({"authenticated": True, "auth_required": True, "identity": "session"})
+    if body.return_session_token:
+        status["session_token"] = session_token
+    return status
+
+
+@router.delete("/api/auth/session")
+def operator_session_logout(response: Response) -> dict[str, object]:
+    """Clear the browser session without changing the deployment token."""
+    response.delete_cookie(
+        key=SESSION_COOKIE,
+        path="/",
+        httponly=True,
+        samesite="strict",
+    )
+    return {"authenticated": False, "auth_required": True, "identity": None, **_session_meta()}
 
 
 @router.post("/api/desktop/bootstrap-code")
@@ -63,16 +182,7 @@ def desktop_bootstrap(body: DesktopBootstrapRequest, response: Response) -> dict
     if not (token_ok and code_ok):
         raise HTTPException(status_code=401, detail="invalid desktop bootstrap credentials")
 
-    session = issue_session_token()
-    response.set_cookie(
-        key=SESSION_COOKIE,
-        value=session,
-        httponly=True,
-        samesite="lax",
-        secure=False,  # loopback http://127.0.0.1
-        max_age=60 * 60 * 24 * 30,
-        path="/",
-    )
+    _set_session_cookie(response, secure=False, same_site="lax")
     return {"ok": True, "session": True}
 
 

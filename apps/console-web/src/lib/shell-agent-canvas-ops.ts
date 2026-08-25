@@ -58,7 +58,9 @@ export function createShellAgentCanvasOps(input: {
   }
 
   function openAgentEditReview(
-    edit: Pick<IdeAgentEditSummary, 'path' | 'diff' | 'added' | 'removed' | 'open'>,
+    edit: Pick<IdeAgentEditSummary, 'path' | 'diff' | 'added' | 'removed' | 'open'> & {
+      preferDraft?: boolean;
+    },
   ): void {
     const path = resolveAgentEditOpenPath(
       edit.path,

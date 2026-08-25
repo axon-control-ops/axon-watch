@@ -36,13 +36,15 @@ describe('resolveConversationModelSwitchIntent', () => {
     });
   });
 
-  it('switches to Cursor Grok 4.5 Fast from short phrasing', () => {
+  it('switches to Grok 4.5 Fast from short phrasing', () => {
+    // cursorModelLabel() intentionally drops the redundant "Cursor" catalog
+    // prefix on the model chip — the family chip elsewhere already says Cursor.
     expect(resolveConversationModelSwitchIntent('change brain to grok fast', ROWS)).toEqual({
       kind: 'switch_composer_model',
       modelId: 'cursor-grok-4.5-high-fast',
-      label: 'Cursor Grok 4.5 Fast',
+      label: 'Grok 4.5 Fast',
       reply:
-        'VAXON brain switched to Cursor Grok 4.5 Fast. That is operator-global — Agent Dock keeps its own workspace model.',
+        'VAXON brain switched to Grok 4.5 Fast. That is operator-global — Agent Dock keeps its own workspace model.',
     });
   });
 

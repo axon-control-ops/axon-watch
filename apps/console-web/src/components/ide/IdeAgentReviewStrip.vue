@@ -13,6 +13,7 @@ import {
   resolveIdeAgentEditDiffFromThread,
   shouldShowIdeAgentReviewStrip,
 } from '../../lib/ide-agent-center-view';
+import { composerRuntimeFamilyLabel } from '../../lib/cursor-catalog-view';
 import { useEmployeeFailureStripActions } from '../../composables/agent-dock/use-employee-failure-strip-actions';
 import { runContinueActionLabel } from '../../lib/run-lifecycle-ui';
 import { useShellStore } from '../../stores/shell';
@@ -32,6 +33,20 @@ const {
   handleExplain,
   handleOpenTeam,
 } = useEmployeeFailureStripActions(shell);
+
+const runtimeFamilyLabel = computed(() => {
+  const preferred = shell.selectedRuntimeTargetId;
+  const status = shell.runtimeStatus;
+  const records = status ? [...status.local, ...status.cloud] : [];
+  const selected =
+    (preferred ? records.find((row) => row.id === preferred) : null) ??
+    (status?.default_runtime
+      ? records.find((row) => row.id === status.default_runtime)
+      : null) ??
+    records[0] ??
+    null;
+  return composerRuntimeFamilyLabel(selected?.family ?? 'cursor');
+});
 
 const editSummaries = computed(() => {
   // During an active stream, avoid full-transcript rescans — use incremental edit count.
@@ -72,7 +87,7 @@ const reviewReadyCount = computed(
     ).length,
 );
 
-const showReviewStrip = computed(() =>
+const showReviewControls = computed(() =>
   shouldShowIdeAgentReviewStrip({
     layoutMode: shell.layoutMode,
     agentStreamActive: shell.agentStreamActive,
@@ -82,6 +97,10 @@ const showReviewStrip = computed(() =>
     latestAgentTurnFailed: latestIdeAgentTurnFailed(shell.threadMessages),
     employeeFailureActions: showFailureActions.value,
   }) || shell.canResumeIdeAgentRun,
+);
+
+const showReviewStrip = computed(
+  () => showReviewControls.value,
 );
 
 const reviewBar = computed(() =>
@@ -165,80 +184,91 @@ function focusReviewFiles(): void {
     aria-label="Agent review controls"
   >
     <div class="ide-agent-review-strip__bar">
-      <button
-        type="button"
-        class="ide-agent-review-strip__toggle"
-        :class="{ 'ide-agent-review-strip__toggle--disabled': !canExpandFileList }"
-        :disabled="!canExpandFileList"
-        :aria-expanded="canExpandFileList ? expanded : undefined"
-        @click="toggleExpanded"
-      >
-        <p class="ide-agent-review-strip__summary">{{ statusLabel }}</p>
-      </button>
-      <div class="ide-agent-review-strip__actions">
+      <div class="ide-agent-review-strip__side ide-agent-review-strip__side--start">
         <button
-          v-if="showRetryAction"
+          v-if="showReviewControls"
           type="button"
-          class="ide-agent-review-strip__btn ide-agent-review-strip__btn--retry"
-          :disabled="actionsDisabled"
-          :title="`${retryLabel} this teammate's last job`"
-          @click="handleRetry"
+          class="ide-agent-review-strip__toggle"
+          :class="{ 'ide-agent-review-strip__toggle--disabled': !canExpandFileList }"
+          :disabled="!canExpandFileList"
+          :aria-expanded="canExpandFileList ? expanded : undefined"
+          @click="toggleExpanded"
         >
-          {{ retrying ? 'Working…' : retryLabel }}
+          <p class="ide-agent-review-strip__summary">{{ statusLabel }}</p>
         </button>
-        <button
-          v-if="showFailureActions && showExplainAction"
-          type="button"
-          class="ide-agent-review-strip__btn ide-agent-review-strip__btn--link"
-          title="Opens Ask so they explain what happened without changing code"
-          :disabled="actionsDisabled"
-          @click="handleExplain"
-        >
-          Explain
-        </button>
-        <button
-          v-if="showFailureActions"
-          type="button"
-          class="ide-agent-review-strip__btn ide-agent-review-strip__btn--link"
-          @click="handleOpenTeam"
-        >
-          Open team
-        </button>
-        <button
-          v-if="reviewBar.showStop"
-          type="button"
-          class="ide-agent-review-strip__btn ide-agent-review-strip__btn--stop"
-          :disabled="shell.runMutationState === 'stopping'"
-          @click="stopAgentRun"
-        >
-          {{ reviewBar.stopLabel }}
-        </button>
-        <button
-          v-if="reviewBar.showResume"
-          type="button"
-          class="ide-agent-review-strip__btn ide-agent-review-strip__btn--resume"
-          :disabled="shell.runMutationState === 'resuming'"
-          @click="resumeAgentRun"
-        >
-          {{ reviewBar.resumeLabel }}
-        </button>
-        <button
-          v-if="reviewBar.showReview"
-          type="button"
-          class="ide-agent-review-strip__btn ide-agent-review-strip__btn--review"
-          @click="focusReviewFiles"
-        >
-          {{ reviewBar.reviewLabel }}
-        </button>
-        <button
-          v-if="reviewBar.showApplyAll"
-          type="button"
-          class="ide-agent-review-strip__btn ide-agent-review-strip__btn--apply"
-          :disabled="shell.runMutationState === 'completing'"
-          @click="applyAllReviewReady"
-        >
-          {{ reviewBar.applyLabel }}
-        </button>
+      </div>
+      <div class="ide-agent-review-strip__side ide-agent-review-strip__side--center">
+        <span
+          class="ide-agent-review-strip__runtime"
+          :title="`CLI runtime: ${runtimeFamilyLabel}`"
+        >{{ runtimeFamilyLabel }}</span>
+      </div>
+      <div class="ide-agent-review-strip__side ide-agent-review-strip__side--end">
+        <div v-if="showReviewControls" class="ide-agent-review-strip__actions">
+          <button
+            v-if="showRetryAction"
+            type="button"
+            class="ide-agent-review-strip__btn ide-agent-review-strip__btn--retry"
+            :disabled="actionsDisabled"
+            :title="`${retryLabel} this teammate's last job`"
+            @click="handleRetry"
+          >
+            {{ retrying ? 'Working…' : retryLabel }}
+          </button>
+          <button
+            v-if="showFailureActions && showExplainAction"
+            type="button"
+            class="ide-agent-review-strip__btn ide-agent-review-strip__btn--link"
+            title="Opens Ask so they explain what happened without changing code"
+            :disabled="actionsDisabled"
+            @click="handleExplain"
+          >
+            Explain
+          </button>
+          <button
+            v-if="showFailureActions"
+            type="button"
+            class="ide-agent-review-strip__btn ide-agent-review-strip__btn--link"
+            @click="handleOpenTeam"
+          >
+            Open team
+          </button>
+          <button
+            v-if="reviewBar.showStop"
+            type="button"
+            class="ide-agent-review-strip__btn ide-agent-review-strip__btn--stop"
+            :disabled="shell.runMutationState === 'stopping'"
+            @click="stopAgentRun"
+          >
+            {{ reviewBar.stopLabel }}
+          </button>
+          <button
+            v-if="reviewBar.showResume"
+            type="button"
+            class="ide-agent-review-strip__btn ide-agent-review-strip__btn--resume"
+            :disabled="shell.runMutationState === 'resuming'"
+            @click="resumeAgentRun"
+          >
+            {{ reviewBar.resumeLabel }}
+          </button>
+          <button
+            v-if="reviewBar.showReview"
+            type="button"
+            class="ide-agent-review-strip__btn ide-agent-review-strip__btn--review"
+            @click="focusReviewFiles"
+          >
+            {{ reviewBar.reviewLabel }}
+          </button>
+          <button
+            v-if="reviewBar.showApplyAll"
+            type="button"
+            class="ide-agent-review-strip__btn ide-agent-review-strip__btn--apply"
+            :disabled="shell.runMutationState === 'completing'"
+            @click="applyAllReviewReady"
+          >
+            {{ reviewBar.applyLabel }}
+          </button>
+        </div>
       </div>
     </div>
 

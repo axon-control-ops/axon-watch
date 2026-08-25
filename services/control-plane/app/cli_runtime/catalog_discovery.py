@@ -8,13 +8,32 @@ import shutil
 
 def cli_runtime_family(path: str = "") -> str:
     candidate = os.path.basename(str(path or "")).strip().lower()
-    if candidate == "cursor":
+    if candidate in {"cursor", "cursor-agent"} or candidate.startswith("cursor-agent."):
         return "cursor"
     if candidate in {"claude", "claude-code"} or candidate.startswith("claude"):
         return "claude"
     if "codex" in candidate:
         return "codex"
     return ""
+
+
+def is_cursor_agent_binary(path: str = "") -> bool:
+    """True when `path` is the standalone agent CLI (not the IDE `cursor` shim).
+
+    `cursor-agent` *is* the agent entrypoint (`cursor-agent status`, `cursor-agent --print`).
+    The IDE `cursor` binary needs an extra `agent` subcommand (`cursor agent status`).
+    """
+    name = os.path.basename(str(path or "")).strip().lower()
+    return name == "cursor-agent" or name.startswith("cursor-agent.")
+
+
+def cursor_cli_argv(binary: str, *parts: str) -> list[str]:
+    """Build argv for Cursor CLI auth/dispatch, binary-aware for agent vs IDE shim."""
+    if not binary:
+        return list(parts)
+    if is_cursor_agent_binary(binary):
+        return [binary, *parts]
+    return [binary, "agent", *parts]
 
 
 def _is_executable(path: str) -> bool:
@@ -31,10 +50,23 @@ def _find_cli(override_path: str, family: str, candidates: tuple[str, ...]) -> s
 
 
 def find_cursor_cli(override_path: str = "") -> str:
+    # Prefer the "cursor-agent" binary over the "cursor" IDE-launcher shim:
+    # the shim's own dispatch logic re-execs through a *separate* "agent"
+    # symlink at runtime (`exec "$HOME/.local/bin/agent" "$@"`), which our
+    # process sandbox has no way to see — it only bind-mounts the resolved
+    # binary's own directory, not a second hop the binary jumps to on its
+    # own. That left every sandboxed Cursor dispatch running the shim
+    # against a symlink target that was never exposed to the sandbox,
+    # surfacing as a spurious "Could not install cursor-agent" failure.
+    # cursor-agent has no such indirection, so resolving straight to it
+    # keeps sandbox path resolution and actual execution in agreement.
     return _find_cli(
         override_path,
         "cursor",
         (
+            shutil.which("cursor-agent") or "",
+            os.path.expanduser("~/.local/bin/cursor-agent"),
+            os.path.expanduser("~/bin/cursor-agent"),
             shutil.which("cursor") or "",
             os.path.expanduser("~/.local/bin/cursor"),
             os.path.expanduser("~/bin/cursor"),

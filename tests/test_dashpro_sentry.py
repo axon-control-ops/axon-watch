@@ -75,11 +75,52 @@ class DashProSentryMonitorTests(unittest.TestCase):
             side_effect=TimeoutError("The read operation timed out"),
         ):
             status, detail, sample = dashpro_sentry.check_sentry_recent_issues(
-                env={"SENTRY_AUTH_TOKEN": "token"}
+                env={"SENTRY_AUTH_TOKEN": "token"},
+                retries=0,
             )
 
         self.assertEqual("warning", status)
         self.assertIn("Sentry API query failed", detail)
+        self.assertEqual([], sample)
+
+    def test_transient_timeout_recovers_on_retry(self) -> None:
+        class _FakeResponse:
+            def __init__(self, status: int, payload):
+                self.status = status
+                self._payload = payload
+
+            def read(self):
+                return json.dumps(self._payload).encode("utf-8")
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, exc_type, exc, tb):
+                return False
+
+        calls = {"n": 0}
+
+        def fake_urlopen(req, timeout=0):
+            calls["n"] += 1
+            self.assertEqual(20, timeout)
+            if calls["n"] == 1:
+                raise TimeoutError("The read operation timed out")
+            return _FakeResponse(200, [])
+
+        with patch.object(dashpro_sentry, "urlopen", side_effect=fake_urlopen):
+            status, detail, sample = dashpro_sentry.check_sentry_recent_issues(
+                env={
+                    "SENTRY_AUTH_TOKEN": "token",
+                    "SENTRY_ORG_SLUG": "edudashpro",
+                    "SENTRY_PROJECT_SLUG": "react-native",
+                },
+                timeout_seconds=20,
+                retries=1,
+            )
+
+        self.assertEqual(2, calls["n"])
+        self.assertEqual("ok", status)
+        self.assertIn("zero unresolved production issues", detail)
         self.assertEqual([], sample)
 
     def test_transport_failure_maps_to_warning_inbox_severity(self) -> None:

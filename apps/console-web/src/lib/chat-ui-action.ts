@@ -6,6 +6,8 @@ export interface SwitchWorkspaceUiAction {
   focus_attention?: boolean;
   signal_id?: string | null;
   cta_label?: string | null;
+  /** When true under Full autonomy, VAXON attends without asking the operator to hunt. */
+  auto_attend?: boolean;
 }
 
 export interface OpenSourceUiAction {
@@ -61,6 +63,7 @@ export function parseChatUiAction(value: unknown): ChatUiAction | null {
       open_file_path: openFilePath || null,
       layout_mode: layoutMode === 'ide' || layoutMode === 'operator' ? layoutMode : undefined,
       focus_attention: record.focus_attention === true,
+      auto_attend: record.auto_attend === true,
       signal_id: signalId || null,
       cta_label: ctaLabel || null,
     };

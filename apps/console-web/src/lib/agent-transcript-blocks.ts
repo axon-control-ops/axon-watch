@@ -1,7 +1,9 @@
 /** Parse block-annotated agent transcripts (:::thinking / :::edit / :::tool / :::terminal). */
 
 import { sanitizeAgentThinkingForOperator, THINKING_SPEECH_FALLBACK } from './agent-live-line-view';
+import { tryParseClarifyingMarkdown } from './agent-question-view';
 import { tryParseLegacyLeadFanOutText } from './lead-fan-out-card';
+import { looksLikeLeadCheckinReport } from './lead-checkin-card';
 import { looksLikeLeadStandupReport } from './lead-standup-card';
 
 export type {
@@ -27,15 +29,23 @@ import {
 
 export function agentContentHasTranscriptBlocks(content: string): boolean {
   if (
-    /^:::(thinking|edit|tool|plan|ask|terminal|research|image|debug-reproduce|lead-fan-out)\b/m.test(
+    /^:::(thinking|edit|edit-failed|tool|plan|ask|terminal|research|image|debug-reproduce|lead-fan-out)\b/m.test(
       content,
     )
   ) {
     return true;
   }
+  // Some runtimes and mobile clients emit a plain question plus numbered
+  // options instead of an :::ask fence. The parser already upgrades that
+  // shape; surface it through the same interactive card rendering path.
+  if (tryParseClarifyingMarkdown(content)) {
+    return true;
+  }
   // Legacy Lead essays (pre-fence) still get the cinematic fan-out / stand-up cards.
   return (
-    tryParseLegacyLeadFanOutText(content) != null || looksLikeLeadStandupReport(content)
+    tryParseLegacyLeadFanOutText(content) != null ||
+    looksLikeLeadStandupReport(content) ||
+    looksLikeLeadCheckinReport(content)
   );
 }
 
@@ -108,16 +118,22 @@ export function collapseClosedEditSegmentsForDisplay(
   return collapsed;
 }
 
+const DISPLAY_PARSE_MAX_CHARS = 400_000;
+
 export function prepareAgentTranscriptSegmentsForDisplay(
   content: string,
   options?: { collapseClosedEditsAt?: number },
 ): AgentTranscriptSegment[] {
+  const normalizedContent =
+    content.length > DISPLAY_PARSE_MAX_CHARS
+      ? `${content.slice(0, DISPLAY_PARSE_MAX_CHARS)}\n\n… [transcript truncated for display performance] …`
+      : content;
   const threshold = options?.collapseClosedEditsAt ?? 12;
-  const editCount = countAgentTranscriptHeaders(content).edit;
+  const editCount = countAgentTranscriptHeaders(normalizedContent).edit;
   const segments =
     editCount >= threshold
-      ? parseAgentTranscriptBlocksUncached(content, { omitClosedEditDiffs: true })
-      : parseAgentTranscriptBlocks(content);
+      ? parseAgentTranscriptBlocksUncached(normalizedContent, { omitClosedEditDiffs: true })
+      : parseAgentTranscriptBlocks(normalizedContent);
   return collapseClosedEditSegmentsForDisplay(segments, threshold);
 }
 
@@ -157,6 +173,15 @@ export function thinkingPreview(text: string, maxLength = 90): string {
     return flattened;
   }
   return `${flattened.slice(0, maxLength - 1).trimEnd()}…`;
+}
+
+const READ_TOOL_LABEL_RE = /^Read\s+(.+)$/;
+
+/** Path a "Read <path>" tool-block label points at, or null for any other tool (Glob, Grep, ...). */
+export function readToolBlockPath(label: string): string | null {
+  const match = READ_TOOL_LABEL_RE.exec(label.trim());
+  const path = match?.[1]?.trim();
+  return path || null;
 }
 
 export function normalizeEditedFilePath(path: string): string {

@@ -100,6 +100,33 @@ export function looksLikeSuccessfulOutcomeDetail(detail: string | null | undefin
   );
 }
 
+/** Worker shift blocked because implementation was requested but no workspace files changed. */
+export function isCompletionGateFailure(detail: string | null | undefined): boolean {
+  const normalized = normalizeOperatorFailureDetail(detail).toLowerCase();
+  if (!normalized) {
+    return false;
+  }
+  return (
+    normalized.includes('completion gate') ||
+    normalized.includes('no changed files') ||
+    normalized.includes('produced no changed files')
+  );
+}
+
+/** Gate 6 acceptance / verification evidence did not pass. */
+export function isGate6AcceptanceFailure(detail: string | null | undefined): boolean {
+  const normalized = normalizeOperatorFailureDetail(detail).toLowerCase();
+  if (!normalized) {
+    return false;
+  }
+  return (
+    normalized.includes('gate 6') ||
+    normalized.includes('acceptance_evidence') ||
+    normalized.includes('acceptance evidence') ||
+    normalized.includes('lane b finalization failed')
+  );
+}
+
 /** Strip Lane B fallback wrappers so dock and retry drafts show the root cause. */
 export function normalizeOperatorFailureDetail(detail: string | null | undefined): string {
   const cleaned = (detail ?? '').replace(/\s+/g, ' ').trim();
@@ -177,6 +204,23 @@ export function isUsageLimitFailure(detail: string | null | undefined): boolean 
 export function isRuntimeAuthFailure(detail: string | null | undefined): boolean {
   const hay = `${detail ?? ''} ${normalizeOperatorFailureDetail(detail)}`;
   return RUNTIME_AUTH_MARKERS.some((marker) => marker.test(hay));
+}
+
+/**
+ * Delivery was blocked by a working-as-intended policy gate (e.g. private-document
+ * paths never leave a workspace automatically) rather than a transient failure.
+ * Retrying re-runs the same task against the same working tree and fails the same
+ * way every time — an operator must remove/relocate the file first.
+ */
+export function isNonRetriableWorkspaceBlockFailure(detail: string | null | undefined): boolean {
+  const normalized = normalizeOperatorFailureDetail(detail).toLowerCase();
+  if (!normalized) {
+    return false;
+  }
+  return (
+    normalized.includes('private_company_material:') ||
+    normalized.includes('working-as-intended behavior, not an error to retry')
+  );
 }
 
 /** Auth-probe timeout vs missing login — both are runtime auth, different operator next step. */

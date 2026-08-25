@@ -11,6 +11,11 @@ import {
   subscribeKairoVoiceUtterance,
 } from '../../lib/kairo-voice-utterance';
 import { kairoVoiceFollowupExpiresAt } from '../../lib/kairo-voice-followup-window';
+import { normalizeKairoCopy } from '../../lib/kairo-entity-labels';
+
+export function vaxonRosterDisplayLine(text: string | null | undefined): string {
+  return normalizeKairoCopy(String(text ?? '').trim());
+}
 
 export function shouldShowVaxonRosterVoiceDock(input: {
   layoutMode: string;
@@ -18,14 +23,10 @@ export function shouldShowVaxonRosterVoiceDock(input: {
   operatorCenterView?: string | null;
   voiceDockVisible: boolean;
 }): boolean {
-  if (
-    !input.voiceDockVisible ||
-    input.layoutMode === 'ide' ||
-    input.operatorCenterView === 'grid'
-  ) {
+  if (!input.voiceDockVisible || input.layoutMode === 'ide') {
     return false;
   }
-  // Mission Control already owns VAXON presence in the right LIVE OPERATIONS orb.
+  // Brain Graph uses the floating orb; Mission Control tabs own VAXON in-center.
   return input.operatorBrainGalaxyActive;
 }
 
@@ -47,7 +48,7 @@ export function useVaxonRosterVoiceDock(
     }
     if (state.speaker?.kind === 'vaxon') {
       lastSpeakerWasVaxon.value = true;
-      const text = state.text?.trim();
+      const text = vaxonRosterDisplayLine(state.text);
       if (text) {
         lastLine.value = text;
         const ws = workspaceId.value?.trim();
@@ -68,7 +69,7 @@ export function useVaxonRosterVoiceDock(
       const pending = getVaxonBriefingInteraction(ws);
       if (pending) {
         lastSpeakerWasVaxon.value = true;
-        lastLine.value = pending.line;
+        lastLine.value = vaxonRosterDisplayLine(pending.line);
       }
     }
     applyUtterance();
@@ -101,7 +102,7 @@ export function useVaxonRosterVoiceDock(
     return ws ? getVaxonBriefingInteraction(ws) : null;
   });
   const displayLine = computed(
-    () => pendingInteraction.value?.line || lastLine.value,
+    () => vaxonRosterDisplayLine(pendingInteraction.value?.line || lastLine.value),
   );
   const visible = computed(
     () =>

@@ -2,17 +2,27 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel
 
 
 class WriteWorkspaceFileRequest(BaseModel):
     content: str
+    # sha256 of the content this save was based on, from the last read/save
+    # response. When present, the save is rejected with 409 if the file on disk
+    # no longer matches — someone else (agent or another tab) changed it since
+    # load. Omit to keep the old last-write-wins behavior.
+    base_sha256: str | None = None
 
 
 class WorkspaceComposerPrefsRequest(BaseModel):
     cursor_cli_model: str | None = None
+    claude_cli_model: str | None = None
+    codex_cli_model: str | None = None
+    runtime_target: str | None = None
+    auto_allowed_runtimes: list[str] | None = None
+    max_concurrent_runtimes: int | None = None
 
 
 class RenameWorkspaceFileRequest(BaseModel):
@@ -51,12 +61,26 @@ class PostChatMessageRequest(BaseModel):
     kairo_session_id: str | None = None
 
 
+class GenerateInstructionsRequest(BaseModel):
+    """A model-authored, non-executing expansion of a composer draft."""
+
+    workspace_id: str
+    content: str
+    specialist_context: dict[str, Any] | None = None
+    runtime_target: str | None = None
+    runtime_model: str | None = None
+
+
 class CreateWorkspaceChatThreadRequest(BaseModel):
     surface: str = "ide"
     run_id: str | None = None
     title: str | None = None
     employee_id: str | None = None
     employee_role: str | None = None
+
+
+class SyncThreadExecutionAccessRequest(BaseModel):
+    execution_access: str
 
 
 class CreateTerminalSessionRequest(BaseModel):
@@ -69,9 +93,21 @@ class CreateTerminalSessionRequest(BaseModel):
 class EnqueueAgentTerminalJobRequest(BaseModel):
     command: str
     run_id: str | None = None
+    source_workspace_id: str | None = None
     stream_to_chat: bool | None = None
     thread_id: str | None = None
     message_id: str | None = None
+    # Per-job deadline override; omitted means the command-class default.
+    timeout_seconds: float | None = None
+    # "workspace" (bound project root) or "sandbox" (the composer checkout).
+    target: str | None = None
+
+
+class StartSandboxPreviewRequest(BaseModel):
+    """Optional overrides when the preview heuristic cannot infer a project."""
+
+    command: str | None = None
+    port: int | None = None
 
 
 class RenameTerminalSessionRequest(BaseModel):
@@ -166,6 +202,8 @@ class OperatorPresenceSettingsRequest(BaseModel):
     stt_mode: str | None = None
     voice_routing_mode: str | None = None
     vaxon_model_id: str | None = None
+    auto_composer_runtime_override_enabled: bool | None = None
+    auto_composer_runtime_target: str | None = None
     narrate_tool_progress: bool | None = None
 
 
@@ -188,6 +226,9 @@ class KairoConverseRequest(BaseModel):
     context_signal_id: str = ""
     context_node_id: str = ""
     attachment_ids: list[str] | None = None
+    # Secure default for current and stale clients: text is an Ask unless the
+    # client deliberately declares the Dispatch action.
+    submission_intent: Literal["ask", "dispatch"] = "ask"
 
 
 class KairoTtsRequest(BaseModel):
@@ -195,6 +236,8 @@ class KairoTtsRequest(BaseModel):
     voice: str | None = None
     rate: float | None = None
     pitch: float | None = None
+    # Mid-utterance chunks skip the long sink wake-up silence.
+    continuation: bool | None = None
 
 
 class DebugSessionLogRequest(BaseModel):

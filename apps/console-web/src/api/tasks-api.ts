@@ -24,6 +24,7 @@ export type WorkspaceTaskRecord = {
   attempts_used: number;
   terminal_outcome: string | null;
   run_id: string | null;
+  mission_id?: string | null;
   created_at: string;
   updated_at: string;
   /** Populated client-side from Lead plan mappings when available. */

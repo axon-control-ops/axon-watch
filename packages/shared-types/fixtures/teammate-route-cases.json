@@ -105,9 +105,9 @@
       "id": "named_assign_frontend_from_lead",
       "prompt": "Ok assign Priya the task and have her report back",
       "current_employee_id": "employee-workspace_dashpro-lead-0",
-      "should_route": true,
+      "should_route": false,
       "employee_id": "employee-workspace_dashpro-frontend-2",
-      "reason": "named_assign_frontend"
+      "reason": "vague_named_assign"
     },
     {
       "id": "named_assign_backend_from_lead",

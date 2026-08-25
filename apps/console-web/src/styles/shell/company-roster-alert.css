@@ -97,6 +97,31 @@
   animation: none;
 }
 
+.company-roster__decision-badge {
+  border: 1px solid rgba(255, 202, 82, 0.7);
+  border-radius: 999px;
+  padding: 0.14rem 0.42rem;
+  color: rgba(255, 230, 164, 0.98);
+  background: rgba(104, 65, 15, 0.42);
+  cursor: pointer;
+  font: 700 0.56rem/1 var(--font-mono, ui-monospace, monospace);
+  letter-spacing: 0.06em;
+  animation: company-roster-decision-pulse 1.55s ease-in-out infinite;
+}
+
+.company-roster__decision-badge:focus-visible {
+  outline: 2px solid rgba(255, 221, 126, 0.95);
+  outline-offset: 2px;
+}
+
+@keyframes company-roster-decision-pulse {
+  50% { box-shadow: 0 0 0.8rem rgba(255, 185, 45, 0.65); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .company-roster__decision-badge { animation: none; }
+}
+
 @keyframes company-roster-busy-pulse {
   0%,
   100% {
@@ -122,8 +147,24 @@
   color: rgba(255, 170, 150, 0.92);
 }
 
+.company-roster__hint--decision {
+  color: rgba(255, 232, 172, 0.96);
+  border: 1px solid rgba(255, 202, 82, 0.45);
+  background: rgba(94, 57, 14, 0.28);
+}
+
+.company-roster__hint--decision:hover,
+.company-roster__hint--decision:focus-visible {
+  color: rgba(255, 244, 212, 1);
+  border-color: rgba(255, 211, 102, 0.72);
+  background: rgba(112, 69, 17, 0.42);
+}
+
 .company-roster__hint--action {
-  display: block;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  overflow: hidden;
   width: 100%;
   margin: 0.4rem 0 0;
   text-align: left;

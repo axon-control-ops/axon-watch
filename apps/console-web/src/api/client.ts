@@ -21,6 +21,25 @@ export const THREAD_HISTORY_FETCH_TIMEOUT_MS = 45_000;
  */
 export const CHAT_MESSAGE_FETCH_TIMEOUT_MS = 60_000;
 
+/** Attachment uploads carry a file body, not just JSON — allow more time than a plain call. */
+export const ATTACHMENT_UPLOAD_TIMEOUT_MS = 60_000;
+export const OPERATOR_AUTH_REQUIRED_EVENT = 'axon-operator-auth-required';
+
+function notifyOperatorAuthRequired(path: string, status: number): void {
+  if (
+    status !== 401 ||
+    path === '/api/auth/session' ||
+    typeof window === 'undefined'
+  ) {
+    return;
+  }
+  window.dispatchEvent(
+    new CustomEvent(OPERATOR_AUTH_REQUIRED_EVENT, {
+      detail: { path, status },
+    }),
+  );
+}
+
 export class ApiRequestError extends Error {
   readonly status: number;
   readonly label: string;
@@ -35,6 +54,27 @@ export class ApiRequestError extends Error {
 
 export function isApiNotFoundError(error: unknown): boolean {
   return error instanceof ApiRequestError && error.status === 404;
+}
+
+export function isApiConflictError(error: unknown): boolean {
+  return error instanceof ApiRequestError && error.status === 409;
+}
+
+/** Transient control-plane / proxy failures — keep thread selection and retry later. */
+export function isApiTransientError(error: unknown): boolean {
+  if (error instanceof ApiRequestError) {
+    return error.status === 503 || error.status === 502 || error.status === 504;
+  }
+  if (error instanceof DOMException && error.name === 'TimeoutError') {
+    return true;
+  }
+  if (error instanceof TypeError) {
+    return true;
+  }
+  if (error instanceof Error) {
+    return /fetch failed|network|ECONNREFUSED|timed out/i.test(error.message);
+  }
+  return false;
 }
 
 export function controlPlaneBaseUrl(): string {
@@ -89,8 +129,13 @@ export async function fetchJson<T>(
 ): Promise<T> {
   const { signal, clear } = mergeAbortSignals(timeoutMs, init.signal);
   try {
-    const response = await fetch(apiUrl(path), { ...init, signal });
+    const response = await fetch(apiUrl(path), {
+      credentials: 'include',
+      ...init,
+      signal,
+    });
     if (!response.ok) {
+      notifyOperatorAuthRequired(path, response.status);
       const fallback = errorLabel ?? `request failed with status ${response.status}`;
       let detail = '';
       try {
@@ -132,6 +177,44 @@ export async function fetchJson<T>(
   }
 }
 
+/**
+ * Bare `fetch()` with no signal never resolves if the network stalls
+ * (as opposed to failing outright) — the caller's request spins forever with
+ * no error and no recovery. Callers that need the raw Response (custom
+ * status-code branching, non-JSON bodies) should use this instead of calling
+ * `fetch()` directly; it gives them the same timeout/abort behavior as
+ * `fetchJson` without forcing the throw-on-!ok contract.
+ */
+export async function fetchWithTimeout(
+  path: string,
+  init: RequestInit = {},
+  timeoutMs: number = DEFAULT_FETCH_TIMEOUT_MS,
+): Promise<Response> {
+  const { signal, clear } = mergeAbortSignals(timeoutMs, init.signal);
+  try {
+    const response = await fetch(apiUrl(path), {
+      credentials: 'include',
+      ...init,
+      signal,
+    });
+    notifyOperatorAuthRequired(path, response.status);
+    return response;
+  } catch (error) {
+    if (error instanceof DOMException && error.name === 'TimeoutError') {
+      throw new Error(`request timed out after ${timeoutMs}ms`);
+    }
+    if (error instanceof Error && error.name === 'AbortError') {
+      if (init.signal?.aborted) {
+        throw error;
+      }
+      throw new Error(`request timed out after ${timeoutMs}ms`);
+    }
+    throw new Error(humanizeNetworkError(error, { action: 'Request' }));
+  } finally {
+    clear();
+  }
+}
+
 export async function fetchBlob(
   path: string,
   init: RequestInit = {},
@@ -140,8 +223,13 @@ export async function fetchBlob(
 ): Promise<Blob> {
   const { signal, clear } = mergeAbortSignals(timeoutMs, init.signal);
   try {
-    const response = await fetch(apiUrl(path), { ...init, signal });
+    const response = await fetch(apiUrl(path), {
+      credentials: 'include',
+      ...init,
+      signal,
+    });
     if (!response.ok) {
+      notifyOperatorAuthRequired(path, response.status);
       throw new Error(errorLabel ?? `request failed with status ${response.status}`);
     }
     return response.blob();

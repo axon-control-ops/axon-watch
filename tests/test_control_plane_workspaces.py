@@ -17,6 +17,7 @@ sys.path.insert(0, str(CONTROL_PLANE_ROOT))
 
 from app.main import app  # noqa: E402
 from app.persistence import run_store  # noqa: E402
+from app.persistence.workspace_composer_prefs_store import set_workspace_composer_prefs  # noqa: E402
 
 
 class ControlPlaneWorkspacesTests(unittest.TestCase):
@@ -58,13 +59,11 @@ class ControlPlaneWorkspacesTests(unittest.TestCase):
     def test_workspaces_show_returns_known_workspace(self) -> None:
         response = self.client.get("/api/workspaces/workspace_alpha")
         self.assertEqual(200, response.status_code)
-        self.assertEqual(
-            {
-                "workspace_id": "workspace_alpha",
-                "connection_kind": "isolated_root",
-            },
-            response.json(),
-        )
+        body = response.json()
+        self.assertEqual("workspace_alpha", body["workspace_id"])
+        self.assertEqual("isolated_root", body["connection_kind"])
+        # workspace_alpha has no configured company (config/workspace-agents.json)
+        self.assertFalse(body["has_active_team"])
 
     def test_workspaces_show_returns_404_for_unknown_workspace(self) -> None:
         response = self.client.get("/api/workspaces/workspace_missing")
@@ -106,6 +105,26 @@ class ControlPlaneWorkspacesTests(unittest.TestCase):
         self.assertEqual("project_path", record["connection_kind"])
         self.assertEqual(str(project_root.resolve()), record["project_root"])
         self.assertEqual("Bound demo", record["display_name"])
+
+    def test_operator_workspace_records_expose_auto_enabled_toggle(self) -> None:
+        set_workspace_composer_prefs(
+            "workspace_axon_watch",
+            auto_allowed_runtimes=["codex", "claude"],
+        )
+
+        response = self.client.get("/api/workspaces?scope=operator")
+        self.assertEqual(200, response.status_code)
+        by_id = {item["workspace_id"]: item for item in response.json()["items"]}
+
+        self.assertTrue(by_id["workspace_axon_watch"]["auto_enabled"])
+        self.assertFalse(by_id["workspace_axon_local"]["auto_enabled"])
+
+        agents_response = self.client.get("/api/agents?scope=operator")
+        self.assertEqual(200, agents_response.status_code)
+        agents_by_workspace = {
+            item["workspace_id"]: item for item in agents_response.json()["items"]
+        }
+        self.assertTrue(agents_by_workspace["workspace_axon_watch"]["auto_enabled"])
 
 
 if __name__ == "__main__":

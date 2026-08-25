@@ -22,8 +22,15 @@ ALLOWED_TRANSITIONS: dict[str, set[str]] = {
     "waiting_external": {"executing", "paused", "cancelled"},
     "awaiting_input": {"planning", "cancelled"},
     "awaiting_approval": {"executing", "cancelled"},
-    "paused": {"executing", "cancelled", "completed"},
-    "review_ready": {"completed", "executing"},
+    # ``failed`` is reachable from every non-terminal phase that fail_run()
+    # already accepts as input (executing / review_ready / paused). Without it
+    # the guard in fail_run and this table disagreed: fail_run let a paused or
+    # review_ready run through, then _transition_record refused the move and
+    # raised RunLifecycleError. fail_worker_run swallows that error, so the run
+    # never reached a terminal phase and sat "paused" or "review_ready"
+    # forever -- the stale runs operators kept having to clear by hand.
+    "paused": {"executing", "cancelled", "completed", "failed"},
+    "review_ready": {"completed", "executing", "failed"},
     "completed": set(),
     "failed": set(),
     "cancelled": set(),

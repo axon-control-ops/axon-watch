@@ -86,6 +86,12 @@ def resolve_lane_b_agent_run(
         summary=lane_b_run_summary(content),
         detail=detail,
         employee_role=cleaned_role,
+        # A direct employee-composer message is a new operator-directed turn.
+        # Open fleet tasks are leased only by the Task Board/scheduler, where
+        # the exact task/run linkage is explicit. Automatically attaching an
+        # unrelated queued verification task here made arbitrary questions
+        # inherit stale acceptance criteria and fail the wrong Gate 6 path.
+        task_id=None,
         requires_approval=(
             False if run_mode == "plan" else lane_b_agent_requires_approval(execution_access)
         ),

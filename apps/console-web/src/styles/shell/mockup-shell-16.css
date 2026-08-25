@@ -77,23 +77,98 @@
   gap: 0.65rem;
 }
 
-.operator-mobile-shell__voice .brain-galaxy-stage__jarvis-float {
-  position: relative;
-  inset: auto;
-  margin: 0 auto;
+.operator-mobile-shell__voice-orb {
+  display: flex;
+  justify-content: center;
+  padding: 0.25rem 0 0.15rem;
+}
+
+.operator-mobile-shell__voice-orb .kairo-galaxy-orb__cinematic {
+  width: min(100%, 20rem);
 }
 
 .operator-mobile-shell__tunnel-actions {
   display: flex;
+  flex-wrap: wrap;
   gap: 0.35rem;
   margin-top: 0.45rem;
+}
+
+.operator-mobile-shell__tunnel-actions > * {
+  flex: 1 1 10rem;
+  min-width: 0;
 }
 
 .console-shell--mobile .topbar-mockup,
 .console-shell--mobile .left-sidebar-mockup,
 .console-shell--mobile .right-dock-mockup,
-.console-shell--mobile .statusbar-mockup {
-  display: none;
+.console-shell--mobile .statusbar-mockup,
+.console-shell--mobile .region-topbar,
+.console-shell--mobile .region-status-bar {
+  display: none !important;
+}
+
+.console-shell--mockup.console-shell--mobile,
+.console-shell--mockup.console-shell--mobile[data-layout-mode] {
+  grid-template-areas: 'mobile';
+  /* Responsive shell media queries are imported later and restore three tracks. */
+  grid-template-columns: minmax(0, 1fr) !important;
+  grid-template-rows: minmax(0, 1fr);
+  height: 100vh;
+  max-width: 100vw;
+  min-height: 100vh;
+  min-width: 0 !important;
+  overflow-x: hidden;
+  padding: 0;
+  position: relative;
+  width: 100%;
+}
+
+.console-shell--mobile .operator-mobile-shell {
+  box-sizing: border-box;
+  grid-area: unset;
+  grid-column: auto;
+  grid-row: auto;
+  height: 100vh;
+  inset: 0;
+  max-width: 100vw;
+  min-height: 100vh;
+  min-width: 0;
+  position: absolute;
+  perspective: none;
+  width: 100%;
+  z-index: 1;
+}
+
+.console-shell--mobile :is(
+  .operator-mobile-shell__header,
+  .operator-mobile-shell__briefing,
+  .operator-mobile-shell__fleet,
+  .operator-mobile-shell__voice,
+  .operator-mobile-shell__tunnel,
+  .operator-mobile-shell__fleet-item
+) {
+  transform: none;
+}
+
+.console-shell--mobile .operator-mobile-shell > *,
+.console-shell--mobile .operator-mobile-shell__voice > * {
+  box-sizing: border-box;
+  max-width: 100%;
+  min-width: 0;
+}
+
+.console-shell--mobile .operator-mobile-shell__tunnel-copy,
+.console-shell--mobile .operator-mobile-shell__notice,
+.console-shell--mobile .operator-mobile-shell__advise {
+  overflow-wrap: anywhere;
+}
+
+.operator-mobile-shell__tunnel-error {
+  color: #ffaaaa;
+  font-size: 0.7rem;
+  line-height: 1.4;
+  margin: 0.55rem 0 0;
 }
 
 .mobile-voice-cockpit-strip__mobile-link {
@@ -312,4 +387,3 @@
   background: rgba(20, 14, 4, 0.78);
   backdrop-filter: blur(8px);
 }
-

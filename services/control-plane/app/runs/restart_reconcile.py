@@ -9,10 +9,33 @@ from app.persistence import run_store
 
 _RESTART_INTERRUPT_SUMMARY = "Run interrupted by control-plane restart"
 _EMPLOYEE_RESTART_SUMMARY = "Continuous worker dispatch lost on control-plane restart"
+_EMPLOYEE_MISSING_TASK_SUMMARY = "Continuous worker dispatch cancelled: linked task is missing"
+
+
+def _release_restart_interrupted_task(record: dict[str, Any]) -> None:
+    """Return the exact cancelled worker lease without charging an attempt."""
+    run_id = str(record.get("run_id") or "").strip()
+    if not run_id:
+        return
+    from app.persistence import task_store
+
+    task_store.reopen_orphaned_leased_tasks(
+        terminal_run_ids=[run_id],
+        terminal_outcome="control-plane restart; lease released without consuming an attempt",
+        refund_attempts=True,
+    )
 
 
 def _cancel_employee_run_on_restart(record: dict[str, Any]) -> dict[str, Any] | None:
-    """Cancel role-tagged worker runs so the scheduler can restart shifts cleanly."""
+    """Cancel role-tagged worker runs so the scheduler can restart shifts cleanly.
+
+    Checkpointed work is paused as RESUMABLE instead of cancelled.
+    """
+    from app.platform_recovery.restart import maybe_preserve_checkpointed_run
+
+    preserved = maybe_preserve_checkpointed_run(record)
+    if preserved is not None:
+        return preserved
     from app.runs.service import RunLifecycleError, RunNotFoundError, _transition_record
 
     phase = str(record.get("phase") or "").strip()
@@ -33,7 +56,7 @@ def _cancel_employee_run_on_restart(record: dict[str, Any]) -> dict[str, Any] | 
                 receipt_type="control_plane_restart",
                 receipt_summary=_EMPLOYEE_RESTART_SUMMARY,
             )
-            return _transition_record(
+            cancelled = _transition_record(
                 paused,
                 to_phase="cancelled",
                 current_step="Continuous worker dispatch cancelled after control-plane restart",
@@ -41,9 +64,11 @@ def _cancel_employee_run_on_restart(record: dict[str, Any]) -> dict[str, Any] | 
                 receipt_type="control_plane_restart",
                 receipt_summary=_EMPLOYEE_RESTART_SUMMARY,
             )
+            _release_restart_interrupted_task(record)
+            return cancelled
 
         if phase in {"awaiting_approval", "awaiting_input", "waiting_external", "paused"}:
-            return _transition_record(
+            cancelled = _transition_record(
                 record,
                 to_phase="cancelled",
                 current_step="Continuous worker dispatch cancelled after control-plane restart",
@@ -51,6 +76,8 @@ def _cancel_employee_run_on_restart(record: dict[str, Any]) -> dict[str, Any] | 
                 receipt_type="control_plane_restart",
                 receipt_summary=_EMPLOYEE_RESTART_SUMMARY,
             )
+            _release_restart_interrupted_task(record)
+            return cancelled
 
         if phase in {"queued", "starting", "planning"}:
             paused = _transition_record(
@@ -61,7 +88,7 @@ def _cancel_employee_run_on_restart(record: dict[str, Any]) -> dict[str, Any] | 
                 receipt_type="control_plane_restart",
                 receipt_summary=_EMPLOYEE_RESTART_SUMMARY,
             )
-            return _transition_record(
+            cancelled = _transition_record(
                 paused,
                 to_phase="cancelled",
                 current_step="Continuous worker dispatch cancelled after control-plane restart",
@@ -69,6 +96,8 @@ def _cancel_employee_run_on_restart(record: dict[str, Any]) -> dict[str, Any] | 
                 receipt_type="control_plane_restart",
                 receipt_summary=_EMPLOYEE_RESTART_SUMMARY,
             )
+            _release_restart_interrupted_task(record)
+            return cancelled
     except (RunLifecycleError, RunNotFoundError):
         return None
 
@@ -138,4 +167,48 @@ def reconcile_orphaned_runs_on_startup(*, boot_id: str) -> list[str]:
     return reconciled
 
 
-__all__ = ["interrupt_run_on_restart", "reconcile_orphaned_runs_on_startup"]
+def reconcile_employee_runs_missing_tasks() -> list[str]:
+    """Cancel active employee runs whose durable task row disappeared."""
+    from app.persistence import task_store
+    from app.runs.service import RunLifecycleError, RunNotFoundError, _transition_record
+
+    reconciled: list[str] = []
+    for record in run_store.list_runs():
+        if is_terminal_phase(str(record.get("phase") or "")):
+            continue
+        if not str(record.get("employee_role") or "").strip():
+            continue
+        task_id = str(record.get("task_id") or "").strip()
+        if not task_id or task_store.get_task(task_id) is not None:
+            continue
+        try:
+            phase = str(record.get("phase") or "").strip()
+            candidate = record
+            if phase == "executing":
+                candidate = _transition_record(
+                    record,
+                    to_phase="paused",
+                    current_step="Continuous worker dispatch paused: linked task is missing",
+                    actor="control-plane",
+                    receipt_type="task_ledger_reconcile",
+                    receipt_summary=f"{_EMPLOYEE_MISSING_TASK_SUMMARY} (task_id={task_id})",
+                )
+            _transition_record(
+                candidate,
+                to_phase="cancelled",
+                current_step=_EMPLOYEE_MISSING_TASK_SUMMARY,
+                actor="control-plane",
+                receipt_type="task_ledger_reconcile",
+                receipt_summary=f"{_EMPLOYEE_MISSING_TASK_SUMMARY} (task_id={task_id})",
+            )
+        except (RunLifecycleError, RunNotFoundError):
+            continue
+        reconciled.append(str(record.get("run_id") or ""))
+    return reconciled
+
+
+__all__ = [
+    "interrupt_run_on_restart",
+    "reconcile_employee_runs_missing_tasks",
+    "reconcile_orphaned_runs_on_startup",
+]

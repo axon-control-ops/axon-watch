@@ -24,6 +24,8 @@ class ChatParitySliceTests(unittest.TestCase):
     def setUp(self) -> None:
         self._tmpdir = tempfile.TemporaryDirectory()
         self.addCleanup(self._tmpdir.cleanup)
+        bindings_file = Path(self._tmpdir.name) / "workspace-project-bindings.json"
+        bindings_file.write_text('{"bindings": {}}\n', encoding="utf-8")
         self._env = patch.dict(
             os.environ,
             {
@@ -32,6 +34,7 @@ class ChatParitySliceTests(unittest.TestCase):
                     "control-plane.sqlite3",
                 ),
                 "AXON_WATCH_STATE_DIR": os.path.join(self._tmpdir.name, "state"),
+                "AXON_WATCH_WORKSPACE_BINDINGS_FILE": str(bindings_file),
                 # Keep lane B chat tests on the synchronous path so mocks apply.
                 "AXON_WATCH_LANE_B_STREAMING": "0",
                 "AXON_WATCH_WORKER_SCHEDULER": "0",

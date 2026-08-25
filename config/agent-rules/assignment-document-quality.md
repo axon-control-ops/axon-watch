@@ -30,3 +30,10 @@ workbook, evidence pack, PDF, or other printable document.
 8. Report separate receipts for content completeness, reference parity, image inspection,
    and render verification. Do not claim “matches”, “complete”, or Confidence above 8
    until all four checks pass.
+9. If the current environment cannot install an optional rich PDF/image dependency, do not
+   stop there when the project has a fallback renderer. Inspect the active fallback, patch
+   it to preserve the required layout, and add or update a regression test that forces the
+   fallback path.
+10. If the operator points at a PDF in the IDE or a screenshot of the expected output, render
+    the current output to a visible preview before final handoff. Source checks, page count,
+    and filenames are not enough for visual-layout work.

@@ -85,6 +85,35 @@ class CursorStreamTerminalBlockTests(unittest.TestCase):
         block = tool_block_from_event(event, "")
         self.assertIn(":::tool Read README.md", block)
 
+    def test_ask_question_tool_call_gets_a_readable_title_case_label(self) -> None:
+        """Regression: str.capitalize() on the camelCase key produced "Askquestion"
+        instead of "Ask Question" (it lowercases every char but the first)."""
+        event = {
+            "type": "tool_call",
+            "subtype": "completed",
+            "tool_call": {"askQuestionToolCall": {"args": {}}},
+        }
+        block = tool_block_from_event(event, "")
+        self.assertIn(":::tool Ask Question", block)
+        self.assertNotIn("Askquestion", block)
+
+    def test_create_plan_tool_call_surfaces_its_body_instead_of_nothing(self) -> None:
+        """Regression: a watcher's CreatePlan call rendered as a bare ":::tool
+        Createplan" header with no body, because the fallback only looked at
+        args.path/args.command — neither of which CreatePlan populates."""
+        event = {
+            "type": "tool_call",
+            "subtype": "completed",
+            "tool_call": {
+                "createPlanToolCall": {
+                    "args": {"plan": "1. Confirm root cause\n2. Report findings"}
+                }
+            },
+        }
+        block = tool_block_from_event(event, "")
+        self.assertIn(":::tool Create Plan", block)
+        self.assertIn("Confirm root cause", block)
+
     def test_shell_started_opens_live_terminal_block(self) -> None:
         block = terminal_started_block_from_event(_shell_started_event("npm test"))
         self.assertEqual("\n:::terminal npm test\n", block)
@@ -246,6 +275,30 @@ class CursorStreamPartialDedupeTests(unittest.TestCase):
         for line in events:
             assembler.feed_line(line)
         self.assertEqual("hello world", assembler.finalize())
+
+    def test_edit_failure_renders_edit_failed_fence_with_reason(self) -> None:
+        event = {
+            "type": "tool_call",
+            "subtype": "completed",
+            "tool_call": {
+                "editToolCall": {
+                    "args": {"path": "/tmp/ws/tests/test_foo.py"},
+                    "result": {
+                        "error": {
+                            "agentMessage": "Sandbox policy denied write to tests/test_foo.py",
+                        }
+                    },
+                }
+            },
+        }
+        block = tool_block_from_event(event, "/tmp/ws")
+        self.assertIn(":::edit-failed tests/test_foo.py", block)
+        self.assertIn("Sandbox policy denied write", block)
+        self.assertTrue(block.rstrip().endswith(":::"))
+
+    def test_legacy_edit_failed_tool_label_still_parses(self) -> None:
+        block = "\n:::tool Edit failed scripts/workflow/foo.mjs\n"
+        self.assertIn("Edit failed", block)
 
     def test_finalize_does_not_reappend_result_when_assistant_text_exists(self) -> None:
         assembler = CursorStreamAssembler()

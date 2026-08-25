@@ -60,3 +60,32 @@ def ensure_workspace_research_mcp(workspace_root: Path) -> bool:
     servers["axon-research"] = server_entry
     config_path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
     return True
+
+
+def remove_workspace_research_mcp(workspace_root: Path) -> bool:
+    """Undo ensure_workspace_research_mcp so a retry truly runs without it.
+
+    Cursor CLI reads mcpServers from the on-disk project config, not from any
+    flag we pass per-invocation — so a recursion-crash retry that merely skips
+    calling ensure_workspace_research_mcp still has the *previous* attempt's
+    mcp.json on disk, and Cursor loads the same crashing server again. Callers
+    must remove the entry before retrying without research.
+    """
+    config_path = workspace_root / ".cursor" / "mcp.json"
+    if not config_path.is_file():
+        return False
+    try:
+        payload = json.loads(config_path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        return False
+    if not isinstance(payload, dict):
+        return False
+    servers = payload.get("mcpServers")
+    if not isinstance(servers, dict) or "axon-research" not in servers:
+        return False
+    del servers["axon-research"]
+    if servers:
+        config_path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+    else:
+        config_path.unlink()
+    return True

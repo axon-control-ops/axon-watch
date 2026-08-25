@@ -12,7 +12,12 @@ STATE_DIR="${AXON_WATCH_STATE_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." &
 PROXY_PIDFILE="${STATE_DIR}/tunnel/public-origin-proxy.pid"
 PROXY_LOG="${STATE_DIR}/tunnel/public-origin-proxy.log"
 PROXY_SCRIPT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/public-origin-proxy.py"
-mkdir -p "${STATE_DIR}/tunnel"
+if ! mkdir -p "${STATE_DIR}/tunnel" 2>/dev/null || [[ ! -w "${STATE_DIR}/tunnel" ]]; then
+  STATE_DIR="/tmp/axon-watch-state"
+  PROXY_PIDFILE="${STATE_DIR}/tunnel/public-origin-proxy.pid"
+  PROXY_LOG="${STATE_DIR}/tunnel/public-origin-proxy.log"
+  mkdir -p "${STATE_DIR}/tunnel"
+fi
 
 echo "=== Soft public cutover ==="
 echo "public :${PUBLIC_PORT} -> ${AXON_X_ORIGIN}"
@@ -33,20 +38,24 @@ fi
 
 # Ensure legacy axon-local is on the soft-rollback port.
 if ! curl -sS --max-time 3 "http://127.0.0.1:${LEGACY_PORT}/api/health" >/dev/null 2>&1; then
-  echo "Starting axon-local on :${LEGACY_PORT} (WhatsApp soft-rollback)"
-  (
-    cd "${AXON_LOCAL_ROOT}"
-    # Do not start a second cloudflared from axon-local.
-    AXON_PORT="${LEGACY_PORT}" AXON_NO_OPEN=1 AXON_START_TUNNEL=0 \
-      nohup .venv/bin/python server.py >"/tmp/axon-local-${LEGACY_PORT}.log" 2>&1 &
-    disown $! 2>/dev/null || true
-  )
-  for _ in $(seq 1 30); do
-    if curl -sS --max-time 2 "http://127.0.0.1:${LEGACY_PORT}/api/health" >/dev/null 2>&1; then
-      break
-    fi
-    sleep 0.5
-  done
+  if [[ -d "${AXON_LOCAL_ROOT}" && -x "${AXON_LOCAL_ROOT}/.venv/bin/python" && -f "${AXON_LOCAL_ROOT}/server.py" ]]; then
+    echo "Starting axon-local on :${LEGACY_PORT} (WhatsApp soft-rollback)"
+    (
+      cd "${AXON_LOCAL_ROOT}"
+      # Do not start a second cloudflared from axon-local.
+      AXON_PORT="${LEGACY_PORT}" AXON_NO_OPEN=1 AXON_START_TUNNEL=0 \
+        nohup .venv/bin/python server.py >"/tmp/axon-local-${LEGACY_PORT}.log" 2>&1 &
+      disown $! 2>/dev/null || true
+    )
+    for _ in $(seq 1 30); do
+      if curl -sS --max-time 2 "http://127.0.0.1:${LEGACY_PORT}/api/health" >/dev/null 2>&1; then
+        break
+      fi
+      sleep 0.5
+    done
+  else
+    echo "WARN: axon-local checkout not available at ${AXON_LOCAL_ROOT}; skipping legacy soft-rollback start." >&2
+  fi
 fi
 
 if [[ -f "${PROXY_PIDFILE}" ]]; then

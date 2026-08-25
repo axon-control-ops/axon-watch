@@ -21,6 +21,7 @@ router = APIRouter(tags=["worker-scheduler"])
 
 
 class WorkerSchedulerPatchRequest(BaseModel):
+    watcher_scheduler_enabled: bool | None = None
     scheduler_enabled: bool | None = None
     max_active: int | None = Field(default=None, ge=1, le=16)
     max_starts_per_tick: int | None = Field(default=None, ge=1, le=8)

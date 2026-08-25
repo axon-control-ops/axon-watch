@@ -3,6 +3,7 @@ import type {
   IdeEditorStatusAgentChip,
   IdeEditorStatusConnectorChip,
   IdeEditorStatusGitChip,
+  IdeEditorStatusProblemsChip,
   IdeEditorStatusSearchChip,
   IdeEditorStatusTeamChip,
   IdeEditorStatusTerminalChip,
@@ -14,6 +15,7 @@ defineProps<{
   gitChip: IdeEditorStatusGitChip | null;
   searchChip: IdeEditorStatusSearchChip | null;
   teamChip: IdeEditorStatusTeamChip | null;
+  problemsChip: IdeEditorStatusProblemsChip | null;
   agentChip: IdeEditorStatusAgentChip | null;
 }>();
 
@@ -23,6 +25,7 @@ const emit = defineEmits<{
   openSourceControl: [];
   openSearch: [];
   openTeam: [];
+  showProblems: [];
   showAgent: [];
 }>();
 </script>
@@ -95,6 +98,16 @@ const emit = defineEmits<{
       @click="emit('openSearch')"
     >
       {{ searchChip.label }}
+    </button>
+    <button
+      v-if="problemsChip"
+      type="button"
+      class="editor-statusbar__panel-toggle editor-statusbar__panel-toggle--problems"
+      :title="problemsChip.title"
+      :aria-label="problemsChip.ariaLabel"
+      @click="emit('showProblems')"
+    >
+      {{ problemsChip.label }}
     </button>
     <button
       v-if="teamChip"

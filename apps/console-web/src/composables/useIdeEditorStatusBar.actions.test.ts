@@ -128,7 +128,9 @@ describe('openEmployeeShiftRetry', () => {
     expect(draft).toContain('console UI/UX');
     expect(draft).toMatch(/my last continuous shift/i);
     expect(draft).toContain('vitest assertion failed');
-    expect(draft.toLowerCase()).toContain('first person');
+    // First-person/persona voice steering is injected server-side (employee_persona_prompt.py)
+    // for every employee dispatch — it must not be duplicated into this persisted message.
+    expect(draft.toLowerCase()).not.toContain('first person');
     expect(shell.submitIdeComposer).toHaveBeenCalledWith('agent', {
       contentOverride: draft,
     });

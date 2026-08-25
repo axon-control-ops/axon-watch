@@ -242,7 +242,7 @@ class Gate2MutatingAuthMiddlewareTests(unittest.TestCase):
 
 
 class Gate2WorkerTrustPolicyTests(unittest.TestCase):
-    def test_worker_policy_omits_force_and_approve_mcps(self) -> None:
+    def test_worker_policy_keeps_force_for_shell_but_omits_approve_mcps(self) -> None:
         from app.cli_runtime.cursor_agent import build_cursor_agent_command
 
         with patch("app.cli_runtime.cursor_agent.ensure_workspace_research_mcp"):
@@ -256,6 +256,23 @@ class Gate2WorkerTrustPolicyTests(unittest.TestCase):
                 research_available=True,
             )
         self.assertIn("--trust", command)
+        # Full Access workers need --force for Shell/Edit; Gate 2 still blocks MCP approve.
+        self.assertIn("--force", command)
+        self.assertNotIn("--approve-mcps", command)
+
+    def test_worker_consultative_omits_force(self) -> None:
+        from app.cli_runtime.cursor_agent import build_cursor_agent_command
+
+        with patch("app.cli_runtime.cursor_agent.ensure_workspace_research_mcp"):
+            command = build_cursor_agent_command(
+                binary="cursor",
+                prompt="hi",
+                workspace_root=Path("."),
+                composer_mode="agent",
+                execution_tier="consultative",
+                trust_policy="worker",
+                research_available=True,
+            )
         self.assertNotIn("--force", command)
         self.assertNotIn("--approve-mcps", command)
 

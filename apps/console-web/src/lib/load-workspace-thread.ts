@@ -3,7 +3,7 @@ import {
   fetchWorkspaceChatThread,
   hasWorkspaceChatThread,
 } from '../api/control-plane';
-import { isApiNotFoundError } from '../api/client';
+import { isApiNotFoundError, isApiTransientError } from '../api/client';
 import type { ChatMessageRecord } from '../api/chat-api';
 import type { OperatorThreadEntry } from './operator-thread';
 import type { ThreadSurface } from './thread-surface-view';
@@ -125,6 +125,14 @@ export async function loadWorkspaceThreadOnce(
         resolvedThreadId,
       )
     ) {
+      return;
+    }
+    if (isApiTransientError(error)) {
+      if (deps.isViewingSurface(workspaceId, surface)) {
+        deps.setLoadError(
+          error instanceof Error ? error.message : 'Conversation history temporarily unavailable',
+        );
+      }
       return;
     }
     deps.clearSelectedThreadId(workspaceId, surface);

@@ -17,7 +17,11 @@ import {
   runtimeAuthSummary,
 } from '../../lib/runtime-auth-view';
 import { useShellStore } from '../../stores/shell';
+import ClaudeUsageCard from './ClaudeUsageCard.vue';
+import CodexUsageCard from './CodexUsageCard.vue';
 import CursorUsageCard from './CursorUsageCard.vue';
+import WorkspaceAutonomyTogglePanel from './WorkspaceAutonomyTogglePanel.vue';
+import WorkspaceRuntimePolicyPanel from './WorkspaceRuntimePolicyPanel.vue';
 
 type RuntimeFamily = 'cursor' | 'claude' | 'codex';
 
@@ -34,8 +38,12 @@ type RuntimeCard = {
   statusCommand: string;
   loginCommand: string;
   canSignIn: boolean;
+  canStartCliLogin: boolean;
   canSignOut: boolean;
+  canShowSignOutHelp: boolean;
   managedByVault: boolean;
+  hostProfileAuth: boolean;
+  accountScopeNote: string;
   statusTone: 'ready' | 'warn' | 'muted';
   statusLabel: string;
 };
@@ -47,7 +55,41 @@ const actionTone = ref<'idle' | 'ok' | 'error' | 'pending'>('idle');
 const copiedCommand = ref<string | null>(null);
 
 const isLoading = computed(() => shell.runtimeStatusLoadState === 'loading' && !shell.runtimeStatus);
+const runtimeTargets = computed(() => [
+  ...(shell.runtimeStatus?.local ?? []),
+  ...(shell.runtimeStatus?.cloud ?? []),
+]);
 const runtimeCards = computed(() => buildCards());
+const autoOverrideEnabled = computed(
+  () => shell.operatorPresenceSettings.auto_composer_runtime_override_enabled,
+);
+const autoOverrideTarget = computed(
+  () => shell.operatorPresenceSettings.auto_composer_runtime_target,
+);
+const autoOverrideEffective = computed(
+  () =>
+    shell.operatorPresenceSettings.autonomy_mode === 'full' &&
+    autoOverrideEnabled.value &&
+    Boolean(autoOverrideTarget.value.trim()),
+);
+const selectedAutoOverrideTarget = computed(() => {
+  const targetId = autoOverrideTarget.value.trim();
+  return runtimeTargets.value.find((record) => record.id === targetId) ?? null;
+});
+const autoOverrideSummary = computed(() => {
+  if (!autoOverrideEnabled.value) {
+    return 'Off — isolated workers use each workspace runtime policy.';
+  }
+  if (!autoOverrideTarget.value.trim()) {
+    return 'Choose a fallback runtime before Full Auto can steer isolated workers.';
+  }
+  const target = selectedAutoOverrideTarget.value;
+  const label = target ? `${target.label} (${runtimeStatusLine(target)})` : autoOverrideTarget.value;
+  if (shell.operatorPresenceSettings.autonomy_mode !== 'full') {
+    return `${label} is armed, but it only applies when VAXON is on Full Auto.`;
+  }
+  return `${label} is the Full Auto worker fallback. PC composers keep their own selections.`;
+});
 
 function shortenBinaryPath(path: string): string {
   const trimmed = path.trim();
@@ -62,11 +104,12 @@ function shortenBinaryPath(path: string): string {
 }
 
 function buildCards(): RuntimeCard[] {
-  const targets = [...(shell.runtimeStatus?.local ?? []), ...(shell.runtimeStatus?.cloud ?? [])];
   return (['cursor', 'claude', 'codex'] as RuntimeFamily[]).map((family) => {
     const target =
-      targets.find((record) => record.family === family && record.target_type === 'local') ??
-      targets.find((record) => record.family === family) ??
+      runtimeTargets.value.find(
+        (record) => record.family === family && record.target_type === 'local',
+      ) ??
+      runtimeTargets.value.find((record) => record.family === family) ??
       null;
     return buildCard(family, target);
   });
@@ -78,14 +121,26 @@ function familyTitle(family: RuntimeFamily): string {
   return 'Codex CLI';
 }
 
-function familyLoginCommand(family: RuntimeFamily): string {
-  if (family === 'cursor') return 'cursor agent login';
+function familyLoginCommand(family: RuntimeFamily, binary = ''): string {
+  if (family === 'cursor') {
+    const name = binary.trim().split('/').pop()?.toLowerCase() ?? '';
+    if (name === 'cursor-agent' || name.startsWith('cursor-agent.')) {
+      return 'cursor-agent login';
+    }
+    return 'cursor agent login';
+  }
   if (family === 'claude') return 'claude auth login';
   return 'codex login';
 }
 
-function familyStatusCommand(family: RuntimeFamily): string {
-  if (family === 'cursor') return 'cursor agent status';
+function familyStatusCommand(family: RuntimeFamily, binary = ''): string {
+  if (family === 'cursor') {
+    const name = binary.trim().split('/').pop()?.toLowerCase() ?? '';
+    if (name === 'cursor-agent' || name.startsWith('cursor-agent.')) {
+      return 'cursor-agent status';
+    }
+    return 'cursor agent status';
+  }
   if (family === 'claude') return 'claude auth status';
   return 'codex login status';
 }
@@ -96,9 +151,13 @@ function buildCard(family: RuntimeFamily, target: RuntimeTargetRecord | null): R
   const installed = Boolean(target?.available && target.binary);
   const managedByVault =
     auth?.auth_method === 'vault_api_key' || auth?.auth_method === 'api_key';
+  const oauthBacked = ['oauth', 'chatgpt', 'claude.ai'].includes(
+    String(auth?.auth_method ?? '').trim().toLowerCase(),
+  );
   const title = familyTitle(family);
-  const loginCommand = familyLoginCommand(family);
-  const statusCommand = familyStatusCommand(family);
+  const binary = target?.binary ?? '';
+  const loginCommand = familyLoginCommand(family, binary);
+  const statusCommand = familyStatusCommand(family, binary);
 
   let statusTone: RuntimeCard['statusTone'] = 'muted';
   let statusLabel = 'Not installed';
@@ -123,8 +182,15 @@ function buildCard(family: RuntimeFamily, target: RuntimeTargetRecord | null): R
     statusCommand,
     loginCommand,
     canSignIn: installed && !loggedIn,
-    canSignOut: installed && loggedIn && !managedByVault,
+    canStartCliLogin: installed && managedByVault,
+    canSignOut: false,
+    canShowSignOutHelp: installed && loggedIn && (managedByVault || oauthBacked),
     managedByVault,
+    hostProfileAuth: oauthBacked,
+    accountScopeNote:
+      installed && loggedIn && oauthBacked
+        ? `${title} browser login is shared by this host profile. To use another account, manually sign out of the host profile first or configure the second account through Vault/API-key auth where supported.`
+        : '',
     statusTone,
     statusLabel,
   };
@@ -167,7 +233,10 @@ async function runAction(family: RuntimeFamily, action: 'login' | 'logout'): Pro
             ? await startCodexRuntimeLogin()
             : await logoutCodexRuntime();
     actionTone.value = result.status === 'error' ? 'error' : 'ok';
-    actionMessage.value = result.message;
+    actionMessage.value =
+      result.account_scope_notice && !result.message.includes(result.account_scope_notice)
+        ? `${result.message} ${result.account_scope_notice}`
+        : result.message;
     await Promise.all([shell.loadRuntimeStatus(true), shell.loadCursorCatalog(true)]);
   } catch (error) {
     actionTone.value = 'error';
@@ -189,6 +258,45 @@ async function copyCommand(command: string): Promise<void> {
     }, 1600);
   } catch {
     copiedCommand.value = null;
+  }
+}
+
+function runtimeStatusLine(record: RuntimeTargetRecord): string {
+  if (record.ready) return 'Ready';
+  if (!record.available) return 'Not installed';
+  return record.auth.message || 'Installed but not ready';
+}
+
+async function setAutoOverrideEnabled(enabled: boolean): Promise<void> {
+  const fallbackTarget =
+    autoOverrideTarget.value.trim() ||
+    shell.selectedRuntimeTargetId ||
+    shell.runtimeStatus?.default_runtime ||
+    runtimeTargets.value[0]?.id ||
+    '';
+  await shell.saveOperatorPresenceSettingsPatch({
+    auto_composer_runtime_override_enabled: enabled,
+    auto_composer_runtime_target: enabled ? fallbackTarget : autoOverrideTarget.value,
+  });
+}
+
+async function onAutoOverrideToggle(event: Event): Promise<void> {
+  const checked = (event.target as HTMLInputElement).checked;
+  try {
+    await setAutoOverrideEnabled(checked);
+  } catch {
+    // Settings banner in the shell owns the durable error; keep the switch controlled by store state.
+  }
+}
+
+async function onAutoOverrideTargetChange(event: Event): Promise<void> {
+  const target = (event.target as HTMLSelectElement).value;
+  try {
+    await shell.saveOperatorPresenceSettingsPatch({
+      auto_composer_runtime_target: target,
+    });
+  } catch {
+    // Settings banner in the shell owns the durable error.
   }
 }
 
@@ -240,6 +348,73 @@ onMounted(() => {
       class="runtime-auth-settings__usage"
       :usage="shell.runtimeStatus?.cursor_usage"
     />
+
+    <ClaudeUsageCard
+      v-if="!isLoading"
+      class="runtime-auth-settings__usage"
+      :usage="shell.runtimeStatus?.claude_usage"
+    />
+
+    <CodexUsageCard
+      v-if="!isLoading"
+      class="runtime-auth-settings__usage"
+      :usage="shell.runtimeStatus?.codex_usage"
+    />
+
+    <section v-if="!isLoading" class="runtime-auth-settings__policy-section">
+      <header class="runtime-auth-settings__policy-header">
+        <h2>Full Auto worker runtime</h2>
+        <p>
+          Choose the fallback runtime for isolated continuous workers while VAXON is on Full
+          Auto. This never changes the runtime selected in your PC composer.
+        </p>
+      </header>
+      <label class="operator-settings-form__row">
+        <input
+          type="checkbox"
+          :checked="autoOverrideEnabled"
+          :disabled="shell.operatorPresenceSettingsSaving"
+          @change="onAutoOverrideToggle"
+        />
+        <span class="operator-settings-form__copy">
+          <strong>Steer isolated workers during Full Auto</strong>
+          <small>{{ autoOverrideSummary }}</small>
+        </span>
+      </label>
+      <label class="operator-settings-form__row operator-settings-form__row--select">
+        <span class="operator-settings-form__copy">
+          <strong>Worker fallback runtime</strong>
+          <small>
+            Per-thread PC composer selections remain independent and visible.
+          </small>
+        </span>
+        <select
+          class="operator-settings-form__select"
+          :value="autoOverrideTarget"
+          :disabled="shell.operatorPresenceSettingsSaving || !autoOverrideEnabled"
+          @change="onAutoOverrideTargetChange"
+        >
+          <option value="">Use each workspace's worker runtime</option>
+          <option
+            v-for="target in runtimeTargets"
+            :key="target.id"
+            :value="target.id"
+          >
+            {{ target.label }} · {{ runtimeStatusLine(target) }}
+          </option>
+        </select>
+      </label>
+      <p
+        class="settings-feedback-banner settings-feedback-banner--inline"
+        :class="{
+          'settings-feedback-banner--ok': autoOverrideEffective,
+          'settings-feedback-banner--pending': autoOverrideEnabled && !autoOverrideEffective,
+        }"
+        role="status"
+      >
+        {{ autoOverrideSummary }}
+      </p>
+    </section>
 
     <div v-if="!isLoading" class="runtime-auth-settings__grid">
       <article
@@ -297,8 +472,15 @@ onMounted(() => {
           </button>
           instead of CLI sign-out.
         </p>
+        <p v-else-if="card.hostProfileAuth" class="runtime-auth-settings__note">
+          {{ card.accountScopeNote }} Axon-X shows sign-out help instead of running
+          host-global logout automatically.
+        </p>
         <p v-else-if="!card.installed" class="runtime-auth-settings__note">
           Install the CLI on the control-plane host, then refresh status.
+        </p>
+        <p v-else-if="card.accountScopeNote" class="runtime-auth-settings__note">
+          {{ card.accountScopeNote }}
         </p>
 
         <div class="runtime-auth-settings__actions">
@@ -318,6 +500,15 @@ onMounted(() => {
             Connected
           </span>
           <button
+            v-if="card.canStartCliLogin"
+            type="button"
+            class="operator-settings-form__button operator-settings-form__button--ghost"
+            :disabled="actionPending !== null"
+            @click="runAction(card.family, 'login')"
+          >
+            {{ actionPending === card.family ? 'Opening login…' : 'CLI sign in' }}
+          </button>
+          <button
             v-if="card.canSignOut"
             type="button"
             class="operator-settings-form__button operator-settings-form__button--ghost"
@@ -326,8 +517,30 @@ onMounted(() => {
           >
             {{ actionPending === card.family ? 'Signing out…' : 'Sign out' }}
           </button>
+          <button
+            v-else-if="card.canShowSignOutHelp"
+            type="button"
+            class="operator-settings-form__button operator-settings-form__button--ghost"
+            :disabled="actionPending !== null"
+            @click="runAction(card.family, 'logout')"
+          >
+            {{ actionPending === card.family ? 'Checking…' : 'Host sign-out help' }}
+          </button>
         </div>
       </article>
+    </div>
+
+    <div v-if="!isLoading" class="runtime-auth-settings__policy-section">
+      <header class="runtime-auth-settings__policy-header"><h2>Workspace autonomy</h2><p>Turn AUTO dispatch on or off per workspace, without switching your active workspace to check each one.</p></header>
+      <WorkspaceAutonomyTogglePanel />
+    </div>
+
+    <div v-if="!isLoading" class="runtime-auth-settings__policy-section">
+      <header class="runtime-auth-settings__policy-header">
+        <h2>Workspace runtime policy</h2>
+        <p>Control which runtimes may run AUTO shifts and how many can run in parallel per workspace.</p>
+      </header>
+      <WorkspaceRuntimePolicyPanel />
     </div>
   </div>
 </template>

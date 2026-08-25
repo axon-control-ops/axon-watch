@@ -1,0 +1,91 @@
+{
+  "connections": {
+    "workspace_young_eagles_day_care": {
+      "display_name": "Young Eagles Day Care",
+      "product": "edudash_ops",
+      "dashpro_tenant_id": "ba79097c-1b93-4b48-bcbe-df73878ab4d1",
+      "env_keys": [
+        "SUPABASE_URL",
+        "SUPABASE_SERVICE_ROLE_KEY",
+        "YEDC_SUPABASE_URL",
+        "YEDC_SUPABASE_SERVICE_ROLE_KEY",
+        "YEDC_SUPABASE_PRESCHOOL_ID",
+        "YEDC_SUPABASE_TENANT_NAME",
+        "YEDC_TENANT_SLUG",
+        "YEDC_SUPABASE_CACHE_MS",
+        "YEDC_OPERATIONAL_SUPABASE",
+        "YEDC_OPERATIONAL_TABLE",
+        "YEDC_OPERATIONAL_STATE_KEY",
+        "YEDC_DASHPRO_SYNC_SECRET"
+      ],
+      "live_verify_command_prefixes": [
+        ["npm", "run", "check-supabase"],
+        ["npm", "run", "graduation:card-pop-counts"]
+      ],
+      "live_roles": ["backend", "integrations", "watcher", "lead"],
+      "network_mode_for_live_roles": "audited"
+    },
+    "workspace_dashpro": {
+      "display_name": "DashPro",
+      "product": "edudash_app",
+      "dashpro_tenant_id": null,
+      "env_keys": [
+        "EXPO_PUBLIC_SUPABASE_URL",
+        "EXPO_PUBLIC_SUPABASE_ANON_KEY",
+        "SUPABASE_URL",
+        "SUPABASE_SERVICE_ROLE_KEY",
+        "SUPABASE_ACCESS_TOKEN"
+      ],
+      "live_verify_command_prefixes": [
+        ["npx", "supabase", "migration", "list", "--linked"],
+        ["npx", "--no-install", "tsx", "services/ops/fix-mebelo-email-password.ts"]
+      ],
+      "live_roles": ["backend", "integrations", "watcher"],
+      "network_mode_for_live_roles": "audited"
+    },
+    "workspace_edudashpro_school": {
+      "display_name": "EDP Excellence",
+      "product": "edudash_ops",
+      "dashpro_tenant_id": null,
+      "env_keys": [
+        "SUPABASE_URL",
+        "SUPABASE_SERVICE_ROLE_KEY",
+        "SUPABASE_ANON_KEY"
+      ],
+      "live_verify_command_prefixes": [
+        ["npm", "run", "check-supabase"]
+      ],
+      "live_roles": ["backend", "integrations", "watcher"],
+      "network_mode_for_live_roles": "audited"
+    },
+    "MoveIT": {
+      "display_name": "move-it",
+      "product": "moveit",
+      "dashpro_tenant_id": null,
+      "required_services": [
+        "github",
+        "sentry",
+        "supabase"
+      ],
+      "env_keys": [
+        "GITHUB_TOKEN",
+        "GH_TOKEN",
+        "SENTRY_AUTH_TOKEN",
+        "SENTRY_ORG",
+        "SENTRY_PROJECT",
+        "SENTRY_DSN",
+        "SUPABASE_URL",
+        "SUPABASE_SERVICE_ROLE_KEY",
+        "SUPABASE_ANON_KEY",
+        "SUPABASE_ACCESS_TOKEN"
+      ],
+      "live_verify_command_prefixes": [
+        ["gh", "auth", "status"],
+        ["npx", "sentry-cli", "info"],
+        ["npx", "supabase", "projects", "list"]
+      ],
+      "live_roles": ["backend", "integrations", "watcher", "lead"],
+      "network_mode_for_live_roles": "audited"
+    }
+  }
+}

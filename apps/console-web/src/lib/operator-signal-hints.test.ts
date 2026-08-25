@@ -9,7 +9,7 @@ import {
 } from './operator-signal-hints';
 
 describe('operator-signal-hints', () => {
-  it('detects bootstrap summary signals', () => {
+  it('detects bootstrap summary signals by exact signal id', () => {
     expect(
       isBootstrapSummarySignal('signal_runtime_summary_degraded', 'Bootstrap: runtime summary stale'),
     ).toBe(true);
@@ -18,12 +18,19 @@ describe('operator-signal-hints', () => {
     ).toBe(true);
   });
 
-  it('returns bootstrap layman copy', () => {
+  it('does not classify a real error as the bootstrap placeholder just because its title mentions "bootstrap"', () => {
+    expect(
+      isBootstrapSummarySignal('signal_connector_dashpro_unavailable', 'Failed to bootstrap connector after 3 retries'),
+    ).toBe(false);
+  });
+
+  it('returns bootstrap layman copy without claiming a specific environment', () => {
     const explained = explainOperatorAlert({
       signalId: 'signal_runtime_summary_degraded',
       title: 'Bootstrap: runtime summary stale',
     });
     expect(explained.what).toContain('warming up');
+    expect(explained.what.toLowerCase()).not.toContain('local development');
     expect(explained.youDo).toContain('ignore');
     expect(explained.agentDo).toContain('not treat this as an incident');
     expect(signalOperatorHint({

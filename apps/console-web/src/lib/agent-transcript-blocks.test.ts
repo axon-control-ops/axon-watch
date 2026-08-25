@@ -8,6 +8,7 @@ import {
   normalizeEditedFilePath,
   parseAgentTranscriptBlocks,
   prepareAgentTranscriptSegmentsForDisplay,
+  readToolBlockPath,
   thinkingPreview,
 } from './agent-transcript-blocks';
 
@@ -111,6 +112,24 @@ describe('parseAgentTranscriptBlocks', () => {
         open: false,
       },
     ]);
+  });
+
+  it('sanitizes jest ansi noise from terminal transcript blocks', () => {
+    const noisy = [
+      ':::terminal npm test',
+      '\x1b[1A\x1b[2K\x1b[32mPASS\x1b[0m tests/unit/foo.test.ts',
+      '[1A[2K[32mPASS[0m tests/unit/bar.test.ts',
+      'Test Suites: 2 passed, 2 total',
+      ':::',
+    ].join('\n');
+    const segments = parseAgentTranscriptBlocks(noisy);
+    const terminal = segments[0];
+    expect(terminal?.kind).toBe('terminal');
+    if (terminal?.kind !== 'terminal') throw new Error('expected terminal segment');
+    expect(terminal.output).not.toMatch(/\x1b\[/);
+    expect(terminal.output).not.toMatch(/\[1A/);
+    expect(terminal.output).toContain('PASS');
+    expect(terminal.output).toContain('Test Suites: 2 passed, 2 total');
   });
 
   it('compacts legacy oversized terminal output before rendering', () => {
@@ -312,6 +331,54 @@ describe('parseAgentTranscriptBlocks', () => {
       { kind: 'text', text: 'Just a reply' },
     ]);
   });
+
+  it('routes plain numbered questions through interactive card rendering', () => {
+    const content = [
+      'What should the workspace validation cover?',
+      '',
+      '1. Graduation groups',
+      '2. Confirmed but unallocated children',
+      '3. Cross-system sync',
+      '4. All of the above',
+    ].join('\n');
+
+    expect(agentContentHasTranscriptBlocks(content)).toBe(true);
+    expect(parseAgentTranscriptBlocks(content)).toEqual([
+      {
+        kind: 'question',
+        prompt: 'What should the workspace validation cover?',
+        options: [
+          { id: '1', label: 'Graduation groups' },
+          { id: '2', label: 'Confirmed but unallocated children' },
+          { id: '3', label: 'Cross-system sync' },
+          { id: '4', label: 'All of the above' },
+        ],
+        open: false,
+      },
+    ]);
+  });
+
+  it('parses edit-failed fences and legacy tool labels', () => {
+    const content = [
+      ':::edit-failed tests/test_foo.py',
+      'Sandbox policy denied write to tests/test_foo.py',
+      ':::',
+      '',
+      ':::tool Edit failed scripts/workflow/foo.mjs',
+    ].join('\n');
+    const segments = parseAgentTranscriptBlocks(content);
+    expect(segments[0]).toEqual({
+      kind: 'edit-failed',
+      path: 'tests/test_foo.py',
+      reason: 'Sandbox policy denied write to tests/test_foo.py',
+    });
+    expect(segments[1]).toEqual({
+      kind: 'edit-failed',
+      path: 'scripts/workflow/foo.mjs',
+      reason: 'Edit was rejected (path may be outside write scope or patch did not apply).',
+    });
+    expect(agentContentHasTranscriptBlocks(content)).toBe(true);
+  });
 });
 
 describe('diffLineTone', () => {
@@ -357,6 +424,22 @@ describe('normalizeEditedFilePath', () => {
     expect(
       normalizeEditedFilePath('/home/edp/.cursor/projects/foo/README.md'),
     ).toBe('README.md');
+  });
+});
+
+describe('readToolBlockPath', () => {
+  it('extracts the path from a Read tool label', () => {
+    expect(readToolBlockPath('Read README.md')).toBe('README.md');
+    expect(readToolBlockPath('Read docs/ops/company-profile.md')).toBe(
+      'docs/ops/company-profile.md',
+    );
+  });
+
+  it('returns null for tool labels with no single-file target', () => {
+    expect(readToolBlockPath('Glob apps/*/package.json')).toBeNull();
+    expect(readToolBlockPath('Grep .axon-si')).toBeNull();
+    expect(readToolBlockPath('Ask Question')).toBeNull();
+    expect(readToolBlockPath('')).toBeNull();
   });
 });
 

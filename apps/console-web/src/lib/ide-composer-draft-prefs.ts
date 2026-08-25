@@ -2,6 +2,25 @@ import { composerThreadScopeKey } from './composer-thread-scope-key';
 
 const IDE_COMPOSER_DRAFT_KEY = 'axon-x-ide-composer-draft-v1';
 
+function normalizedDraftText(value: string | null | undefined): string {
+  return String(value ?? '').trim().replace(/\s+/g, ' ');
+}
+
+export function draftWasAlreadySubmitted(
+  draft: string | null | undefined,
+  messages: ReadonlyArray<{ role?: string | null; content?: string | null }>,
+): boolean {
+  const candidate = normalizedDraftText(draft);
+  if (!candidate) {
+    return false;
+  }
+  return messages.some(
+    (message) =>
+      message.role === 'operator'
+      && normalizedDraftText(message.content) === candidate,
+  );
+}
+
 function readStoredIdeComposerDraftByScope(): Record<string, string> {
   if (typeof window === 'undefined') {
     return {};

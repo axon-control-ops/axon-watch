@@ -18,7 +18,7 @@ from app.operator_briefing_rhythm import build_operator_briefing_rhythm
 from app.operator_presence import build_operator_presence
 from app.production_readiness import build_production_readiness
 from app.runtime_summary_assembler import WatchProbe, assemble_runtime_summary
-from app.workspace_project_bindings import load_workspace_project_bindings
+from app.workspace_project_bindings import list_valid_workspace_project_bindings
 
 
 def _build_next_safe_actions(
@@ -235,7 +235,7 @@ def build_operator_briefing(
     pending_approvals_count = len(pending_approval_records)
     display_names = {
         workspace_key: str(binding.display_name).strip()
-        for workspace_key, binding in load_workspace_project_bindings().items()
+        for workspace_key, binding in list_valid_workspace_project_bindings().items()
         if binding.display_name and str(binding.display_name).strip()
     }
     scope_mode = "workspace" if scoped_workspace_id else "fleet"

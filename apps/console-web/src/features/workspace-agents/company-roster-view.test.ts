@@ -13,6 +13,7 @@ import {
   employeePresenceSelectLabel,
   employeePresenceStripTitle,
   firstFailedRosterEmployee,
+  firstPendingDecisionEmployee,
   pickDefaultRosterEmployee,
   presenceStripOptionId,
   selectedPresenceStripEmployee,
@@ -139,7 +140,54 @@ describe('company-roster-view', () => {
     expect(pickDefaultRosterEmployee([rows[0]])?.employee_id).toBe('e_idle');
   });
 
-  it('sorts presence strip with failed teammates first', () => {
+  it('prefers pending decisions over failed teammates for default dock selection', () => {
+    const rows = [
+      employee({
+        employee_id: 'e_failed',
+        name: 'Soren',
+        role: 'integrations',
+        status: 'idle',
+        last_outcome: 'failed',
+        last_outcome_detail: 'completion gate',
+      }),
+      employee({
+        employee_id: 'e_pending',
+        name: 'Cass',
+        role: 'watcher',
+        status: 'waiting_approval',
+        pending_decision_id: 'auton-1',
+        pending_decision_title: 'Dana (lead) last shift failed',
+      }),
+      employee({ employee_id: 'e_lead', name: 'Dana', role: 'lead', primary: true, status: 'idle' }),
+    ];
+    expect(firstPendingDecisionEmployee(rows)?.employee_id).toBe('e_pending');
+    expect(pickDefaultRosterEmployee(rows)?.employee_id).toBe('e_pending');
+  });
+
+  it('sorts presence strip with pending decisions before failed teammates', () => {
+    const rows = [
+      employee({ employee_id: 'e_idle', name: 'Zara', status: 'idle' }),
+      employee({
+        employee_id: 'e_failed',
+        name: 'Mira',
+        status: 'idle',
+        last_outcome: 'failed',
+        last_outcome_detail: 'timeout',
+      }),
+      employee({
+        employee_id: 'e_pending',
+        name: 'Cass',
+        role: 'watcher',
+        pending_decision_id: 'auton-1',
+      }),
+      employee({ employee_id: 'e_work', name: 'Alex', status: 'executing' }),
+    ];
+    expect(
+      sortEmployeesForPresenceStrip(rows).map((row) => row.employee_id),
+    ).toEqual(['e_pending', 'e_failed', 'e_work', 'e_idle']);
+  });
+
+  it('sorts presence strip with failed teammates before working when no pending decisions', () => {
     const rows = [
       employee({ employee_id: 'e_idle', name: 'Zara', status: 'idle' }),
       employee({

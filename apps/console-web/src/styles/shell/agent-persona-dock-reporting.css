@@ -1,0 +1,93 @@
+/* Live shift preview inside the Team panel persona card. */
+
+.agent-persona-dock__hero {
+  flex-shrink: 0;
+}
+
+.agent-persona-dock__scroll {
+  scrollbar-gutter: stable;
+}
+
+.agent-persona-dock__beat:not(.agent-persona-dock__beat-btn) {
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.agent-persona-dock__beat--live {
+  border-color: rgba(80, 220, 180, 0.22);
+  background: rgba(18, 48, 40, 0.35);
+  color: rgba(190, 245, 225, 0.94);
+}
+
+.agent-persona-dock__beat-btn {
+  overflow-wrap: anywhere;
+}
+
+.agent-persona-dock__beat-btn .agent-persona-dock__beat-cta {
+  margin-top: 0.28rem;
+}
+
+.agent-persona-dock__transcript-list {
+  list-style: none;
+  margin: 0;
+  padding: 0.45rem 0.5rem;
+  border-radius: 0.4rem;
+  border: 1px solid rgba(120, 190, 255, 0.16);
+  background: rgba(0, 0, 0, 0.28);
+  display: flex;
+  flex-direction: column;
+  gap: 0.28rem;
+  max-height: min(14rem, 28vh);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.agent-persona-dock__transcript-line {
+  margin: 0;
+  padding: 0.18rem 0.28rem;
+  border-radius: 0.28rem;
+  font-size: 0.68rem;
+  line-height: 1.35;
+  color: rgba(198, 220, 235, 0.92);
+  overflow-wrap: anywhere;
+  font-family: var(--font-mono, ui-monospace, monospace);
+}
+
+.agent-persona-dock__transcript-line[data-kind='thinking'] {
+  font-family: inherit;
+  font-style: italic;
+  color: rgba(170, 195, 215, 0.82);
+}
+
+.agent-persona-dock__transcript-line[data-kind='tool'] {
+  color: rgba(160, 210, 255, 0.88);
+}
+
+.agent-persona-dock__transcript-line[data-kind='edit'] {
+  color: rgba(150, 235, 195, 0.92);
+}
+
+.agent-persona-dock__transcript-line[data-kind='terminal'] {
+  color: rgba(210, 220, 235, 0.9);
+}
+
+.agent-persona-dock__transcript-line[data-kind='text'] {
+  font-family: inherit;
+}
+
+.agent-persona-dock__transcript-line[data-live='true'] {
+  background: rgba(0, 242, 255, 0.06);
+  box-shadow: inset 2px 0 0 rgba(0, 242, 255, 0.55);
+}
+
+.agent-persona-dock--reporting .agent-persona-dock__actions {
+  flex-shrink: 0;
+  margin-top: 0.15rem;
+}
+
+/* Legacy raw transcript block — keep bounded if referenced elsewhere. */
+.agent-persona-dock__transcript {
+  flex: 0 1 auto;
+  max-height: min(14rem, 28vh);
+  min-height: 0;
+}

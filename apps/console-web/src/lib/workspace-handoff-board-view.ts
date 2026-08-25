@@ -11,6 +11,14 @@ export type IncomingHandoffRow = {
   direction: 'incoming' | 'outgoing';
 };
 
+function handoffTaskKey(task: string): string {
+  return task.trim().toLowerCase().replace(/\s+/g, ' ').slice(0, 160);
+}
+
+function peerWorkspaceId(row: IncomingHandoffRow): string {
+  return row.direction === 'incoming' ? row.sourceWorkspaceId : row.targetWorkspaceId;
+}
+
 export function mapWorkspaceHandoffRows(
   items: ReadonlyArray<Record<string, unknown>> | null | undefined,
   currentWorkspaceId: string | null | undefined,
@@ -25,6 +33,7 @@ export function mapWorkspaceHandoffRows(
   }
   const taskStatusById = options?.taskStatusById ?? null;
   const rows: IncomingHandoffRow[] = [];
+  const seen = new Set<string>();
   for (const item of items ?? []) {
     const handoffId = String(item.handoff_id ?? '').trim();
     const sourceWorkspaceId = String(item.source_workspace_id ?? '').trim();
@@ -53,7 +62,7 @@ export function mapWorkspaceHandoffRows(
     if (!direction) {
       continue;
     }
-    rows.push({
+    const row: IncomingHandoffRow = {
       handoffId,
       sourceWorkspaceId,
       targetWorkspaceId,
@@ -62,7 +71,14 @@ export function mapWorkspaceHandoffRows(
       targetTaskId,
       routedRole: String(item.routed_role ?? '').trim(),
       direction,
-    });
+    };
+    // Twin handoff records often share the same task body across workspaces.
+    const dedupeKey = `${direction}:${peerWorkspaceId(row)}:${handoffTaskKey(task)}`;
+    if (seen.has(dedupeKey)) {
+      continue;
+    }
+    seen.add(dedupeKey);
+    rows.push(row);
   }
   return rows;
 }
@@ -73,4 +89,23 @@ export function incomingHandoffHeadline(row: IncomingHandoffRow): string {
     return `From ${row.sourceWorkspaceId.replace(/^workspace_/, '')}${role}`;
   }
   return `To ${row.targetWorkspaceId.replace(/^workspace_/, '')}${role}`;
+}
+
+/** Short operator CTA — what to do with this handoff. */
+export function incomingHandoffNextStep(row: IncomingHandoffRow): string {
+  if (row.direction === 'incoming') {
+    return row.targetTaskId ? 'Open ticket' : 'Review handoff';
+  }
+  return 'Open target workspace';
+}
+
+export function summarizeHandoffTask(task: string, max = 96): string {
+  const cleaned = task.replace(/\s+/g, ' ').trim();
+  if (!cleaned) {
+    return 'Untitled handoff';
+  }
+  if (cleaned.length <= max) {
+    return cleaned;
+  }
+  return `${cleaned.slice(0, Math.max(24, max - 1)).trimEnd()}…`;
 }

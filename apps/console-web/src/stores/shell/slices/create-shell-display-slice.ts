@@ -9,6 +9,8 @@ import type {
   RuntimeSummary,
   WorkspaceRecord,
 } from '../../../contracts/canonical';
+import { buildStatusBarClaudeUsageZone } from '../../../lib/claude-usage-view';
+import { buildStatusBarCodexUsageZone } from '../../../lib/codex-usage-view';
 import { buildStatusBarConnectorChip } from '../../../lib/connector-glance-view';
 import { buildStatusBarUsageZone } from '../../../lib/cursor-usage-view';
 import { shouldShowIdeAgentStop } from '../../../lib/ide-agent-run-active';
@@ -35,6 +37,7 @@ import {
 } from '../../../lib/run-lifecycle-ui';
 import { buildStatusBarSegments, buildTopbarChips } from '../../../lib/runtime-strip';
 import { selectPrimaryApprovalRun } from '../../shell-run-selection';
+import { recoveryAttentionCount } from '../../../features/recovery-center/recovery-overlay-state';
 import type {
   InboxLoadState,
   LayoutMode,
@@ -66,6 +69,7 @@ interface CreateShellDisplaySliceInput {
   connectorsItems: Ref<ConnectorProbeRecord[]>;
   connectorsSummary: Ref<{ required_unavailable: number } | null>;
   connectorsLoadState: Ref<'idle' | 'loading' | 'loaded' | 'error'>;
+  getSelectedRuntimeTargetId?: () => string | null | undefined;
   /** Kept for callers that still pass fleet activeRun; unused by status-bar zones. */
   activeRun?: Ref<RunRecord | null>;
 }
@@ -122,20 +126,20 @@ export function createShellDisplaySlice(input: CreateShellDisplaySliceInput) {
   );
 
   const attentionSignals = computed(() => {
-    if (
+    const workspaceId = input.currentWorkspace.value?.workspace_id ?? null;
+    const fromInbox =
       input.inboxLoadState.value === 'loaded' ||
       (input.inboxLoadState.value === 'loading' && input.inboxItems.value.length > 0)
-    ) {
-      return filterAttentionSignals(
-        input.inboxItems.value,
-        input.currentWorkspace.value?.workspace_id ?? null,
-      ).slice(0, 3);
-    }
-
-    return filterAttentionSignals(
+        ? filterAttentionSignals(input.inboxItems.value, workspaceId)
+        : [];
+    // Loaded-but-empty inbox was blanking Mission Control Attention while
+    // briefing still had actionable top signals (Sentry / CI / Android).
+    const fromBriefing = filterAttentionSignals(
       input.operatorBriefing.value?.top_signals ?? [],
-      input.currentWorkspace.value?.workspace_id ?? null,
-    ).slice(0, 3);
+      workspaceId,
+    );
+    const items = fromInbox.length > 0 ? fromInbox : fromBriefing;
+    return items.slice(0, 3);
   });
 
   const workspaceAttentionSignalCount = computed(() =>
@@ -157,6 +161,7 @@ export function createShellDisplaySlice(input: CreateShellDisplaySliceInput) {
       layoutMode: input.layoutMode.value,
       idePresenceProfile: input.getIdePresenceProfile(),
       activeSignalCount: activeOperatorSignalCount.value,
+      attentionCount: recoveryAttentionCount.value,
     });
 
     const watchConnected = input.runtimeSummary.value?.watch.connected ?? false;
@@ -172,7 +177,18 @@ export function createShellDisplaySlice(input: CreateShellDisplaySliceInput) {
       zones.center.push(connectorChip);
     }
 
-    const usageZone = buildStatusBarUsageZone(input.runtimeStatus.value?.cursor_usage);
+    const selectedRuntimeTargetId = input.getSelectedRuntimeTargetId?.()?.trim();
+    const selectedRuntime = [
+      ...(input.runtimeStatus.value?.local ?? []),
+      ...(input.runtimeStatus.value?.cloud ?? []),
+    ].find((record) => record.id === selectedRuntimeTargetId);
+    const family = selectedRuntime?.family?.trim().toLowerCase() || 'cursor';
+    const usageZone =
+      family === 'codex'
+        ? buildStatusBarCodexUsageZone(input.runtimeStatus.value?.codex_usage)
+        : family === 'claude'
+          ? buildStatusBarClaudeUsageZone(input.runtimeStatus.value?.claude_usage)
+          : buildStatusBarUsageZone(input.runtimeStatus.value?.cursor_usage);
     if (usageZone) {
       zones.center.push(usageZone);
     }
@@ -344,7 +360,12 @@ export function createShellDisplaySlice(input: CreateShellDisplaySliceInput) {
   const pendingApprovalsCount = computed(() => {
     const fromSummary = input.runtimeSummary.value?.approvals.pending_count ?? 0;
     const fromBriefing = input.operatorBriefing.value?.pending_approvals.count ?? 0;
-    return Math.max(fromSummary, fromBriefing);
+    // A freshly loaded run can be awaiting approval before the briefing/items
+    // projection catches up. The run ledger is authoritative for that gap.
+    const fromRuns = input.runs.value.filter(
+      (run) => run.phase === 'awaiting_approval',
+    ).length;
+    return Math.max(fromSummary, fromBriefing, fromRuns);
   });
 
   const leftSidebarAttentionBadgeCount = computed(() => {

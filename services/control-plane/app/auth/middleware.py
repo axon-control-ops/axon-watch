@@ -21,8 +21,15 @@ from app.auth.settings import (
 )
 
 _MUTATING = frozenset({"POST", "PUT", "PATCH", "DELETE"})
+_SENSITIVE_GET_PREFIXES = (
+    "/api/vault/secrets",
+    "/api/vault/export",
+    "/api/vault/provider-keys",
+)
 _EXEMPT_PREFIXES = (
     "/api/health",
+    # Browser login/logout must remain reachable before a session exists.
+    "/api/auth/session",
     "/api/desktop/bootstrap",
     "/api/desktop/bootstrap-code",
     "/api/desktop/status",
@@ -36,6 +43,10 @@ _EXEMPT_PREFIXES = (
 
 def _is_exempt(path: str) -> bool:
     return any(path == prefix or path.startswith(prefix + "/") for prefix in _EXEMPT_PREFIXES)
+
+
+def _is_sensitive_get(path: str) -> bool:
+    return any(path == prefix or path.startswith(prefix + "/") for prefix in _SENSITIVE_GET_PREFIXES)
 
 
 def _extract_bearer(request: Request) -> str:
@@ -81,17 +92,21 @@ class MutatingAuthMiddleware(BaseHTTPMiddleware):
         identity = "anonymous"
         token = None
         try:
-            if method in _MUTATING and not _is_exempt(path):
-                origin_error = reject_cross_origin_mutation(request)
-                if origin_error is not None:
-                    return JSONResponse(
-                        status_code=403,
-                        content={
-                            "detail": origin_error,
-                            "auth_required": True,
-                            "csrf_blocked": True,
-                        },
-                    )
+            requires_identity = (method in _MUTATING and not _is_exempt(path)) or (
+                method == "GET" and _is_sensitive_get(path)
+            )
+            if requires_identity:
+                if method in _MUTATING:
+                    origin_error = reject_cross_origin_mutation(request)
+                    if origin_error is not None:
+                        return JSONResponse(
+                            status_code=403,
+                            content={
+                                "detail": origin_error,
+                                "auth_required": True,
+                                "csrf_blocked": True,
+                            },
+                        )
                 resolved, error = resolve_mutating_identity(request)
                 if resolved is None:
                     return JSONResponse(
@@ -102,15 +117,16 @@ class MutatingAuthMiddleware(BaseHTTPMiddleware):
                         },
                     )
                 identity = resolved
-                rate_error = reject_mutating_rate_limit(request, identity=identity)
-                if rate_error is not None:
-                    return JSONResponse(
-                        status_code=429,
-                        content={
-                            "detail": rate_error,
-                            "rate_limited": True,
-                        },
-                    )
+                if method in _MUTATING:
+                    rate_error = reject_mutating_rate_limit(request, identity=identity)
+                    if rate_error is not None:
+                        return JSONResponse(
+                            status_code=429,
+                            content={
+                                "detail": rate_error,
+                                "rate_limited": True,
+                            },
+                        )
             token = bind_request_identity(identity)
             return await call_next(request)
         finally:

@@ -51,7 +51,10 @@ class OperatorBriefingRhythmTests(unittest.TestCase):
             lead_awaiting_engagement_count=1,
         )
 
-        self.assertEqual("A Lead-team plan is waiting for you in Mission Control.", notice)
+        self.assertEqual(
+            "A Lead review is ready — open the plan marked Review now in Mission Control.",
+            notice,
+        )
 
     def test_notice_surfaces_multiple_lead_plans_tts_safe(self) -> None:
         notice = build_briefing_notice(
@@ -64,7 +67,7 @@ class OperatorBriefingRhythmTests(unittest.TestCase):
         )
 
         self.assertEqual(
-            "Lead-team plans are waiting for you in Mission Control — Four of them.",
+            "Lead reviews are ready in Mission Control — Four of them.",
             notice,
         )
         self.assertNotRegex(notice, r"\b\d+\s+Lead\b")

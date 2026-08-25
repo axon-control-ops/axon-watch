@@ -1,10 +1,17 @@
-import { computed, type Ref, ref } from 'vue';
+import { computed, type Ref, ref, watch } from 'vue';
 
 import {
-  disableSandboxSession,
-  enableSandboxSession,
-  fetchSandboxSessionStatus,
-} from '../../api/safe-improvement-api';
+  disableComposerSandbox,
+  discardComposerSandbox,
+  enableComposerSandbox,
+  fetchComposerSandboxPreview,
+  fetchComposerSandboxStatus,
+  publishComposerSandbox,
+  reviewComposerSandbox,
+  startComposerSandboxPreview,
+  stopComposerSandboxPreview,
+  type ComposerSandboxStatus,
+} from '../../api/composer-sandbox-api';
 import {
   agentExecutionAccessHint,
   agentExecutionAccessLabel,
@@ -13,8 +20,10 @@ import { isToolCapableComposerMode } from '../../lib/composer-tool-modes';
 import { OPERATOR_PERSONA_NAME } from '../../lib/operator-persona-name';
 import {
   buildComposerModeAccessLabel,
+  sandboxRootDirtyMessage,
   sandboxSessionHint,
   sandboxSessionLabel,
+  sandboxUnpromotedChangesMessage,
 } from '../../lib/sandbox-session-view';
 import { useShellStore } from '../../stores/shell';
 
@@ -72,8 +81,37 @@ export function useComposerMenus(shell: ShellStore, options: UseComposerMenusOpt
   const sandboxConsentChecked = ref(false);
   const sandboxSessionEnabled = ref(false);
   const sandboxEnvForced = ref(false);
+  const sandboxAutoEnabled = ref(false);
+  const sandboxManualEnabled = ref(false);
+  const sandboxDirty = ref(false);
+  const sandboxSource = ref('off');
   const sandboxSessionPending = ref(false);
   const sandboxSessionError = ref('');
+  const sandboxChangedPaths = ref<string[]>([]);
+  // URL of a dev server running against the Sandbox checkout, empty when none.
+  const sandboxPreviewUrl = ref('');
+  const SANDBOX_STRIP_COLLAPSED_KEY = 'axon.sandboxStrip.collapsed';
+  const sandboxStripCollapsed = ref(readCollapsedPreference());
+
+  function readCollapsedPreference(): boolean {
+    try {
+      return window.localStorage.getItem(SANDBOX_STRIP_COLLAPSED_KEY) === '1';
+    } catch {
+      return false;
+    }
+  }
+
+  function toggleSandboxStripCollapsed(): void {
+    sandboxStripCollapsed.value = !sandboxStripCollapsed.value;
+    try {
+      window.localStorage.setItem(
+        SANDBOX_STRIP_COLLAPSED_KEY,
+        sandboxStripCollapsed.value ? '1' : '0',
+      );
+    } catch {
+      // A non-persisted preference is still usable for this session.
+    }
+  }
   const showAddModelsPanel = ref(false);
   const showRuntimeTargetsPanel = ref(false);
   const modelSearchQuery = ref('');
@@ -87,20 +125,37 @@ export function useComposerMenus(shell: ShellStore, options: UseComposerMenusOpt
       shell.agentExecutionAccess === 'full' &&
       shell.ideAgentLinkedRun?.phase === 'awaiting_approval',
   );
-  const executionAccessLabel = computed(() =>
-    agentExecutionAccessLabel(shell.agentExecutionAccess),
+  const effectiveExecutionAccess = computed(() =>
+    sandboxSessionEnabled.value && isToolCapableComposerMode(composerMode.value)
+      ? 'full'
+      : shell.agentExecutionAccess,
   );
+  const executionAccessLabel = computed(() => agentExecutionAccessLabel(effectiveExecutionAccess.value));
   const executionAccessHint = computed(() =>
-    agentExecutionAccessHint(shell.agentExecutionAccess),
+    sandboxSessionEnabled.value && effectiveExecutionAccess.value === 'full'
+      ? 'Full Access inside disposable isolation; external and protected effects remain gated'
+      : agentExecutionAccessHint(effectiveExecutionAccess.value),
   );
   const isFullAccessAgent = computed(
     () =>
-      isToolCapableComposerMode(composerMode.value) && shell.agentExecutionAccess === 'full',
+      isToolCapableComposerMode(composerMode.value) && effectiveExecutionAccess.value === 'full',
   );
-  const sandboxHint = computed(() =>
-    sandboxSessionHint(sandboxSessionEnabled.value, sandboxEnvForced.value),
-  );
-  const sandboxLabel = computed(() => sandboxSessionLabel(sandboxSessionEnabled.value));
+  const sandboxHint = computed(() => {
+    if (sandboxDirty.value && sandboxSource.value === 'retained') {
+      return 'Full Auto ended; unpromoted changes are retained for review';
+    }
+    if (sandboxAutoEnabled.value) {
+      return 'Full Auto provides lazy disposable isolation for this workspace';
+    }
+    return sandboxSessionHint(sandboxSessionEnabled.value, sandboxEnvForced.value);
+  });
+  const sandboxLabel = computed(() => {
+    if (!sandboxSessionEnabled.value) return sandboxSessionLabel(false);
+    if (sandboxSource.value === 'retained') return 'Sandbox · Retained changes';
+    if (sandboxAutoEnabled.value && sandboxManualEnabled.value) return 'Sandbox · Auto + Manual';
+    if (sandboxAutoEnabled.value) return 'Sandbox · Auto';
+    return 'Sandbox · Manual';
+  });
   const modeButtonLabel = computed(() =>
     buildComposerModeAccessLabel({
       modeLabel: activeMode.value.label,
@@ -121,17 +176,98 @@ export function useComposerMenus(shell: ShellStore, options: UseComposerMenusOpt
     return activeMode.value.hint;
   });
 
-  async function refreshSandboxSession(): Promise<void> {
-    try {
-      const status = await fetchSandboxSessionStatus();
-      sandboxSessionEnabled.value = status.enabled;
-      sandboxEnvForced.value = status.env_forced;
+  function applySandboxStatusMessage(
+    status: ComposerSandboxStatus,
+    options?: { preserveReviewDetail?: boolean },
+  ): void {
+    if (status.root_dirty) {
+      sandboxSessionError.value = sandboxRootDirtyMessage(status);
+      return;
+    }
+    const detailedReview = sandboxSessionError.value.startsWith('Sandbox changes:');
+    if (status.dirty) {
+      if (!options?.preserveReviewDetail || !detailedReview) {
+        sandboxSessionError.value = sandboxUnpromotedChangesMessage();
+      }
+      return;
+    }
+    if (!options?.preserveReviewDetail || !detailedReview) {
       sandboxSessionError.value = '';
+    }
+  }
+
+  function applySandboxStatusFields(status: ComposerSandboxStatus): void {
+    sandboxSessionEnabled.value = status.enabled;
+    sandboxEnvForced.value = status.env_forced;
+    sandboxAutoEnabled.value = status.auto_enabled;
+    sandboxManualEnabled.value = status.manual_enabled;
+    sandboxDirty.value = status.dirty;
+    sandboxSource.value = status.source;
+  }
+
+  async function refreshSandboxSession(options?: { afterAgentTurn?: boolean }): Promise<void> {
+    const workspaceId = shell.currentWorkspace?.workspace_id;
+    if (!workspaceId) {
+      sandboxSessionEnabled.value = false;
+      sandboxEnvForced.value = false;
+      return;
+    }
+    try {
+      const status = await fetchComposerSandboxStatus(workspaceId);
+      if (shell.currentWorkspace?.workspace_id !== workspaceId) {
+        return;
+      }
+      applySandboxStatusFields(status);
+      applySandboxStatusMessage(status, {
+        preserveReviewDetail: Boolean(options?.afterAgentTurn),
+      });
+      if (status.enabled) {
+        try {
+          const preview = await fetchComposerSandboxPreview(workspaceId);
+          if (shell.currentWorkspace?.workspace_id === workspaceId) {
+            sandboxPreviewUrl.value = preview.running ? (preview.url ?? '') : '';
+          }
+        } catch {
+          // A preview probe must never mask the Sandbox status it rides along with.
+          sandboxPreviewUrl.value = '';
+        }
+      } else {
+        sandboxPreviewUrl.value = '';
+      }
     } catch (error) {
       sandboxSessionError.value =
         error instanceof Error ? error.message : 'Could not load Sandbox status.';
     }
   }
+
+  // Sandbox sessions are explicitly per-workspace. Never carry the prior
+  // workspace's badge/state into the next composer while its status loads.
+  watch(
+    () => `${shell.currentWorkspace?.workspace_id ?? ''}:${shell.operatorPresenceSettings.autonomy_mode}`,
+    () => {
+      sandboxSessionEnabled.value = false;
+      sandboxEnvForced.value = false;
+      sandboxAutoEnabled.value = false;
+      sandboxManualEnabled.value = false;
+      sandboxDirty.value = false;
+      sandboxSource.value = 'off';
+      sandboxSessionError.value = '';
+      sandboxPreviewUrl.value = '';
+      void refreshSandboxSession();
+    },
+    { immediate: true },
+  );
+
+  // After an agent turn finishes, refresh dirty state so Publish enables without
+  // forcing the operator to open the mode menu or click Review first.
+  watch(
+    () => shell.agentStreamActive,
+    (active, wasActive) => {
+      if (wasActive && !active && sandboxSessionEnabled.value) {
+        void refreshSandboxSession({ afterAgentTurn: true });
+      }
+    },
+  );
 
   function closeMenus(): void {
     showContextMenu.value = false;
@@ -160,7 +296,12 @@ export function useComposerMenus(shell: ShellStore, options: UseComposerMenusOpt
       void shell.loadRuntimeMcpTools();
     }
     if (openingModel) {
-      void Promise.all([shell.loadRuntimeStatus(), shell.loadCursorCatalog(true)]);
+      void Promise.all([
+        shell.loadRuntimeStatus(),
+        shell.loadCursorCatalog(true),
+        shell.loadClaudeCatalog(true),
+        shell.loadCodexCatalog(true),
+      ]);
     }
     if (openingMode) {
       void refreshSandboxSession();
@@ -224,12 +365,21 @@ export function useComposerMenus(shell: ShellStore, options: UseComposerMenusOpt
     if (!sandboxConsentChecked.value || sandboxSessionPending.value) {
       return;
     }
+    const workspaceId = shell.currentWorkspace?.workspace_id;
+    if (!workspaceId) {
+      sandboxSessionError.value = 'No workspace is open — cannot enable Sandbox.';
+      return;
+    }
     sandboxSessionPending.value = true;
     sandboxSessionError.value = '';
     try {
-      const status = await enableSandboxSession();
+      const status = await enableComposerSandbox(workspaceId);
       sandboxSessionEnabled.value = status.enabled;
       sandboxEnvForced.value = status.env_forced;
+      sandboxAutoEnabled.value = status.auto_enabled;
+      sandboxManualEnabled.value = status.manual_enabled;
+      sandboxDirty.value = status.dirty;
+      sandboxSource.value = status.source;
       showSandboxConsent.value = false;
       sandboxConsentChecked.value = false;
     } catch (error) {
@@ -241,19 +391,159 @@ export function useComposerMenus(shell: ShellStore, options: UseComposerMenusOpt
   }
 
   async function disableSandboxSessionAccess(): Promise<void> {
-    if (sandboxEnvForced.value || sandboxSessionPending.value) {
+    if (sandboxEnvForced.value || sandboxAutoEnabled.value || sandboxSessionPending.value) {
+      return;
+    }
+    const workspaceId = shell.currentWorkspace?.workspace_id;
+    if (!workspaceId) {
       return;
     }
     sandboxSessionPending.value = true;
     sandboxSessionError.value = '';
     try {
-      const status = await disableSandboxSession();
+      const status = await disableComposerSandbox(workspaceId);
       sandboxSessionEnabled.value = status.enabled;
       sandboxEnvForced.value = status.env_forced;
+      sandboxAutoEnabled.value = status.auto_enabled;
+      sandboxManualEnabled.value = status.manual_enabled;
+      sandboxDirty.value = status.dirty;
+      sandboxSource.value = status.source;
       showModeMenu.value = false;
     } catch (error) {
       sandboxSessionError.value =
         error instanceof Error ? error.message : 'Could not turn Sandbox off.';
+    } finally {
+      sandboxSessionPending.value = false;
+    }
+  }
+
+  async function reviewSandboxSessionChanges(): Promise<void> {
+    const workspaceId = shell.currentWorkspace?.workspace_id;
+    if (!workspaceId || sandboxSessionPending.value) return;
+    sandboxSessionPending.value = true;
+    try {
+      const review = await reviewComposerSandbox(workspaceId);
+      sandboxChangedPaths.value = review.changed_paths;
+      sandboxDirty.value = review.dirty;
+      sandboxPreviewUrl.value = review.preview?.running ? (review.preview.url ?? '') : '';
+      if (review.root_dirty) {
+        sandboxSessionError.value = sandboxRootDirtyMessage(review);
+      } else if (review.changed_paths.length) {
+        // Actually open the diffs. Listing path names is what made this button
+        // read as doing nothing — there was never anything to look at.
+        const diffs = review.file_diffs ?? [];
+        for (const file of diffs) {
+          shell.openAgentEditReview({
+            path: file.path,
+            added: file.added,
+            removed: file.removed,
+            diff: file.diff,
+            open: false,
+            // The file lives in the checkout, not the bound root; opening the
+            // real path would show an empty document for sandbox-created files.
+            preferDraft: true,
+          });
+        }
+        const opened = diffs.length
+          ? `Opened ${diffs.length} sandbox diff${diffs.length === 1 ? '' : 's'} in the editor. `
+          : '';
+        sandboxSessionError.value = `${opened}Sandbox changes: ${review.changed_paths.join(', ')}.`;
+      } else if (review.preview?.available) {
+        sandboxSessionError.value = `Sandbox is clean. Preview checkout: ${review.preview.checkout_root ?? review.checkout_root}`;
+      } else {
+        sandboxSessionError.value = 'Sandbox has no unpromoted changes.';
+      }
+    } catch (error) {
+      sandboxSessionError.value = error instanceof Error ? error.message : 'Review failed.';
+    } finally {
+      sandboxSessionPending.value = false;
+    }
+  }
+
+  async function startSandboxPreview(): Promise<void> {
+    const workspaceId = shell.currentWorkspace?.workspace_id;
+    if (!workspaceId || sandboxSessionPending.value) return;
+    sandboxSessionPending.value = true;
+    try {
+      const preview = await startComposerSandboxPreview(workspaceId);
+      sandboxPreviewUrl.value = preview.url ?? '';
+      // Expo/Metro bundles for a minute or more before the port answers, so
+      // "starting" must not be phrased as if the URL were already live.
+      sandboxSessionError.value = preview.url
+        ? `Sandbox preview ${preview.reused ? 'already running' : 'starting'} at ${preview.url} — first build can take a minute before the page loads. It serves the checkout, not the bound workspace. Logs are in the "vaxon · sandbox" terminal tab.`
+        : 'Sandbox preview did not report a URL.';
+    } catch (error) {
+      sandboxSessionError.value =
+        error instanceof Error ? error.message : 'Could not start the Sandbox preview.';
+    } finally {
+      sandboxSessionPending.value = false;
+    }
+  }
+
+  async function stopSandboxPreview(): Promise<void> {
+    const workspaceId = shell.currentWorkspace?.workspace_id;
+    if (!workspaceId || sandboxSessionPending.value) return;
+    sandboxSessionPending.value = true;
+    try {
+      await stopComposerSandboxPreview(workspaceId);
+      sandboxPreviewUrl.value = '';
+      sandboxSessionError.value = 'Sandbox preview stopped.';
+    } catch (error) {
+      sandboxSessionError.value =
+        error instanceof Error ? error.message : 'Could not stop the Sandbox preview.';
+    } finally {
+      sandboxSessionPending.value = false;
+    }
+  }
+
+  async function restartSandboxPreview(): Promise<void> {
+    const workspaceId = shell.currentWorkspace?.workspace_id;
+    if (!workspaceId || sandboxSessionPending.value) return;
+    sandboxSessionPending.value = true;
+    try {
+      await stopComposerSandboxPreview(workspaceId);
+      const preview = await startComposerSandboxPreview(workspaceId);
+      sandboxPreviewUrl.value = preview.url ?? '';
+      sandboxSessionError.value = preview.url
+        ? `Sandbox preview restarted at ${preview.url} — first build can take a minute.`
+        : 'Sandbox preview restarted but did not report a URL.';
+    } catch (error) {
+      sandboxSessionError.value =
+        error instanceof Error ? error.message : 'Could not restart the Sandbox preview.';
+    } finally {
+      sandboxSessionPending.value = false;
+    }
+  }
+
+  async function publishSandboxSessionChanges(): Promise<void> {
+    const workspaceId = shell.currentWorkspace?.workspace_id;
+    if (!workspaceId || sandboxSessionPending.value) return;
+    sandboxSessionPending.value = true;
+    try {
+      const status = await publishComposerSandbox(workspaceId);
+      sandboxDirty.value = status.dirty;
+      sandboxSessionEnabled.value = status.enabled;
+      sandboxSessionError.value = 'Sandbox changes were published through workspace delivery.';
+      await refreshSandboxSession();
+    } catch (error) {
+      sandboxSessionError.value = error instanceof Error ? error.message : 'Publish failed.';
+    } finally {
+      sandboxSessionPending.value = false;
+    }
+  }
+
+  async function discardSandboxSessionChanges(): Promise<void> {
+    const workspaceId = shell.currentWorkspace?.workspace_id;
+    if (!workspaceId || sandboxSessionPending.value) return;
+    if (!window.confirm('Permanently discard every unpromoted change in this Sandbox?')) return;
+    sandboxSessionPending.value = true;
+    try {
+      await discardComposerSandbox(workspaceId);
+      sandboxChangedPaths.value = [];
+      sandboxSessionError.value = '';
+      await refreshSandboxSession();
+    } catch (error) {
+      sandboxSessionError.value = error instanceof Error ? error.message : 'Discard failed.';
     } finally {
       sandboxSessionPending.value = false;
     }
@@ -268,6 +558,7 @@ export function useComposerMenus(shell: ShellStore, options: UseComposerMenusOpt
     confirmFullAccessConsent,
     confirmSandboxConsent,
     disableSandboxSessionAccess,
+    discardSandboxSessionChanges,
     executionAccessHint,
     executionAccessLabel,
     fullAccessConsentChecked,
@@ -277,10 +568,24 @@ export function useComposerMenus(shell: ShellStore, options: UseComposerMenusOpt
     modelSearchQuery,
     requestFullAccess,
     requestSandboxSession,
+    publishSandboxSessionChanges,
+    refreshSandboxSession,
+    reviewSandboxSessionChanges,
+    startSandboxPreview,
+    stopSandboxPreview,
+    restartSandboxPreview,
+    sandboxPreviewUrl,
+    sandboxStripCollapsed,
+    toggleSandboxStripCollapsed,
     sandboxConsentChecked,
+    sandboxChangedPaths,
+    sandboxAutoEnabled,
+    sandboxDirty,
     sandboxEnvForced,
     sandboxHint,
     sandboxLabel,
+    sandboxManualEnabled,
+    sandboxSource,
     sandboxSessionEnabled,
     sandboxSessionError,
     sandboxSessionPending,

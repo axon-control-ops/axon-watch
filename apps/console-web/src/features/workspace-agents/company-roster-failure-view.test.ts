@@ -11,6 +11,7 @@ import {
   employeeFailureBannerAriaLabel,
   employeeFailureBannerCopy,
   employeeFailureBeatAriaLabel,
+  employeeFailureBlocksRetry,
   employeeFailureDetailTooltip,
   employeeFailureLine,
   employeeFailurePeekKey,
@@ -159,6 +160,29 @@ describe('company-roster-failure-view', () => {
         }),
       ),
     ).toMatch(/usage/i);
+    const codexBlocked = employee({
+      status: 'idle',
+      last_outcome: 'failed',
+      last_outcome_detail: 'Codex usage limit is still active',
+    });
+    expect(employeeFailureLine(codexBlocked)).toMatch(/Codex CLI reported a usage-limit block/i);
+    expect(employeeFailureLine(codexBlocked)).toMatch(/cannot verify the live account quota/i);
+    expect(employeeFailureLine(codexBlocked)).not.toMatch(/Cursor usage signal/i);
+  });
+
+  it('maps completion-gate failures to operator-friendly copy', () => {
+    const sorenLike = employee({
+      name: 'Soren',
+      role: 'integrations',
+      status: 'idle',
+      last_outcome: 'failed',
+      last_outcome_detail:
+        'Workspace delivery blocked by completion gate: Implementation requested but worker produced no changed files',
+    });
+    expect(employeeFailureLine(sorenLike)).toBe(
+      'Last job produced no file changes in the worker isolation checkout — not Composer Sandbox. Tap Try again with a narrower task, or reassign as report-only audit.',
+    );
+    expect(employeeDisplayStatus(sorenLike)).toBe('failed');
   });
 
   it('maps restart-interrupted failures to operator-friendly copy', () => {
@@ -328,7 +352,7 @@ describe('company-roster-failure-view', () => {
       last_outcome_detail: 'vitest: assertion failed',
       last_run_id: 'run_failed_1',
     });
-    expect(employeeDockReceiptDetail(failed)).toBeNull();
+    expect(employeeDockReceiptDetail(failed)).toBe('vitest: assertion failed');
 
     const ok = employee({
       status: 'idle',
@@ -443,7 +467,9 @@ describe('company-roster-failure-view', () => {
           last_outcome_detail: 'vitest',
         }),
       ]),
-    ).toBe('Shell Craft — Last job failed: vitest');
+    ).toBe(
+      'Shell Craft — Last job failed: vitest Tap to open their dock and Try again.',
+    );
     expect(
       companyFailedEmployeesHint([
         employee({
@@ -487,7 +513,7 @@ describe('company-roster-failure-view', () => {
         }),
       ]),
     ).toBe(
-      '2 teammates need attention after a failed job — select one and tap Try again, or click to talk it through.',
+      '2 teammates need attention after a failed job — tap to open a failed teammate\'s dock and Try again.',
     );
   });
 
@@ -608,6 +634,46 @@ describe('company-roster-failure-view', () => {
         label: '2 interrupted',
         tone: 'interrupted',
       });
+    });
+  });
+
+  describe('private-material blocks are non-retriable', () => {
+    const blockedDetail =
+      'Workspace delivery blocked: private_company_material: assets/TPS-PACK.zip matches ' +
+      'a private-document rule (financial records, RFQ packs, exports, and office-document ' +
+      'formats never leave a workspace automatically) -- this is expected, working-as-intended ' +
+      'behavior, not an error to retry. To actually deliver this run\'s other changes, an ' +
+      'operator must remove or relocate this file from the task\'s working tree first.';
+
+    it('flags employeeFailureBlocksRetry for a private-material block', () => {
+      const blocked = employee({
+        status: 'idle',
+        last_outcome: 'failed',
+        last_outcome_detail: blockedDetail,
+      });
+      expect(employeeFailureBlocksRetry(blocked)).toBe(true);
+
+      const ordinary = employee({
+        status: 'idle',
+        last_outcome: 'failed',
+        last_outcome_detail: 'Cursor CLI exited with status 143.',
+      });
+      expect(employeeFailureBlocksRetry(ordinary)).toBe(false);
+    });
+
+    it('does not flag employees with no failure at all', () => {
+      expect(employeeFailureBlocksRetry(employee({ status: 'idle' }))).toBe(false);
+    });
+
+    it('labels the failure line as working-as-intended, not a bare failure', () => {
+      const blocked = employee({
+        status: 'idle',
+        last_outcome: 'failed',
+        last_outcome_detail: blockedDetail,
+      });
+      const line = employeeFailureLine(blocked);
+      expect(line).toContain('working as intended');
+      expect(line).toContain('operator must remove or relocate the file first');
     });
   });
 });

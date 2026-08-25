@@ -130,6 +130,31 @@ def resolve_critical_review_confidence(reply_text: str) -> tuple[int | None, boo
     return None, False
 
 
+_REVIEW_INTENT_RE = re.compile(
+    r"\b(?:critically review|code review|review the|please review|audit the|"
+    r"qa pass|quality review|verification after)\b",
+    re.IGNORECASE,
+)
+
+
+def is_review_type_task(task: dict[str, object] | None) -> bool:
+    """True when a task is genuinely a review/verification job, not routine work.
+
+    The mandatory Critical Review Clause ritual only makes sense for tasks that
+    are actually reviewing/verifying something — routine replies (status
+    updates, "I need a file path", ordinary implementation work) should not be
+    forced through a formal self-critique + Confidence: N/10 rewrite.
+    """
+    if not isinstance(task, dict):
+        return False
+    from app.workspace_agents.lead_verification_handoff import is_verification_task
+
+    if is_verification_task(task):
+        return True
+    blob = f"{task.get('goal') or ''} {task.get('acceptance_criteria') or ''}"
+    return bool(_REVIEW_INTENT_RE.search(blob))
+
+
 def critical_review_receipt_summary(confidence: int, *, auto_recovered: bool) -> str:
     if auto_recovered:
         return (
@@ -150,6 +175,7 @@ __all__ = [
     "append_agent_standing_accuracy_clause",
     "append_critical_review_clause",
     "critical_review_receipt_summary",
+    "is_review_type_task",
     "parse_confidence",
     "resolve_critical_review_confidence",
 ]

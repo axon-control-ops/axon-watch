@@ -7,6 +7,8 @@ from fastapi import APIRouter, HTTPException
 from app.adapters.watch_client import (
     fetch_watch_connectors,
     fetch_watch_delivery_receipts,
+    fetch_watch_email_folders,
+    fetch_watch_email_messages,
     fetch_watch_events,
     fetch_watch_monitors,
     fetch_watch_tunnel,
@@ -17,8 +19,10 @@ from app.adapters.watch_client import (
     post_watch_sentry_probe_write,
     post_watch_tunnel_action,
 )
+from app.email_account_resolve import resolve_workspace_email_account
 from app.inbox_projection import WatchInboxUnavailableError, build_inbox_response
 from app.inbox_signals import acknowledge_inbox_signals
+from app.persistence import email_settings_store
 from app.routes.schemas import (
     AcknowledgeInboxSignalsRequest,
     SentryAttendRequest,
@@ -30,11 +34,57 @@ router = APIRouter()
 
 
 @router.get("/api/inbox")
-def inbox() -> dict[str, object]:
+def inbox(force: bool = False) -> dict[str, object]:
     try:
-        return build_inbox_response()
+        return build_inbox_response(force_refresh=force)
     except WatchInboxUnavailableError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+
+def _resolve_account_id(*, workspace_id: str = "", account_id: str = "") -> str:
+    account_id = account_id.strip()
+    if account_id:
+        settings = email_settings_store.load_settings()
+        for entry in settings.get("accounts") or []:
+            if isinstance(entry, dict) and str(entry.get("account_id") or "") == account_id:
+                return account_id
+        raise HTTPException(
+            status_code=404,
+            detail=f"no mailbox configured for account_id: {account_id}",
+        )
+
+    workspace_id = workspace_id.strip()
+    settings = email_settings_store.load_settings()
+    account = resolve_workspace_email_account(settings, workspace_id=workspace_id)
+    if account is None:
+        raise HTTPException(
+            status_code=404,
+            detail=f"no mailbox configured for workspace: {workspace_id}",
+        )
+    return str(account.get("account_id") or "")
+
+
+@router.get("/api/email/folders")
+def email_folders(workspace_id: str = "", account_id: str = "") -> dict[str, object]:
+    resolved_account_id = _resolve_account_id(workspace_id=workspace_id, account_id=account_id)
+    payload = fetch_watch_email_folders(resolved_account_id)
+    if payload is None:
+        raise HTTPException(status_code=503, detail="watch service unavailable")
+    return payload
+
+
+@router.get("/api/email/messages")
+def email_messages(
+    workspace_id: str = "",
+    account_id: str = "",
+    role: str = "inbox",
+    limit: int = 25,
+) -> dict[str, object]:
+    resolved_account_id = _resolve_account_id(workspace_id=workspace_id, account_id=account_id)
+    payload = fetch_watch_email_messages(resolved_account_id, role, limit=limit)
+    if payload is None:
+        raise HTTPException(status_code=503, detail="watch service unavailable")
+    return payload
 
 
 @router.post("/api/inbox/signals/acknowledge")

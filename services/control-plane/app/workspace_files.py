@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import mimetypes
 import os
 from pathlib import Path
@@ -12,6 +13,15 @@ from app.workspace_catalog import get_workspace_record
 
 class WorkspaceFileError(ValueError):
     pass
+
+
+class WorkspaceFileConflictError(WorkspaceFileError):
+    """Raised when a save's base_sha256 no longer matches the file on disk —
+    someone else (an agent, another operator tab) changed it since it was loaded."""
+
+
+def _content_sha256(content: str) -> str:
+    return hashlib.sha256(content.encode("utf-8")).hexdigest()
 
 
 _SKIPPED_DIRECTORY_NAMES = {
@@ -178,6 +188,7 @@ def read_workspace_file(workspace_id: str, file_path: str) -> dict[str, object]:
         "path": file_path,
         "content": content,
         "size_bytes": size_bytes,
+        "content_sha256": _content_sha256(content),
     }
 
 
@@ -189,9 +200,24 @@ def read_workspace_file_bytes(workspace_id: str, file_path: str) -> tuple[bytes,
     return target.read_bytes(), workspace_file_media_type(file_path), size_bytes
 
 
-def write_workspace_file(workspace_id: str, file_path: str, content: str) -> dict[str, object]:
+def write_workspace_file(
+    workspace_id: str,
+    file_path: str,
+    content: str,
+    *,
+    base_sha256: str | None = None,
+) -> dict[str, object]:
     root = resolve_workspace_root(workspace_id)
     target = _safe_resolve(root, file_path)
+    if base_sha256 and target.is_file():
+        try:
+            on_disk = target.read_text(encoding="utf-8")
+        except UnicodeDecodeError:
+            on_disk = None
+        if on_disk is not None and _content_sha256(on_disk) != base_sha256:
+            raise WorkspaceFileConflictError(
+                f"{file_path} was changed on disk since it was loaded — reload before saving"
+            )
     target.parent.mkdir(parents=True, exist_ok=True)
     target.write_text(content, encoding="utf-8")
     return {
@@ -199,6 +225,7 @@ def write_workspace_file(workspace_id: str, file_path: str, content: str) -> dic
         "path": file_path,
         "size_bytes": target.stat().st_size,
         "saved": True,
+        "content_sha256": _content_sha256(content),
     }
 
 

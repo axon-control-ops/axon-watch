@@ -10,7 +10,7 @@ from app.workspace_agents.diff_policy import (
     DiffPolicyFinding,
     evaluate_changed_paths,
     evaluate_diff_texts,
-    resolve_effective_allowed_paths,
+    normalize_path_prefixes,
 )
 
 VERIFIER_IDENTITY = "verifier"
@@ -111,9 +111,13 @@ def evaluate_acceptance(
     checks = evaluate_check_outputs(plan, results_by_name=check_results, actor=actor)
     findings: list[DiffPolicyFinding] = []
     if changed_paths is not None:
-        effective_allowed = resolve_effective_allowed_paths(
-            contract_allowed_paths=contract.get("allowed_paths") or [],
-            task_allowed_paths=task_allowed_paths or [],
+        # Task path lists are objective hints rather than a narrow allowlist.
+        # Gate 6 must still enforce the repository contract. The worker sandbox
+        # and delivery service add the narrower employee role boundary; passing
+        # an empty allowlist here would mean "unrestricted" and would silently
+        # let changes outside the project contract pass acceptance.
+        effective_allowed = normalize_path_prefixes(
+            contract.get("allowed_paths") or []
         )
         findings.extend(
             evaluate_changed_paths(

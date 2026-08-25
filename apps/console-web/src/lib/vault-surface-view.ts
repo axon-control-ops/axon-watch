@@ -37,6 +37,26 @@ export interface VaultStatusSnapshot {
   import_hint?: string;
 }
 
+export interface VaultSentryValidation {
+  ok: boolean;
+  present: boolean;
+  read_ok: boolean;
+  write_ok: boolean;
+  project_found: boolean;
+  checked_at: string;
+  token_key?: string;
+  org_key?: string;
+  project_key?: string;
+  org_slug?: string;
+  project_slug?: string;
+  token_prefix?: string;
+  token_length?: number;
+  status_code?: number | null;
+  visible_project_count?: number;
+  detail?: string;
+  write_detail?: string;
+}
+
 export interface VaultSecretRecord {
   id: number;
   name: string;

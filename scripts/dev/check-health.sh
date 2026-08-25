@@ -99,6 +99,39 @@ else
 fi
 
 echo
+echo "Agent dispatch prerequisites:"
+if command -v rg >/dev/null 2>&1; then
+  ok "ripgrep (rg) on PATH"
+else
+  bad "ripgrep (rg) missing from PATH — sandboxed agents and DashPro CI require rg"
+fi
+if command -v bwrap >/dev/null 2>&1; then
+  ok "bubblewrap (bwrap) on PATH"
+else
+  bad "bubblewrap (bwrap) missing from PATH — sandboxed agent dispatch will fail"
+fi
+if command -v git >/dev/null 2>&1; then
+  ok "git on PATH"
+else
+  bad "git missing from PATH — worker isolation checkouts require git"
+fi
+if command -v node >/dev/null 2>&1; then
+  ok "node on PATH ($(node -v 2>/dev/null || echo unknown))"
+else
+  bad "node missing from PATH — workflow scripts and CI tooling need node"
+fi
+if command -v npm >/dev/null 2>&1; then
+  ok "npm on PATH ($(npm -v 2>/dev/null || echo unknown))"
+else
+  bad "npm missing from PATH — sandbox jest/tsc validation requires npm"
+fi
+if command -v python3 >/dev/null 2>&1; then
+  ok "python3 on PATH"
+else
+  warn "python3 missing from PATH — some control-plane tooling may be unavailable"
+fi
+
+echo
 if (( failures > 0 )); then
   echo "Health FAILED (${failures} check(s))."
   echo "If the IDE shows 'could not reach :8787' but this script says ok, the failure was transient"

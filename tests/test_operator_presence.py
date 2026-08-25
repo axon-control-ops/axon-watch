@@ -272,6 +272,40 @@ class OperatorPresenceSettingsApiTests(unittest.TestCase):
         reloaded = self.client.get("/api/operator-presence/settings").json()
         self.assertEqual("composer-2", reloaded["settings"]["vaxon_model_id"])
 
+    def test_auto_composer_runtime_override_round_trip(self) -> None:
+        loaded = self.client.get("/api/operator-presence/settings").json()
+        self.assertFalse(
+            loaded["settings"]["auto_composer_runtime_override_enabled"]
+        )
+        self.assertEqual("", loaded["settings"]["auto_composer_runtime_target"])
+
+        save = self.client.put(
+            "/api/operator-presence/settings",
+            json={
+                "autonomy_mode": "full",
+                "auto_composer_runtime_override_enabled": True,
+                "auto_composer_runtime_target": "claude_local",
+            },
+        )
+        self.assertEqual(200, save.status_code)
+        self.assertTrue(
+            save.json()["settings"]["auto_composer_runtime_override_enabled"]
+        )
+        self.assertEqual(
+            "claude_local",
+            save.json()["settings"]["auto_composer_runtime_target"],
+        )
+
+        reloaded = self.client.get("/api/operator-presence/settings").json()
+        self.assertEqual("full", reloaded["settings"]["autonomy_mode"])
+        self.assertTrue(
+            reloaded["settings"]["auto_composer_runtime_override_enabled"]
+        )
+        self.assertEqual(
+            "claude_local",
+            reloaded["settings"]["auto_composer_runtime_target"],
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

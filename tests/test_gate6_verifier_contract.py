@@ -127,5 +127,57 @@ class Gate6VerifierContractTests(unittest.TestCase):
         self.assertIn("acceptance=", str(ctx.exception))
 
 
+    def test_ensure_acceptance_uses_terminal_jobs_for_verification_task(self) -> None:
+        from app.terminal.agent_job_registry import register_job
+
+        task = task_store.create_task(
+            workspace_id="workspace_dashpro",
+            owner_role="backend",
+            goal=(
+                "Verification after Marco (backend): run scoped verify commands — "
+                "`npm test -- tests/unit/foo.test.ts` [from run run_demo]"
+            ),
+            acceptance_criteria="Attach stdout receipts.",
+            allowed_paths=[],
+        )
+        leased = task_store.lease_task(
+            task["task_id"],
+            lease_holder="employee-workspace_dashpro-backend",
+        )
+        created = create_run(
+            workspace_id="workspace_dashpro",
+            mode="agent",
+            summary="Verification shift",
+            employee_role="backend",
+            task_id=str(leased["task_id"]),
+            require_leased_task=True,
+        )
+        run_id = str(created["run_id"])
+        register_job(
+            {
+                "job_id": "agent-job-gate6",
+                "workspace_id": "workspace_dashpro",
+                "run_id": run_id,
+                "command": "npm test -- tests/unit/foo.test.ts",
+                "status": "completed",
+                "exit_code": 0,
+                "created_at": "2026-01-01T00:00:00Z",
+            }
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            dirty = root / "src" / "unrelated.ts"
+            dirty.parent.mkdir(parents=True)
+            dirty.write_text("export const x = 1;\n", encoding="utf-8")
+            ensure_acceptance_before_publish(
+                run_id,
+                workspace_root=root,
+                changed_paths=["src/unrelated.ts"],
+            )
+        self.assertTrue(has_passing_acceptance_evidence(run_id))
+        completed = complete_run(run_id)
+        self.assertEqual("completed", completed["phase"])
+
+
 if __name__ == "__main__":
     unittest.main()

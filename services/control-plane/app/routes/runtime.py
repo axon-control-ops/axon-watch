@@ -5,7 +5,9 @@ from __future__ import annotations
 from fastapi import APIRouter
 
 from app.cli_runtime.routes import (
+    get_claude_runtime_status,
     get_cursor_runtime_status,
+    get_codex_runtime_status,
     get_runtime_mcp_tools,
     get_runtime_status,
     post_claude_runtime_login_start,
@@ -63,6 +65,16 @@ def claude_runtime_login_start() -> dict[str, object]:
 @router.get("/api/runtime/cursor/status")
 def cursor_runtime_status(force_refresh: bool = False) -> dict[str, object]:
     return get_cursor_runtime_status(force_refresh=force_refresh)
+
+
+@router.get("/api/runtime/claude/status")
+def claude_runtime_status(force_refresh: bool = False) -> dict[str, object]:
+    return get_claude_runtime_status(force_refresh=force_refresh)
+
+
+@router.get("/api/runtime/codex/status")
+def codex_runtime_status(force_refresh: bool = False) -> dict[str, object]:
+    return get_codex_runtime_status(force_refresh=force_refresh)
 
 
 @router.get("/api/runtime/mcp-tools")

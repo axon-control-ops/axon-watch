@@ -6,6 +6,7 @@ import IdeAttentionPanel from '../ide/IdeAttentionPanel.vue';
 import IdeBriefingPanel from '../ide/IdeBriefingPanel.vue';
 import IdeExplorerPanel from '../ide/IdeExplorerPanel.vue';
 import IdeTeamPanel from '../ide/IdeTeamPanel.vue';
+import IdeVaxonTalkPanel from '../ide/IdeVaxonTalkPanel.vue';
 import KairoSidebarPanel from '../ide/KairoSidebarPanel.vue';
 import AttentionStackPanel from './AttentionStackPanel.vue';
 import WorkspaceAddForm from './WorkspaceAddForm.vue';
@@ -13,6 +14,13 @@ import WorkspaceIcon from '../WorkspaceIcon.vue';
 import WorkbenchIcon from '../WorkbenchIcon.vue';
 import HudHoloPanelShell from '../../features/hud-holo/HudHoloPanelShell.vue';
 import type { HudHoloTone } from '../../features/hud-holo/hud-holo-tones';
+import { useSpokenUtteranceText } from '../../composables/useSpokenUtteranceText';
+import { shouldShowIdeVaxonDock } from '../../lib/ide-vaxon-dock-visibility';
+import {
+  getVaxonBriefingInteraction,
+  vaxonBriefingPendingByWorkspace,
+} from '../../lib/vaxon-briefing-interaction';
+import { vaxonLineAsksForReply } from '../../lib/vaxon-reply-prompt';
 import {
   workspaceDisplayLabel,
 } from '../../lib/operator-workspace-catalog';
@@ -24,6 +32,7 @@ import { isActiveRun } from '../../stores/shell-run-selection';
 import {
   clampSidebarWidth,
   MIN_SIDEBAR_WIDTH,
+  DEFAULT_SIDEBAR_WIDTH,
   readStoredSidebarWidth,
   SIDEBAR_WIDTH_KEY,
 } from '../../lib/sidebar-width-split';
@@ -34,10 +43,11 @@ import {
 import { useVerticalPanelResize } from '../../composables/useVerticalPanelResize';
 
 const shell = useShellStore();
+const { spokenText } = useSpokenUtteranceText();
 const workspaceFilter = ref('');
 const showAddWorkspaceForm = ref(false);
 const sidebarRef = ref<HTMLElement | null>(null);
-const expandedSidebarWidth = ref(readStoredSidebarWidth() ?? 280);
+const expandedSidebarWidth = ref(readStoredSidebarWidth() ?? DEFAULT_SIDEBAR_WIDTH);
 const resizing = ref(false);
 const {
   panelSize: voiceCardHeight,
@@ -103,6 +113,27 @@ const runCountsByWorkspace = computed(() => {
 
 const showSidebarModeToggle = computed(() => shell.layoutMode === 'operator');
 const isIdeMode = computed(() => shell.layoutMode === 'ide');
+const teamViewOpen = computed(
+  () => isIdeMode.value && shell.ideActivityView === 'team',
+);
+const showIdeKairoDock = computed(() => {
+  void vaxonBriefingPendingByWorkspace.value;
+  if (!isIdeMode.value) {
+    return false;
+  }
+  const pending = getVaxonBriefingInteraction(shell.currentWorkspace?.workspace_id ?? '');
+  return shouldShowIdeVaxonDock({
+    layoutMode: shell.layoutMode,
+    ideActivityView: shell.ideActivityView,
+    workspaceId: shell.currentWorkspace?.workspace_id,
+    kairoSpeechActive: shell.kairoSpeechActive,
+    liveSpokenText: spokenText.value,
+    stickySpokenText: pending?.line ?? null,
+    stickyNeedsDecision: pending ? vaxonLineAsksForReply(pending.line) : false,
+    operatorPinned: shell.ideVaxonDockPinned,
+  });
+});
+const ideTeamPanelFullHeight = computed(() => teamViewOpen.value && !showIdeKairoDock.value);
 const workspacesHoloTone = computed<HudHoloTone>(() =>
   shell.leftSidebarAttentionBadgeCount > 0 ? 'attention' : 'nominal',
 );
@@ -218,6 +249,8 @@ onBeforeUnmount(() => {
       'left-sidebar-mockup--ide-kairo-resizing': ideKairoPanelResizing,
       'left-sidebar-mockup--ide-kairo-user-sized': ideKairoPanelUserSized,
       'left-sidebar-mockup--ide': isIdeMode,
+      'left-sidebar-mockup--ide-team-full': ideTeamPanelFullHeight,
+      'left-sidebar-mockup--ide-team-popup': teamViewOpen && showIdeKairoDock,
       'left-sidebar-mockup--explorer-collapsed': isIdeMode && shell.ideExplorerCollapsed,
       'left-sidebar-mockup--galaxy': !isIdeMode && shell.operatorBrainGalaxyActive,
       'left-sidebar-mockup--mission-control':
@@ -234,7 +267,10 @@ onBeforeUnmount(() => {
           <IdeExplorerPanel v-else />
         </div>
       </div>
-      <div class="left-sidebar-mockup__status-anchor left-sidebar-mockup__status-anchor--ide">
+      <div
+        v-if="showIdeKairoDock"
+        class="left-sidebar-mockup__status-anchor left-sidebar-mockup__status-anchor--ide"
+      >
         <div
           class="ide-kairo-panel-resize-handle"
           role="separator"
@@ -251,7 +287,8 @@ onBeforeUnmount(() => {
         >
           <span class="ide-kairo-panel-resize-grip" aria-hidden="true" />
         </div>
-        <KairoSidebarPanel />
+        <IdeVaxonTalkPanel v-if="shell.ideVaxonDockPinned" />
+        <KairoSidebarPanel v-else />
       </div>
     </template>
 

@@ -105,6 +105,18 @@
   z-index: 1300;
 }
 
+/* Teleported to <body> so no ancestor stacking context (the topbar's
+   z-index:50 + backdrop-filter) can bury it behind the threads rail.
+   Coordinates come from the trigger rect via inline style. */
+.workspace-picker-menu__panel--floating {
+  position: fixed;
+  z-index: 1400;
+}
+
+.workspace-picker-menu__panel--floating.workspace-picker-menu__panel--compact {
+  z-index: 1400;
+}
+
 .workspace-picker-menu__item {
   display: flex;
   align-items: center;
@@ -390,9 +402,9 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 0.4rem;
+  gap: 0.2rem;
   width: 100%;
-  padding: 0.38rem 0.46rem;
+  padding: 0.12rem 0.12rem 0.12rem 0.22rem;
   border: 0;
   border-radius: 7px;
   background: transparent;
@@ -400,7 +412,50 @@
   font-family: var(--font-ui);
   font-size: 0.62rem;
   text-align: left;
+}
+
+.agent-dock-thread-tabbar__history-select {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.4rem;
+  min-width: 0;
+  flex: 1;
+  padding: 0.26rem 0.34rem;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
   cursor: pointer;
+}
+
+.agent-dock-thread-tabbar__history-delete {
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  width: 1.35rem;
+  height: 1.35rem;
+  padding: 0;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: rgba(138, 154, 173, 0.72);
+  cursor: pointer;
+  opacity: 0.55;
+}
+
+.agent-dock-thread-tabbar__history-delete:hover,
+.agent-dock-thread-tabbar__history-delete:focus-visible {
+  opacity: 1;
+  color: rgba(255, 170, 150, 0.95);
+  background: rgba(140, 40, 30, 0.28);
+}
+
+.agent-dock-thread-tabbar__history-item:hover .agent-dock-thread-tabbar__history-delete,
+.agent-dock-thread-tabbar__history-item--active .agent-dock-thread-tabbar__history-delete {
+  opacity: 0.9;
 }
 
 .agent-dock-thread-tabbar__history-copy {
@@ -408,6 +463,7 @@
   flex-direction: column;
   gap: 0.06rem;
   min-width: 0;
+  flex: 1;
 }
 
 .agent-dock-thread-tabbar__history-label-row {
@@ -478,6 +534,11 @@
   background: rgba(0, 242, 255, 0.08);
 }
 
+.agent-dock-thread-tabbar__history-item:hover .agent-dock-thread-tabbar__history-select,
+.agent-dock-thread-tabbar__history-item--active .agent-dock-thread-tabbar__history-select {
+  background: transparent;
+}
+
 .agent-dock-thread-tabbar__history-item--failed:hover,
 .agent-dock-thread-tabbar__history-item--failed.agent-dock-thread-tabbar__history-item--active {
   background: rgba(120, 40, 32, 0.22);
@@ -527,3 +588,19 @@
   color: #edf4fb;
 }
 
+
+/* Agent thread tabs: glow carries state, the border marks the active tab.
+   Previously every busy/failed tab drew its own outline, so a row of tabs read
+   as several "selected" chips and the real selection was hard to find. State
+   still reads at a glance — it just uses glow and fill instead of an outline. */
+.agent-dock-thread-tabbar__tab.hud-active-chip:not(.hud-active-chip--active):not(
+    .agent-dock-thread-tabbar__tab--active
+  ) {
+  border-color: transparent !important;
+}
+
+.agent-dock-thread-tabbar__tab.hud-active-chip.agent-dock-thread-tabbar__tab--active,
+.agent-dock-thread-tabbar__tab.hud-active-chip.hud-active-chip--active {
+  border-style: solid !important;
+  border-width: 1px !important;
+}

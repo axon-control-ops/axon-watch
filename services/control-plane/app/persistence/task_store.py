@@ -11,6 +11,8 @@ import uuid
 from typing import Any, Iterable
 
 from app.persistence import run_store_sqlite
+from app.persistence.schema_serialization import serialized_schema
+from app.workspace_missions.events import notify_task_terminal
 
 TASK_STATUSES = frozenset({"open", "leased", "completed", "failed", "cancelled"})
 DEFAULT_ATTEMPT_BUDGET = 3
@@ -26,7 +28,7 @@ _TASK_COLUMNS = (
     "dependencies_json",
     "exclusive_paths_json",
     "allowed_paths_json",
-    "approval_receipt_id",
+    "approval_receipt_id", "mission_id",
     "status",
     "lease_holder",
     "lease_expires_at",
@@ -83,6 +85,7 @@ def _parse_iso(value: str | None) -> datetime | None:
     return parsed.astimezone(timezone.utc)
 
 
+@serialized_schema
 def ensure_task_ledger_schema(connection: Any) -> None:
     connection.execute(
         """
@@ -97,6 +100,7 @@ def ensure_task_ledger_schema(connection: Any) -> None:
             exclusive_paths_json TEXT NOT NULL DEFAULT '[]',
             allowed_paths_json TEXT NOT NULL DEFAULT '[]',
             approval_receipt_id TEXT,
+            mission_id TEXT,
             status TEXT NOT NULL,
             lease_holder TEXT,
             lease_expires_at TEXT,
@@ -113,20 +117,14 @@ def ensure_task_ledger_schema(connection: Any) -> None:
         str(row["name"])
         for row in connection.execute("PRAGMA table_info(workspace_tasks)").fetchall()
     }
-    if "exclusive_paths_json" not in columns:
-        connection.execute(
-            "ALTER TABLE workspace_tasks "
-            "ADD COLUMN exclusive_paths_json TEXT NOT NULL DEFAULT '[]'"
-        )
-    if "allowed_paths_json" not in columns:
-        connection.execute(
-            "ALTER TABLE workspace_tasks "
-            "ADD COLUMN allowed_paths_json TEXT NOT NULL DEFAULT '[]'"
-        )
-    if "approval_receipt_id" not in columns:
-        connection.execute(
-            "ALTER TABLE workspace_tasks ADD COLUMN approval_receipt_id TEXT"
-        )
+    optional_columns = (
+        ("exclusive_paths_json", "TEXT NOT NULL DEFAULT '[]'"),
+        ("allowed_paths_json", "TEXT NOT NULL DEFAULT '[]'"),
+        ("approval_receipt_id", "TEXT"), ("mission_id", "TEXT"),
+    )
+    for name, ddl in optional_columns:
+        if name not in columns:
+            connection.execute(f"ALTER TABLE workspace_tasks ADD COLUMN {name} {ddl}")
     connection.execute(
         """
         CREATE INDEX IF NOT EXISTS idx_workspace_tasks_workspace_status
@@ -178,7 +176,7 @@ def _row_to_record(row: Any) -> dict[str, Any]:
             if "approval_receipt_id" in row.keys()
             else None
         ),
-        "status": row["status"],
+        "mission_id": row["mission_id"] if "mission_id" in row.keys() else None, "status": row["status"],
         "lease_holder": row["lease_holder"],
         "lease_expires_at": row["lease_expires_at"],
         "attempt_budget": int(row["attempt_budget"] or DEFAULT_ATTEMPT_BUDGET),
@@ -256,7 +254,7 @@ def create_task(
     dependencies: list[str] | None = None,
     exclusive_paths: list[str] | None = None,
     allowed_paths: list[str] | None = None,
-    approval_receipt_id: str | None = None,
+    approval_receipt_id: str | None = None, mission_id: str | None = None,
     attempt_budget: int = DEFAULT_ATTEMPT_BUDGET,
 ) -> dict[str, Any]:
     workspace = workspace_id.strip()
@@ -269,6 +267,12 @@ def create_task(
     deps = [str(item).strip() for item in (dependencies or []) if str(item).strip()]
     paths = [str(item).strip() for item in (exclusive_paths or []) if str(item).strip()]
     allowed = [str(item).strip() for item in (allowed_paths or []) if str(item).strip()]
+    if not allowed and owner_role.strip():
+        # Record useful role-owned routing hints on otherwise unscoped tasks;
+        # enforcement still comes from employee and repository policy.
+        from app.workspace_agents.execution_policy import default_write_scope_for_role
+
+        allowed = default_write_scope_for_role(owner_role)
     from app.workspace_agents.autonomous_attention_policy import normalize_task_risk
 
     timestamp = _utc_now_iso()
@@ -285,7 +289,7 @@ def create_task(
         "approval_receipt_id": (
             str(approval_receipt_id).strip() if approval_receipt_id else None
         ),
-        "status": "open",
+        "mission_id": str(mission_id).strip() if mission_id else None, "status": "open",
         "lease_holder": None,
         "lease_expires_at": None,
         "attempt_budget": budget,
@@ -307,6 +311,40 @@ def create_task(
         )
         connection.commit()
     stored = get_task(record["task_id"])
+    assert stored is not None
+    return stored
+
+
+def refresh_task_dependencies(task_id: str, dependencies: list[str]) -> dict[str, Any]:
+    """Replace dependency list on an open task (e.g. swap stale verification deps)."""
+    task_key = str(task_id or "").strip()
+    if not task_key:
+        raise TaskLedgerError("task_id is required")
+    deps = [str(item).strip() for item in dependencies if str(item).strip()]
+    timestamp = _utc_now_iso()
+    with _managed_connection() as connection:
+        ensure_task_ledger_schema(connection)
+        row = connection.execute(
+            "SELECT * FROM workspace_tasks WHERE task_id = ?",
+            (task_key,),
+        ).fetchone()
+        if row is None:
+            raise TaskLedgerError(f"task not found: {task_key}")
+        record = _row_to_record(row)
+        if record["status"] != "open":
+            raise TaskLedgerError(
+                f"only open tasks can refresh dependencies ({record['status']})"
+            )
+        connection.execute(
+            """
+            UPDATE workspace_tasks
+            SET dependencies_json = ?, updated_at = ?
+            WHERE task_id = ?
+            """,
+            (json.dumps(deps), timestamp, task_key),
+        )
+        connection.commit()
+    stored = get_task(task_key)
     assert stored is not None
     return stored
 
@@ -644,6 +682,7 @@ def _finalize_task(
         connection.commit()
     finalized = get_task(task_key)
     assert finalized is not None
+    notify_task_terminal(finalized)
     return deepcopy(finalized)
 
 
@@ -679,9 +718,9 @@ def reopen_orphaned_leased_tasks(
     *,
     terminal_run_ids: Iterable[str],
     terminal_outcome: str = "run terminal; lease recovered",
+    refund_attempts: bool = False,
 ) -> list[dict[str, Any]]:
     """Reopen leased tasks whose bound run already reached a terminal phase.
-
     Prevents canceled/failed/paused worker runs from leaving leased zombies that
     block claim_open_task_for_role until the lease TTL expires.
     """
@@ -716,12 +755,13 @@ def reopen_orphaned_leased_tasks(
                 SET status = 'open',
                     lease_holder = NULL,
                     lease_expires_at = NULL,
+                    attempts_used = MAX(0, attempts_used - ?),
                     run_id = NULL,
                     terminal_outcome = ?,
                     updated_at = ?
                 WHERE task_id = ? AND status = 'leased'
                 """,
-                (outcome, updated_at, record["task_id"]),
+                (int(refund_attempts), outcome, updated_at, record["task_id"]),
             )
             if connection.total_changes:
                 recovered.append(
@@ -730,6 +770,7 @@ def reopen_orphaned_leased_tasks(
                         "status": "open",
                         "lease_holder": None,
                         "lease_expires_at": None,
+                        "attempts_used": max(0, int(record["attempts_used"]) - int(refund_attempts)),
                         "run_id": None,
                         "terminal_outcome": outcome,
                         "updated_at": updated_at,
@@ -737,7 +778,6 @@ def reopen_orphaned_leased_tasks(
                 )
         connection.commit()
     return recovered
-
 
 def cancel_tasks_matching_goal_prefix(
     *,
@@ -823,4 +863,3 @@ def claim_open_task_for_role(
         except TaskLedgerError:
             continue
     return None
-

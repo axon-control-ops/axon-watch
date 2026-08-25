@@ -9,6 +9,8 @@ import {
   truncateMarkdownForDockPreview,
 } from '../../lib/ide-agent-edit-review';
 import { diffLineTone, normalizeEditedFilePath } from '../../lib/agent-transcript-blocks';
+import { agentEditOperation, agentEditOperationLabel } from '../../lib/agent-edit-operation';
+import { AGENT_EDIT_BLOCK_DEFAULT_EXPANDED } from '../../lib/agent-edit-block-view';
 import { handleMarkdownContainerClick } from '../../lib/markdown-link-click';
 import { resolveThreadImageUrl } from '../../lib/thread-image-url';
 import { isImageFilePath, isPdfFilePath } from '../../lib/workspace-file-language';
@@ -24,9 +26,11 @@ const props = defineProps<{
 }>();
 
 const shell = useShellStore();
-// Collapsed by default: expanded markdown/diff previews are expensive, and a
-// long agent turn can otherwise freeze the main thread while streaming.
-const expanded = ref(false);
+// Cursor-style default: show the edit/diff body as soon as a streaming edit
+// block appears. The operator can still collapse noisy blocks explicitly.
+const pinned = ref(AGENT_EDIT_BLOCK_DEFAULT_EXPANDED);
+const hovered = ref(false);
+const expanded = computed(() => pinned.value || hovered.value);
 const lightboxOpen = ref(false);
 
 const normalizedPath = computed(() => normalizeEditedFilePath(props.path));
@@ -34,6 +38,14 @@ const isMarkdown = computed(() => isMarkdownAgentEditPath(normalizedPath.value))
 const isImage = computed(() => isImageFilePath(normalizedPath.value));
 const isPdf = computed(() => isPdfFilePath(normalizedPath.value));
 const isCanvasFile = computed(() => isImage.value || isPdf.value);
+const editOperation = computed(() =>
+  agentEditOperation({
+    added: props.added,
+    removed: props.removed,
+    diff: props.diff,
+  }),
+);
+const editOperationLabel = computed(() => agentEditOperationLabel(editOperation.value));
 
 const openActionLabel = computed(() => {
   if (props.open) {
@@ -82,7 +94,15 @@ const diffPreview = computed(() => {
 });
 
 function toggle(): void {
-  expanded.value = !expanded.value;
+  pinned.value = !pinned.value;
+}
+
+function onMouseEnter(): void {
+  hovered.value = true;
+}
+
+function onMouseLeave(): void {
+  hovered.value = false;
 }
 
 function openInEditor(): void {
@@ -115,13 +135,17 @@ function handlePreviewClick(event: MouseEvent): void {
 </script>
 
 <template>
-  <div class="agent-block agent-block--edit">
+  <div
+    class="agent-block agent-block--edit"
+    @mouseenter="onMouseEnter"
+    @mouseleave="onMouseLeave"
+  >
     <div class="agent-block__edit-header">
       <button
         type="button"
         class="agent-block__edit-toggle"
         :aria-expanded="expanded"
-        :title="expanded ? 'Collapse edit' : 'Expand edit'"
+        :title="pinned ? 'Collapse edit' : 'Expand edit'"
         @click="toggle"
       >
         <span class="agent-block__edit-icon" aria-hidden="true">
@@ -131,11 +155,17 @@ function handlePreviewClick(event: MouseEvent): void {
       <button
         type="button"
         class="agent-block__edit-path agent-block__edit-path--link"
-        :title="`${openActionLabel}: ${normalizedPath}`"
-        @click="openInEditor"
+        :title="`${editOperationLabel}: ${normalizedPath} — click to preview, Open to edit`"
+        @click="toggle"
       >
         {{ normalizedPath }}
       </button>
+      <span
+        class="agent-block__edit-operation"
+        :class="`agent-block__edit-operation--${editOperation}`"
+      >
+        {{ editOperationLabel }}
+      </span>
       <span class="agent-block__edit-stat agent-block__edit-stat--add">+{{ added }}</span>
       <span class="agent-block__edit-stat agent-block__edit-stat--remove">-{{ removed }}</span>
       <button

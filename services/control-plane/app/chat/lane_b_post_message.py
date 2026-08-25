@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import shutil
+from pathlib import Path
+
 from app.chat.lane_b_agent import EditorSelectionContext, LaneBContext, generate_lane_b_result
 from app.chat.lane_b_fast_paths import post_image_redisplay_message, post_workspace_switch_message
 from app.chat.lane_b_generated_image_actions import (
@@ -12,7 +15,11 @@ from app.chat.lane_b_generated_image_actions import (
 from app.chat.lane_b_lead_decompose_fast_path import maybe_post_lead_decompose_message
 from app.chat.lane_b_lead_fan_out_fast_path import maybe_post_lead_fan_out_message
 from app.chat.lane_b_lead_named_assign_fast_path import maybe_post_lead_named_assign_message
-from app.chat.lane_b_persona_fast_path import build_lane_b_persona_reply, post_lane_b_persona_message
+from app.chat.lane_b_persona_fast_path import (
+    build_ambiguous_reply_guard,
+    build_lane_b_persona_reply,
+    post_lane_b_persona_message,
+)
 from app.chat.lane_b_plan_run import finalize_lane_b_plan_run
 from app.chat.lane_b_run_dispatch import resolve_lane_b_agent_run
 from app.chat.lane_b_system_content import lane_b_system_content as _lane_b_system_content
@@ -31,6 +38,42 @@ from app.workspace_agents.employee_first_person import (
     employee_name_from_persona_block,
     rewrite_employee_third_person_to_first,
 )
+
+
+def _localize_attachment_paths_for_sandbox(
+    paths: tuple[str, ...],
+    *,
+    sandbox_workspace_root: Path | None,
+) -> tuple[str, ...]:
+    """Copy attachments into the agent's own sandbox so it can actually read them.
+
+    ``image_paths`` carries real absolute host paths under the control
+    plane's own state directory (attachment_store._attachments_root()). An
+    agent executing in an isolated sandbox checkout has no access to that
+    directory at all, so handing it that path as-is guarantees a "No such
+    file or directory" the moment it tries to read it (confirmed live: an
+    agent given an attached image path ran `find`/`rg` against its own
+    workspace root and never found the file). Copy each attachment into the
+    sandbox and rewrite the path to the reachable copy instead.
+    """
+    if not paths or sandbox_workspace_root is None:
+        return paths
+    dest_dir = sandbox_workspace_root / ".attachments"
+    localized: list[str] = []
+    for raw_path in paths:
+        source = Path(raw_path)
+        try:
+            if not source.is_file():
+                localized.append(raw_path)
+                continue
+            dest_dir.mkdir(parents=True, exist_ok=True)
+            dest = dest_dir / source.name
+            shutil.copy2(source, dest)
+            localized.append(str(dest))
+        except OSError:
+            # Fail open: worst case matches today's unreachable-path behavior.
+            localized.append(raw_path)
+    return tuple(localized)
 
 
 def post_lane_b_message(
@@ -62,6 +105,9 @@ def post_lane_b_message(
         _remember_lane_b_turn,
         _resolve_chat_thread,
     )
+    from app.cli_runtime.composer_sandbox import resolve_sandbox_execution
+
+    sandbox_workspace_root, execution_access = resolve_sandbox_execution(workspace_id, composer_mode, execution_access)
 
     try:
         switch_intent = resolve_workspace_switch_intent(content)
@@ -136,6 +182,17 @@ def post_lane_b_message(
         for item in chat_store.list_thread_messages(thread_id)
     ]
     thread_employee_role = str(early_thread.get("employee_role") or "").strip()
+    # Role baseline this thread is bound to, independent of the operator's own
+    # Full Access toggle — a message landing in a consultative-only role's
+    # thread must not inherit the operator's own write access.
+    from app.cli_runtime.composer_execution_policy import resolve_composer_execution_policy
+
+    thread_execution_policy = resolve_composer_execution_policy(
+        sandbox_workspace_root,
+        thread_employee_role,
+        composer_mode,
+        execution_access,
+    )
     lead_name = employee_name_from_persona_block(employee_persona or "") or "Lead"
     bind_lane_b_attachments = lambda message_id: _bind_message_attachments(
         attachment_ids=attachment_ids,
@@ -143,6 +200,21 @@ def post_lane_b_message(
         message_id=message_id,
         thread_id=thread_id,
     )[0]
+    # A number typed into the free-text composer has no reliable connection to
+    # an earlier decision card.  Never recover a stale question from history or
+    # turn it into a Lead handoff.
+    ambiguous_reply = build_ambiguous_reply_guard(content)
+    if ambiguous_reply:
+        return post_lane_b_persona_message(
+            workspace_id=workspace_id,
+            content=content,
+            thread_id=thread_id,
+            created_at=created_at,
+            save_message=chat_store.save_message,
+            new_message_id=_new_message_id,
+            bind_attachments=bind_lane_b_attachments,
+            agent_content=ambiguous_reply,
+        )
     # Named assign before fan-out: "assign Cole…" must not become assign-all / Lead essay.
     lead_named_assign_response = maybe_post_lead_named_assign_message(
         workspace_id=workspace_id,
@@ -329,6 +401,8 @@ def post_lane_b_message(
             created_at=created_at,
             memory_appendix=memory_appendix,
             kairo_session_id=kairo_session_id,
+            workspace_root=sandbox_workspace_root,
+            execution_policy=thread_execution_policy,
         )
         payload: dict[str, object] = {
             "thread_id": thread_id,
@@ -344,7 +418,10 @@ def post_lane_b_message(
             payload["agent_terminal_session"] = serialize_session(agent_terminal_session)
         return payload
 
-    image_paths = _attachment_paths_for_ids(attachment_ids, workspace_id)
+    image_paths = _localize_attachment_paths_for_sandbox(
+        _attachment_paths_for_ids(attachment_ids, workspace_id),
+        sandbox_workspace_root=sandbox_workspace_root,
+    )
     context = LaneBContext(
         workspace_id=workspace_id,
         composer_mode=composer_mode,
@@ -369,6 +446,8 @@ def post_lane_b_message(
             runtime_target=runtime_target,
             runtime_model=runtime_model,
             execution_access=execution_access,
+            workspace_root=sandbox_workspace_root,
+            execution_policy=thread_execution_policy,
         )
     else:
         lane_b_result = generate_lane_b_result(
@@ -376,7 +455,9 @@ def post_lane_b_message(
             user_prompt=content,
             runtime_target=runtime_target,
             runtime_model=runtime_model,
+            workspace_root=sandbox_workspace_root,
             execution_access=execution_access,
+            execution_policy=thread_execution_policy,
         )
 
     agent_content = str(lane_b_result.get("content") or "")

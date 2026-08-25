@@ -14,6 +14,7 @@ import {
   persistTerminalScrollback,
   restoreTerminalScrollback,
 } from './terminal-scrollback';
+import { attachTerminalWheelContainment } from './terminal-wheel-containment';
 
 export interface TerminalContext {
   primarySignalId: string | null;
@@ -51,6 +52,17 @@ interface TerminalServerMessage {
   workspace_id?: string;
   workspace_root?: string;
 }
+
+/** Transient WS drops happen on server restarts/network blips; mirror the chat-stream backoff. */
+export const TERMINAL_RECONNECT_MAX_ATTEMPTS = 6;
+export const TERMINAL_RECONNECT_BASE_MS = 500;
+/**
+ * Close codes the terminal WebSocket route sends for conditions that will never
+ * succeed on retry (see services/control-plane/app/terminal/session_handler.py,
+ * WorkspaceRootError -> code=4400). Reconnecting against these just wastes the
+ * backoff window before failing the same way every time.
+ */
+const TERMINAL_NON_RETRYABLE_CLOSE_CODES = new Set([4400]);
 
 function sendResize(socket: WebSocket, terminal: Terminal): void {
   if (socket.readyState !== WebSocket.OPEN) {
@@ -102,6 +114,7 @@ export async function createXtermSession(
   terminal.loadAddon(fitAddon);
   terminal.open(container);
   fitAddon.fit();
+  const detachTerminalWheelContainment = attachTerminalWheelContainment(container);
 
   let attachedWorkspaceId: string | null = null;
   let attachedSessionId = 'terminal-operator';
@@ -114,6 +127,16 @@ export async function createXtermSession(
   let mirrorMode = false;
   let lastMirrorText = '';
   let socketSendInput: ((data: string) => void) | null = null;
+  let reconnectAttempts = 0;
+  let reconnectTargetKey: string | null = null;
+  let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+
+  const clearReconnectTimer = (): void => {
+    if (reconnectTimer) {
+      clearTimeout(reconnectTimer);
+      reconnectTimer = null;
+    }
+  };
 
   const clearScreen = (): void => {
     terminal.clear();
@@ -134,6 +157,7 @@ export async function createXtermSession(
   let connectGeneration = 0;
 
   const disposeSocket = (): void => {
+    clearReconnectTimer();
     inputDisposable?.dispose();
     inputDisposable = null;
     pasteDisposable?.();
@@ -171,42 +195,12 @@ export async function createXtermSession(
     lastMirrorText = normalized;
   };
 
-  const attachWorkspace = (
-    workspaceId: string | null,
-    sessionId = 'terminal-operator',
-    sessionRole = 'operator',
+  const openSocket = (
+    workspaceId: string,
+    sessionId: string,
+    sessionRole: string,
   ): void => {
-    if (
-      workspaceId === attachedWorkspaceId &&
-      sessionId === attachedSessionId &&
-      socket &&
-      (socket.readyState === WebSocket.CONNECTING || socket.readyState === WebSocket.OPEN)
-    ) {
-      return;
-    }
-
     const generation = ++connectGeneration;
-    if (attachedWorkspaceId) {
-      persistAttachedScrollback();
-    }
-    disposeSocket();
-    pendingInputLine = '';
-    socketSendInput = null;
-    attachedWorkspaceId = workspaceId;
-    attachedSessionId = sessionId;
-    attachedSessionRole = sessionRole;
-
-    if (!workspaceId) {
-      return;
-    }
-
-    migrateTerminalScrollback(workspaceId, sessionId);
-    terminal.clear();
-    const restoredScrollback = restoreTerminalScrollback(workspaceId, terminal, sessionId);
-    if (restoredScrollback) {
-      terminal.write('\r\n');
-    }
-
     const nextSocket = new WebSocket(
       buildTerminalWebSocketUrl(workspaceId, {
         sessionId,
@@ -220,6 +214,7 @@ export async function createXtermSession(
         return;
       }
 
+      reconnectAttempts = 0;
       fitAddon.fit();
       sendResize(nextSocket, terminal);
 
@@ -296,11 +291,86 @@ export async function createXtermSession(
       }
     };
 
-    nextSocket.onclose = () => {
-      if (generation !== connectGeneration || attachedWorkspaceId !== workspaceId) {
+    nextSocket.onclose = (event) => {
+      // disposeSocket() nulls this handler before closing intentionally (dispose,
+      // explicit re-attach, mirror mode), so reaching here means the server or
+      // network dropped the connection out from under us — reconnect with backoff
+      // instead of leaving the terminal silently dead.
+      if (generation !== connectGeneration || attachedWorkspaceId !== workspaceId || socket !== nextSocket) {
         return;
       }
+      socket = null;
+      socketSendInput = null;
+
+      if (TERMINAL_NON_RETRYABLE_CLOSE_CODES.has(event.code)) {
+        writeStatus('[terminal] this workspace/session is no longer available. Close and reopen this tab.');
+        return;
+      }
+
+      if (reconnectAttempts >= TERMINAL_RECONNECT_MAX_ATTEMPTS) {
+        writeStatus(
+          `[terminal] disconnected after ${TERMINAL_RECONNECT_MAX_ATTEMPTS} reconnect attempts. Close and reopen this tab to reconnect.`,
+        );
+        return;
+      }
+
+      const delayMs = TERMINAL_RECONNECT_BASE_MS * 2 ** reconnectAttempts;
+      reconnectAttempts += 1;
+      if (reconnectAttempts === 1) {
+        writeStatus('[terminal] connection lost — reconnecting…');
+      }
+      clearReconnectTimer();
+      reconnectTimer = setTimeout(() => {
+        reconnectTimer = null;
+        if (attachedWorkspaceId === workspaceId) {
+          openSocket(workspaceId, sessionId, sessionRole);
+        }
+      }, delayMs);
     };
+  };
+
+  const attachWorkspace = (
+    workspaceId: string | null,
+    sessionId = 'terminal-operator',
+    sessionRole = 'operator',
+  ): void => {
+    if (
+      workspaceId === attachedWorkspaceId &&
+      sessionId === attachedSessionId &&
+      socket &&
+      (socket.readyState === WebSocket.CONNECTING || socket.readyState === WebSocket.OPEN)
+    ) {
+      return;
+    }
+
+    if (attachedWorkspaceId) {
+      persistAttachedScrollback();
+    }
+    disposeSocket();
+    pendingInputLine = '';
+    socketSendInput = null;
+    attachedWorkspaceId = workspaceId;
+    attachedSessionId = sessionId;
+    attachedSessionRole = sessionRole;
+
+    const targetKey = `${workspaceId ?? ''}::${sessionId}::${sessionRole}`;
+    if (targetKey !== reconnectTargetKey) {
+      reconnectAttempts = 0;
+      reconnectTargetKey = targetKey;
+    }
+
+    if (!workspaceId) {
+      return;
+    }
+
+    migrateTerminalScrollback(workspaceId, sessionId);
+    terminal.clear();
+    const restoredScrollback = restoreTerminalScrollback(workspaceId, terminal, sessionId);
+    if (restoredScrollback) {
+      terminal.write('\r\n');
+    }
+
+    openSocket(workspaceId, sessionId, sessionRole);
   };
 
   const onResize = (): void => {
@@ -319,6 +389,7 @@ export async function createXtermSession(
     clearScreen,
     dispose() {
       persistAttachedScrollback();
+      detachTerminalWheelContainment();
       window.removeEventListener('resize', onResize);
       resizeObserver.disconnect();
       disposeSocket();

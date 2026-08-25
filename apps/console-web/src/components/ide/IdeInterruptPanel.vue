@@ -60,6 +60,18 @@ const compactLabel = computed(() =>
 
 const tooltip = computed(() => resolveIdeInterruptTooltip(headline.value, detailLine.value));
 
+// The headline text itself had no click target at all — an operator could
+// only act on it when the separate, stricter-gated Attention button also
+// happened to render. Any signal behind this strip is safe to jump to.
+const canFocusTopSignal = computed(() => Boolean(topSignal.value?.signal_id));
+
+function focusTopSignal(): void {
+  const signalId = topSignal.value?.signal_id;
+  if (signalId) {
+    shell.focusAttentionSidebar(signalId);
+  }
+}
+
 const showApprovalAction = computed(() => shell.pendingApprovalsCount > 0);
 
 const showAttentionAction = computed(() =>
@@ -137,7 +149,16 @@ function stopActiveRun(): void {
     aria-label="IDE attention required"
   >
     <span class="ide-interrupt-topbar__badge">ATTN</span>
-    <p class="ide-interrupt-topbar__summary" :title="tooltip">{{ compactLabel }}</p>
+    <p
+      class="ide-interrupt-topbar__summary"
+      :class="{ 'ide-interrupt-topbar__summary--clickable': canFocusTopSignal }"
+      :title="tooltip"
+      :role="canFocusTopSignal ? 'button' : undefined"
+      :tabindex="canFocusTopSignal ? 0 : undefined"
+      @click="canFocusTopSignal && focusTopSignal()"
+      @keydown.enter="canFocusTopSignal && focusTopSignal()"
+      @keydown.space.prevent="canFocusTopSignal && focusTopSignal()"
+    >{{ compactLabel }}</p>
     <div class="ide-interrupt-topbar__actions">
       <button
         v-if="showApprovalAction"
@@ -216,6 +237,18 @@ function stopActiveRun(): void {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.ide-interrupt-topbar__summary--clickable {
+  cursor: pointer;
+  text-decoration: underline;
+  text-decoration-color: rgba(255, 160, 120, 0.4);
+  text-underline-offset: 0.15em;
+}
+
+.ide-interrupt-topbar__summary--clickable:hover,
+.ide-interrupt-topbar__summary--clickable:focus-visible {
+  color: rgba(255, 200, 170, 0.98);
 }
 
 .ide-interrupt-topbar__actions {

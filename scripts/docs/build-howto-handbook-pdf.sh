@@ -13,8 +13,5 @@ fi
 "${python3}" "${repo_root}/scripts/render-howto-handbook-pdf.py" "$@"
 
 echo
-echo "How-To Handbook artifacts:"
-echo "  Markdown: docs/HOW-TO-HANDBOOK.md (+ linked docs/how-to/*.md)"
-echo "  HTML:     docs/HOW-TO-HANDBOOK.html"
-echo "  PDF:      docs/HOW-TO-HANDBOOK.pdf"
-echo "  Desktop:  ~/Desktop/Axon-X-How-To-Handbook.pdf"
+echo "How-To Handbook source: docs/HOW-TO-HANDBOOK.md (+ linked docs/how-to/*.md)"
+echo "Artifact paths are the renderer results printed above."

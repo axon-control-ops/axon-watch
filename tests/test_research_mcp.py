@@ -12,6 +12,7 @@ sys.path.insert(0, str(CONTROL_PLANE_ROOT))
 from app.cli_runtime.research_mcp import (  # noqa: E402
     _control_plane_root,
     ensure_workspace_research_mcp,
+    remove_workspace_research_mcp,
 )
 
 
@@ -36,6 +37,36 @@ class ResearchMcpBootstrapTests(unittest.TestCase):
                 server["env"]["PYTHONPATH"],
             )
             self.assertEqual(["-m", "app.research.mcp_server"], server["args"])
+
+    def test_remove_deletes_config_when_axon_research_is_the_only_server(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            workspace_root = Path(temp_dir)
+            self.assertTrue(ensure_workspace_research_mcp(workspace_root))
+            config_path = workspace_root / ".cursor" / "mcp.json"
+            self.assertTrue(config_path.is_file())
+
+            self.assertTrue(remove_workspace_research_mcp(workspace_root))
+            self.assertFalse(config_path.is_file())
+
+    def test_remove_preserves_other_configured_mcp_servers(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            workspace_root = Path(temp_dir)
+            self.assertTrue(ensure_workspace_research_mcp(workspace_root))
+            config_path = workspace_root / ".cursor" / "mcp.json"
+            payload = json.loads(config_path.read_text(encoding="utf-8"))
+            payload["mcpServers"]["other-tool"] = {"command": "other"}
+            config_path.write_text(json.dumps(payload), encoding="utf-8")
+
+            self.assertTrue(remove_workspace_research_mcp(workspace_root))
+
+            remaining = json.loads(config_path.read_text(encoding="utf-8"))
+            self.assertNotIn("axon-research", remaining["mcpServers"])
+            self.assertIn("other-tool", remaining["mcpServers"])
+
+    def test_remove_is_a_no_op_when_no_config_exists(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            workspace_root = Path(temp_dir)
+            self.assertFalse(remove_workspace_research_mcp(workspace_root))
 
 
 if __name__ == "__main__":

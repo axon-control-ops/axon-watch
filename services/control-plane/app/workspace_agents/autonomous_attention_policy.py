@@ -83,6 +83,24 @@ _GITHUB_EMAIL_CI_RE = re.compile(
 _GITHUB_EMAIL_SIGNAL_RE = re.compile(
     r"(?i)signal_email_.*(check-suites|pull_|actions|_github)"
 )
+_ACCOUNT_SECURITY_EMAIL_RE = re.compile(
+    r"(?is)email needs follow-up:.*\b("
+    r"new sign[ -]in|security alert|recovery codes?|password (?:was )?changed|"
+    r"two-factor authentication|2fa|unrecognized (?:login|device|activity)|"
+    r"verify (?:your )?(?:login|identity|account)"
+    r")\b"
+)
+
+# Investigatory criticals VAXON may auto-dispatch under Full autonomy
+# (no secrets / production mutation — those stay operator-gated).
+_INVESTIGATORY_CRITICAL_RE = re.compile(
+    r"(?i)\b("
+    r"sentry|fast\s*gate|typecheck|workflow|pipeline|check[- ]suite|"
+    r"github\s*actions|android(?:\s+ci|\s+build)?|assembledebug|"
+    r"ci(?:\s|/|-)|monitor|probe|crash|exception|ota|canary|"
+    r"integration\s*test|unit\s*test|lint"
+    r")\b"
+)
 
 _SAFE_FINDING_KINDS = frozenset(
     {
@@ -156,6 +174,23 @@ def is_github_email_ci_noise(*, title: str = "", detail: str = "", dedupe_key: s
     return bool(_GITHUB_EMAIL_SIGNAL_RE.search(blob))
 
 
+def is_account_security_email(*, title: str = "", dedupe_key: str = "") -> bool:
+    """True for account-security mail that needs review, never worker execution."""
+    if not str(dedupe_key or "").lower().startswith("signal:workspace_"):
+        return False
+    return bool(_ACCOUNT_SECURITY_EMAIL_RE.search(str(title or "")))
+
+
+def is_investigatory_critical(*, title: str = "", detail: str = "", kind: str = "") -> bool:
+    """True when a critical is safe to investigate automatically (CI/Sentry/monitor)."""
+    blob = f"{kind}\n{title}\n{detail}".strip()
+    if not blob:
+        return False
+    if text_looks_dangerous(title, detail, kind):
+        return False
+    return bool(_INVESTIGATORY_CRITICAL_RE.search(blob))
+
+
 def classify_attention_item(
     *,
     kind: str,
@@ -190,6 +225,42 @@ def classify_attention_item(
             ask_operator=False,
         )
 
+    if cleaned_kind in {"warning_signal", "high_signal", "monitor_alert"} and is_account_security_email(
+        title=blob_title,
+        dedupe_key=dedupe_key,
+    ):
+        return AutonomyPolicyDecision(
+            tier="operator_gated",
+            decision="skip",
+            risk="high",
+            reason="account_security_email_operator_review",
+            ask_operator=True,
+        )
+
+    # Secrets / production markers always gate — even for investigatory CI titles.
+    if text_looks_dangerous(blob_title, blob_detail, cleaned_kind):
+        return AutonomyPolicyDecision(
+            tier="operator_gated",
+            decision="escalate",
+            risk="dangerous",
+            reason="dangerous_marker",
+            ask_operator=True,
+        )
+
+    # Critical CI/Sentry/monitor spikes: VAXON investigates without yanking the operator.
+    if (
+        not escalate_only
+        and (cleaned_kind == "critical_signal" or severity_l == "critical")
+        and is_investigatory_critical(title=blob_title, detail=blob_detail)
+    ):
+        return AutonomyPolicyDecision(
+            tier="auto_safe",
+            decision="dispatch",
+            risk="normal",
+            reason="bounded_auto:investigate_critical",
+            ask_operator=False,
+        )
+
     if escalate_only or cleaned_kind in _ESCALATE_FINDING_KINDS:
         return AutonomyPolicyDecision(
             tier="operator_gated",
@@ -205,15 +276,6 @@ def classify_attention_item(
             decision="escalate",
             risk="critical",
             reason="critical_severity",
-            ask_operator=True,
-        )
-
-    if text_looks_dangerous(blob_title, blob_detail, cleaned_kind):
-        return AutonomyPolicyDecision(
-            tier="operator_gated",
-            decision="escalate",
-            risk="dangerous",
-            reason="dangerous_marker",
             ask_operator=True,
         )
 

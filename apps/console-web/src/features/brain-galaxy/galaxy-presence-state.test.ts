@@ -82,6 +82,10 @@ describe('resolveGalaxyPresence', () => {
     ).toBe('thinking');
   });
 
+  it('stays alerting while any signals remain open', () => {
+    expect(resolveGalaxyPresence({ ...base, openSignals: 15 }).phase).toBe('alerting');
+  });
+
   it('keeps ambient energy while idle', () => {
     expect(resolveGalaxyPresence(base).presenceAmp).toBe(0.32);
   });

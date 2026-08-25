@@ -1,0 +1,112 @@
+.recovery-center {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: flex;
+  align-items: stretch;
+  justify-content: stretch;
+}
+
+.recovery-center__veil {
+  position: absolute;
+  inset: 0;
+  background: rgba(1, 8, 14, 0.72);
+  backdrop-filter: blur(3px);
+}
+
+.recovery-center__panel {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  margin: 0.55rem;
+  overflow: auto;
+  border: 1px solid rgba(90, 220, 255, 0.34);
+  border-radius: 0.55rem;
+  background: rgba(4, 12, 20, 0.94);
+  color: #d7f4ff;
+  padding: 1rem 1.1rem;
+}
+
+.recovery-center__header {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  align-items: flex-start;
+}
+
+.recovery-center__header-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.45rem;
+}
+
+.recovery-center__eyebrow {
+  margin: 0;
+  letter-spacing: 0.12em;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  color: #7ad7ff;
+}
+
+.recovery-center__title {
+  margin: 0.2rem 0;
+}
+
+.recovery-center__goal,
+.recovery-center__item p {
+  margin: 0.35rem 0;
+  color: #b7c9d4;
+}
+
+.recovery-center__bucket {
+  margin-top: 1rem;
+}
+
+.recovery-center__item {
+  border: 1px solid rgba(90, 220, 255, 0.18);
+  border-radius: 0.4rem;
+  padding: 0.7rem 0.8rem;
+  margin-bottom: 0.6rem;
+}
+
+.recovery-center__item-title {
+  font-weight: 650;
+  color: #e8fbff;
+}
+
+.recovery-center__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-top: 0.5rem;
+}
+
+.recovery-center__actions button,
+.recovery-center__dismiss,
+.recovery-center__clear {
+  border: 1px solid rgba(90, 220, 255, 0.4);
+  background: rgba(10, 40, 55, 0.8);
+  color: #d7f4ff;
+  border-radius: 0.3rem;
+  padding: 0.25rem 0.55rem;
+  cursor: pointer;
+}
+
+.recovery-center__clear {
+  border-color: rgba(255, 190, 90, 0.56);
+  background: rgba(78, 45, 8, 0.78);
+}
+
+.recovery-center__clear:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.recovery-center__result {
+  margin: 0.7rem 0 0;
+  color: #ffd18a;
+}

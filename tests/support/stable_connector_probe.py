@@ -61,8 +61,9 @@ def _empty_monitor_records() -> list[dict[str, object]]:
     return []
 
 
-def _empty_email_inbox_items() -> list[dict[str, object]]:
+def _empty_email_inbox_items(*, force: bool = False) -> list[dict[str, object]]:
     """Keep bootstrap inbox tests deterministic (no dev email stub noise)."""
+    del force
     return []
 
 

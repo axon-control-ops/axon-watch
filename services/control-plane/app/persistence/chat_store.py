@@ -17,6 +17,9 @@ _MESSAGE_COLUMNS = (
     "run_id",
     "role",
     "content",
+    "speaker_name",
+    "speaker_role",
+    "speaker_employee_id",
     "created_at",
 )
 
@@ -82,6 +85,11 @@ def _message_row_to_record(row: Any) -> dict[str, Any]:
         "run_id": row["run_id"],
         "role": row["role"],
         "content": row["content"],
+        "speaker_name": row["speaker_name"] if "speaker_name" in row.keys() else None,
+        "speaker_role": row["speaker_role"] if "speaker_role" in row.keys() else None,
+        "speaker_employee_id": (
+            row["speaker_employee_id"] if "speaker_employee_id" in row.keys() else None
+        ),
         "created_at": row["created_at"],
     }
 
@@ -259,7 +267,7 @@ def save_message(record: dict[str, Any]) -> dict[str, Any]:
         connection.execute(
             f"""
             INSERT INTO chat_messages ({", ".join(_MESSAGE_COLUMNS)})
-            VALUES (?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 stored["message_id"],
@@ -268,6 +276,9 @@ def save_message(record: dict[str, Any]) -> dict[str, Any]:
                 stored["run_id"],
                 stored["role"],
                 stored["content"],
+                str(stored.get("speaker_name") or "").strip() or None,
+                str(stored.get("speaker_role") or "").strip().lower() or None,
+                str(stored.get("speaker_employee_id") or "").strip() or None,
                 stored["created_at"],
             ),
         )
@@ -384,3 +395,21 @@ def count_messages() -> int:
     with _managed_connection() as connection:
         row = connection.execute("SELECT COUNT(*) FROM chat_messages").fetchone()
     return int(row[0]) if row is not None else 0
+
+
+def delete_thread(thread_id: str) -> dict[str, Any]:
+    """Permanently remove one chat thread and its messages."""
+    cleaned = str(thread_id or "").strip()
+    if not cleaned:
+        raise ChatThreadNotFoundError("thread_id is required")
+    with _managed_connection() as connection:
+        row = connection.execute(
+            "SELECT thread_id FROM chat_threads WHERE thread_id = ?",
+            (cleaned,),
+        ).fetchone()
+        if row is None:
+            raise ChatThreadNotFoundError(f"thread not found: {cleaned}")
+        connection.execute("DELETE FROM chat_messages WHERE thread_id = ?", (cleaned,))
+        connection.execute("DELETE FROM chat_threads WHERE thread_id = ?", (cleaned,))
+        connection.commit()
+    return {"thread_id": cleaned, "deleted": True}

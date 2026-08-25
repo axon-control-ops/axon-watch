@@ -14,6 +14,7 @@ export type IdeQuickGuideTone =
 export type IdeQuickGuideActionId =
   | 'expand-agent-dock'
   | 'show-terminal'
+  | 'show-problems'
   | 'open-connectors'
   | 'open-team'
   | 'open-source-control'
@@ -63,6 +64,10 @@ export function ideQuickGuideActionAriaLabel(action: IdeQuickGuideAction): strin
 
   if (action.id === 'show-terminal') {
     return ideSidebarStubActionAriaLabel('Show terminal', 'terminal');
+  }
+
+  if (action.id === 'show-problems') {
+    return 'Show Problems tab in the workbench terminal dock';
   }
 
   if (action.id === 'retry-employee-shift') {
@@ -220,6 +225,8 @@ export function buildIdeQuickGuide(input: {
   searchExpanded?: boolean;
   /** Team activity view already open — skip redundant "Open Team" failure sticky. */
   teamExpanded?: boolean;
+  /** Active workbench problem count (terminal Problems tab). */
+  problemCount?: number;
 }): IdeQuickGuide | null {
   if (input.layoutMode !== 'ide') {
     return null;
@@ -317,6 +324,23 @@ export function buildIdeQuickGuide(input: {
   });
   if (connectorGuide) {
     return connectorGuide;
+  }
+
+  const problemCount = input.problemCount ?? 0;
+  if (idleRun && problemCount > 0 && !input.terminalVisible) {
+    return {
+      title:
+        problemCount === 1
+          ? '1 problem reported — open Problems to review'
+          : `${problemCount} problems reported — open Problems to review`,
+      tone: 'attention',
+      actions: [{ id: 'show-problems', label: 'Show problems' }],
+      steps: [
+        'Save, runtime, briefing, and run errors appear in the Problems tab.',
+        'Editor status bar PROBLEMS chip opens the tab directly.',
+        'Ctrl/Cmd+J opens the terminal panel when you prefer the keyboard.',
+      ],
+    };
   }
 
   if (idleRun && !(input.employeeFailureLine ?? '').trim()) {

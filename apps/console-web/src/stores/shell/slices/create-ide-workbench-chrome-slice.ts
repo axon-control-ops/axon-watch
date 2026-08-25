@@ -8,19 +8,29 @@ import {
 
 interface CreateIdeWorkbenchChromeSliceInput {
   ideTerminalRevealToken: Ref<number>;
+  ideTerminalProblemsRevealToken: Ref<number>;
   ideTerminalToggleToken: Ref<number>;
+  ideExplorerInlineCreateToken: Ref<number>;
+  ideExplorerInlineCreateKind: Ref<'file' | 'folder'>;
   teamRosterRevealToken: Ref<number>;
   ideActivityView: Ref<IdeActivityView>;
   ideExplorerCollapsed: Ref<boolean>;
   agentDockCollapsed: Ref<boolean>;
   ideAttentionPanelOpen: Ref<boolean>;
   ideBriefingPanelOpen: Ref<boolean>;
+  ideVaxonDockPinned: Ref<boolean>;
 }
 
 export function createIdeWorkbenchChromeSlice(input: CreateIdeWorkbenchChromeSliceInput) {
   /** Bump reveal token only — CenterWorkbench persists visibility for the active layout mode. */
   function revealIdeTerminalPanel(): void {
     input.ideTerminalRevealToken.value += 1;
+  }
+
+  /** Reveal the terminal dock and switch WorkbenchTerminalDock to the Problems tab. */
+  function revealIdeWorkbenchProblems(): void {
+    input.ideTerminalRevealToken.value += 1;
+    input.ideTerminalProblemsRevealToken.value += 1;
   }
 
   function toggleIdeTerminalPanel(): void {
@@ -30,20 +40,22 @@ export function createIdeWorkbenchChromeSlice(input: CreateIdeWorkbenchChromeSli
   function focusIdeSidebarView(view: IdeActivityView): void {
     input.ideAttentionPanelOpen.value = false;
     input.ideBriefingPanelOpen.value = false;
-    input.ideActivityView.value = view;
+    input.ideVaxonDockPinned.value = false;
+    input.ideActivityView.value = view === 'agent' ? 'team' : view;
     input.ideExplorerCollapsed.value = false;
     persistIdeExplorerCollapsed(false);
   }
 
   function setIdeActivityView(view: IdeActivityView): void {
+    if (view === 'agent') {
+      focusIdeSidebarView('team');
+      input.agentDockCollapsed.value = false;
+      persistAgentDockCollapsed(false);
+      return;
+    }
     focusIdeSidebarView(view);
     if (view === 'terminal') {
       revealIdeTerminalPanel();
-      return;
-    }
-    if (view === 'agent') {
-      input.agentDockCollapsed.value = false;
-      persistAgentDockCollapsed(false);
     }
   }
 
@@ -66,13 +78,22 @@ export function createIdeWorkbenchChromeSlice(input: CreateIdeWorkbenchChromeSli
     input.teamRosterRevealToken.value += 1;
   }
 
+  /** Focus Explorer and start inline file/folder creation in the tree. */
+  function requestIdeExplorerInlineCreate(kind: 'file' | 'folder' = 'file'): void {
+    input.ideExplorerInlineCreateKind.value = kind;
+    focusIdeSidebarView('explorer');
+    input.ideExplorerInlineCreateToken.value += 1;
+  }
+
   return {
     revealIdeTerminalPanel,
+    revealIdeWorkbenchProblems,
     toggleIdeTerminalPanel,
     focusIdeSidebarView,
     setIdeActivityView,
     toggleIdeExplorer,
     toggleAgentDock,
     revealTeamRosterForActiveEmployee,
+    requestIdeExplorerInlineCreate,
   };
 }

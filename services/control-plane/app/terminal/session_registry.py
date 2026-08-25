@@ -6,10 +6,17 @@ from copy import deepcopy
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from threading import Lock
+from typing import Any
 from uuid import uuid4
 
 _OPERATOR_SESSION_ID = "terminal-operator"
 _AGENT_SESSION_ID = "terminal-agent"
+# Sandbox jobs need their own lane: runtimes are keyed by (workspace, session),
+# so reusing the agent session would hand back the PTY already rooted at the
+# bound project root and silently run the job against the wrong checkout.
+_SANDBOX_SESSION_ID = "terminal-sandbox"
+# Public alias: other modules label this lane and must not import the private name.
+SANDBOX_SESSION_ID = _SANDBOX_SESSION_ID
 
 
 @dataclass(frozen=True)
@@ -150,6 +157,20 @@ def ensure_agent_session(*, workspace_id: str, run_id: str) -> TerminalSessionRe
     )
 
 
+def ensure_sandbox_session(*, workspace_id: str, run_id: str) -> TerminalSessionRecord:
+    """One shared sandbox-preview tab per workspace, rooted at the checkout."""
+    clean_run_id = str(run_id or "").strip()
+    if not clean_run_id:
+        raise ValueError("run_id is required for sandbox terminal sessions")
+    return create_session(
+        workspace_id=workspace_id,
+        role="agent",
+        title="vaxon · sandbox",
+        run_id=clean_run_id,
+        session_id=_SANDBOX_SESSION_ID,
+    )
+
+
 def get_session(workspace_id: str, session_id: str) -> TerminalSessionRecord | None:
     key = _session_key(workspace_id, session_id)
     with _lock:
@@ -202,7 +223,7 @@ def delete_session(workspace_id: str, session_id: str) -> bool:
     return removed is not None
 
 
-def serialize_session(record: TerminalSessionRecord) -> dict[str, str | None]:
+def serialize_session(record: TerminalSessionRecord) -> dict[str, Any]:
     return {
         "session_id": record.session_id,
         "workspace_id": record.workspace_id,
@@ -211,6 +232,19 @@ def serialize_session(record: TerminalSessionRecord) -> dict[str, str | None]:
         "run_id": record.run_id,
         "created_at": record.created_at,
     }
+
+
+def serialize_session_with_context(record: TerminalSessionRecord) -> dict[str, Any]:
+    """Serialize a session plus the cwd/branch its PTY is really rooted at.
+
+    Separate from ``serialize_session`` because it shells out to git: job
+    receipts embed sessions on a hot path and must stay cheap.
+    """
+    from app.terminal.session_context import session_root_context
+
+    payload = serialize_session(record)
+    payload.update(session_root_context(record.workspace_id, record.session_id))
+    return payload
 
 
 def reset_registry() -> None:

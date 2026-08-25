@@ -14,11 +14,11 @@ export type AutonomyActionTone = 'idle' | 'ok' | 'error' | 'pending' | 'warn';
 
 export const AUTONOMY_MODE_COPY: Record<AutonomyMode, string> = {
   manual:
-    'VAXON speaks only for approvals and interruptive signals. Continuous workers stay paused. Lead Send still kicks specialists for that handoff.',
+    'VAXON speaks only for approvals and interruptive signals. Continuous workers stay paused. Composer access, runtime, and Sandbox remain under your separate PC controls.',
   semi:
-    'VAXON stays proactive with advisory briefs. Continuous workers stay paused (no idle Cursor burn). Lead Send still kicks specialists for that handoff — Full is required for always-on leasing.',
+    'VAXON stays proactive with advisory briefs. Continuous workers pause; clean Auto-only Sandboxes close, dirty ones are retained, and manual workspace Sandboxes remain.',
   full:
-    'VAXON advisory plus continuous workers that lease tasks and run Cursor shifts without per-run approval.',
+    'VAXON advisory plus isolated continuous workers. Every bound workspace becomes Sandbox-ready; Agent/Debug gets effective Full Access inside isolation while Ask stays read-only.',
 };
 
 export function useWorkerAutonomyControl(options?: {
@@ -60,6 +60,24 @@ export function useWorkerAutonomyControl(options?: {
     return status.value.effective_enabled ? 'running' : 'paused';
   });
   const workersWantedOn = computed(() => Boolean(status.value?.scheduler_enabled));
+  const watcherLabel = computed(() => {
+    if (!status.value) {
+      return 'Unknown';
+    }
+    if (status.value.watcher_blocked_by_env) {
+      return 'Blocked by host brake';
+    }
+    return status.value.watcher_effective_enabled ? 'Watching' : 'Paused';
+  });
+  const watcherTone = computed(() => {
+    if (!status.value) {
+      return 'unknown';
+    }
+    if (status.value.watcher_blocked_by_env) {
+      return 'blocked';
+    }
+    return status.value.watcher_effective_enabled ? 'running' : 'paused';
+  });
 
   async function reload(): Promise<void> {
     loadState.value = status.value ? loadState.value : 'loading';
@@ -91,8 +109,8 @@ export function useWorkerAutonomyControl(options?: {
           : mode === 'semi'
             ? 'Semi-autonomous — VAXON stays proactive; continuous workers paused'
             : mode === 'manual'
-              ? 'Manual — VAXON quiet except approvals; workers paused'
-              : 'Full autonomous — continuous workers will start leased tasks';
+              ? 'Manual — workers paused; Auto-only Sandboxes reconciled; manual preferences preserved'
+              : 'Full autonomous — workers active; workspaces are lazily Sandbox-ready';
       return true;
     } catch (error) {
       actionTone.value = 'error';
@@ -105,7 +123,19 @@ export function useWorkerAutonomyControl(options?: {
   }
 
   async function enableAutonomous(): Promise<boolean> {
-    return setAutonomyMode('full');
+    // AUTO ON = VAXON CEO mode: Full autonomy + workers unpaused (unless env-blocked).
+    // If already Full, still resume — screenshot trap was AUTO ON with Workers paused.
+    if (autonomyMode.value !== 'full') {
+      const modeOk = await setAutonomyMode('full');
+      if (!modeOk) {
+        return false;
+      }
+    }
+    let resumed = true;
+    if (!status.value?.effective_enabled) {
+      resumed = await resume();
+    }
+    return resumed;
   }
 
   async function disableAutonomous(): Promise<boolean> {
@@ -233,6 +263,8 @@ export function useWorkerAutonomyControl(options?: {
     effectiveLabel,
     effectiveTone,
     workersWantedOn,
+    watcherLabel,
+    watcherTone,
     modeCopy: AUTONOMY_MODE_COPY,
     reload,
     setAutonomyMode,

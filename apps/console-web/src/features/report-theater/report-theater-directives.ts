@@ -41,8 +41,11 @@ export function toVaxonDirectiveLine(nextMove: string): string {
       'and start that investigation next',
     )}.`;
   }
+  if (/vaxon is attending/i.test(cleaned)) {
+    return cleaned.endsWith('.') ? cleaned : `${cleaned}.`;
+  }
   if (/needs review|need review/i.test(cleaned) && /switch/i.test(cleaned)) {
-    return `I'll switch us there and start that investigation next.`;
+    return `I'll attend that workspace and start the investigation next.`;
   }
   if (/github/i.test(cleaned) && (/vault/i.test(cleaned) || /token/i.test(cleaned))) {
     return "I'll open Vault and restore the GitHub probe token next.";
@@ -77,7 +80,7 @@ export function toVaxonActionLabel(action: BriefingAction): string {
   if (action.kind === 'review_signal') {
     const title = action.title?.trim() || 'that signal';
     if (/^review\b/i.test(title)) {
-      return `I'll switch us there and review that signal next`;
+      return `I'll attend that signal and report the outcome here`;
     }
     return `I'll open Attention for ${title}`;
   }
@@ -196,7 +199,10 @@ export function isAutoExecutableCommitment(label: string, action: BriefingAction
   if (!action) {
     return false;
   }
-  return /I'll (?:switch|open Attention|open the Lead|clear Approvals|open Mission Control|open the command seam|open Vault|restore runtime|restart the public tunnel)/i.test(
+  if (/^VAXON is attending/i.test(label) || /^I'll attend\b/i.test(label)) {
+    return true;
+  }
+  return /I'll (?:switch|attend|open Attention|open the Lead|clear Approvals|open Mission Control|open the command seam|open Vault|restore runtime|restart the public tunnel)/i.test(
     label,
   );
 }

@@ -36,21 +36,22 @@ export function isIdleIncompleteExecutingRun(input: {
   return true;
 }
 
-/** Offer CONTINUE/RESUME when the run is incomplete and can be progressed. */
+/** Offer RESUME only when the backend marks a genuinely paused/input-blocked run resumable. */
 export function shouldOfferRunContinue(input: {
   phase: RunPhase | null | undefined;
   canResume: boolean;
   agentStreamActive: boolean;
   mode?: RunMode | null;
 }): boolean {
-  if (input.canResume) {
-    return true;
-  }
-  return isIdleIncompleteExecutingRun({
-    phase: input.phase,
-    agentStreamActive: input.agentStreamActive,
-    mode: input.mode,
-  });
+  return (
+    input.canResume
+    && (input.phase === 'paused' || input.phase === 'awaiting_input')
+  );
+}
+
+/** Show Stop only when the backend explicitly grants the capability. */
+export function shouldOfferRunStop(canStop: boolean | null | undefined): boolean {
+  return canStop === true;
 }
 
 /** Mission Control / IDE label: CONTINUE for idle execute, RESUME otherwise. */

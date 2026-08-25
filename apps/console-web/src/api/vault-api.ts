@@ -1,10 +1,15 @@
 import type {
   VaultSecretDetail,
   VaultSecretRecord,
+  VaultSentryValidation,
   VaultStatusSnapshot,
 } from '../lib/vault-surface-view';
 
-import { apiUrl, DEFAULT_FETCH_TIMEOUT_MS, fetchBlob } from './client';
+import {
+  DEFAULT_FETCH_TIMEOUT_MS,
+  fetchBlob,
+  fetchWithTimeout,
+} from './client';
 
 export interface VaultImportResult {
   imported_keys: string[];
@@ -51,7 +56,11 @@ async function vaultRequest<T>(
     }
   }
   try {
-    const response = await fetch(apiUrl(path), { ...init, signal: controller.signal });
+    const response = await fetchWithTimeout(
+      path,
+      { ...init, signal: controller.signal },
+      timeoutMs,
+    );
     if (!response.ok) {
       let detail = `request failed with status ${response.status}`;
       try {
@@ -99,6 +108,12 @@ export async function fetchVaultProviderKeys(): Promise<{
   dev_bypass: boolean;
 }> {
   return vaultRequest('/api/vault/provider-keys');
+}
+
+export async function validateVaultSentry(): Promise<VaultSentryValidation> {
+  return vaultRequest<VaultSentryValidation>('/api/vault/validate/sentry', {
+    method: 'POST',
+  });
 }
 
 export async function setupVault(masterPassword: string): Promise<VaultSetupResponse> {

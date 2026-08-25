@@ -13,7 +13,9 @@ from app.cli_runtime.catalog import (
     invalidate_runtime_snapshot_cache,
     runtime_status_snapshot,
 )
+from app.cli_runtime.catalog_discovery import cursor_cli_argv
 from app.cli_runtime.cursor_models import cursor_runtime_snapshot
+from app.cli_runtime.runtime_profiles import codex_profile_env
 
 StatusRecord = dict[str, Any]
 
@@ -32,6 +34,7 @@ def _action_result(
     message: str,
     command_preview: str = "",
     output: str = "",
+    account_scope_notice: str = "",
     force_refresh: bool = True,
 ) -> StatusRecord:
     # Login start should return quickly so the browser flow can open; callers
@@ -43,9 +46,19 @@ def _action_result(
         "message": message,
         "command_preview": command_preview,
         "output": output,
+        "account_scope_notice": account_scope_notice,
         "runtime_status": snapshot,
         "cursor_runtime": cursor,
     }
+
+
+def _host_cli_oauth_notice(runtime_label: str) -> str:
+    return (
+        f"{runtime_label} browser login is host-profile scoped. If another account is "
+        "already active in this machine session, sign out first or use Vault/API-key "
+        "auth for the second account where that runtime supports it; Axon-X will not "
+        "silently replace accounts."
+    )
 
 
 def logout_cursor_runtime() -> StatusRecord:
@@ -61,17 +74,31 @@ def logout_cursor_runtime() -> StatusRecord:
         return _action_result(
             status="manual_required",
             message="Cursor is authenticated via API key. Remove CURSOR_API_KEY from /vault or the shell env to sign out.",
-            command_preview=f"{binary} agent status",
+            command_preview=" ".join(cursor_cli_argv(binary, "status")),
+        )
+    if auth.get("auth_method") == "oauth":
+        notice = _host_cli_oauth_notice("Cursor CLI")
+        return _action_result(
+            status="manual_required",
+            message=(
+                "Cursor CLI sign-out is host-profile scoped, so Axon-X will not run "
+                "`cursor agent logout` from the console. Run it manually only if you "
+                "intend to sign this host profile out of Cursor."
+            ),
+            command_preview=" ".join(cursor_cli_argv(binary, "logout")),
+            account_scope_notice=notice,
+            force_refresh=False,
         )
     if not auth.get("logged_in"):
         return _action_result(
             status="completed",
             message="Cursor CLI is already signed out.",
-            command_preview=f"{binary} agent status",
+            command_preview=" ".join(cursor_cli_argv(binary, "status")),
         )
+    logout_argv = cursor_cli_argv(binary, "logout")
     try:
         proc = subprocess.run(
-            [binary, "agent", "logout"],
+            logout_argv,
             capture_output=True,
             text=True,
             timeout=12,
@@ -80,15 +107,15 @@ def logout_cursor_runtime() -> StatusRecord:
     except subprocess.TimeoutExpired:
         return _action_result(
             status="error",
-            message="Cursor sign-out timed out. Run `cursor agent logout` on the host.",
-            command_preview=f"{binary} agent logout",
+            message=f"Cursor sign-out timed out. Run `{' '.join(logout_argv)}` on the host.",
+            command_preview=" ".join(logout_argv),
         )
     output = (proc.stdout or proc.stderr or "").strip()
     if proc.returncode != 0:
         return _action_result(
             status="error",
             message=output or "Cursor sign-out failed.",
-            command_preview=f"{binary} agent logout",
+            command_preview=" ".join(logout_argv),
             output=output,
         )
     invalidate_runtime_snapshot_cache()
@@ -97,13 +124,13 @@ def logout_cursor_runtime() -> StatusRecord:
         return _action_result(
             status="error",
             message="Cursor sign-out did not clear authentication.",
-            command_preview=f"{binary} agent status",
+            command_preview=" ".join(cursor_cli_argv(binary, "status")),
             output=output,
         )
     return _action_result(
         status="completed",
         message="Cursor CLI signed out.",
-        command_preview=f"{binary} agent status",
+        command_preview=" ".join(cursor_cli_argv(binary, "status")),
         output=output,
     )
 
@@ -135,7 +162,7 @@ def logout_codex_runtime() -> StatusRecord:
             capture_output=True,
             text=True,
             timeout=12,
-            env={**os.environ, "NO_COLOR": "1"},
+            env={**codex_profile_env(), "NO_COLOR": "1"},
         )
     except subprocess.TimeoutExpired:
         return _action_result(
@@ -182,13 +209,18 @@ def start_cursor_runtime_login() -> StatusRecord:
         )
     if auth.get("logged_in") and auth.get("auth_method") == "oauth":
         account = str(auth.get("account_label") or "").strip()
+        notice = _host_cli_oauth_notice("Cursor CLI")
         return _action_result(
             status="completed",
-            message=f"Cursor CLI is already signed in{(': ' + account) if account else ''}.",
-            command_preview=f"{binary} agent status",
+            message=(
+                f"Cursor CLI is already signed in{(': ' + account) if account else ''}. "
+                f"{notice}"
+            ),
+            command_preview=" ".join(cursor_cli_argv(binary, "status")),
+            account_scope_notice=notice,
             force_refresh=False,
         )
-    command = [binary, "agent", "login"]
+    command = cursor_cli_argv(binary, "login")
     try:
         subprocess.Popen(
             command,
@@ -224,10 +256,15 @@ def start_codex_runtime_login() -> StatusRecord:
         )
     if auth.get("logged_in") and auth.get("auth_method") in {"oauth", "chatgpt"}:
         account = str(auth.get("account_label") or "").strip()
+        notice = _host_cli_oauth_notice("Codex CLI")
         return _action_result(
             status="completed",
-            message=f"Codex CLI is already signed in{(': ' + account) if account else ''}.",
+            message=(
+                f"Codex CLI is already signed in{(': ' + account) if account else ''}. "
+                f"{notice}"
+            ),
             command_preview=f"{binary} login status",
+            account_scope_notice=notice,
             force_refresh=False,
         )
     command = [binary, "login"]
@@ -237,7 +274,7 @@ def start_codex_runtime_login() -> StatusRecord:
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
             start_new_session=True,
-            env={**os.environ, "NO_COLOR": "1"},
+            env={**codex_profile_env(), "NO_COLOR": "1"},
         )
     except OSError as exc:
         return _action_result(
@@ -248,8 +285,9 @@ def start_codex_runtime_login() -> StatusRecord:
         )
     return _action_result(
         status="browser_opened",
-        message="Codex login started — complete the browser flow on this host, then refresh status.",
+        message="Codex login started in Axon-X's isolated profile — complete the browser flow, then refresh status.",
         command_preview=" ".join(command),
+        account_scope_notice="This Axon-X Codex profile is isolated from Cursor and other desktop sessions.",
         force_refresh=False,
     )
 
@@ -268,6 +306,19 @@ def logout_claude_runtime() -> StatusRecord:
             status="manual_required",
             message="Claude is authenticated via API key. Remove ANTHROPIC_API_KEY from /vault or the shell env to sign out.",
             command_preview=f"{binary} auth status",
+        )
+    if auth.get("auth_method") in {"oauth", "claude.ai"}:
+        notice = _host_cli_oauth_notice("Claude Code CLI")
+        return _action_result(
+            status="manual_required",
+            message=(
+                "Claude Code CLI sign-out is host-profile scoped, so Axon-X will not "
+                "run `claude auth logout` from the console. Run it manually only if "
+                "you intend to sign this host profile out of Claude Code."
+            ),
+            command_preview=f"{binary} auth logout",
+            account_scope_notice=notice,
+            force_refresh=False,
         )
     if not auth.get("logged_in"):
         return _action_result(
@@ -326,10 +377,15 @@ def start_claude_runtime_login() -> StatusRecord:
         )
     if auth.get("logged_in") and auth.get("auth_method") in {"oauth", "claude.ai"}:
         account = str(auth.get("account_label") or "").strip()
+        notice = _host_cli_oauth_notice("Claude Code CLI")
         return _action_result(
             status="completed",
-            message=f"Claude Code CLI is already signed in{(': ' + account) if account else ''}.",
+            message=(
+                f"Claude Code CLI is already signed in{(': ' + account) if account else ''}. "
+                f"{notice}"
+            ),
             command_preview=f"{binary} auth status",
+            account_scope_notice=notice,
             force_refresh=False,
         )
     command = [binary, "auth", "login"]

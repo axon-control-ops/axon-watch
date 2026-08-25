@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Any
 
 from app.persistence import handoff_store
+from app.workspace_agents.autonomous_attention_policy import is_investigatory_critical
 from app.workspace_agents.lead_checkin_assign import (
     SPECIALIST_ROLES,
     LeadCheckinFinding,
@@ -49,15 +50,21 @@ def collect_signal_findings(
             str(signal.get("kind") or signal.get("check_type") or ""),
             title,
         )
+        detail_text = detail or f"{signal_id} severity={severity}"
+        # Investigatory criticals (CI/Sentry/monitor) may auto-dispatch under Full autonomy.
+        escalate_only = severity == "critical" and not is_investigatory_critical(
+            title=title,
+            detail=detail_text,
+        )
         findings.append(
             LeadCheckinFinding(
                 kind=kind,
                 workspace_id=workspace_id,
                 owner_role=owner,
                 title=title,
-                detail=detail or f"{signal_id} severity={severity}",
+                detail=detail_text,
                 dedupe_key=f"signal:{workspace_id}:{signal_id}:{severity}",
-                escalate_only=severity == "critical",
+                escalate_only=escalate_only,
             )
         )
     return findings

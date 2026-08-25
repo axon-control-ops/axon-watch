@@ -10,6 +10,13 @@ RUN_SERVICE = REPO_ROOT / "scripts" / "ops" / "run-service.sh"
 
 
 class RunServiceConsoleWebContractTests(unittest.TestCase):
+    def test_deployment_env_is_exported_to_python_services(self) -> None:
+        script = RUN_SERVICE.read_text(encoding="utf-8")
+        env_file_branch = script.split('if [[ -f "${env_file}" ]]', 1)[1].split("elif", 1)[0]
+        self.assertIn("set -a", env_file_branch)
+        self.assertIn('source "${env_file}"', env_file_branch)
+        self.assertIn("set +a", env_file_branch)
+
     def test_console_web_prefers_vite_preview_over_http_server(self) -> None:
         script = RUN_SERVICE.read_text(encoding="utf-8")
         console_case = script.split("console-web)", 1)[1].split("*)", 1)[0]

@@ -39,6 +39,7 @@ import {
   workbenchTerminalPanelAlive,
 } from '../../lib/workbench-terminal-panel-view';
 import IdeActivityIcon from './IdeActivityIcon.vue';
+import IdeVaxonActivityButton from './IdeVaxonActivityButton.vue';
 import { navigateToAppSurface } from '../../lib/app-surface-route';
 import { countIdeDirtyFileTabs } from '../../lib/ide-activity-panel-view';
 import { useShellStore } from '../../stores/shell';
@@ -265,10 +266,7 @@ function itemAriaLabel(item: (typeof items)[number]): string {
 
 function isActive(item: (typeof items)[number]): boolean {
   if (item.id === 'agent') {
-    return (
-      agentDockExpanded.value ||
-      (shell.ideActivityView === 'agent' && !shell.ideExplorerCollapsed)
-    );
+    return agentDockExpanded.value;
   }
   if (item.id === 'terminal') {
     return (
@@ -291,7 +289,11 @@ function selectView(view: IdeActivityView): void {
 
   if (action === 'toggle-agent') {
     shell.toggleAgentDock();
-    shell.focusIdeSidebarView('agent');
+    return;
+  }
+
+  if (action === 'open-agent-dock') {
+    shell.openIdeComposer({ keepActivityView: true });
     return;
   }
 
@@ -308,6 +310,7 @@ function selectView(view: IdeActivityView): void {
 
   shell.setIdeActivityView(view);
 }
+
 </script>
 
 <template>
@@ -462,15 +465,18 @@ function selectView(view: IdeActivityView): void {
         aria-hidden="true"
       />
     </button>
-    <button
-      type="button"
-      class="ide-activity-bar__button ide-activity-bar__button--settings"
-      :class="{ 'ide-activity-bar__button--active': false }"
-      aria-label="Operator settings"
-      title="Settings (KAIRO narration, voice, persona)"
-      @click.stop="navigateToAppSurface('settings')"
-    >
-      <span class="ide-activity-bar__settings-icon" aria-hidden="true">⚙</span>
-    </button>
+    <div class="ide-activity-bar__footer">
+      <IdeVaxonActivityButton />
+      <button
+        type="button"
+        class="ide-activity-bar__button ide-activity-bar__button--settings"
+        :class="{ 'ide-activity-bar__button--active': false }"
+        aria-label="Operator settings"
+        title="Settings (KAIRO narration, voice, persona)"
+        @click.stop="navigateToAppSurface('settings')"
+      >
+        <span class="ide-activity-bar__settings-icon" aria-hidden="true">⚙</span>
+      </button>
+    </div>
   </nav>
 </template>

@@ -4,7 +4,11 @@ import type { IdeComposerRestoreMode } from '../../lib/ide-composer-restore-requ
 import { SERVER_RESTART_CONTINUATION_PROMPT } from '../../lib/ide-run-recovery';
 import { resolveEmployeeManualHandoff } from './employee-manual-handoff';
 import {
+  resolveOperatorStartAction,
+} from '../../lib/verification-handoff';
+import {
   employeeDockReceiptRunId,
+  employeeFailureBlocksRetry,
   employeeFailureLine,
   employeeFailureRetryActionLabel,
   isRuntimeAuthFailure,
@@ -38,6 +42,13 @@ function ownsSnippet(employee: CompanyEmployeeRecord): string {
   return owns || employee.role_label?.trim() || employee.role;
 }
 
+function usageRuntime(detail: string | null | undefined): 'Codex' | 'Claude' | 'Cursor' {
+  const normalized = (detail ?? '').toLowerCase();
+  if (normalized.includes('codex')) return 'Codex';
+  if (normalized.includes('claude')) return 'Claude';
+  return 'Cursor';
+}
+
 /** Talk opens the composer without a starter sentence — speak/status UI already introduces the teammate. */
 export function employeeTalkDraft(_employee: CompanyEmployeeRecord): string {
   return '';
@@ -56,41 +67,51 @@ export function employeeAssignDraft(employee: CompanyEmployeeRecord): string {
 export function employeeRetryDraft(employee: CompanyEmployeeRecord): string {
   const owns = ownsSnippet(employee);
   const detail = normalizeOperatorFailureDetail(employee.last_outcome_detail);
-  const voiceLock =
-    'Speak in first person only — never say you are "acting as" a role, ' +
-    'Lane B, or VAXON, and never refer to yourself by name in the third person.';
+  // No voice/persona steering text here — the backend's employee_persona_prompt.py
+  // already injects "speak in first person, never say you're acting as a role"
+  // guidance server-side for every employee-persona dispatch. Duplicating it here
+  // used to leak an internal instruction into the operator-visible, persisted
+  // chat message.
   if (isShiftContinuationFailure(detail)) {
     return (
       `Continue my interrupted shift on ${owns}. ${SERVER_RESTART_CONTINUATION_PROMPT} ` +
-      `${voiceLock} Summarize what I changed and include receipts.`
+      `Summarize what I changed and include receipts.`
     );
   }
   if (isUsageLimitFailure(employee.last_outcome_detail)) {
+    const runtime = usageRuntime(employee.last_outcome_detail);
+    if (runtime !== 'Cursor') {
+      return (
+        `The signed-in ${runtime} account quota blocked my last shift on ${owns}. ` +
+        `Use an approved Auto fallback runtime, then retry my bounded continuous shift. ` +
+        `Summarize what I changed and include receipts.`
+      );
+    }
     return (
       `A Cursor usage signal blocked my last shift on ${owns}. ` +
       `Auto+Composer or on-demand may still have headroom — check Usage, then ` +
-      `I will retry my bounded continuous shift. ${voiceLock} ` +
+      `I will retry my bounded continuous shift. ` +
       `Summarize what I changed and include receipts.`
     );
   }
   if (isRuntimeAuthProbeFailure(employee.last_outcome_detail)) {
     return (
       `Cursor CLI auth probe timed out on my last shift on ${owns}. After checking ` +
-      `\`cursor agent status\` on the host, I will retry my bounded continuous shift. ${voiceLock} ` +
+      `\`cursor agent status\` on the host, I will retry my bounded continuous shift. ` +
       `Summarize what I changed and include receipts.`
     );
   }
   if (isRuntimeAuthFailure(employee.last_outcome_detail)) {
     return (
       `Runtime auth blocked my last shift on ${owns}. After \`cursor agent login\` ` +
-      `on the host or /vault unlock, I will retry my bounded continuous shift. ${voiceLock} ` +
+      `on the host or /vault unlock, I will retry my bounded continuous shift. ` +
       `Summarize what I changed and include receipts.`
     );
   }
   const errorHint = detail ? ` Last error: ${detail}` : '';
   return (
     `My last continuous shift on ${owns} failed.${errorHint} ` +
-    `Retry that bounded shift now as me. ${voiceLock} ` +
+    `Retry that bounded shift now as me. ` +
     `Summarize what I changed and include receipts.`
   );
 }
@@ -120,6 +141,14 @@ export function employeeReceiptsDraft(employee: CompanyEmployeeRecord): string {
     );
   }
   if (isUsageLimitFailure(employee.last_outcome_detail)) {
+    const runtime = usageRuntime(employee.last_outcome_detail);
+    if (runtime !== 'Cursor') {
+      return (
+        `Walk me through what happened on my last job${runHint}. ` +
+        `The ${runtime} CLI reported a usage-limit block, but Axon cannot verify the live ` +
+        `account quota. Retry once, check approved Auto fallback runtimes, then suggest the next move.`
+      );
+    }
     return (
       `Walk me through what happened on my last job${runHint}. ` +
       `The job hit a Cursor usage signal — do not claim the whole account is exhausted. ` +
@@ -257,10 +286,13 @@ export function employeeQuickActions(
     chatKind: 'receipts',
     composerMode: 'ask',
   };
+  // Working-as-intended policy blocks (e.g. private-document paths) fail the
+  // same way on every retry — offering "Try again" here just burns a shift.
+  const blocksRetry = failed && employeeFailureBlocksRetry(employee);
   const actions: TeamMemberQuickAction[] = [
     ...(failed
       ? [
-          retryAction,
+          ...(blocksRetry ? [] : [retryAction]),
           ...(employeeDockReceiptRunId(employee) ? [receiptsAction] : []),
           talkAction,
         ]
@@ -294,13 +326,20 @@ export function employeeQuickActions(
     runs: options?.runs,
     liveBusy: options?.liveBusy,
   });
-  if (handoff.waiting && handoff.taskId) {
+  const operatorStart = resolveOperatorStartAction({
+    employee,
+    tasks: options?.tasks ?? [],
+    runs: options?.runs,
+    handoffTaskId: handoff.waiting ? handoff.taskId : null,
+    liveBusy: options?.liveBusy,
+  });
+  if (operatorStart) {
     actions.unshift({
       id: 'start_now',
-      label: 'Start now',
+      label: operatorStart.label,
       kind: 'control',
       control: 'start_now',
-      taskId: handoff.taskId,
+      taskId: operatorStart.taskId,
     });
   }
 
@@ -332,4 +371,3 @@ export function employeeQuickActions(
 
   return actions;
 }
-

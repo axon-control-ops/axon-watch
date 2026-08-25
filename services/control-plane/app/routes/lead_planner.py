@@ -37,6 +37,9 @@ class LeadFanOutRequest(BaseModel):
     mode: _PLAN_MODE = "auto"
     create_runs: bool = True
     use_model: bool = True
+    target_role: (
+        Literal["lead", "watcher", "frontend", "backend", "integrations"] | None
+    ) = None
 
 
 class LeadReplanRequest(BaseModel):
@@ -76,6 +79,23 @@ def workspace_lead_plans(workspace_id: str, limit: int = 50) -> dict[str, Any]:
     return {"workspace_id": cleaned, "items": items, "count": len(items)}
 
 
+def _vaxon_handoff_for_plan(plan_id: str) -> dict[str, str] | None:
+    """Where "Review now" should navigate: the VAXON chat message that carries
+    this plan's rollup, if Lead has posted one yet (see lead_vaxon_handoff.py's
+    HANDOFF_RECEIPT_KIND = "lead_synthesis_vaxon_posted")."""
+    for receipt in reversed(lead_plan_store.list_receipts(plan_id)):
+        if str(receipt.get("kind") or "") != "lead_synthesis_vaxon_posted":
+            continue
+        payload = receipt.get("payload")
+        if not isinstance(payload, dict):
+            continue
+        thread_id = str(payload.get("thread_id") or "").strip()
+        message_id = str(payload.get("message_id") or "").strip()
+        if thread_id:
+            return {"thread_id": thread_id, "message_id": message_id}
+    return None
+
+
 @router.get("/api/lead/plans/{plan_id}")
 def lead_plan_get(plan_id: str) -> dict[str, Any]:
     cleaned = str(plan_id or "").strip()
@@ -88,6 +108,7 @@ def lead_plan_get(plan_id: str) -> dict[str, Any]:
         "task_links": task_links,
         "task_ids": [link["task_id"] for link in task_links],
         "awaiting_engagement": str(plan.get("status") or "") == "awaiting_engagement",
+        "vaxon_handoff": _vaxon_handoff_for_plan(cleaned),
     }
 
 
@@ -124,6 +145,7 @@ def workspace_lead_fan_out(workspace_id: str, body: LeadFanOutRequest) -> dict[s
             mode=body.mode,  # type: ignore[arg-type]
             create_runs=body.create_runs,
             use_model=body.use_model,
+            target_role=body.target_role,
         )
     except LeadFanOutError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc

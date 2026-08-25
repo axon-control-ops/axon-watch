@@ -18,6 +18,8 @@ const props = defineProps<{
   executionAccessHint: string;
   sandboxSessionEnabled: boolean;
   sandboxEnvForced: boolean;
+  sandboxAutoEnabled: boolean;
+  sandboxDirty: boolean;
   sandboxHint: string;
   sandboxLabel: string;
   sandboxSessionPending?: boolean;
@@ -30,6 +32,9 @@ const emit = defineEmits<{
   'switch-consultative': [];
   'request-sandbox-session': [];
   'disable-sandbox-session': [];
+  'review-sandbox-session': [];
+  'publish-sandbox-session': [];
+  'discard-sandbox-session': [];
 }>();
 
 const shell = useShellStore();
@@ -143,6 +148,9 @@ const menuStatus = computed(() =>
           <span class="agent-dock-composer__access-status-dot" aria-hidden="true" />
           <span>{{ menuStatus.sandboxLine }}</span>
         </div>
+        <p class="agent-dock-composer__menu-caption agent-dock-composer__menu-caption--subtle">
+          {{ menuStatus.workerIsolationLine }}
+        </p>
         <button
           v-if="!sandboxSessionEnabled"
           type="button"
@@ -157,13 +165,27 @@ const menuStatus = computed(() =>
           v-else
           type="button"
           class="agent-dock-composer__menu-item agent-dock-composer__menu-item--sandbox is-active"
-          :disabled="sandboxEnvForced || sandboxSessionPending"
-          :title="sandboxEnvForced ? sandboxHint : 'Turn Sandbox off for this session'"
+          :disabled="sandboxEnvForced || sandboxAutoEnabled || sandboxSessionPending"
+          :title="sandboxAutoEnabled ? 'Full Auto keeps Sandbox active' : sandboxEnvForced ? sandboxHint : 'Turn Sandbox off for this workspace'"
           @click="emit('disable-sandbox-session')"
         >
           <span>{{ sandboxLabel }}</span>
           <small>{{ sandboxHint }}</small>
         </button>
+        <p v-if="sandboxDirty" class="agent-dock-composer__menu-note agent-dock-composer__menu-note--warning">
+          Unpromoted changes are retained. Review, publish, or explicitly discard them before turning Sandbox off.
+        </p>
+        <template v-if="sandboxDirty">
+          <button type="button" class="agent-dock-composer__menu-item" :disabled="sandboxSessionPending" @click="emit('review-sandbox-session')">
+            <span>Review changes</span><small>List the paths retained in this checkout</small>
+          </button>
+          <button type="button" class="agent-dock-composer__menu-item" :disabled="sandboxSessionPending" @click="emit('publish-sandbox-session')">
+            <span>Publish changes</span><small>Commit, push, and open the configured draft PR</small>
+          </button>
+          <button type="button" class="agent-dock-composer__menu-item" :disabled="sandboxSessionPending" @click="emit('discard-sandbox-session')">
+            <span>Discard changes</span><small>Requires explicit destructive confirmation</small>
+          </button>
+        </template>
       </div>
     </div>
   </div>

@@ -178,6 +178,11 @@
   padding: 0.35rem 0.45rem;
 }
 
+.workspace-add-form__hint {
+  color: rgba(120, 220, 255, 0.78);
+  font-size: 0.64rem;
+}
+
 .workspace-add-form__error {
   margin: 0;
   color: rgba(255, 140, 140, 0.92);
@@ -207,6 +212,60 @@
 .workspace-add-form__button:disabled {
   opacity: 0.55;
   cursor: default;
+}
+
+.workspace-add-form__suggestions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  padding: 0.35rem;
+  border: 1px dashed rgba(0, 242, 255, 0.22);
+  border-radius: 0.3rem;
+  background: rgba(0, 8, 14, 0.4);
+}
+
+.workspace-add-form__suggestions-label {
+  margin: 0 0 0.1rem;
+  font-size: 0.6rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: rgba(150, 200, 220, 0.7);
+}
+
+.workspace-add-form__suggestion {
+  display: flex;
+  align-items: baseline;
+  gap: 0.4rem;
+  min-width: 0;
+  border: none;
+  border-radius: 0.25rem;
+  background: transparent;
+  padding: 0.2rem 0.3rem;
+  font: inherit;
+  text-align: left;
+  color: rgba(190, 220, 235, 0.9);
+  cursor: pointer;
+}
+
+.workspace-add-form__suggestion:hover,
+.workspace-add-form__suggestion:focus-visible {
+  background: rgba(0, 242, 255, 0.1);
+}
+
+.workspace-add-form__suggestion-label {
+  flex: 0 0 auto;
+  font-size: 0.7rem;
+  color: rgba(180, 245, 255, 0.95);
+}
+
+.workspace-add-form__suggestion-parent {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.62rem;
+  color: rgba(150, 180, 200, 0.65);
 }
 
 .console-shell--mockup .region-center-workbench.center-workbench--terminal-collapsed {

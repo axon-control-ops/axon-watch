@@ -1,0 +1,128 @@
+.center-workbench__empty-editor {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  justify-content: center;
+  gap: 0.65rem;
+  min-height: 12rem;
+  margin: 0.75rem 1rem 1rem;
+  padding: 1.25rem 1.35rem;
+  border: 1px dashed rgba(0, 242, 255, 0.18);
+  border-radius: 2px;
+  background: rgba(0, 242, 255, 0.03);
+}
+
+.center-workbench__empty-editor-title {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(150, 231, 255, 0.94);
+}
+
+.center-workbench__empty-editor-subtitle {
+  margin: 0;
+  max-width: 36rem;
+  font-family: var(--font-mono);
+  font-size: 0.58rem;
+  line-height: 1.45;
+  color: rgba(176, 198, 214, 0.9);
+}
+
+.center-workbench__empty-editor-blocked {
+  margin: 0;
+  max-width: 36rem;
+  font-family: var(--font-mono);
+  font-size: 0.56rem;
+  line-height: 1.4;
+  color: rgba(255, 196, 120, 0.95);
+}
+
+.center-workbench__empty-editor-steps {
+  margin: 0.35rem 0 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 0.45rem;
+  max-width: 40rem;
+}
+
+.center-workbench__empty-editor-step-btn {
+  display: grid;
+  grid-template-columns: minmax(5.5rem, 7rem) 1fr auto;
+  gap: 0.55rem;
+  align-items: start;
+  width: 100%;
+  margin: 0;
+  padding: 0.45rem 0.55rem;
+  border: 1px solid rgba(0, 242, 255, 0.14);
+  border-radius: 2px;
+  background: rgba(8, 16, 24, 0.35);
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
+}
+
+.center-workbench__empty-editor-step-btn:hover,
+.center-workbench__empty-editor-step-btn:focus-visible {
+  border-color: rgba(0, 242, 255, 0.32);
+  background: rgba(0, 242, 255, 0.06);
+}
+
+.center-workbench__empty-editor-step-btn:focus-visible {
+  outline: 1px solid rgba(0, 245, 212, 0.55);
+  outline-offset: 1px;
+}
+
+.center-workbench__empty-editor-step-btn--static {
+  cursor: default;
+  opacity: 0.92;
+}
+
+.center-workbench__empty-editor-step-btn--static:hover,
+.center-workbench__empty-editor-step-btn--static:focus-visible {
+  border-color: rgba(0, 242, 255, 0.14);
+  background: rgba(8, 16, 24, 0.35);
+}
+
+.center-workbench__empty-editor-step-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.center-workbench__empty-editor-step-label {
+  font-family: var(--font-mono);
+  font-size: 0.56rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: rgba(150, 231, 255, 0.92);
+}
+
+.center-workbench__empty-editor-step-detail {
+  font-family: var(--font-mono);
+  font-size: 0.56rem;
+  line-height: 1.4;
+  color: rgba(176, 198, 214, 0.92);
+}
+
+.center-workbench__empty-editor-step-shortcut {
+  flex-shrink: 0;
+  border: 1px solid rgba(176, 198, 214, 0.22);
+  border-radius: 2px;
+  padding: 0.08rem 0.32rem;
+  font-family: var(--font-mono);
+  font-size: 0.48rem;
+  letter-spacing: 0.06em;
+  color: rgba(176, 198, 214, 0.78);
+  white-space: nowrap;
+}
+
+@media (max-width: 720px) {
+  .center-workbench__empty-editor-step-btn {
+    grid-template-columns: 1fr;
+    gap: 0.25rem;
+  }
+}

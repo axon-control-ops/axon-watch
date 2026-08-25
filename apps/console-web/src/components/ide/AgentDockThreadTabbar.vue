@@ -101,6 +101,27 @@ function closeTab(event: MouseEvent, threadId: string): void {
   void shell.closeIdeThreadTab(threadId);
 }
 
+async function deleteThread(event: MouseEvent, thread: {
+  thread_id: string;
+  employee_id?: string | null;
+  preview_label?: string | null;
+}): Promise<void> {
+  event.stopPropagation();
+  const title = threadDisplayTitle(thread);
+  const confirmed = window.confirm(
+    `Delete “${title}”? This permanently removes the conversation and cannot be undone.`,
+  );
+  if (!confirmed) {
+    return;
+  }
+  const deleted = await shell.deleteIdeThread(thread.thread_id);
+  if (deleted) {
+    // Confirm dialog can synthesize a document click that closes the panel.
+    await nextTick();
+    historyOpen.value = true;
+  }
+}
+
 function handleDocumentClick(event: MouseEvent): void {
   const target = event.target;
   if (target instanceof Node && menuRef.value?.contains(target)) {
@@ -341,10 +362,9 @@ onUnmounted(() => {
           >
             + New chat
           </button>
-          <button
+          <div
             v-for="thread in allThreads"
             :key="thread.thread_id"
-            type="button"
             role="option"
             class="agent-dock-thread-tabbar__history-item"
             :class="{
@@ -357,41 +377,55 @@ onUnmounted(() => {
               ),
             }"
             :aria-selected="activeThreadId === thread.thread_id"
-            :aria-label="
-              threadFailureHintById.get(thread.thread_id)
-                ? `Last job failed — ${threadDisplayTitle(thread)}`
-                : busyThreadIds.has(thread.thread_id)
-                  ? `Busy — ${threadDisplayTitle(thread)}`
-                  : threadDisplayTitle(thread)
-            "
-            :title="
-              threadFailureHoverTitle(thread.thread_id, threadDisplayTitle(thread))
-            "
-            @click="selectThread(thread.thread_id)"
           >
-            <span class="agent-dock-thread-tabbar__history-copy">
-              <span class="agent-dock-thread-tabbar__history-label-row">
-                <span
-                  v-if="threadFailureHintById.has(thread.thread_id)"
-                  class="agent-dock-thread-tabbar__history-fail-mark"
-                  aria-hidden="true"
-                >
-                  !
+            <button
+              type="button"
+              class="agent-dock-thread-tabbar__history-select"
+              :aria-label="
+                threadFailureHintById.get(thread.thread_id)
+                  ? `Last job failed — ${threadDisplayTitle(thread)}`
+                  : busyThreadIds.has(thread.thread_id)
+                    ? `Busy — ${threadDisplayTitle(thread)}`
+                    : threadDisplayTitle(thread)
+              "
+              :title="
+                threadFailureHoverTitle(thread.thread_id, threadDisplayTitle(thread))
+              "
+              @click="selectThread(thread.thread_id)"
+            >
+              <span class="agent-dock-thread-tabbar__history-copy">
+                <span class="agent-dock-thread-tabbar__history-label-row">
+                  <span
+                    v-if="threadFailureHintById.has(thread.thread_id)"
+                    class="agent-dock-thread-tabbar__history-fail-mark"
+                    aria-hidden="true"
+                  >
+                    !
+                  </span>
+                  <span class="agent-dock-thread-tabbar__history-label">
+                    {{ threadDisplayTitle(thread) }}
+                  </span>
                 </span>
-                <span class="agent-dock-thread-tabbar__history-label">
-                  {{ threadDisplayTitle(thread) }}
+                <span class="agent-dock-thread-tabbar__history-meta">
+                  {{ ideThreadMenuMeta(thread) }}
                 </span>
               </span>
-              <span class="agent-dock-thread-tabbar__history-meta">
-                {{ ideThreadMenuMeta(thread) }}
-              </span>
-            </span>
-            <span
-              v-if="activeThreadId === thread.thread_id"
-              class="agent-dock-thread-tabbar__history-dot"
-              aria-hidden="true"
-            />
-          </button>
+              <span
+                v-if="activeThreadId === thread.thread_id"
+                class="agent-dock-thread-tabbar__history-dot"
+                aria-hidden="true"
+              />
+            </button>
+            <button
+              type="button"
+              class="agent-dock-thread-tabbar__history-delete"
+              :aria-label="`Delete ${threadDisplayTitle(thread)}`"
+              title="Delete conversation"
+              @click="deleteThread($event, thread)"
+            >
+              <WorkbenchIcon name="trash" :size="12" />
+            </button>
+          </div>
         </div>
       </div>
 

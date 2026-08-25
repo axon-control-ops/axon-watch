@@ -87,4 +87,13 @@ describe('editor-open-tabs-prefs', () => {
       }),
     ).toBe('file:README.md');
   });
+
+  it('prefers a text tab when the stored active tab is a PDF preview', () => {
+    expect(
+      resolveRestoredActiveEditorDocumentId({
+        storedDocumentId: 'file:output/report.pdf',
+        openedPaths: ['README.md', 'output/report.pdf'],
+      }),
+    ).toBe('file:README.md');
+  });
 });

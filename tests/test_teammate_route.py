@@ -230,6 +230,7 @@ class TeammateRouteEndpointTests(unittest.TestCase):
                 "content": "Fix the enrollment confirmation UI card.",
                 "workspace_id": "workspace_dashpro",
                 "use_runtime": False,
+                "submission_intent": "dispatch",
             },
         )
         self.assertEqual(200, response.status_code)

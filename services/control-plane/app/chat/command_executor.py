@@ -29,11 +29,13 @@ _RESUME_FROM_REVIEW = re.compile(
     re.IGNORECASE,
 )
 _DASHPRO_CANARY_OTA_RE = re.compile(r"\bnpm\s+run\s+ota(?::canary)?\b", re.IGNORECASE)
+_ROOT_NPM_DEV_RE = re.compile(r"^\s*run\s+npm\s+run\s+dev\s*$", re.IGNORECASE)
 _PRODUCTION_OTA_RE = re.compile(
     r"\bota:production\b|RELEASE_GUARD_ALLOW_PRODUCTION_OTA\s*=\s*1",
     re.IGNORECASE,
 )
 _DASHPRO_WORKSPACE_ID = "workspace_dashpro"
+_AXON_WATCH_WORKSPACE_ID = "workspace_axon_watch"
 
 
 @dataclass(frozen=True)
@@ -247,6 +249,18 @@ def execute_resume_from_review(workspace_id: str) -> CommandExecutionResult:
 
 
 def execute_shell_command_intent(workspace_id: str, content: str) -> CommandExecutionResult:
+    if workspace_id == _AXON_WATCH_WORKSPACE_ID and _ROOT_NPM_DEV_RE.match(content):
+        return CommandExecutionResult(
+            intent="shell_command",
+            success=False,
+            output=_truncate_output(
+                "Root `npm run dev` starts the Axon-X platform bootstrap, not the Expo "
+                "mobile companion. For the Axon-X mobile app use "
+                "`run npm run dev:console-mobile`, or ask Lead to verify "
+                "`apps/console-mobile` with the mobile companion acceptance checks."
+            ),
+            receipt_summary="Shell command blocked (ambiguous Axon-X dev target)",
+        )
     if _PRODUCTION_OTA_RE.search(content):
         return CommandExecutionResult(
             intent="shell_command",
@@ -263,7 +277,7 @@ def execute_shell_command_intent(workspace_id: str, content: str) -> CommandExec
             success=False,
             output=_truncate_output(
                 "DashPro OTA canary commands must run from workspace_dashpro "
-                "(/home/edp/Projectx/product/dashpro). Switch to the DashPro workspace and retry."
+                "(/run/media/vaxon/axon-data/projectx/product/dashpro). Switch to the DashPro workspace and retry."
             ),
             receipt_summary="Shell command failed (wrong workspace for DashPro OTA)",
         )

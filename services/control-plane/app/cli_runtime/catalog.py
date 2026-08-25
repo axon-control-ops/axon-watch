@@ -14,6 +14,7 @@ from app.cli_runtime.auth_probes import (
 )
 from app.cli_runtime.catalog_discovery import (
     cli_runtime_family,
+    cursor_cli_argv,
     find_claude_cli,
     find_codex_cli,
     find_cursor_cli,
@@ -33,7 +34,7 @@ from app.cli_runtime.catalog_snapshot import (
 StatusRecord = dict[str, Any]
 
 __all__ = [
-    "StatusRecord", "cli_runtime_family",
+    "StatusRecord", "cli_runtime_family", "cursor_cli_argv",
     "find_claude_cli", "find_codex_cli", "find_cursor_cli",
     "heal_cursor_auth_probe_timeout", "invalidate_runtime_snapshot_cache",
     "recover_cursor_auth_synchronously", "runtime_identity_snapshot",

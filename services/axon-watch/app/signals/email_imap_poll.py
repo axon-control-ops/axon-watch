@@ -123,15 +123,27 @@ def _message_summary(
     }
 
 
-def _fetch_account_messages(account: dict[str, Any], *, limit: int) -> list[dict[str, Any]]:
+def fetch_account_folder_messages(
+    account: dict[str, Any],
+    folder: str,
+    *,
+    limit: int,
+    require_monitor_enabled: bool = True,
+) -> list[dict[str, Any]]:
+    """Fetch recent messages from one IMAP folder on one account.
+
+    Generalized out of the inbox-only poll below so the Sent/Junk/Archive
+    folder views can reuse the exact same connect/select/fetch/parse path
+    instead of a second, drifting copy of it.
+    """
     monitor = account.get("monitor") if isinstance(account.get("monitor"), dict) else {}
-    if not bool(monitor.get("enabled", True)):
+    if require_monitor_enabled and not bool(monitor.get("enabled", True)):
         return []
     imap = account.get("imap") if isinstance(account.get("imap"), dict) else {}
     host = str(imap.get("host") or "").strip()
     port = int(imap.get("port") or 993)
     username = str(imap.get("username") or account.get("email_address") or "").strip()
-    folder = str(imap.get("folder") or "INBOX").strip() or "INBOX"
+    folder = folder.strip() or "INBOX"
     use_ssl = bool(imap.get("ssl", True))
     password = _resolve_password(str(imap.get("password_ref") or ""))
     account_id = str(account.get("account_id") or "").strip()
@@ -221,7 +233,11 @@ def fetch_native_email_messages(
 
     messages: list[dict[str, Any]] = []
     for account in accounts:
-        messages.extend(_fetch_account_messages(account, limit=limit_per_account))
+        imap = account.get("imap") if isinstance(account.get("imap"), dict) else {}
+        folder = str(imap.get("folder") or "INBOX").strip() or "INBOX"
+        messages.extend(
+            fetch_account_folder_messages(account, folder, limit=limit_per_account)
+        )
     messages.sort(key=lambda item: str(item.get("sent_at") or ""), reverse=True)
     _cache_at = now
     _cache_payload = list(messages)

@@ -91,6 +91,17 @@ def runs_show(run_id: str) -> dict[str, Any]:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 
 
+@router.get("/api/runs/{run_id}/execution-policy")
+def run_execution_policy_route(run_id: str) -> dict[str, object]:
+    """Resolved access + write scope for a run, so the UI need not guess."""
+    from app.runs.execution_policy_view import run_execution_policy
+
+    try:
+        return run_execution_policy(run_id)
+    except RunNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
 @router.get("/api/runs/{run_id}/history")
 def runs_history(run_id: str) -> dict[str, Any]:
     try:

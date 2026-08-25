@@ -1,0 +1,145 @@
+/* Responsive Agent Persona Dock — container queries + action footer pin.
+   Kept separate from agent-persona-dock.css (hotspot ratchet). */
+
+.company-roster--persona-dock .company-roster__dock-host > .agent-persona-dock {
+  min-height: 0;
+  height: auto;
+  box-sizing: border-box;
+}
+
+.agent-persona-dock {
+  /* Scroll region lives inside the card; do not pin action footer. */
+  min-width: 0;
+}
+
+.agent-persona-dock__scroll {
+  scrollbar-gutter: stable;
+}
+
+.agent-persona-dock__owns-info {
+  top: 0.45rem;
+  right: 0.45rem;
+  width: 1.05rem;
+  height: 1.05rem;
+  font-size: 0.58rem;
+}
+
+.agent-persona-dock__hero {
+  padding-right: 1.2rem;
+}
+
+.agent-persona-dock__action-stack {
+  margin-top: 0;
+}
+
+.agent-persona-dock__actions {
+  margin-top: 0;
+  padding-top: 0;
+  padding-bottom: 0.1rem;
+  border-top: 0;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.38rem;
+}
+
+.agent-persona-dock__delivery-links {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(7.5rem, 1fr));
+  gap: 0.35rem;
+}
+
+.agent-persona-dock__delivery-link {
+  justify-content: center;
+  min-width: 0;
+  text-align: center;
+}
+
+.agent-persona-dock__actions .company-roster__action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-width: 0;
+  min-height: 1.75rem;
+  padding: 0.24rem 0.35rem;
+  text-align: center;
+  white-space: normal;
+  line-height: 1.25;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: clamp(0.62rem, 2vw, 0.68rem);
+}
+
+.company-roster__header-row {
+  flex-wrap: wrap;
+  row-gap: 0.35rem;
+}
+
+@container roster-dock (max-width: 22rem) {
+  .agent-persona-dock {
+    gap: 0.55rem;
+    padding: 0.55rem 0.5rem 0.65rem;
+  }
+
+  .agent-persona-dock__hero {
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: 0.5rem;
+  }
+
+  .agent-persona-dock__status {
+    grid-column: 1 / -1;
+    justify-self: start;
+  }
+
+  .agent-persona-dock__avatar {
+    width: 2.75rem;
+    height: 2.75rem;
+    font-size: 0.8rem;
+  }
+
+  .agent-persona-dock__name {
+    font-size: 0.92rem;
+  }
+
+  .agent-persona-dock__beat {
+    font-size: 0.68rem;
+    padding: 0.4rem 0.45rem;
+  }
+
+  .agent-persona-dock__actions {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.28rem;
+  }
+
+  .agent-persona-dock__actions .company-roster__action {
+    min-height: 1.65rem;
+    padding: 0.2rem 0.28rem;
+    font-size: 0.58rem;
+  }
+
+  .company-presence-strip__btn {
+    min-width: 2.7rem;
+  }
+}
+
+@container roster-dock (max-width: 17.5rem) {
+  .agent-persona-dock__hero {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .agent-persona-dock__status {
+    grid-column: 1 / -1;
+  }
+
+  .agent-persona-dock__actions {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .agent-persona-dock__delivery-links {
+    grid-template-columns: 1fr;
+  }
+
+  .company-roster__fleet-link {
+    width: 100%;
+    text-align: center;
+  }
+}

@@ -5,6 +5,7 @@ import type { RunRecord } from '../contracts/canonical';
 import {
   appendIdeComposerQueueEntry,
   findIdeComposerQueueEntry,
+  ideComposerQueueScopeKey,
   removeIdeComposerQueueEntry,
   resolveIdeStopRun,
   shouldQueueIdeComposerSubmit,
@@ -25,6 +26,19 @@ const baseRun = (overrides: Partial<RunRecord>): RunRecord =>
   }) as RunRecord;
 
 describe('ide composer queue', () => {
+  it('isolates queues by workspace and active agent thread', () => {
+    expect(ideComposerQueueScopeKey('workspace_tps', 'thread_noor')).toBe(
+      'workspace_tps::thread_noor',
+    );
+    expect(ideComposerQueueScopeKey('workspace_tps', 'thread_vera')).toBe(
+      'workspace_tps::thread_vera',
+    );
+    expect(ideComposerQueueScopeKey('workspace_tps', null)).toBe(
+      'workspace_tps::workspace',
+    );
+    expect(ideComposerQueueScopeKey(null, 'thread_noor')).toBeNull();
+  });
+
   it('resolves stoppable runs from linked, explicit, or primary ids', () => {
     expect(
       resolveIdeStopRun({
@@ -91,6 +105,7 @@ describe('ide composer queue', () => {
       content: 'first',
       composerMode: 'agent',
       createdAt: '2026-07-08T00:00:00Z',
+      threadId: 'thread_noor',
     });
 
     expect(shiftIdeComposerQueue(queue).next?.content).toBe('first');
@@ -103,6 +118,7 @@ describe('ide composer queue', () => {
       content: 'revise me',
       composerMode: 'plan',
       createdAt: '2026-07-08T00:00:00Z',
+      threadId: 'thread_noor',
     });
 
     expect(findIdeComposerQueueEntry(queue, 'q1')?.content).toBe('revise me');

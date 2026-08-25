@@ -75,17 +75,24 @@ const otherText = ref(
 const submitting = ref(false);
 const error = ref('');
 const locallyAnswered = ref<AgentQuestionOption | null>(null);
+// Set only once the agent has actually received the answer (not merely
+// queued behind a still-running turn) — see submitQuestionAnswer.
+const queuedAnswer = ref<AgentQuestionOption | null>(null);
 
 const resolvedAnswer = computed(
   () => locallyAnswered.value ?? props.answeredOption ?? null,
 );
 const isAnswered = computed(() => Boolean(resolvedAnswer.value) && !props.live);
+const isQueued = computed(() => Boolean(queuedAnswer.value) && !isAnswered.value);
+const queuedAnswerLabel = computed(() =>
+  queuedAnswer.value ? formatAnsweredQuestionChoice(queuedAnswer.value) : '',
+);
 const otherSelected = computed(() => {
   const selected = displayOptions.value.find((option) => option.id === selectedId.value);
   return Boolean(selected && isAgentQuestionOtherOption(selected));
 });
 const canContinue = computed(() => {
-  if (!selectedId.value || props.live || submitting.value || isAnswered.value) {
+  if (!selectedId.value || props.live || submitting.value || isAnswered.value || isQueued.value) {
     return false;
   }
   if (otherSelected.value) {
@@ -144,7 +151,7 @@ watch(
 );
 
 function selectOption(optionId: string): void {
-  if (props.live || submitting.value || isAnswered.value) {
+  if (props.live || submitting.value || isAnswered.value || isQueued.value) {
     return;
   }
   selectedId.value = optionId;
@@ -161,7 +168,7 @@ function focusOptionButton(optionId: string): void {
 }
 
 function handleOptionKeydown(event: KeyboardEvent, optionId: string): void {
-  if (props.live || submitting.value || isAnswered.value) {
+  if (props.live || submitting.value || isAnswered.value || isQueued.value) {
     return;
   }
 
@@ -203,16 +210,23 @@ async function continueWithSelection(): Promise<void> {
   submitting.value = true;
   error.value = '';
   try {
-    locallyAnswered.value = answeredOption;
-    await submitQuestionAnswer(shell, {
+    const status = await submitQuestionAnswer(shell, {
       workspaceId: shell.currentWorkspace?.workspace_id,
       option: answeredOption,
       prompt: props.prompt,
       messageId: props.messageId,
       customText,
     });
+    // Flip to "answered" only once the agent actually has it; a queue-behind
+    // result must keep showing an honest in-flight state, not a false one.
+    if (status === 'queued') {
+      queuedAnswer.value = answeredOption;
+    } else {
+      locallyAnswered.value = answeredOption;
+    }
   } catch (err) {
     locallyAnswered.value = null;
+    queuedAnswer.value = null;
     error.value = err instanceof Error ? err.message : 'Unable to submit choice.';
   } finally {
     submitting.value = false;
@@ -248,6 +262,24 @@ async function continueWithSelection(): Promise<void> {
         :title="resolvedAnswer.label"
       >
         {{ answeredChoiceLabel }}
+      </p>
+    </template>
+    <template v-else-if="isQueued && queuedAnswer">
+      <p class="agent-block__question-kicker">Question</p>
+      <p
+        :id="groupLabelId"
+        class="agent-block__question-prompt"
+      >
+        {{ displayPrompt }}
+      </p>
+      <p
+        class="agent-block__question-answered-choice"
+        :title="queuedAnswer.label"
+      >
+        {{ queuedAnswerLabel }}
+      </p>
+      <p class="agent-block__question-queued-notice">
+        Answer queued — will send once the current run finishes.
       </p>
     </template>
     <template v-else>

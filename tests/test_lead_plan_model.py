@@ -23,6 +23,15 @@ ROSTER = [
     {"role": "watcher", "name": "Cass", "owns": "signals"},
 ]
 
+# A plain content-editing task with no API/database/signals system involved at
+# all, but containing a couple of generic keyword-bag words per role — the
+# exact pattern that fanned a childcare-menu task out to mismatched Backend +
+# Watcher specialists. Ties backend=2/watcher=3, both below the decisive bar.
+_DOMAIN_AGNOSTIC_GOAL = (
+    "Rearrange the existing weekly menu items and update the room roster "
+    "service data, keeping an eye on child health signals throughout."
+)
+
 
 class LeadPlanModelTests(unittest.TestCase):
     def test_plan_from_model_payload_validates_roles(self) -> None:
@@ -93,6 +102,58 @@ class LeadPlanModelTests(unittest.TestCase):
         else:
             # Deterministic may still emit a soft winner; fail-open must still yield items.
             self.assertTrue(plan.items)
+
+    def test_ambiguous_multi_role_routes_through_model_tie_break(self) -> None:
+        # Closes the gap that let the original incident ship: previously a
+        # bare-minimum keyword-bag tie never reached the model at all because
+        # it wasn't flagged ambiguous. This proves the tie-break is actually
+        # invoked once _owners_for_clause correctly flags it.
+        calls: list[dict] = []
+
+        def fake_dispatch(**kwargs):  # type: ignore[no-untyped-def]
+            calls.append(kwargs)
+            return {
+                "content": json.dumps(
+                    {
+                        "items": [
+                            {
+                                "owner_role": "watcher",
+                                "goal": "Rearrange the menu and watch for health-note changes",
+                                "dependencies": [],
+                            }
+                        ]
+                    }
+                ),
+                "dispatched": True,
+            }
+
+        plan = resolve_lead_task_plan(
+            goal=_DOMAIN_AGNOSTIC_GOAL,
+            roster=ROSTER,
+            mode="decompose",
+            workspace_id="workspace_dashpro",
+            use_model=True,
+            dispatch_runtime=fake_dispatch,
+        )
+        self.assertTrue(calls, "the ambiguous multi-role tie should reach the model tie-break")
+        self.assertEqual(1, len(plan.items))
+        self.assertEqual("watcher", plan.items[0].owner_role)
+
+    def test_ambiguous_multi_role_fails_safe_to_single_owner_when_model_unavailable(self) -> None:
+        def failing_dispatch(**kwargs):  # type: ignore[no-untyped-def]
+            raise RuntimeError("runtime unavailable")
+
+        plan = resolve_lead_task_plan(
+            goal=_DOMAIN_AGNOSTIC_GOAL,
+            roster=ROSTER,
+            mode="decompose",
+            workspace_id="workspace_dashpro",
+            use_model=True,
+            dispatch_runtime=failing_dispatch,
+        )
+        # Model tie-break failed; must not dispatch the mismatched Backend +
+        # Watcher pair on a keyword-bag hunch — collapse to one confident owner.
+        self.assertEqual(1, len(plan.items))
 
     def test_fallback_single_owner(self) -> None:
         plan = fallback_single_owner_plan(goal="do the work", roster=ROSTER)

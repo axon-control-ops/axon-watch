@@ -9,6 +9,11 @@ import AxonProductLogo from '../../components/AxonProductLogo.vue';
 import { navigateToAppSurface, type AppSurface } from '../../lib/app-surface-route';
 import { useAppSurface } from '../../composables/useAppSurface';
 import { openOperatorStandup } from '../../features/kairo-conversation/open-operator-standup';
+import {
+  openRecoveryCenter,
+  recoveryAttentionCount,
+  recoveryAttentionLabel,
+} from '../../features/recovery-center/recovery-overlay-state';
 import { shouldShowIdeInterruptStrip } from '../../lib/ide-interrupt-panel-view';
 import { useShellStore } from '../../stores/shell';
 
@@ -34,6 +39,16 @@ const topbarSubtitle = computed(() => {
   }
   return shell.layoutMode === 'ide' ? 'IDE WORKSPACE' : 'OPERATOR CONSOLE';
 });
+const currentWorkspaceLabel = computed(
+  () => shell.currentWorkspace?.display_name?.trim() || shell.currentWorkspace?.workspace_id || 'No workspace',
+);
+const currentModeLabel = computed(() =>
+  activeSurface.value === 'console'
+    ? shell.layoutMode === 'ide'
+      ? 'Build'
+      : 'Mission Control'
+    : topbarSubtitle.value,
+);
 const showTopbarKairoPresence = computed(
   () => activeSurface.value === 'console' && shell.layoutMode !== 'operator',
 );
@@ -45,6 +60,9 @@ const showIdeInterruptTopbar = computed(
       presenceProfile: shell.idePresenceProfile,
       pendingApprovalsCount: shell.pendingApprovalsCount,
     }),
+);
+const topbarHasNoMid = computed(
+  () => !showIdeInterruptTopbar.value && shell.topbarChips.length === 0,
 );
 
 function openSurface(surface: AppSurface): void {
@@ -58,18 +76,32 @@ function openSettings(): void {
 async function openStandup(): Promise<void> {
   await openOperatorStandup(shell);
 }
+
+async function openAttention(): Promise<void> {
+  await openRecoveryCenter(shell.currentWorkspace?.workspace_id);
+}
 </script>
 
 <template>
   <header class="region region-topbar topbar-mockup">
     <div
       class="topbar-mockup__grid"
-      :class="{ 'topbar-mockup__grid--ide-interrupt': showIdeInterruptTopbar }"
+      :class="{
+        'topbar-mockup__grid--ide-interrupt': showIdeInterruptTopbar,
+        'topbar-mockup__grid--no-mid': topbarHasNoMid,
+      }"
     >
       <div class="topbar-mockup__identity-zone">
         <div class="topbar-mockup__brand">
           <AxonProductLogo />
-          <p class="topbar-mockup__subtitle">{{ topbarSubtitle }}</p>
+          <div class="topbar-mockup__brand-copy">
+            <p class="topbar-mockup__subtitle">{{ topbarSubtitle }}</p>
+            <p class="topbar-mockup__context">
+              <span class="topbar-mockup__context-mode">{{ currentModeLabel }}</span>
+              <span class="topbar-mockup__context-sep" aria-hidden="true">/</span>
+              <span class="topbar-mockup__context-workspace">{{ currentWorkspaceLabel }}</span>
+            </p>
+          </div>
         </div>
       </div>
 
@@ -87,6 +119,11 @@ async function openStandup(): Promise<void> {
           {{ chip.label }}
         </span>
       </div>
+      <div
+        v-else
+        class="topbar-mockup__mid-spacer"
+        aria-hidden="true"
+      />
 
       <div class="topbar-mockup__kairo-slot">
         <KairoPresenceBar
@@ -173,6 +210,16 @@ async function openStandup(): Promise<void> {
           </button>
         </div>
         <button
+          v-if="recoveryAttentionCount > 0"
+          type="button"
+          class="layout-toggle__button topbar-mockup__attention"
+          :aria-label="`Open Recovery Center. ${recoveryAttentionLabel}`"
+          :title="recoveryAttentionLabel"
+          @click="openAttention"
+        >
+          {{ recoveryAttentionLabel }}
+        </button>
+        <button
           type="button"
           class="layout-toggle__button topbar-mockup__standup"
           aria-label="Open VAXON stand-up report"
@@ -205,6 +252,40 @@ async function openStandup(): Promise<void> {
   overflow: hidden;
 }
 
+.topbar-mockup__brand-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 0.18rem;
+  min-width: 0;
+}
+
+.topbar-mockup__context {
+  display: flex;
+  align-items: center;
+  gap: 0.34rem;
+  margin: 0;
+  min-width: 0;
+  color: rgba(180, 205, 226, 0.78);
+  font-size: 0.72rem;
+  line-height: 1.1;
+}
+
+.topbar-mockup__context-mode {
+  color: rgba(227, 241, 255, 0.94);
+  font-weight: 600;
+}
+
+.topbar-mockup__context-workspace {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.topbar-mockup__context-sep {
+  color: rgba(138, 170, 196, 0.52);
+}
+
 .topbar-mockup__workspace {
   margin-right: 0.45rem;
   max-width: 12.5rem;
@@ -217,7 +298,8 @@ async function openStandup(): Promise<void> {
   z-index: 12;
 }
 
-.topbar-mockup__standup {
+.topbar-mockup__standup,
+.topbar-mockup__attention {
   margin-right: 0.35rem;
   letter-spacing: 0.06em;
   font-size: 0.68rem;

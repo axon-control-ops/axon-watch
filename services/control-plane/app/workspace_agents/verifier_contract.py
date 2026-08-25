@@ -180,10 +180,17 @@ def ensure_acceptance_before_publish(
     if has_passing_acceptance_evidence(run_id):
         return None
 
+    from app.workspace_agents.diff_policy import strip_control_plane_owned_paths
+
     root = _resolve_workspace_root(record, workspace_root)
     paths = list(changed_paths) if changed_paths is not None else []
     if not paths and root is not None:
         paths = list_changed_paths(root)
+    # The control plane writes its own bookkeeping (.axon-si/*, the research
+    # MCP config) into the isolation worktree. Counting those as agent-changed
+    # paths failed correct runs — including read-only consultative ones — with
+    # "acceptance=fail · policy=out_of_scope" for files the agent never wrote.
+    paths = strip_control_plane_owned_paths(paths)
 
     task_allowed_paths: list[str] = []
     task_id = str(record.get("task_id") or "").strip()
@@ -192,6 +199,16 @@ def ensure_acceptance_before_publish(
 
         task = task_store.get_task(task_id)
         if isinstance(task, dict):
+            from app.workspace_agents.lead_verification_handoff import (
+                build_verification_acceptance_evaluation,
+                is_verification_task,
+            )
+
+            if is_verification_task(task):
+                payload = build_verification_acceptance_evaluation(run_id=run_id, task=task)
+                payload["summary"] = f"{payload['summary']} · mode=verification_terminal"
+                return record_acceptance_evaluation(run_id, payload)
+
             raw_allowed = task.get("allowed_paths")
             if isinstance(raw_allowed, list):
                 task_allowed_paths = [
@@ -206,7 +223,11 @@ def ensure_acceptance_before_publish(
     else:
         try:
             contract = load_repo_contract(str(root))
-            check_results = execute_check_plan(root, contract)
+            check_results = execute_check_plan(
+                root,
+                contract,
+                changed_paths=paths,
+            )
             path_to_text = read_path_texts(root, paths)
             mode = "contract"
         except ProjectContractError as exc:

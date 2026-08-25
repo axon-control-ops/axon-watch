@@ -1,27 +1,21 @@
-import { computed, ref } from 'vue';
-
+import { computed, nextTick, ref } from 'vue';
 import { resizeCommandComposer } from '../../lib/command-composer-autosize';
 import { useKairoConversation } from '../../features/kairo-conversation/use-kairo-conversation';
 import { useShellStore } from '../../stores/shell';
-import {
-  useComposerActions,
-  type PlanSoftSwitchNotice,
-} from './use-composer-actions';
+import { useComposerActions, type PlanSoftSwitchNotice } from './use-composer-actions';
 import { useComposerContext } from './use-composer-context';
 import { useComposerDisplayState } from './use-composer-display-state';
 import { useComposerHistory } from './use-composer-history';
 import { useComposerImages } from './use-composer-images';
-import {
-  useComposerMenus,
-  type ComposerMode,
-} from './use-composer-menus';
+import { useComposerMenus, type ComposerMode } from './use-composer-menus';
 import { useComposerModelRuntime } from './use-composer-model-runtime';
 import { useComposerTypeahead } from './use-composer-typeahead';
 import { useComposerWorkspaceSync } from './use-composer-workspace-sync';
 import { readWorkspaceComposerMode } from '../../lib/composer-mode-prefs';
+import { persistIdeComposerDraft } from '../../lib/ide-composer-draft-prefs';
 import { teammateRouteNotice } from '../../lib/teammate-route-notice';
+import { workspaceScopeNotice } from '../../lib/workspace-scope-notice';
 import { buildAgentDockComposerApi } from './build-agent-dock-composer-api';
-
 export function useAgentDockComposerSetup() {
   const shell = useShellStore();
   const {
@@ -34,12 +28,12 @@ export function useAgentDockComposerSetup() {
     stopVoiceCapture,
   } = useKairoConversation();
   const inputRef = ref<HTMLTextAreaElement | null>(null);
+  const composerRootRef = ref<HTMLElement | null>(null);
   const dismissedDebugReproduceMessageId = ref<string | null>(null);
   const planSoftSwitchNotice = ref<PlanSoftSwitchNotice | null>(null);
   function setInputRef(el: HTMLTextAreaElement | null): void {
     inputRef.value = el;
   }
-
   const defaultComposerMode =
     (shell.runtimeSummary?.runtime_identity.mode_default as ComposerMode) || 'agent';
   const composerMode = ref<ComposerMode>(
@@ -49,16 +43,13 @@ export function useAgentDockComposerSetup() {
       shell.activeIdeThreadId,
     ) ?? defaultComposerMode,
   );
-
   const menus = useComposerMenus(shell, { composerMode });
   const {
     activeMode,
-    cancelFullAccessConsent,
-    cancelSandboxConsent,
+    cancelFullAccessConsent, cancelSandboxConsent,
     closeMenus,
-    confirmFullAccessConsent,
-    confirmSandboxConsent,
-    disableSandboxSessionAccess,
+    confirmFullAccessConsent, confirmSandboxConsent,
+    disableSandboxSessionAccess, discardSandboxSessionChanges,
     executionAccessHint,
     fullAccessConsentChecked,
     isFullAccessAgent,
@@ -66,8 +57,10 @@ export function useAgentDockComposerSetup() {
     modeButtonTitle,
     modelSearchQuery,
     requestFullAccess,
-    requestSandboxSession,
-    sandboxConsentChecked,
+    requestSandboxSession, publishSandboxSessionChanges, reviewSandboxSessionChanges,
+    startSandboxPreview, stopSandboxPreview, restartSandboxPreview, sandboxPreviewUrl,
+    sandboxStripCollapsed, toggleSandboxStripCollapsed,
+    sandboxConsentChecked, sandboxAutoEnabled, sandboxDirty,
     sandboxEnvForced,
     sandboxHint,
     sandboxLabel,
@@ -87,7 +80,6 @@ export function useAgentDockComposerSetup() {
     switchToConsultativeAccess,
     toggleSection,
   } = menus;
-
   const {
     contextWorkspace,
     contextSelection,
@@ -105,7 +97,6 @@ export function useAgentDockComposerSetup() {
     clearSkillAttachments,
     withSkillTokensForSubmit,
   } = useComposerContext(shell);
-
   const images = useComposerImages();
   const {
     composerImages,
@@ -124,7 +115,6 @@ export function useAgentDockComposerSetup() {
     disposeComposerImagesPersistTimer,
     revokeAllComposerImagePreviews,
   } = images;
-
   function attachFilesMedia(): void {
     images.openComposerAttachmentPicker();
     closeMenus();
@@ -162,19 +152,27 @@ export function useAgentDockComposerSetup() {
   const {
     autoModelRow,
     autoToggleChecked,
+    claudeFlatRows,
     closeAddModelsPanel,
     composerPickerRows,
     cursorAuthLine,
     cursorCatalogCount,
     cursorCatalogStatus,
     cursorCatalogTotal,
+    codexCatalogRows,
+    codexCatalogStatus,
     cursorManageRows,
     cursorStaleWarning,
     extraPinnedRows,
+    isClaudeCatalog,
+    modelCatalogErrorMessage,
+    modelCatalogLoading,
+    modelCatalogLoadingLabel,
     onAutoToggleClick,
     openAddModelsPanel,
     openVaultSurface,
     runtimeDetail,
+    runtimeFamilyLabel,
     runtimeHint,
     runtimeLabel,
     runtimeTargets,
@@ -185,8 +183,11 @@ export function useAgentDockComposerSetup() {
     selectedModelLabel,
     selectedRuntimeSummary,
     showAddModelsEntry,
+    showModelCatalog,
     showCursorCatalog,
+    showCodexCatalog,
     showExtraPinnedRows,
+    showFallbackCatalogNote,
     showVaultAction,
     toggleRuntimeTargetsPanel,
   } = useComposerModelRuntime(shell, {
@@ -241,9 +242,12 @@ export function useAgentDockComposerSetup() {
     declinePlanSoftSwitchOffer,
     dismissPlanSoftSwitch,
     dismissTeammateRoute,
+    dismissWorkspaceScopeNotice,
+    switchComposerWorkspaceScope,
     handleApproveRun,
     handleComposerKeydown,
     handleDebugReproduceProceed,
+    handleDebugReproduceResolved,
     handleRejectRun,
     handleResumeRun,
     handleSteer,
@@ -264,6 +268,7 @@ export function useAgentDockComposerSetup() {
     composerImages,
     composerHistory,
     composerHistoryIndex,
+    dismissedDebugReproduceMessageId,
     submitKairoTurn,
     recordComposerHistoryIfSent,
     handleHistory,
@@ -286,6 +291,8 @@ export function useAgentDockComposerSetup() {
     composerActivityChips,
     composerDraftModel,
     canConvertInstructions,
+    instructionsGenerating,
+    instructionsSpecialistLabel,
     convertDraftToInstructions,
     composerPlaceholder,
     composerQueueHint,
@@ -319,11 +326,25 @@ export function useAgentDockComposerSetup() {
     void syncTypeaheadFromComposer();
   }
 
+  function clearComposerDraft(): void {
+    composerDraftModel.value = '';
+    if (composerMode.value !== 'kairo') {
+      persistIdeComposerDraft(
+        shell.currentWorkspace?.workspace_id ?? null,
+        '',
+        shell.activeIdeThreadId || null,
+      );
+    }
+    closeTypeahead();
+    void nextTick(syncComposerHeight);
+  }
+
   useComposerWorkspaceSync({
     shell,
     composerMode,
     defaultComposerMode,
     inputRef,
+    composerRootRef,
     applyingHistoryDraft,
     composerHistoryIndex,
     composerHistoryScratch,
@@ -351,6 +372,7 @@ export function useAgentDockComposerSetup() {
     autoModelRow,
     autoToggleChecked,
     canSubmitComposer,
+    clearComposerDraft,
     closeAddModelsPanel,
     closeComposerImageLightbox,
     composerAccessBanner,
@@ -358,6 +380,8 @@ export function useAgentDockComposerSetup() {
     composerActivityChips,
     composerDraftModel,
     canConvertInstructions,
+    instructionsGenerating,
+    instructionsSpecialistLabel,
     convertDraftToInstructions,
     composerImages,
     composerMode,
@@ -369,22 +393,31 @@ export function useAgentDockComposerSetup() {
     cancelSandboxConsent,
     confirmFullAccessConsent,
     confirmSandboxConsent,
-    disableSandboxSessionAccess,
+    disableSandboxSessionAccess, discardSandboxSessionChanges,
     attachFilesMedia,
     contextIde,
     contextPinned,
     contextSelection,
     contextTerminal,
     contextWorkspace,
+    claudeFlatRows,
     cursorAuthLine,
     cursorCatalogCount,
     cursorCatalogStatus,
     cursorCatalogTotal,
+    codexCatalogRows,
+    codexCatalogStatus,
     cursorManageRows,
     cursorStaleWarning,
+    isClaudeCatalog,
+    modelCatalogErrorMessage,
+    modelCatalogLoading,
+    modelCatalogLoadingLabel,
     debugReproduceRequest,
     dismissPlanSoftSwitch,
     dismissTeammateRoute,
+    dismissWorkspaceScopeNotice,
+    switchComposerWorkspaceScope,
     enlargedComposerImage,
     executionAccessHint,
     extraPinnedRows,
@@ -397,6 +430,7 @@ export function useAgentDockComposerSetup() {
     handleComposerPaste,
     handleDebugReproduceDismiss,
     handleDebugReproduceProceed,
+    handleDebugReproduceResolved,
     handleRejectRun,
     handleResumeRun,
     handleSteer,
@@ -417,14 +451,17 @@ export function useAgentDockComposerSetup() {
     openVaultSurface,
     planSoftSwitchNotice,
     teammateRouteNotice,
+    workspaceScopeNotice,
     removeChip,
     removeComposerImage,
     editQueuedMessage,
     removeQueuedMessage,
     requestFullAccess,
-    requestSandboxSession,
+    requestSandboxSession, publishSandboxSessionChanges, reviewSandboxSessionChanges,
+    startSandboxPreview, stopSandboxPreview, restartSandboxPreview, sandboxPreviewUrl,
+    sandboxStripCollapsed, toggleSandboxStripCollapsed,
     revealComposerTerminalPanel,
-    sandboxConsentChecked,
+    sandboxConsentChecked, sandboxAutoEnabled, sandboxDirty,
     sandboxEnvForced,
     sandboxHint,
     sandboxLabel,
@@ -432,6 +469,7 @@ export function useAgentDockComposerSetup() {
     sandboxSessionError,
     sandboxSessionPending,
     runtimeDetail,
+    runtimeFamilyLabel,
     runtimeHint,
     runtimeLabel,
     runtimeTargets,
@@ -452,7 +490,10 @@ export function useAgentDockComposerSetup() {
     showComposerSteer,
     showComposerStop,
     showContextMenu,
+    showModelCatalog,
+    showFallbackCatalogNote,
     showCursorCatalog,
+    showCodexCatalog,
     showDebugReproduceBanner,
     showExtraPinnedRows,
     showFullAccessConsent,
@@ -483,6 +524,7 @@ export function useAgentDockComposerSetup() {
     undoPlanSoftSwitch,
     undoTeammateRoute,
     updateComposerDraft,
+    composerRootRef,
     cancelFullAccessConsent,
   });
 }

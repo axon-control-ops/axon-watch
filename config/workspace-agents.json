@@ -34,7 +34,7 @@
         {
           "name": "Jules",
           "role": "frontend",
-          "owns": "console UI/UX, dock, and shell polish",
+          "owns": "Axon-X console UI/UX, mobile VAXON control-plane cockpit, orb/glass-morphism interaction design, dock, and shell polish",
           "schedule": "continuous",
           "azure_voice_id": "en-GB-LibbyNeural"
         },
@@ -63,7 +63,14 @@
           "owns": "DashPro priorities; Expo/React Native app UI + parent dashboard + OTA/canary publish; monitor self-hosted CI→PR→main (never reintroduce ubuntu-latest); ensure green builds reach Vercel production; coach upgrades",
           "schedule": "on_demand",
           "primary": true,
-          "azure_voice_id": "en-US-AriaNeural"
+          "azure_voice_id": "en-US-AriaNeural",
+          "execution_policy": {
+            "write_paths": ["docs/ops"],
+            "approved_wrappers": ["axon-agent-terminal-job"],
+            "capabilities": ["planning_write", "workspace_read"],
+            "network_mode": "none",
+            "timeout_seconds": 600
+          }
         },
         {
           "name": "Cass",
@@ -191,7 +198,7 @@
         {
           "name": "Ash",
           "role": "watcher",
-          "owns": "Centre readiness signals and enrolment blockers",
+          "owns": "Centre readiness signals, enrolment blockers, and verified health/CI receipts (Shell/Read allowed)",
           "schedule": "always_on",
           "azure_voice_id": "en-ZA-LukeNeural"
         },
@@ -205,14 +212,55 @@
         {
           "name": "Cole",
           "role": "backend",
-          "owns": "Enrolment data, NPO records, and ops checklists",
+          "owns": "Enrolment data, NPO records, ops checklists, and verified count/query scripts",
           "schedule": "continuous",
           "azure_voice_id": "en-GB-ElliotNeural"
         },
         {
           "name": "Sol",
           "role": "integrations",
-          "owns": "Document export hooks and EduDash linkage notes",
+          "owns": "Document export hooks, EduDash/chat POP delivery wiring, and smoke-script verification",
+          "schedule": "continuous",
+          "azure_voice_id": "en-GB-HollieNeural"
+        }
+      ]
+    },
+    "MoveIT": {
+      "company_name": "move-it",
+      "employees": [
+        {
+          "name": "Jabulani",
+          "role": "lead",
+          "owns": "MoveIT priorities, handoffs, and product direction",
+          "schedule": "on_demand",
+          "primary": true,
+          "azure_voice_id": "en-ZA-LeahNeural"
+        },
+        {
+          "name": "Remy",
+          "role": "watcher",
+          "owns": "MoveIT signals, connectors, and runtime health",
+          "schedule": "always_on",
+          "azure_voice_id": "en-GB-ThomasNeural"
+        },
+        {
+          "name": "Ayesha",
+          "role": "frontend",
+          "owns": "MoveIT UI/UX, shell, and frontend polish",
+          "schedule": "continuous",
+          "azure_voice_id": "en-GB-LibbyNeural"
+        },
+        {
+          "name": "Reed",
+          "role": "backend",
+          "owns": "MoveIT APIs, control plane, and persistence",
+          "schedule": "continuous",
+          "azure_voice_id": "en-GB-ElliotNeural"
+        },
+        {
+          "name": "Sol",
+          "role": "integrations",
+          "owns": "MoveIT connectors and integrated services",
           "schedule": "continuous",
           "azure_voice_id": "en-GB-HollieNeural"
         }

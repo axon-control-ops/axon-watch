@@ -79,6 +79,32 @@ _VAULT_CONSUMERS: tuple[dict[str, object], ...] = (
         ),
     },
     {
+        "id": "young_eagles_dashpro",
+        "label": "Young Eagles DashPro tenant bridge",
+        "required_keys": ("SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY"),
+        "optional_keys": (
+            "YEDC_SUPABASE_PRESCHOOL_ID",
+            "YEDC_SUPABASE_TENANT_NAME",
+            "YEDC_DASHPRO_SYNC_SECRET",
+        ),
+        "auth_note": (
+            "Store Supabase keys in /vault or materialize them in the bound Young Eagles "
+            "ops repo .env. Fleet sandboxes receive whitelisted keys via the workspace "
+            "service-connection bridge so agents can run npm run check-supabase like an operator."
+        ),
+    },
+    {
+        "id": "supabase_cli",
+        "label": "Supabase CLI migration checks",
+        "required_keys": ("SUPABASE_ACCESS_TOKEN",),
+        "auth_note": (
+            "Store SUPABASE_ACCESS_TOKEN in /vault so agents can run read-only "
+            "`supabase migration list --linked` checks without asking the operator "
+            "to paste tokens into chat. Database pushes still require explicit "
+            "deployment approval."
+        ),
+    },
+    {
         "id": "vaxon_research",
         "label": "VAXON online research (Google CSE)",
         "required_keys": ("AXON_WATCH_GOOGLE_CSE_API_KEY", "AXON_WATCH_GOOGLE_CSE_CX"),

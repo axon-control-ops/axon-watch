@@ -3,7 +3,7 @@
   "enabled": true,
   "workspace_id": "workspace_axon_watch",
   "workspace_label": "Axon-X",
-  "project_root": "/home/edp/axon-nvme/repos/axon-watch",
+  "project_root": "/run/media/vaxon/axon-data/repos/axon-nvme/repos/axon-watch",
   "checks": [
     {
       "id": "axon_x_public_origin_health",

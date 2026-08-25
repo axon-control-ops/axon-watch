@@ -5,49 +5,20 @@ from __future__ import annotations
 from copy import deepcopy
 from contextlib import contextmanager
 import json
+import logging
 import os
-import re
 import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from app.persistence import run_store_sqlite
-
-_SECRET_ASSIGNMENT_RE = re.compile(
-    r"(?i)\b([A-Z0-9_]*(?:TOKEN|SECRET|PASSWORD|API_KEY|APIKEY))"
-    r"\s*([:=])\s*([^\s,;]+)"
-)
-_BEARER_RE = re.compile(r"(?i)\bbearer\s+[A-Za-z0-9._~+/=-]+")
-_KNOWN_TOKEN_RE = re.compile(r"\b(?:gh[pousr]_[A-Za-z0-9]{20,}|sk-[A-Za-z0-9_-]{20,})\b")
-_SENSITIVE_KEY_RE = re.compile(
-    r"(?i)(token|secret|password|api[_-]?key|authorization|credential)"
+from app.persistence.autonomous_attention_decisions import supersede_pending_decision
+from app.persistence.autonomous_attention_redaction import (
+    redact_payload as _redact_payload,
+    redact_text as _redact_text,
 )
 
-
-def _redact_text(value: Any) -> str:
-    text = str(value or "")
-    text = _SECRET_ASSIGNMENT_RE.sub(r"\1\2[REDACTED]", text)
-    text = _BEARER_RE.sub("Bearer [REDACTED]", text)
-    return _KNOWN_TOKEN_RE.sub("[REDACTED]", text)
-
-
-def _redact_payload(value: Any) -> Any:
-    if isinstance(value, dict):
-        return {
-            str(key): (
-                "[REDACTED]"
-                if _SENSITIVE_KEY_RE.search(str(key))
-                else _redact_payload(item)
-            )
-            for key, item in value.items()
-        }
-    if isinstance(value, list):
-        return [_redact_payload(item) for item in value]
-    if isinstance(value, tuple):
-        return [_redact_payload(item) for item in value]
-    if isinstance(value, str):
-        return _redact_text(value)
-    return value
+logger = logging.getLogger(__name__)
 
 _RECEIPT_COLUMNS = (
     "receipt_id",
@@ -282,7 +253,59 @@ def append_receipt(
         "ask_operator": bool(record["ask_operator"]),
         "payload": _redact_payload(payload or {}),
     }
+    _index_constitution_receipt(stored)
     return deepcopy(stored)
+
+
+def _index_constitution_receipt(receipt: dict[str, Any]) -> None:
+    """Best-effort constitution trace for autonomy decisions.
+
+    The autonomy receipt remains the source of truth. The constitution registry
+    stores an index + canonical decision record so VAXON can later explain why
+    a dispatch/escalation/skip happened without duplicating execution.
+    """
+    try:
+        from app.persistence import constitution_registry_store as registry
+        from app.persistence.evidence_ref_adapters import index_autonomy_receipt
+
+        receipt_id = str(receipt.get("receipt_id") or "").strip()
+        if not receipt_id:
+            return
+        evidence = index_autonomy_receipt(
+            receipt_id=receipt_id,
+            workspace_id=str(receipt.get("workspace_id") or ""),
+            decision=str(receipt.get("decision") or ""),
+            tier=str(receipt.get("tier") or ""),
+            risk=str(receipt.get("risk") or ""),
+            task_id=receipt.get("task_id"),
+            summary=str(receipt.get("title") or receipt.get("detail") or ""),
+        )
+        decision = registry.record_decision(
+            actor="autonomous_attention",
+            capability_id="CAP-034",
+            decision=str(receipt.get("decision") or "skip"),
+            tier=str(receipt.get("tier") or "unclassified"),
+            risk=str(receipt.get("risk") or "normal"),
+            explanation=str(receipt.get("detail") or receipt.get("title") or ""),
+            confidence=None,
+            confidence_note="confidence_unavailable",
+            task_id=receipt.get("task_id"),
+            source_table="autonomy_attention_receipts",
+            source_id=receipt_id,
+            evidence_ids=[str(evidence["evidence_id"])],
+        )
+        index_autonomy_receipt(
+            receipt_id=receipt_id,
+            workspace_id=str(receipt.get("workspace_id") or ""),
+            decision=str(receipt.get("decision") or ""),
+            tier=str(receipt.get("tier") or ""),
+            risk=str(receipt.get("risk") or ""),
+            task_id=receipt.get("task_id"),
+            summary=str(receipt.get("title") or receipt.get("detail") or ""),
+            decision_id=str(decision["decision_id"]),
+        )
+    except Exception:
+        logger.exception("constitution indexing failed for autonomy receipt")
 
 
 def get_receipt(receipt_id: str) -> dict[str, Any] | None:
@@ -442,6 +465,17 @@ def resolve_decision(
         raise
 
 
+def soft_dedupe_key(dedupe_key: str) -> str:
+    """Collapse failed_shift:ws:role:run_id → failed_shift:ws:role for twin suppression."""
+    key = str(dedupe_key or "").strip().lower()
+    if not key:
+        return ""
+    parts = key.split(":")
+    if parts and parts[0] == "failed_shift" and len(parts) >= 3:
+        return f"failed_shift:{parts[1]}:{parts[2]}"
+    return key
+
+
 def has_recent_dedupe_key(
     dedupe_key: str,
     *,
@@ -450,17 +484,18 @@ def has_recent_dedupe_key(
     key = str(dedupe_key or "").strip()
     if not key:
         return False
+    soft = soft_dedupe_key(key)
     pending = list_pending_decisions(limit=500)
-    if any(str(row.get("dedupe_key") or "") == key for row in pending):
+    if any(soft_dedupe_key(str(row.get("dedupe_key") or "")) == soft for row in pending):
         return True
     resolving = list_receipts(limit=500, status="resolving")
-    if any(str(row.get("dedupe_key") or "") == key for row in resolving):
+    if any(soft_dedupe_key(str(row.get("dedupe_key") or "")) == soft for row in resolving):
         return True
     cutoff = datetime.now(timezone.utc) - timedelta(
         seconds=max(1, int(cooldown_seconds))
     )
     for row in list_receipts(limit=500):
-        if str(row.get("dedupe_key") or "") != key:
+        if soft_dedupe_key(str(row.get("dedupe_key") or "")) != soft:
             continue
         raw = str(row.get("resolved_at") or row.get("created_at") or "").replace(
             "Z", "+00:00"
@@ -480,10 +515,12 @@ __all__ = [
     "append_receipt",
     "begin_decision_resolution",
     "complete_decision_resolution",
+    "supersede_pending_decision",
     "ensure_autonomy_receipt_schema",
     "get_receipt",
     "get_meta",
     "has_recent_dedupe_key",
+    "soft_dedupe_key",
     "list_pending_decisions",
     "list_receipts",
     "release_decision_resolution",

@@ -16,6 +16,7 @@ from app.chat.workspace_git import (
 )
 from app.cli_runtime.approval_gate import full_access_requested
 from app.plain_text_to_instructions import prompt_requests_git_actions
+from app.workspace_agents.execution_policy import AgentExecutionPolicy
 
 _COMMIT_INTENT_RE = re.compile(
     r"\b(?:commit(?:\s+(?:these|my|the|all))?(?:\s+changes?)?(?:\s+and\s+push)?"
@@ -121,8 +122,14 @@ def resolve_stage_plan(
     if mentioned:
         return mentioned, None
 
-    allow_all = bool(_COMMIT_ALL_RE.search(user_prompt)) or continue_prompt is None
-    if allow_all:
+    # The mixed-tree guard below used to only run for "commit … then …"
+    # continuation turns — a plain "commit and push" (the common phrasing,
+    # `continue_prompt is None`) skipped straight to a blind `git add -A`.
+    # That let one task's commit sweep up whatever unrelated, concurrent
+    # agent's dirty files happened to be sitting in the same workspace root
+    # at that moment. Apply the same guard to every commit turn instead.
+    explicit_commit_all = bool(_COMMIT_ALL_RE.search(user_prompt))
+    if explicit_commit_all:
         return None, None
 
     if _mixed_tree_needs_explicit_scope(changed):
@@ -132,7 +139,8 @@ def resolve_stage_plan(
         return [], (
             "Working tree spans multiple areas "
             f"({', '.join(tops[:5])}; {len(changed)} files). "
-            "I will not run a blind `git add -A` on a commit-then turn. "
+            "I will not run a blind `git add -A` when this much is pending — "
+            "some of it may belong to other concurrent work. "
             "Reply with `commit all and then …`, or name paths to stage "
             f"(pending includes: {sample}{more})."
         )
@@ -144,6 +152,7 @@ def try_lane_b_git_commit_dispatch(
     workspace_id: str,
     user_prompt: str,
     execution_access: str | None,
+    execution_policy: AgentExecutionPolicy | None = None,
 ) -> dict[str, object] | None:
     if not full_access_requested(execution_access):
         return None
@@ -151,6 +160,28 @@ def try_lane_b_git_commit_dispatch(
         return None
     if not prompt_requests_git_actions(user_prompt):
         return None
+
+    # execution_access above is the OPERATOR's own Full Access toggle — it says
+    # nothing about which employee's thread this turn is dispatched under. A
+    # chat message that lands in a consultative-only role's thread (e.g.
+    # watcher: write_paths=(), execution_access="consultative") must not run a
+    # real `git add`/`commit`/`push` just because the operator's own toggle is
+    # on; that role is never allowed to write, regardless of who is asking.
+    if execution_policy is not None and execution_policy.execution_access != "full":
+        return {
+            "content": (
+                "This teammate's role is consultative-only and has no write scope "
+                "— I can't run git add/commit/push here regardless of Full Access. "
+                "Ask a role with write access (Lead/Frontend/Backend/Integrations) "
+                "to make this commit, or do it from a thread bound to one of those roles."
+            ),
+            "dispatched": False,
+            "continue_prompt": None,
+            "execution_tier": "executing",
+            "runtime_id": "workspace_git",
+            "runtime_label": "workspace git",
+            "reason": "role execution_access is not full",
+        }
 
     continue_prompt = split_commit_then_remainder(user_prompt)
     subject_source = continue_prompt or user_prompt
@@ -211,6 +242,10 @@ def try_lane_b_git_commit_dispatch(
     message = explicit_message or derive_commit_message(
         workspace_id,
         turn_subject=subject_source,
+        # None means "git add -A" (whole tree is genuinely the change); a
+        # concrete list means only those paths are being staged, so the
+        # subject must describe just them, not everything sitting dirty.
+        scoped_paths=stage_paths,
     )
     if not message.strip() or message.strip() == "Update via Axon-X":
         lines.extend(

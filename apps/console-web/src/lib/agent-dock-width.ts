@@ -1,4 +1,8 @@
 export const AGENT_DOCK_WIDTH_KEY = 'axon-x-agent-dock-width-v1';
+// Separate storage key: the Operator Live Ops rail and the IDE agent dock
+// render in the same shell slot but must not share a persisted width --
+// resizing one used to silently resize the other on the next mode switch.
+export const LIVE_OPS_WIDTH_KEY = 'axon-x-live-ops-width-v1';
 export const DEFAULT_AGENT_DOCK_WIDTH = 380;
 export const MIN_AGENT_DOCK_WIDTH = 280;
 export const MAX_AGENT_DOCK_WIDTH = 720;
@@ -28,6 +32,13 @@ export function clampAgentDockWidth(width: number, viewportWidth: number): numbe
 
 export function defaultAgentDockWidth(viewportWidth: number): number {
   const target = Math.round(viewportWidth * 0.32);
+  return clampAgentDockWidth(target, viewportWidth);
+}
+
+export const DEFAULT_OPERATOR_LIVE_OPS_GLANCE_WIDTH = 360;
+
+export function defaultOperatorLiveOpsGlanceWidth(viewportWidth: number): number {
+  const target = Math.max(DEFAULT_OPERATOR_LIVE_OPS_GLANCE_WIDTH, Math.round(viewportWidth * 0.22));
   return clampAgentDockWidth(target, viewportWidth);
 }
 
@@ -100,12 +111,12 @@ export function applyAgentDockResizeKeyAction(
   return defaultAgentDockWidth(viewportWidth);
 }
 
-export function readStoredAgentDockWidth(): number | null {
+export function readStoredAgentDockWidth(storageKey: string = AGENT_DOCK_WIDTH_KEY): number | null {
   if (typeof window === 'undefined') {
     return null;
   }
 
-  const raw = window.localStorage.getItem(AGENT_DOCK_WIDTH_KEY);
+  const raw = window.localStorage.getItem(storageKey);
   if (!raw) {
     return null;
   }
@@ -114,10 +125,13 @@ export function readStoredAgentDockWidth(): number | null {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
-export function persistAgentDockWidth(width: number): void {
+export function persistAgentDockWidth(
+  width: number,
+  storageKey: string = AGENT_DOCK_WIDTH_KEY,
+): void {
   if (typeof window === 'undefined') {
     return;
   }
 
-  window.localStorage.setItem(AGENT_DOCK_WIDTH_KEY, String(width));
+  window.localStorage.setItem(storageKey, String(width));
 }

@@ -41,6 +41,15 @@ def _utc_now_iso() -> str:
     )
 
 
+def _normalize_runtime_target(raw: Any) -> str:
+    value = str(raw or "").strip()
+    if not value:
+        return ""
+    if all(char.isalnum() or char in {"_", "-", "."} for char in value):
+        return value[:120]
+    return ""
+
+
 def _normalize_settings(raw: dict[str, Any] | None) -> dict[str, bool | str | float]:
     defaults = default_operator_presence_settings()
     if not raw:
@@ -89,6 +98,9 @@ def _normalize_settings(raw: dict[str, Any] | None) -> dict[str, bool | str | fl
             value = str(raw[key] or defaults[key]).strip()
             if value:
                 normalized[key] = value[:120]
+            continue
+        if key == "auto_composer_runtime_target":
+            normalized[key] = _normalize_runtime_target(raw[key])
             continue
         if key == "autonomy_mode":
             value = str(raw[key] or defaults[key]).strip().lower()

@@ -58,7 +58,10 @@ function resolveOperatorToken(): string {
   return '';
 }
 
-const operatorToken = resolveOperatorToken();
+const proxyOperatorAuthEnabled = ['1', 'true', 'yes', 'on'].includes(
+  (process.env.AXON_WATCH_VITE_INJECT_OPERATOR_TOKEN || '').trim().toLowerCase(),
+);
+const operatorToken = proxyOperatorAuthEnabled ? resolveOperatorToken() : '';
 
 function resolveAllowedHosts(): string[] {
   // Vite preview blocks unknown Host headers. Soft-cutover :7734 rewrote Host to
@@ -82,11 +85,13 @@ function resolveAllowedHosts(): string[] {
 const allowedHosts = resolveAllowedHosts();
 
 function injectOperatorAuth(proxyReq: { setHeader: (name: string, value: string) => void }) {
-  // Always-on Gate 2: console :4173 → vite /api proxy → CP appears as loopback.
-  // With AUTH_ALLOW_LOOPBACK=0 the browser must not rely on loopback bypass;
-  // inject the deployment operator token on proxied mutating calls.
-  // Dev :5173 also loads ~/.config/axon-watch/deployment.env when the process
-  // env is unset (plain `npm run dev` without run-5173.sh).
+  // Explicit trusted-dev escape hatch only. Default browser traffic must use
+  // the HttpOnly operator session; silently injecting the deployment token
+  // here bypasses the product login and makes a remote browser indistinguishable
+  // from an authenticated operator.
+  if (!proxyOperatorAuthEnabled) {
+    return;
+  }
   const token = operatorToken || (process.env.AXON_WATCH_OPERATOR_TOKEN || '').trim();
   if (!token || token === 'replace-me') {
     return;

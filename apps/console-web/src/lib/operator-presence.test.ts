@@ -44,6 +44,8 @@ describe('operator presence helpers', () => {
           proactive_duplex_enabled: false,
           autonomy_mode: 'manual',
           vaxon_model_id: 'gpt-5.4-high',
+          auto_composer_runtime_override_enabled: false,
+          auto_composer_runtime_target: '',
         },
         spoken_alert: {
           eligible: false,
@@ -57,9 +59,12 @@ describe('operator presence helpers', () => {
   });
 
   it('dedupes spoken alerts within a session', () => {
+    const store = new Map<string, string>();
     const storage = {
-      getItem: vi.fn().mockReturnValue(null),
-      setItem: vi.fn(),
+      getItem: vi.fn((key: string) => store.get(key) ?? null),
+      setItem: vi.fn((key: string, value: string) => {
+        store.set(key, value);
+      }),
     };
     const alert = {
       eligible: true,
@@ -69,8 +74,34 @@ describe('operator presence helpers', () => {
     };
 
     expect(shouldSpeakAlert(alert, storage)).toBe(true);
-    storage.getItem.mockReturnValue(spokenAlertDedupeKey(alert));
     expect(shouldSpeakAlert(alert, storage)).toBe(false);
+    expect(spokenAlertDedupeKey(alert)).toBe('operator_approval_required');
+  });
+
+  it('keeps multiple recent alert keys across tabs', () => {
+    const store = new Map<string, string>();
+    const storage = {
+      getItem: vi.fn((key: string) => store.get(key) ?? null),
+      setItem: vi.fn((key: string, value: string) => {
+        store.set(key, value);
+      }),
+    };
+    const first = {
+      eligible: true,
+      reason: 'autonomy_advisory',
+      signal_id: 'advisory:1',
+      message: 'Lead reviews are ready.',
+    };
+    const second = {
+      eligible: true,
+      reason: 'ci_remediation_failure',
+      signal_id: 'signal_ci',
+      message: 'CI still red.',
+    };
+    expect(shouldSpeakAlert(first, storage)).toBe(true);
+    expect(shouldSpeakAlert(second, storage)).toBe(true);
+    expect(shouldSpeakAlert(first, storage)).toBe(false);
+    expect(shouldSpeakAlert(second, storage)).toBe(false);
   });
 
   it('speaks eligible alerts once', async () => {

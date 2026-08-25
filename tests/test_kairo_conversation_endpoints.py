@@ -55,6 +55,18 @@ class KairoConversationEndpointTests(unittest.TestCase):
         clear_pack_cache_for_tests()
         clear_memory_for_tests()
         isolate_control_plane_db(self, run_store)
+        runtime = patch(
+            "app.kairo_conversation.dispatch_ide_composer",
+            return_value={
+                "content": "",
+                "dispatched": False,
+                "runtime_id": "test_runtime",
+                "runtime_label": "Test runtime",
+                "reason": "unit-test runtime disabled",
+            },
+        )
+        runtime.start()
+        self.addCleanup(runtime.stop)
         self.client = TestClient(app)
         self.addCleanup(self.client.close)
 
@@ -73,10 +85,11 @@ class KairoConversationEndpointTests(unittest.TestCase):
             "requires_confirmation", "action", "artifacts", "active_participant",
             "action_tier", "dispatch_lane", "voice_routing_mode",
             "model_receipt", "routing_receipt",
-            "report", "vaxon_model_id",
+            "report", "vaxon_model_id", "submission_intent",
         }
         self.assertEqual(expected, set(payload))
         self.assertEqual("status_question", payload["turn_kind"])
+        self.assertEqual("ask", payload["submission_intent"])
         self.assertTrue(payload["reply"])
 
     @patch("app.routes.operator.converse_turn", return_value={"turn_kind": "chat", "reply": "ok"})
@@ -88,6 +101,27 @@ class KairoConversationEndpointTests(unittest.TestCase):
         self.assertEqual(200, response.status_code)
         self.assertTrue(mock_converse.called)
         self.assertTrue(mock_converse.call_args.kwargs["force_refresh"])
+        self.assertEqual("ask", mock_converse.call_args.kwargs["submission_intent"])
+
+    @patch(_GRAPH_PATCH, return_value=_MOCK_GRAPH)
+    @patch(_FLEET_PATCH, return_value=_MOCK_FLEET)
+    @patch(_BRIEFING_PATCH, return_value=_MOCK_BRIEFING)
+    def test_converse_endpoint_defaults_to_ask_not_dispatch(self, *_mocks: object) -> None:
+        response = self.client.post(
+            "/api/kairo/converse",
+            json={"content": "health", "session_id": "endpoint-default-ask"},
+        )
+        self.assertEqual(200, response.status_code)
+        payload = response.json()
+        self.assertEqual("status_question", payload["turn_kind"])
+        self.assertIsNone(payload["command_content"])
+
+    def test_converse_endpoint_rejects_unknown_submission_intent(self) -> None:
+        response = self.client.post(
+            "/api/kairo/converse",
+            json={"content": "health", "submission_intent": "auto"},
+        )
+        self.assertEqual(422, response.status_code)
 
     @patch(_GRAPH_PATCH, return_value=_MOCK_GRAPH)
     @patch(_FLEET_PATCH, return_value=_MOCK_FLEET)
@@ -99,7 +133,7 @@ class KairoConversationEndpointTests(unittest.TestCase):
         session_id = "endpoint-auto-dispatch"
         first = self.client.post(
             "/api/kairo/converse",
-            json={"content": "health", "session_id": session_id},
+            json={"content": "health", "session_id": session_id, "submission_intent": "dispatch"},
         )
         self.assertEqual(200, first.status_code)
         self.assertEqual("command", first.json()["turn_kind"])
@@ -126,7 +160,11 @@ class KairoConversationEndpointTests(unittest.TestCase):
         ):
             response = self.client.post(
                 "/api/kairo/converse",
-                json={"content": content, "session_id": f"health-policy-{index}"},
+                json={
+                    "content": content,
+                    "session_id": f"health-policy-{index}",
+                    "submission_intent": "dispatch",
+                },
             )
             self.assertEqual(200, response.status_code, content)
             payload = response.json()

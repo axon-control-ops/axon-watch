@@ -12,6 +12,8 @@ from pathlib import Path
 from typing import Any, Iterator
 from uuid import uuid4
 
+from app.persistence.sqlite_connection import ManagedConnection
+
 _LOCK = threading.Lock()
 _MEMORY_CONN: sqlite3.Connection | None = None
 
@@ -53,7 +55,9 @@ def _connect() -> sqlite3.Connection:
     path = _db_path()
     if path is None:
         if _MEMORY_CONN is None:
-            _MEMORY_CONN = sqlite3.connect(":memory:", check_same_thread=False)
+            _MEMORY_CONN = sqlite3.connect(
+                ":memory:", check_same_thread=False, factory=ManagedConnection
+            )
             _MEMORY_CONN.row_factory = sqlite3.Row
             _ensure_schema(_MEMORY_CONN)
         return _MEMORY_CONN

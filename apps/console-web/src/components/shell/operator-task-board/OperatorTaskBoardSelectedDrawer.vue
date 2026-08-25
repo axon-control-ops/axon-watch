@@ -86,7 +86,7 @@ const emit = defineEmits<{
         class="operator-task-board__submit"
         @click="emit('openVaxonReview')"
       >
-        Open VAXON review
+        Open Lead review
       </button>
       <button
         v-if="row.canCancel"

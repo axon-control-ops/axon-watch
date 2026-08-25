@@ -18,12 +18,15 @@ from app.chat.progress_milestones import (
 from app.chat.stream_hub import clear_chat_stream_buffer, publish_chat_stream_event
 from app.cli_runtime.research_stream_blocks import normalize_transcript_content
 from app.persistence import chat_store
+from app.persistence import run_store
 from app.terminal.active_chat_stream import (
     clear_active_chat_stream,
     register_active_chat_stream,
 )
 from app.terminal.agent_job_chat import merge_active_agent_job_terminals
 from app.workspace_agents import build_company_roster
+from app.workspace_agents.assignment_messages import employee_display_name, readable_goal
+from app.workspace_agents.assignment_voice import narrate_worker_started
 from app.workspace_agents.config_loader import EmployeeConfig
 
 logger = logging.getLogger(__name__)
@@ -67,12 +70,7 @@ def resolve_worker_employee_id(workspace_id: str, employee: EmployeeConfig) -> s
 def _task_goal_preview(task: dict[str, Any] | None) -> str:
     if not isinstance(task, dict):
         return "(no task goal)"
-    goal = " ".join(str(task.get("goal") or "").split())
-    if not goal:
-        return "(no task goal)"
-    if len(goal) > 400:
-        return f"{goal[:399].rstrip()}…"
-    return goal
+    return readable_goal(str(task.get("goal") or ""), max_chars=400)
 
 
 def prepare_worker_ide_stream(
@@ -101,7 +99,12 @@ def prepare_worker_ide_stream(
         employee_id=employee_id,
         thread_kind="ide",
     )
-    display_name = str(employee.name or "").strip() or employee.role.replace("_", " ").title()
+    display_name = employee_display_name(
+        {
+            "name": employee.name,
+        },
+        employee.role,
+    )
     if thread is None:
         thread = chat_store.create_thread(
             workspace_id=workspace_id,
@@ -117,18 +120,27 @@ def prepare_worker_ide_stream(
 
     chat_store.save_message(
         {
-            "message_id": _new_message_id("message_operator"),
+            "message_id": _new_message_id("message_agent"),
             "thread_id": thread_id,
             "workspace_id": workspace_id,
             "run_id": run_id,
-            "role": "operator",
-            "content": (
-                f"Continuous worker dispatch started.\n"
-                f"Role: {employee.role}\n"
-                f"Task: {task_id}\n"
-                f"Run: {run_id}\n"
-                f"Goal: {_task_goal_preview(task)}"
+            "role": "agent",
+            "content": narrate_worker_started(
+                workspace_id=workspace_id,
+                assignee_name=display_name,
+                assignee_role=employee.role,
+                goal=_task_goal_preview(task),
+                task_id=task_id,
+                run_id=run_id,
+                # exclusive_paths (never backfilled) is the honest, task-specific
+                # file list — allowed_paths is the full role write-scope
+                # enforcement ceiling and shows a generic template for every
+                # task when the goal names no real path.
+                expected_files=list((task or {}).get("exclusive_paths") or []),
             ),
+            "speaker_name": display_name,
+            "speaker_role": employee.role,
+            "speaker_employee_id": employee_id,
             "created_at": created_at,
         }
     )
@@ -158,6 +170,9 @@ def prepare_worker_ide_stream(
             "run_id": run_id,
             "role": "agent",
             "content": "",
+            "speaker_name": display_name,
+            "speaker_role": employee.role,
+            "speaker_employee_id": employee_id,
             "created_at": created_at,
         }
     )
@@ -202,6 +217,21 @@ def stream_worker_chunk(
     )
 
 
+def _latest_completion_gate_summary(run_record: dict[str, Any] | None) -> str:
+    history_ref = str((run_record or {}).get("history_ref") or "").strip()
+    if not history_ref:
+        return ""
+    fallback = ""
+    for item in reversed(run_store.list_history(history_ref)):
+        receipt = item.get("receipt") if isinstance(item, dict) else None
+        if isinstance(receipt, dict) and receipt.get("type") == "completion_gate":
+            summary = str(receipt.get("summary") or "").strip()
+            if "commit=pending" not in summary:
+                return summary
+            fallback = fallback or summary
+    return fallback
+
+
 def finalize_worker_ide_stream(
     stream: WorkerIdeStream,
     *,
@@ -215,6 +245,9 @@ def finalize_worker_ide_stream(
         stream.agent_message_id,
         agent_content,
     )
+    gate_summary = _latest_completion_gate_summary(run_record)
+    if gate_summary:
+        agent_content = f"{agent_content.rstrip()}\n\nDelivery receipt: {gate_summary}".strip()
     chat_store.update_message_content(
         message_id=stream.agent_message_id,
         content=agent_content,

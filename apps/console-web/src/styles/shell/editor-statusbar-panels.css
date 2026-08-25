@@ -222,6 +222,22 @@
   outline-offset: 2px;
 }
 
+.editor-statusbar__panel-toggle--problems {
+  border-color: rgba(255, 110, 90, 0.38);
+  background: rgba(120, 40, 32, 0.42);
+  color: rgba(255, 190, 170, 0.96);
+  box-shadow: inset 0 -1px 0 rgba(190, 80, 60, 0.38);
+}
+
+.editor-statusbar__panel-toggle--problems:hover,
+.editor-statusbar__panel-toggle--problems:focus-visible {
+  border-color: rgba(220, 110, 90, 0.52);
+  background: rgba(110, 36, 28, 0.55);
+  color: rgba(255, 210, 190, 1);
+  outline: 2px solid rgba(220, 110, 90, 0.55);
+  outline-offset: 2px;
+}
+
 .editor-statusbar__panel-toggle--team-failure {
   border-color: rgba(190, 80, 60, 0.38);
   background: rgba(90, 28, 22, 0.55);

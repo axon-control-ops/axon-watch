@@ -143,7 +143,11 @@ describe('company-roster-actions', () => {
     expect(employeeRetryDraft(failed)).toMatch(/My last continuous shift on .+ failed/);
     expect(employeeRetryDraft(failed)).not.toMatch(/^I am /);
     expect(employeeRetryDraft(failed)).toContain('vitest: assertion failed');
-    expect(employeeRetryDraft(failed).toLowerCase()).toContain('first person');
+    // First-person/persona voice steering is injected server-side by
+    // employee_persona_prompt.py for every employee dispatch — it must not be
+    // duplicated into this operator-visible, persisted retry message.
+    expect(employeeRetryDraft(failed).toLowerCase()).not.toContain('first person');
+    expect(employeeRetryDraft(failed)).not.toContain('acting as');
     expect(employeeChatDraft(failed, 'retry')).toBe(employeeRetryDraft(failed));
 
     expect(employeeReceiptsDraft(failed)).toContain('run_failed_abc123');
@@ -152,6 +156,27 @@ describe('company-roster-actions', () => {
     expect(employeeReceiptsDraft(failed)).not.toContain("Priya's");
     expect(employeeReceiptsDraft(failed)).not.toContain('Error: Run completed');
     expect(employeeChatComposerMode('receipts')).toBe('ask');
+  });
+
+  it('drops retry (but keeps receipts/talk) for a working-as-intended private-material block', () => {
+    const blocked = employee({
+      status: 'idle',
+      last_outcome: 'failed',
+      last_outcome_detail:
+        'Workspace delivery blocked: private_company_material: assets/TPS-PACK.zip matches ' +
+        'a private-document rule (financial records, RFQ packs, exports, and office-document ' +
+        'formats never leave a workspace automatically) -- this is expected, working-as-intended ' +
+        "behavior, not an error to retry.",
+      last_run_id: 'run_blocked_abc123',
+    });
+    expect(employeeQuickActions(blocked).map((action) => action.id)).toEqual([
+      'receipts',
+      'talk',
+      'status',
+      'assign',
+      'toggle_enabled',
+    ]);
+    expect(employeeQuickActions(blocked).find((action) => action.id === 'retry')).toBeUndefined();
   });
 
   it('still offers Try again when Cursor usage is exhausted (copy warns; dock must not hide retry)', () => {

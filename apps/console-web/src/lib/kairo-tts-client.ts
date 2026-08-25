@@ -50,6 +50,7 @@ export async function postKairoTts(
     rate?: number;
     pitch?: number;
     voice?: string;
+    continuation?: boolean;
   } = {},
 ): Promise<KairoTtsResponse> {
   // Azure synthesis is allowed 12 seconds server-side. Keep the client budget
@@ -71,6 +72,7 @@ export async function postKairoTts(
         ...(typeof options.rate === 'number' ? { rate: options.rate } : {}),
         ...(typeof options.pitch === 'number' ? { pitch: options.pitch } : {}),
         ...(options.voice ? { voice: options.voice } : {}),
+        ...(options.continuation ? { continuation: true } : {}),
       }),
       signal: controller.signal,
     });

@@ -28,6 +28,28 @@ describe('rewriteComposerAskOptionAnswer', () => {
     expect(rewritten?.content).toContain('(answer to: How should I clear the canary gate?)');
   });
 
+  it('rewrites a bare digit for a plain cross-platform numbered question', () => {
+    const content = [
+      'What should the workspace validation cover?',
+      '',
+      '1. Graduation groups',
+      '2. Confirmed but unallocated children',
+      '3. Cross-system sync',
+      '4. All of the above',
+    ].join('\n');
+
+    const rewritten = rewriteComposerAskOptionAnswer('4', [
+      {
+        message_id: 'msg_plain_cross_platform_ask',
+        role: 'agent',
+        content,
+      },
+    ]);
+
+    expect(rewritten?.content).toContain('Selected option 4: All of the above');
+    expect(rewritten?.content).toContain('(answer to: What should the workspace validation cover?)');
+  });
+
   it('ignores bare digits when there is no open ask', () => {
     expect(
       rewriteComposerAskOptionAnswer('3', [

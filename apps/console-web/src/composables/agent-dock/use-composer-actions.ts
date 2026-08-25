@@ -1,6 +1,8 @@
 import type { Ref } from 'vue';
+import { nextTick } from 'vue';
 
 import {
+  shouldProceedDebugReproduceComposer,
   shouldSteerAgentDockComposer,
   shouldSubmitAgentDockComposer,
 } from '../../lib/agent-dock-composer-input';
@@ -21,26 +23,34 @@ import {
 } from '../../lib/apply-employee-specialty-route';
 import { shouldSoftSwitchAgentToPlan } from '../../lib/composer-plan-auto-switch';
 import {
+  isVagueNamedAssignPrompt,
   matchNamedAssignEmployee,
   rewriteNamedAssignPrompt,
 } from '../../lib/named-assign-route';
 import { resolveEmployeeSpecialtyRoute } from '../../lib/resolve-employee-specialty-route';
 import { shouldApplySpecialtyRouteNow } from '../../lib/specialty-route-busy-gate';
-import { DEBUG_REPRODUCE_PROCEED_MESSAGE } from '../../lib/debug-reproduce-view';
 import {
   findIdeComposerQueueEntry,
   type IdeComposerMode,
 } from '../../lib/ide-composer-queue';
 import { persistIdeComposerDraft } from '../../lib/ide-composer-draft-prefs';
 import { focusAgentDockComposerInput } from '../../lib/agent-dock-composer-focus';
+import type { TeammateRouteNotice } from '../../lib/teammate-route-notice';
+import { resolveComposerWorkspaceScopeMismatch } from '../../lib/composer-workspace-scope';
 import {
-  type TeammateRouteNotice,
-} from '../../lib/teammate-route-notice';
+  clearWorkspaceScopeNotice, stayInCurrentWorkspaceScope,
+  setWorkspaceScopeNotice, workspaceScopeNotice, isWorkspaceScopePairSuppressed,
+  type WorkspaceScopeNotice,
+} from '../../lib/workspace-scope-notice';
+import { applyChatUiAction } from '../../lib/chat-ui-action';
 import { resolveLiveBusyEmployeeIds } from '../../features/workspace-agents/company-roster-busy';
 import { useShellStore } from '../../stores/shell';
+import { useDebugReproduceActions } from './use-debug-reproduce-actions';
 import type { ComposerMode } from './use-composer-menus';
 
 type ShellStore = ReturnType<typeof useShellStore>;
+
+export type { WorkspaceScopeNotice };
 
 export type PlanSoftSwitchNotice = {
   reason: string;
@@ -61,6 +71,7 @@ type UseComposerActionsOptions = {
   composerImages: Ref<ComposerClipboardImage[]>;
   composerHistory: Ref<string[]>;
   composerHistoryIndex: Ref<number>;
+  dismissedDebugReproduceMessageId: Ref<string | null>;
   submitKairoTurn: (
     draft: string,
     options?: { dockAttachments?: ComposerClipboardImage[] },
@@ -89,6 +100,7 @@ export function useComposerActions(options: UseComposerActionsOptions) {
     composerImages,
     composerHistory,
     composerHistoryIndex,
+    dismissedDebugReproduceMessageId,
     submitKairoTurn,
     recordComposerHistoryIfSent,
     handleHistory,
@@ -131,39 +143,33 @@ export function useComposerActions(options: UseComposerActionsOptions) {
     return applied.routed;
   }
 
-  function handleApproveRun(): void {
-    void shell.approveIdeAgentRun();
-  }
-
-  function handleRejectRun(): void {
-    void shell.rejectIdeAgentRun();
-  }
-
-  function handleStopRun(): void {
-    void shell.stopIdeAgentRun();
-  }
-
-  function handleResumeRun(): void {
-    void shell.resumeIdeAgentRun();
-  }
-
-  function toggleVoiceCapture(): void {
+  const handleApproveRun = (): void => { void shell.approveIdeAgentRun(); };
+  const handleRejectRun = (): void => { void shell.rejectIdeAgentRun(); };
+  const handleStopRun = (): void => { void shell.stopIdeAgentRun(); };
+  const handleResumeRun = (): void => { void shell.resumeIdeAgentRun(); };
+  const toggleVoiceCapture = (): void => {
     if (speechCapture.capturing.value) {
       stopVoiceCapture();
       return;
     }
     shell.interruptKairoVoice();
     startVoiceCapture();
-  }
-
-  async function handleDebugReproduceProceed(messageId: string): Promise<void> {
-    if (composerMode.value !== 'debug' && shell.ideAgentLinkedRun?.mode !== 'debug') {
-      composerMode.value = 'debug';
-    }
-    onDebugReproduceProceed?.(messageId);
-    shell.ideComposerDraft = DEBUG_REPRODUCE_PROCEED_MESSAGE;
-    await shell.submitIdeComposer('debug');
-  }
+  };
+  const {
+    debugReproduceActive,
+    activeDebugReproduceMessageId,
+    handleDebugReproduceProceed,
+    handleDebugReproduceResolved,
+  } = useDebugReproduceActions({
+    shell,
+    composerMode,
+    composerImages,
+    dismissedDebugReproduceMessageId,
+    recordComposerHistoryIfSent,
+    onDebugReproduceProceed,
+    withSkillTokensForSubmit,
+    clearSkillAttachments,
+  });
 
   async function handleSubmit(event?: Event): Promise<void> {
     event?.preventDefault();
@@ -216,8 +222,22 @@ export function useComposerActions(options: UseComposerActionsOptions) {
       }
     }
 
-    dismissEmployeeSpecialtyRoute();
     const workspaceId = shell.currentWorkspace?.workspace_id ?? '';
+    const scopeMismatch = resolveComposerWorkspaceScopeMismatch(workspaceId, submitDraft);
+    // A suppressed pair must fall through and send, never abort silently.
+    if (scopeMismatch && !isWorkspaceScopePairSuppressed(scopeMismatch.currentWorkspaceId, scopeMismatch.inferredWorkspaceId)) {
+      setWorkspaceScopeNotice({
+        currentWorkspaceId: scopeMismatch.currentWorkspaceId,
+        inferredWorkspaceId: scopeMismatch.inferredWorkspaceId,
+        inferredLabel: scopeMismatch.inferredLabel,
+        currentLabel: scopeMismatch.currentLabel,
+        pendingDraft: submitDraft,
+      });
+      return;
+    }
+    clearWorkspaceScopeNotice();
+
+    dismissEmployeeSpecialtyRoute();
     const originThreadId = shell.activeIdeThreadId;
     // Capture attachments before specialty route swaps the thread image scope.
     const attachmentFiles = composerImages.value.map((image) => image.file);
@@ -233,7 +253,9 @@ export function useComposerActions(options: UseComposerActionsOptions) {
       roster,
       useModelTiebreak: false,
     });
-    const routed = await maybeApplySpecialtyRoute(routeDecision);
+    const vagueNamedAssign =
+      Boolean(namedAssign) && isVagueNamedAssignPrompt(submitDraft, namedAssign?.employee.name ?? '');
+    const routed = vagueNamedAssign ? false : await maybeApplySpecialtyRoute(routeDecision);
     const shouldRewriteNamedAssign =
       Boolean(namedAssign) &&
       (routed ||
@@ -244,8 +266,12 @@ export function useComposerActions(options: UseComposerActionsOptions) {
         ? rewriteNamedAssignPrompt(submitDraft, namedAssign.employee.name)
         : submitDraft;
 
-    // Never park the prompt on the destination tab — that bled drafts across agents
-    // when submit failed or the operator switched threads mid-flight.
+    // Clear both the visible draft and its origin-thread copy before dispatch.
+    // Waiting for the response let a thread route restore the old prompt after work started.
+    shell.ideComposerDraft = '';
+    if (originThreadId && workspaceId) {
+      persistIdeComposerDraft(workspaceId, '', originThreadId);
+    }
     const submitted = await shell.submitIdeComposer(modeForSubmit, {
       attachmentFiles,
       contentOverride: routedPrompt,
@@ -256,9 +282,6 @@ export function useComposerActions(options: UseComposerActionsOptions) {
       }
       shell.ideComposerDraft = submitDraft;
       return;
-    }
-    if (routed && originThreadId && workspaceId) {
-      persistIdeComposerDraft(workspaceId, '', originThreadId);
     }
     clearSkillAttachments?.();
     recordComposerHistoryIfSent(draft);
@@ -329,7 +352,9 @@ export function useComposerActions(options: UseComposerActionsOptions) {
       roster,
       useModelTiebreak: false,
     });
-    const routed = await maybeApplySpecialtyRoute(routeDecision);
+    const vagueNamedAssign =
+      Boolean(namedAssign) && isVagueNamedAssignPrompt(pending, namedAssign?.employee.name ?? '');
+    const routed = vagueNamedAssign ? false : await maybeApplySpecialtyRoute(routeDecision);
     const shouldRewriteNamedAssign =
       Boolean(namedAssign) &&
       (routed ||
@@ -363,6 +388,29 @@ export function useComposerActions(options: UseComposerActionsOptions) {
 
   function dismissTeammateRoute(): void {
     dismissEmployeeSpecialtyRoute();
+  }
+
+  /** stayHere also suppresses re-prompting for this workspace pair. */
+  const dismissWorkspaceScopeNotice = (stayHere = false): void =>
+    (stayHere ? stayInCurrentWorkspaceScope : clearWorkspaceScopeNotice)();
+
+  function switchComposerWorkspaceScope(): void {
+    const notice = workspaceScopeNotice.value;
+    if (!notice) {
+      return;
+    }
+    applyChatUiAction(shell, {
+      type: 'switch_workspace',
+      workspace_id: notice.inferredWorkspaceId,
+      layout_mode: 'ide',
+    });
+    shell.ideComposerDraft = notice.pendingDraft;
+    const threadId = shell.activeIdeThreadId;
+    if (threadId) {
+      persistIdeComposerDraft(notice.inferredWorkspaceId, notice.pendingDraft, threadId);
+    }
+    clearWorkspaceScopeNotice();
+    void nextTick(() => focusAgentDockComposerInput());
   }
 
   async function handleSteer(event?: Event): Promise<void> {
@@ -450,6 +498,15 @@ export function useComposerActions(options: UseComposerActionsOptions) {
       }
     }
 
+    if (shouldProceedDebugReproduceComposer(event, debugReproduceActive())) {
+      event.preventDefault();
+      const messageId = activeDebugReproduceMessageId();
+      if (messageId) {
+        void handleDebugReproduceProceed(messageId);
+      }
+      return;
+    }
+
     if (shouldSteerAgentDockComposer(event)) {
       event.preventDefault();
       void handleSteer();
@@ -468,9 +525,13 @@ export function useComposerActions(options: UseComposerActionsOptions) {
     declinePlanSoftSwitchOffer,
     dismissPlanSoftSwitch,
     dismissTeammateRoute,
+    dismissWorkspaceScopeNotice,
+    switchComposerWorkspaceScope,
+    workspaceScopeNotice,
     handleApproveRun,
     handleComposerKeydown,
     handleDebugReproduceProceed,
+    handleDebugReproduceResolved,
     handleRejectRun,
     handleResumeRun,
     handleSteer,

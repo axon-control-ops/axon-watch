@@ -1,0 +1,160 @@
+.workspace-runtime-policy {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.workspace-runtime-policy__empty {
+  margin: 0;
+  color: rgba(180, 210, 230, 0.7);
+  font-size: 0.85rem;
+}
+
+.workspace-runtime-policy__runtime-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.workspace-runtime-policy__runtime-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.7rem;
+  padding: 0.6rem 0.8rem;
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 0.45rem;
+  transition: border-color 150ms ease, background 150ms ease;
+}
+
+.workspace-runtime-policy__runtime-row-main {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.7rem;
+  cursor: pointer;
+}
+
+.workspace-runtime-policy__runtime-model {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  margin-left: auto;
+}
+
+.workspace-runtime-policy__runtime-model-label {
+  font-size: 0.72rem;
+  color: rgba(180, 210, 230, 0.62);
+}
+
+.workspace-runtime-policy__runtime-model select {
+  background: rgba(8, 20, 28, 0.65);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 0.35rem;
+  color: rgba(220, 240, 255, 0.92);
+  font-size: 0.78rem;
+  padding: 0.3rem 0.5rem;
+  max-width: 14rem;
+}
+
+.workspace-runtime-policy__runtime-model select:disabled {
+  opacity: 0.6;
+}
+
+.workspace-runtime-policy__runtime-row:hover {
+  background: rgba(0, 242, 255, 0.04);
+  border-color: rgba(0, 242, 255, 0.18);
+}
+
+.workspace-runtime-policy__runtime-row--active {
+  border-color: rgba(0, 242, 255, 0.28);
+  background: rgba(0, 242, 255, 0.06);
+}
+
+.workspace-runtime-policy__runtime-row input[type='checkbox'] {
+  margin-top: 0.15rem;
+  flex-shrink: 0;
+  accent-color: rgba(0, 242, 255, 0.9);
+}
+
+.workspace-runtime-policy__runtime-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.workspace-runtime-policy__runtime-label {
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: rgba(220, 240, 255, 0.92);
+}
+
+.workspace-runtime-policy__runtime-hint {
+  font-size: 0.75rem;
+  color: rgba(180, 210, 230, 0.62);
+}
+
+.workspace-runtime-policy__note {
+  margin: 0.25rem 0 0;
+  font-size: 0.75rem;
+  color: rgba(180, 210, 230, 0.55);
+  font-style: italic;
+}
+
+.workspace-runtime-policy__concurrency-choices {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.workspace-runtime-policy__concurrency-choice {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.7rem;
+  padding: 0.7rem 0.9rem;
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 0.45rem;
+  cursor: pointer;
+  transition: border-color 150ms ease, background 150ms ease;
+}
+
+.workspace-runtime-policy__concurrency-choice:hover {
+  background: rgba(0, 242, 255, 0.04);
+  border-color: rgba(0, 242, 255, 0.18);
+}
+
+.workspace-runtime-policy__concurrency-choice--active {
+  border-color: rgba(0, 242, 255, 0.3);
+  background: rgba(0, 242, 255, 0.07);
+}
+
+.workspace-runtime-policy__concurrency-choice input[type='radio'] {
+  margin-top: 0.18rem;
+  flex-shrink: 0;
+  accent-color: rgba(0, 242, 255, 0.9);
+}
+
+.workspace-runtime-policy__concurrency-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.workspace-runtime-policy__concurrency-label {
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: rgba(220, 240, 255, 0.92);
+}
+
+.workspace-runtime-policy__concurrency-hint {
+  font-size: 0.75rem;
+  color: rgba(180, 210, 230, 0.62);
+  line-height: 1.45;
+}
+
+.workspace-runtime-policy__actions {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  flex-wrap: wrap;
+}

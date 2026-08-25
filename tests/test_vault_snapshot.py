@@ -126,6 +126,22 @@ class VaultSnapshotTests(unittest.TestCase):
         self.assertIn("GH_TOKEN", github["satisfied_keys"])
         self.assertNotIn("ghp_test_only", str(snapshot))
 
+    def test_supabase_cli_consumer_ready_with_access_token(self) -> None:
+        with patch(
+            "app.vault.snapshot.merge_monitor_env",
+            return_value={"SUPABASE_ACCESS_TOKEN": "sbp_test_only"},
+        ):
+            with patch("app.vault.snapshot.vault_status", return_value={
+                "import_file_present": True,
+                "imported_keys": ["SUPABASE_ACCESS_TOKEN"],
+                "available_keys": ["SUPABASE_ACCESS_TOKEN"],
+            }):
+                snapshot = vault_operator_snapshot()
+        supabase = next(item for item in snapshot["consumers"] if item["id"] == "supabase_cli")
+        self.assertEqual("ready", supabase["status"])
+        self.assertIn("SUPABASE_ACCESS_TOKEN", supabase["satisfied_keys"])
+        self.assertNotIn("sbp_test_only", str(snapshot))
+
 
 if __name__ == "__main__":
     unittest.main()

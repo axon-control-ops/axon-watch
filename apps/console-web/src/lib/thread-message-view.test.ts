@@ -6,7 +6,11 @@ import {
   formatThreadTimestamp,
   shortenRunId,
   shouldCollapseSystemMessage,
+  stickyPromptCanExpand,
+  stickyPromptPreviewText,
   summarizeAgentErrorContent,
+  threadMessageSpeakerLabel,
+  threadMessageSpeakerStyle,
 } from './thread-message-view';
 
 describe('thread-message-view', () => {
@@ -14,6 +18,18 @@ describe('thread-message-view', () => {
     expect(formatThreadRole('operator')).toBe('OP');
     expect(formatThreadRole('agent')).toBe('AGENT');
     expect(formatThreadRole('system')).toBe('SYSTEM');
+  });
+
+  it('labels agent messages with speaker names and role colors', () => {
+    const message = {
+      role: 'agent' as const,
+      speaker_name: 'Priya',
+      speaker_role: 'frontend',
+      speaker_employee_id: 'employee-priya',
+    };
+
+    expect(threadMessageSpeakerLabel(message)).toBe('PRIYA · FRONTEND');
+    expect(threadMessageSpeakerStyle(message)['--thread-speaker-bg']).toBe('#1f4f6e');
   });
 
   it('formats timestamps for display', () => {
@@ -52,5 +68,35 @@ describe('thread-message-view', () => {
     expect(
       shouldCollapseSystemMessage('Command linked to run run_abc123 (phase executing).'),
     ).toBe(true);
+  });
+
+  it('does not offer expand for a short operator message', () => {
+    expect(stickyPromptCanExpand('Fix the login button.')).toBe(false);
+  });
+
+  it('offers expand for a multi-section Instructions doc', () => {
+    const text = [
+      '# Instructions',
+      '',
+      '## Goal',
+      '',
+      'Create the Young Eagles 2nd-week menu by rearranging the existing 1st-week menu.',
+      '',
+      '## In scope',
+      '',
+      '- Confirm which item Oats refers to.',
+    ].join('\n');
+    expect(stickyPromptCanExpand(text)).toBe(true);
+  });
+
+  it('strips blank lines from the collapsed preview so real content shows first', () => {
+    const text = ['# Instructions', '', '## Goal', '', 'Create the 2nd-week menu.'].join('\n');
+    const preview = stickyPromptPreviewText(text);
+    expect(preview).toBe('Create the 2nd-week menu.');
+  });
+
+  it('caps the preview at one substantive line', () => {
+    const text = ['Line one', 'Line two', 'Line three', 'Line four'].join('\n');
+    expect(stickyPromptPreviewText(text)).toBe('Line one');
   });
 });

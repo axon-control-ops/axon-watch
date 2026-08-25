@@ -20,6 +20,11 @@ from app.workspace_agents.catalog import (
     scoped_default_owns,
     stable_role_persona,
 )
+from app.workspace_agents.execution_policy import (
+    AgentExecutionPolicyOverride,
+    ExecutionPolicyError,
+    parse_execution_policy_override,
+)
 
 
 class WorkspaceAgentError(ValueError):
@@ -36,6 +41,7 @@ class EmployeeConfig:
     primary: bool = False
     employee_id: str | None = None
     azure_voice_id: str | None = None
+    execution_policy: AgentExecutionPolicyOverride | None = None
 
 
 @dataclass(frozen=True)
@@ -157,6 +163,10 @@ def _parse_employee_config(raw: Any, *, default_primary: bool = False) -> Employ
     azure_voice_id = _clean_text(
         raw.get("azure_voice_id") or raw.get("azureVoiceId") or raw.get("voice_id")
     ) or None
+    try:
+        execution_policy = parse_execution_policy_override(raw.get("execution_policy"))
+    except ExecutionPolicyError as exc:
+        raise WorkspaceAgentError(f"invalid employee execution_policy: {exc}") from exc
     return EmployeeConfig(
         name=name,
         role=role,
@@ -166,6 +176,7 @@ def _parse_employee_config(raw: Any, *, default_primary: bool = False) -> Employ
         primary=primary,
         employee_id=employee_id,
         azure_voice_id=azure_voice_id,
+        execution_policy=execution_policy,
     )
 
 
@@ -333,6 +344,7 @@ def _resolve_employees(
                 primary=True,
                 employee_id=first.employee_id,
                 azure_voice_id=first.azure_voice_id,
+                execution_policy=first.execution_policy,
             )
         return employees
 
@@ -374,6 +386,7 @@ def _resolve_employees(
             primary=True,
             employee_id=first.employee_id,
             azure_voice_id=first.azure_voice_id,
+            execution_policy=first.execution_policy,
         )
     # Ensure only one primary.
     primary_seen = False
@@ -392,6 +405,7 @@ def _resolve_employees(
                 primary=is_primary,
                 employee_id=employee.employee_id,
                 azure_voice_id=employee.azure_voice_id,
+                execution_policy=employee.execution_policy,
             )
         )
     return normalized

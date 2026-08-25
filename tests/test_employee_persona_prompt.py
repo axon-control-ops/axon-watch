@@ -20,9 +20,13 @@ from app.workspace_agents.employee_persona_prompt import (  # noqa: E402
 )
 from app.workspace_agents.worker_prompt import build_continuous_worker_prompt  # noqa: E402
 from app.workspace_agents.config_loader import EmployeeConfig  # noqa: E402
+from tests.support.control_plane_db import isolate_workspace_bindings  # noqa: E402
 
 
 class EmployeePersonaPromptTests(unittest.TestCase):
+    def setUp(self) -> None:
+        isolate_workspace_bindings(self)
+
     def test_identity_line_shape(self) -> None:
         line = build_employee_identity_line(
             workspace_id="workspace_axon_watch",
@@ -80,6 +84,8 @@ class EmployeePersonaPromptTests(unittest.TestCase):
         self.assertIn("not as VAXON", appendix)
         self.assertIn("say which role should own it", appendix)
         self.assertIn("frontend, backend, integrations, watcher, or lead", appendix)
+        self.assertIn("company documents, customer records", appendix)
+        self.assertIn("Commit messages: make them explain", appendix)
         self.assertIn("Company team roster (authoritative", appendix)
 
     def test_lead_appendix_includes_authoritative_team_and_no_search_clause(self) -> None:
@@ -159,6 +165,36 @@ class EmployeePersonaPromptTests(unittest.TestCase):
         self.assertIn("I am wiring Copy Link", appendix)
         self.assertIn("Priya is planning", appendix)
         self.assertIn("I am planning activities and assignments", appendix)
+
+    def test_axon_x_jules_appendix_includes_advanced_ux_doctrine(self) -> None:
+        roster_row = {
+            "employee_id": "employee-workspace_axon_watch-frontend-2",
+            "name": "Jules",
+            "role": "frontend",
+            "role_label": "Frontend",
+            "owns": "Axon-X mobile VAXON control-plane cockpit and console UI/UX",
+        }
+        with patch(
+            "app.workspace_agents.employee_persona_prompt.find_roster_employee",
+            return_value=roster_row,
+        ), patch(
+            "app.workspace_agents.employee_persona_prompt.build_team_roster_context",
+            return_value="",
+        ):
+            appendix = build_employee_persona_appendix(
+                workspace_id="workspace_axon_watch",
+                employee_id="employee-workspace_axon_watch-frontend-2",
+                employee_role="frontend",
+            )
+        assert appendix is not None
+        self.assertIn("Axon-X/Jules advanced UI/UX doctrine", appendix)
+        self.assertIn("Observe (health, signals, fleet, live run state)", appendix)
+        self.assertIn("VAXON command surface", appendix)
+        self.assertIn("Overview, Command, Fleet, and Data", appendix)
+        self.assertIn("Do not collapse the mobile control-plane into one long tab", appendix)
+        self.assertIn("never let a poster-like background carry the product", appendix)
+        self.assertIn("glass-morphism panels", appendix)
+        self.assertIn("do not call it implemented", appendix)
 
     def test_appendix_fallback_when_roster_misses(self) -> None:
         with patch(
@@ -243,10 +279,10 @@ class EmployeePersonaPromptTests(unittest.TestCase):
             employee_id="employee-workspace_axon_watch-integrations-4",
             employee_role="integrations",
         )
-        original = "You are Axon-X Lane B in Agent mode with Full Access. Tool execution is allowed."
+        original = "You are Axon-X Lane B in Agent mode with approved execution access. Tool execution is allowed."
         adapted = adapt_lane_b_system_prompt_for_employee(original, appendix)
         self.assertIn("named employee in the Employee persona block", adapted)
-        self.assertNotIn("You are Axon-X Lane B in Agent mode with Full Access.", adapted)
+        self.assertNotIn("You are Axon-X Lane B in Agent mode with approved execution access.", adapted)
         self.assertIn("Do not identify as VAXON", adapted)
         self.assertIn("first person", adapted)
         unchanged = adapt_lane_b_system_prompt_for_employee(original, "no persona here")
@@ -275,7 +311,7 @@ class EmployeePersonaPromptTests(unittest.TestCase):
         self.assertIn("You are Quinn", prompt)
         self.assertIn("named employee in the Employee persona block", prompt)
         self.assertNotIn(
-            "You are Axon-X Lane B in Agent mode with Full Access.",
+            "You are Axon-X Lane B in Agent mode with approved execution access.",
             prompt,
         )
         persona_at = prompt.index(EMPLOYEE_PERSONA_MARKER)

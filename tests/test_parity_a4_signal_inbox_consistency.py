@@ -12,6 +12,7 @@ from tests.support.bootstrap_signal_fixture import (
     BOOTSTRAP_WATCH_INBOX,
     consistency_tuple,
 )
+from tests.support.control_plane_db import isolate_workspace_bindings
 from tests.support.connector_signal_fixture import (
     CONNECTOR_DEGRADED_INBOX_ITEM,
     CONNECTOR_DEGRADED_WATCH_INBOX,
@@ -61,6 +62,7 @@ ACTIONABLE_MONITOR_ITEM = {
 
 class ParityA4SignalInboxConsistencyTests(unittest.TestCase):
     def setUp(self) -> None:
+        isolate_workspace_bindings(self)
         prepare_control_plane_imports()
         self.client = TestClient(load_control_plane_app())
         self.addCleanup(self.client.close)

@@ -6,6 +6,7 @@ import {
   OPERATOR_PRESENCE_SETTINGS_KEY,
   persistOperatorPresenceSettings,
   readPersistedOperatorPresenceSettings,
+  resolveAutoWorkerRuntimeFallback,
 } from './operator-presence-settings';
 
 class MemoryStorage implements Storage {
@@ -64,6 +65,8 @@ describe('operator-presence-settings', () => {
       voice_routing_mode: 'runtime_on_deep',
       narrate_tool_progress: false,
       vaxon_model_id: 'cursor-grok-4.5-high-fast',
+      auto_composer_runtime_override_enabled: false,
+      auto_composer_runtime_target: '',
     });
     expect(storage.getItem(OPERATOR_PRESENCE_SETTINGS_KEY)).toContain('"operator_persona_enabled":false');
   });
@@ -86,6 +89,8 @@ describe('operator-presence-settings', () => {
       voice_routing_mode: 'runtime_on_deep',
       narrate_tool_progress: false,
       vaxon_model_id: 'cursor-grok-4.5-high-fast',
+      auto_composer_runtime_override_enabled: false,
+      auto_composer_runtime_target: '',
     });
   });
 
@@ -124,5 +129,39 @@ describe('operator-presence-settings', () => {
     expect(
       normalizeOperatorPresenceSettings({ vaxon_model_id: 'composer-2' }).vaxon_model_id,
     ).toBe('composer-2');
+  });
+
+  it('only applies the worker runtime fallback while Full Auto is active', () => {
+    expect(
+      resolveAutoWorkerRuntimeFallback({
+        autonomy_mode: 'semi',
+        auto_composer_runtime_override_enabled: true,
+        auto_composer_runtime_target: 'claude_local',
+      }),
+    ).toBe('');
+    expect(
+      resolveAutoWorkerRuntimeFallback({
+        autonomy_mode: 'full',
+        auto_composer_runtime_override_enabled: false,
+        auto_composer_runtime_target: 'claude_local',
+      }),
+    ).toBe('');
+    expect(
+      resolveAutoWorkerRuntimeFallback({
+        autonomy_mode: 'full',
+        auto_composer_runtime_override_enabled: true,
+        auto_composer_runtime_target: 'claude_local',
+      }),
+    ).toBe('claude_local');
+  });
+
+  it('normalizes invalid Auto runtime override ids back to manual behavior', () => {
+    const normalized = normalizeOperatorPresenceSettings({
+      autonomy_mode: 'full',
+      auto_composer_runtime_override_enabled: true,
+      auto_composer_runtime_target: '../claude',
+    });
+    expect(normalized.auto_composer_runtime_target).toBe('');
+    expect(resolveAutoWorkerRuntimeFallback(normalized)).toBe('');
   });
 });

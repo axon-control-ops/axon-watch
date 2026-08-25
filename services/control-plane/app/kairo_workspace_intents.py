@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import re
 
-from app.workspace_project_bindings import load_workspace_project_bindings
+from app.workspace_project_bindings import list_valid_workspace_project_bindings
 
 
 def normalize_workspace_alias(value: str) -> str:
@@ -59,7 +59,7 @@ def infer_workspace_id_from_content(content: str) -> str | None:
     normalized = normalize_workspace_alias(content)
     if not normalized:
         return None
-    bindings = load_workspace_project_bindings()
+    bindings = list_valid_workspace_project_bindings()
     matches: list[tuple[str, str]] = []
     for binding in bindings.values():
         for alias in workspace_aliases(binding.workspace_id, binding.display_name):

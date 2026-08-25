@@ -43,6 +43,16 @@ class EffectiveScopeTests(unittest.TestCase):
             ),
         )
 
+    def test_missing_task_scope_can_fail_closed_at_execution_boundary(self) -> None:
+        self.assertEqual(
+            ["__axon_deny_all__"],
+            resolve_effective_allowed_paths(
+                contract_allowed_paths=["apps/", "services/"],
+                task_allowed_paths=[],
+                fail_closed_missing_task=True,
+            ),
+        )
+
     def test_task_scope_intersects_contract(self) -> None:
         effective = resolve_effective_allowed_paths(
             contract_allowed_paths=["apps/", "services/", "scripts/"],
@@ -71,23 +81,20 @@ class EffectiveScopeTests(unittest.TestCase):
         codes = {f.code for f in findings}
         self.assertIn("out_of_scope", codes)
 
-    def test_evaluate_acceptance_uses_task_allowed_paths(self) -> None:
+    def test_evaluate_acceptance_treats_task_paths_as_routing_hints(self) -> None:
         contract = {
             "allowed_paths": ["apps/", "scripts/"],
             "forbidden_path_globs": ["**/.env"],
             "verifier": {"required_checks": []},
             "commands": {},
         }
-        blocked = evaluate_acceptance(
+        adjacent_role_file = evaluate_acceptance(
             contract=contract,
             check_results={},
             changed_paths=["apps/console-web/src/App.vue"],
             task_allowed_paths=["scripts/guardrails/"],
         )
-        self.assertFalse(blocked.passed)
-        self.assertTrue(
-            any(f.code == "out_of_scope" for f in blocked.policy_findings)
-        )
+        self.assertTrue(adjacent_role_file.passed)
         passed = evaluate_acceptance(
             contract=contract,
             check_results={},
@@ -95,6 +102,29 @@ class EffectiveScopeTests(unittest.TestCase):
             task_allowed_paths=["scripts/guardrails/"],
         )
         self.assertTrue(passed.passed)
+        outside_contract = evaluate_acceptance(
+            contract=contract,
+            check_results={},
+            changed_paths=["private/internal.txt"],
+            task_allowed_paths=["private/"],
+        )
+        self.assertFalse(outside_contract.passed)
+        self.assertTrue(
+            any(
+                finding.code == "out_of_scope"
+                for finding in outside_contract.policy_findings
+            )
+        )
+        forbidden = evaluate_acceptance(
+            contract=contract,
+            check_results={},
+            changed_paths=["apps/.env"],
+            task_allowed_paths=["scripts/guardrails/"],
+        )
+        self.assertFalse(forbidden.passed)
+        self.assertTrue(
+            any(f.code == "forbidden_path" for f in forbidden.policy_findings)
+        )
 
 
 class FileSizePatrolTests(unittest.TestCase):
@@ -155,6 +185,23 @@ class FileSizePatrolTests(unittest.TestCase):
         self.assertIn("lower stale ratchet", created[0]["goal"])
         self.assertEqual([MANIFEST_REL], created[0]["allowed_paths"])
         self.assertEqual("low", created[0]["risk"])
+        self.assertEqual("integrations", created[0]["owner_role"])
+
+    def test_enqueue_routes_code_extractions_to_a_writable_specialist(self) -> None:
+        created = enqueue_file_size_patrol_tasks(
+            workspace_id="workspace_axon_watch",
+            findings=[
+                FileSizePatrolFinding(
+                    kind="extraction",
+                    path="tests/test_lane_b_git_dispatch.py",
+                    lines=518,
+                    budget=500,
+                )
+            ],
+            owner_role="watcher",
+        )
+        self.assertEqual(1, len(created))
+        self.assertEqual("backend", created[0]["owner_role"])
 
     def test_classify_runs_against_real_repo(self) -> None:
         findings = classify_file_size_findings(REPO_ROOT)
@@ -176,6 +223,65 @@ class CompanyWorkSourceTests(unittest.TestCase):
         self.assertIn("file_size_patrol", ids)
         self.assertIn("lead_team_checkin", ids)
         self.assertIn("ci_stale_signal_sweep", ids)
+        self.assertIn("fleet_self_heal_detect", ids)
+        self.assertIn("attention_stale_sweep", ids)
+
+    def test_run_scheduled_work_sources_dispatches_attention_stale_sweep(self) -> None:
+        with patch(
+            "app.workspace_agents.company_work_sources.list_runs", return_value=[]
+        ), patch(
+            "app.workspace_agents.file_size_patrol.classify_file_size_findings", return_value=[]
+        ), patch(
+            "app.workspace_agents.lead_team_checkin.run_lead_team_checkin",
+            return_value={"work_source": "lead_team_checkin", "created_tasks": []},
+        ), patch(
+            "app.ci_remediation.stale_sweep.sweep_stale_ci_signals",
+            return_value={"work_source": "ci_stale_signal_sweep", "resolved_count": 0},
+        ), patch(
+            "app.fleet_self_heal.detect.scan_fleet_failures"
+        ) as scan_mock, patch(
+            "app.workspace_agents.autonomous_attention_recovery.sweep_stale_attention_decisions"
+        ) as sweep_mock:
+            from app.fleet_self_heal.detect import DetectScanResult
+
+            scan_mock.return_value = DetectScanResult(
+                scanned_runs=0, fleet_infra_observations=0,
+                dispatchable_fingerprints=[], regressed_fingerprints=[],
+                skipped_min_interval=False,
+            )
+            sweep_mock.return_value = [{"receipt_id": "auton-1"}, {"receipt_id": "auton-2"}]
+            result = run_scheduled_work_sources(root=REPO_ROOT)
+        source_result = result["sources"]["attention_stale_sweep"]
+        self.assertEqual(2, source_result["expired_count"])
+        self.assertEqual(["auton-1", "auton-2"], source_result["expired_receipt_ids"])
+        sweep_mock.assert_called_once_with(max_age_hours=24.0)
+
+    def test_run_scheduled_work_sources_dispatches_fleet_self_heal_detect(self) -> None:
+        with patch(
+            "app.workspace_agents.company_work_sources.list_runs", return_value=[]
+        ), patch(
+            "app.workspace_agents.file_size_patrol.classify_file_size_findings", return_value=[]
+        ), patch(
+            "app.workspace_agents.lead_team_checkin.run_lead_team_checkin",
+            return_value={"work_source": "lead_team_checkin", "created_tasks": []},
+        ), patch(
+            "app.ci_remediation.stale_sweep.sweep_stale_ci_signals",
+            return_value={"work_source": "ci_stale_signal_sweep", "resolved_count": 0},
+        ), patch(
+            "app.fleet_self_heal.detect.scan_fleet_failures"
+        ) as scan_mock:
+            from app.fleet_self_heal.detect import DetectScanResult
+
+            scan_mock.return_value = DetectScanResult(
+                scanned_runs=3, fleet_infra_observations=1,
+                dispatchable_fingerprints=[], regressed_fingerprints=[],
+                skipped_min_interval=False,
+            )
+            result = run_scheduled_work_sources(root=REPO_ROOT)
+        source_result = result["sources"]["fleet_self_heal_detect"]
+        self.assertEqual(3, source_result["scanned_runs"])
+        self.assertEqual(1, source_result["fleet_infra_observations"])
+        scan_mock.assert_called_once_with(window_hours=6.0, min_interval_seconds=300.0)
 
     def test_run_scheduled_work_sources_recovers_orphans(self) -> None:
         created = task_store.create_task(

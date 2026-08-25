@@ -9,6 +9,12 @@ export interface WorkspaceRecord {
   connection_kind?: 'isolated_root' | 'project_path';
   project_root?: string;
   display_name?: string;
+  /** True when config/workspace-agents.json has a company for this
+   * workspace with at least one enabled employee — i.e. someone is
+   * actually staffed to work here right now. */
+  has_active_team?: boolean;
+  /** True when this workspace's AUTO dispatch/runtime toggle is switched on. */
+  auto_enabled?: boolean;
 }
 
 export interface WorkspaceHandoffRecord {

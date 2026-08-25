@@ -1,5 +1,7 @@
 import type { RuntimeStatusSnapshot } from '../api/control-plane';
 
+import { composerRuntimeFamilyLabel } from './cursor-catalog-view';
+
 export type AgentDockRuntimeTone = 'ready' | 'partial' | 'missing' | 'loading' | 'error' | 'vault';
 
 export interface AgentDockRuntimeChip {
@@ -19,7 +21,7 @@ function vaultLockedHint(status: RuntimeStatusSnapshot | null): string | null {
     return null;
   }
   if (posture === 'missing_keys') {
-    return status?.vault_runtime?.hint || 'Sign in with Cursor/Codex CLI on the host or add keys in /vault.';
+    return status?.vault_runtime?.hint || 'Sign in with Cursor, Claude, or Codex CLI on the host or add keys in /vault.';
   }
   return null;
 }
@@ -75,8 +77,7 @@ export function buildAgentDockRuntimeChip(input: {
     };
   }
 
-  const scope = selected.target_type === 'cloud' ? 'cloud' : 'local';
-  const label = `${selected.family} ${scope}`;
+  const label = composerRuntimeFamilyLabel(selected.family);
   const detail = selected.ready
     ? selected.auth.message || 'Runtime ready'
     : selected.auth.message || vaultHint || 'Runtime needs attention';
@@ -139,5 +140,5 @@ export function runtimeVaultHint(status: RuntimeStatusSnapshot | null): string {
     status?.local.find((record) => record.id === status.default_runtime) ??
     status?.local[0] ??
     null;
-  return target?.auth.message || 'Unlock /vault or sign in to Cursor/Codex locally.';
+  return target?.auth.message || 'Unlock /vault or sign in to a local CLI runtime.';
 }
