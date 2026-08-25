@@ -42,12 +42,14 @@ def build_conversation_context_pack_uncached(*, workspace_id: str | None = None)
     critical_workspaces = sum(
         1
         for item in fleet.get("items", [])
-        if isinstance(item, dict) and item.get("tone") == "critical"
+        if isinstance(item, dict)
+        and (item.get("health") or item.get("tone")) == "critical"
     )
     attention_workspaces = sum(
         1
         for item in fleet.get("items", [])
-        if isinstance(item, dict) and item.get("tone") == "attention"
+        if isinstance(item, dict)
+        and (item.get("health") or item.get("tone")) == "attention"
     )
     return {
         "briefing": briefing,
