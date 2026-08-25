@@ -41,7 +41,7 @@ def collect_workspace_reports(
             scoped_handoffs if workspace_id == scoped_workspace_id else handoff_loader(workspace_id)
         )
         active_runs = int(item.get("active_runs") or 0)
-        has_recent_work = bool(
+        has_reportable_evidence = bool(
             roster.get("busy")
             or roster.get("completed")
             or roster.get("failed")
@@ -50,7 +50,7 @@ def collect_workspace_reports(
             or int(item.get("review_ready_count") or 0)
             or int(item.get("pending_approvals_count") or 0)
         )
-        if not has_recent_work:
+        if not has_reportable_evidence:
             continue
         reports.append(
             {
@@ -115,9 +115,15 @@ def workspace_update_bits(reports: list[dict[str, Any]], spell_count: Callable[[
         if active_runs and not busy:
             details.append(f"{spell_count(active_runs)} active run{'s' if active_runs != 1 else ''}")
         if completed:
-            details.append("recently completed: " + ", ".join(_name_role(row) for row in completed[:3]))
+            details.append(
+                "last recorded completion: "
+                + ", ".join(_name_role(row) for row in completed[:3])
+            )
         if failed:
-            details.append("needs recovery: " + ", ".join(_name_role(row) for row in failed[:3]))
+            details.append(
+                "last recorded failure: "
+                + ", ".join(_name_role(row) for row in failed[:3])
+            )
         review_ready = int(report.get("review_ready_count") or 0)
         approvals = int(report.get("pending_approvals_count") or 0)
         if review_ready:
@@ -139,6 +145,11 @@ def fleet_lead_rollup_bits(
 ) -> list[str]:
     bits: list[str] = []
     for report in reports:
+        # A fleet report must not attribute an inferred plan to a Lead. The
+        # builder also has board-derived fallback prose, so call it only when
+        # this workspace has a stored, verified Lead handoff receipt.
+        if not report.get("handoffs"):
+            continue
         workspace_name = str(report.get("display_name") or report.get("workspace_id") or "Workspace")
         nested = {
             **snapshot,
@@ -167,33 +178,28 @@ def render_report_text(
     next_move: str,
     spell_count: Callable[[int], str],
 ) -> tuple[str, str]:
-    if not attention and not work and not rollups:
-        text = (
-            "Here's the stand-up. Attention: nothing screaming. "
-            "Work in flight: idle. "
-            f"Fleet: {', '.join(fleet)}. Next move: {next_move}."
-        )
-    else:
-        fleet_data = snapshot.get("fleet") or {}
-        checked = int(fleet_data.get("count") or fleet_data.get("workspace_count") or 0)
-        parts = [
-            "Fleet report",
-            "Attention:\n- " + "\n- ".join(attention or ["Nothing screaming"]),
-            f"Workspaces checked: {spell_count(checked)}.",
-            "Active workspace updates:\n- "
-            + "\n- ".join(workspace_updates or ["No active or recently completed workspace work found"]),
-            "Work in flight:\n- " + "\n- ".join(work or ["Idle"]),
-            "Lead rollups:\n- " + "\n- ".join(rollups) if rollups else "Lead rollups: none verified yet.",
-            "Fleet:\n- " + "\n- ".join(fleet),
-            f"Next move:\n- {next_move}",
-        ]
-        text = "\n\n".join(parts)
+    fleet_data = snapshot.get("fleet") or {}
+    checked = int(fleet_data.get("count") or fleet_data.get("workspace_count") or 0)
+    parts = [
+        "Fleet report",
+        "Attention:\n- " + "\n- ".join(attention or ["Nothing screaming"]),
+        f"Workspaces checked: {spell_count(checked)}.",
+        "Workspace evidence:\n- "
+        + "\n- ".join(workspace_updates or ["No current or recorded workspace work found"]),
+        "Work in flight:\n- " + "\n- ".join(work or ["Idle"]),
+        "Stored Lead evidence:\n- " + "\n- ".join(rollups)
+        if rollups
+        else "Stored Lead evidence: no verified receipt found.",
+        "Fleet:\n- " + "\n- ".join(fleet),
+        f"Next move:\n- {next_move}",
+    ]
+    text = "\n\n".join(parts)
     spoken = " ".join(
         [
             "Here's the fleet report.",
             f"Attention: {', '.join(attention) if attention else 'nothing screaming'}.",
-            f"Active workspaces: {', '.join(workspace_updates[:3]) if workspace_updates else 'none found'}.",
-            f"Lead rollups: {'; '.join(rollups[:3]) if rollups else 'none verified yet'}.",
+            f"Workspace evidence: {', '.join(workspace_updates[:3]) if workspace_updates else 'none found'}.",
+            f"Stored Lead evidence: {'; '.join(rollups[:3]) if rollups else 'no verified receipt found'}.",
             f"Fleet: {', '.join(fleet)}.",
             f"Next move: {next_move}.",
         ]
