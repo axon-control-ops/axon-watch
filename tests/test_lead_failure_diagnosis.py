@@ -155,6 +155,38 @@ class WorkspaceDeliveryConfigTests(unittest.TestCase):
             self.assertTrue(_workspace_delivery_configured("workspace_moveit"))
 
 
+class FleetInfraBugTests(_AssumeDeliveryConfiguredTestCase):
+    """Regression: a bug in axon-watch's own code must not be dispatched to
+    the workspace's watcher as an "investigate and fix" task — the watcher
+    has no scope to touch axon-watch's own repo. Mirrors the identical guard
+    assign_owner_role_for_failed_shift already applies for non-Lead roles."""
+
+    def test_fleet_infra_marker_is_blocked_not_routed_to_watcher(self) -> None:
+        decision = diagnose_lead_failure(
+            workspace_id="workspace_demo",
+            run_id="run_abc",
+            detail="RuntimeError: could not resolve sandbox path for workspace_demo",
+        )
+        self.assertEqual("blocked", decision.card_type)
+        self.assertEqual("fleet_infra_bug", decision.classification)
+        self.assertTrue(decision.operator_action_required)
+        self.assertEqual((), decision.choices)
+        self.assertFalse(decision.recovery_eligible)
+
+    def test_fleet_infra_marker_stripped_by_normalization_is_still_caught(self) -> None:
+        # normalize_operator_failure_detail() strips a leading "continuous
+        # worker dispatch failed:" prefix — which is itself one of the exact
+        # fleet-infra markers being matched. Checking only the normalized
+        # text would silently miss this one; must also check raw detail.
+        decision = diagnose_lead_failure(
+            workspace_id="workspace_demo",
+            run_id="run_abc",
+            detail="continuous worker dispatch failed: no lease available",
+        )
+        self.assertEqual("blocked", decision.card_type)
+        self.assertEqual("fleet_infra_bug", decision.classification)
+
+
 class UnsafeAndFallthroughTests(_AssumeDeliveryConfiguredTestCase):
     def test_operator_sensitive_text_is_blocked(self) -> None:
         decision = diagnose_lead_failure(

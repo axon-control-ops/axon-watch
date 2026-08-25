@@ -23,6 +23,7 @@ genuinely safe to automate without new destructive capability):
 
 from __future__ import annotations
 
+from app.fleet_self_heal.classify import quick_fleet_infra_marker_match
 from app.workspace_agents.failure_detail import (
     is_billing_block_failure,
     is_billing_failure,
@@ -80,13 +81,20 @@ def diagnose_lead_failure(
     The caller (lead_team_checkin.py) executes whatever the decision's
     automatic_next_action calls for and persists attempt history.
     """
+    # `normalized` is used only for display text and the raw-text substring
+    # scans below. Every is_*_failure() classifier is called with the raw
+    # `detail`, not `normalized` — they already do their own internal
+    # raw+normalized matching (see is_usage_limit_failure et al.), and
+    # normalization can strip text a marker depends on (e.g. a leading
+    # "continuous worker dispatch failed:" prefix is itself a fleet-infra
+    # marker) — passing already-normalized text in would silently lose it.
     normalized = normalize_operator_failure_detail(detail)
     evidence = (EvidenceRef(label="Failed run", ref=run_id),) if run_id else ()
 
     # 1. Transient interruption (restart, operator stop, OOM-kill) — always
     #    safe to retry, this is exactly what task continuation already means
     #    elsewhere in the codebase (isShiftContinuationFailure on the frontend).
-    if is_shift_continuation_failure(normalized):
+    if is_shift_continuation_failure(detail):
         if prior_attempts >= MAX_AUTO_RECOVERY_ATTEMPTS:
             return RecoveryDecision(
                 card_type="failed",
@@ -123,7 +131,7 @@ def diagnose_lead_failure(
     #    gate (spec: "A required credential, connection or permission is
     #    missing"), but a SINGLE specific missing thing, not a menu of
     #    business choices. Blocked, not decision_required.
-    if is_usage_limit_failure(normalized):
+    if is_usage_limit_failure(detail):
         return RecoveryDecision(
             card_type="blocked",
             summary="The runtime is out of usage and cannot dispatch more shifts.",
@@ -138,7 +146,7 @@ def diagnose_lead_failure(
             recovery_eligible=False,
             escalation_reason="A usage-limit block requires an operator/billing action; the Lead has no authority to raise it.",
         )
-    if is_billing_failure(normalized) or is_billing_block_failure(normalized):
+    if is_billing_failure(detail) or is_billing_block_failure(detail):
         return RecoveryDecision(
             card_type="blocked",
             summary="A billing hold is blocking this workspace's runtime.",
@@ -153,7 +161,7 @@ def diagnose_lead_failure(
             recovery_eligible=False,
             escalation_reason="Billing is an account-level action; the Lead cannot pay an invoice.",
         )
-    if is_runtime_auth_failure(normalized):
+    if is_runtime_auth_failure(detail):
         return RecoveryDecision(
             card_type="blocked",
             summary="The agent runtime isn't signed in.",
@@ -198,10 +206,38 @@ def diagnose_lead_failure(
             ),
         )
 
-    # 4. Any other failure whose text touches operator-only territory
+    # 4. A bug in axon-watch's own control-plane/runtime code, not the
+    #    workspace's repo. Dispatching a "watcher, investigate and fix" task
+    #    would be a dead-end — the workspace's watcher has no scope to touch
+    #    axon-watch's own code. Mirrors assign_owner_role_for_failed_shift's
+    #    identical guard for non-Lead specialist roles.
+    # Checked against the raw detail, not `normalized` — normalization strips
+    # a "continuous worker dispatch failed:" prefix when present, which is
+    # itself one of the exact fleet-infra markers being matched here, so
+    # checking only the normalized text would silently miss it.
+    if quick_fleet_infra_marker_match(detail) or quick_fleet_infra_marker_match(normalized):
+        return RecoveryDecision(
+            card_type="blocked",
+            summary="This looks like a bug in axon-watch's own control-plane/runtime, not this workspace.",
+            classification="fleet_infra_bug",
+            operator_action_required=True,
+            recommended_action="Route to VAXON fleet self-heal / the axon-watch maintainers, not this workspace's team.",
+            automatic_next_action=None,
+            actions_attempted=("Inspected the failure detail", "Matched a known fleet-infra failure marker"),
+            evidence=evidence,
+            confidence=0.6,
+            retry_eligible=False,
+            recovery_eligible=False,
+            escalation_reason=(
+                "Failure signature points at axon-watch's own code, not the workspace's repo — "
+                "the workspace's watcher has no scope to fix it."
+            ),
+        )
+
+    # 5. Any other failure whose text touches operator-only territory
     #    (destructive/production/credentials/customer data/...) stays a
     #    genuine gate rather than being auto-routed.
-    if _contains_any(normalized, _UNSAFE_MARKERS):
+    if _contains_any(detail, _UNSAFE_MARKERS) or _contains_any(normalized, _UNSAFE_MARKERS):
         return RecoveryDecision(
             card_type="blocked",
             summary="This failure touches a operator-sensitive action and was not auto-handled.",
@@ -217,7 +253,7 @@ def diagnose_lead_failure(
             escalation_reason=f"Detail mentions operator-sensitive territory: {normalized[:200]}",
         )
 
-    # 5. Everything else: not a business decision, not an operator-only
+    # 6. Everything else: not a business decision, not an operator-only
     #    signal — route it to a specialist for investigation the same way a
     #    non-Lead failure would be routed. No ask.
     return RecoveryDecision(
