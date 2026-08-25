@@ -9,6 +9,7 @@ from pathlib import Path
 from unittest.mock import Mock, patch
 
 from fastapi.testclient import TestClient
+from starlette.websockets import WebSocketDisconnect
 
 from tests.support.control_plane_db import isolate_control_plane_db
 
@@ -16,7 +17,9 @@ CONTROL_PLANE_ROOT = Path(__file__).resolve().parents[1] / "services" / "control
 sys.path.insert(0, str(CONTROL_PLANE_ROOT))
 
 from app.main import app  # noqa: E402
+from app.auth import middleware as auth_middleware  # noqa: E402
 from app.persistence import run_store  # noqa: E402
+from app.terminal import session_handler as terminal_session_handler  # noqa: E402
 from app.terminal.session_registry import reset_registry  # noqa: E402
 from app.terminal.session_runtime import reset_runtimes  # noqa: E402
 from app.terminal.workspace_roots import resolve_workspace_root, workspace_roots_base  # noqa: E402
@@ -33,7 +36,12 @@ class ControlPlaneTerminalTests(unittest.TestCase):
         self.addCleanup(self.workspace_tempdir.cleanup)
         self.env_patch = patch.dict(
             os.environ,
-            {"AXON_WATCH_WORKSPACE_ROOT": self.workspace_tempdir.name},
+            {
+                "AXON_WATCH_AUTH_MODE": "off",
+                "AXON_WATCH_PUBLIC_BASE_URL": "http://127.0.0.1:4173",
+                "AXON_WATCH_REMOTELY_REACHABLE": "0",
+                "AXON_WATCH_WORKSPACE_ROOT": self.workspace_tempdir.name,
+            },
             clear=False,
         )
         self.env_patch.start()
@@ -83,6 +91,83 @@ class ControlPlaneTerminalTests(unittest.TestCase):
             message = json.loads(ws.receive_text())
             self.assertEqual("error", message["type"])
             self.assertIn("workspace not found", message["message"])
+
+    def test_terminal_websocket_requires_identity_in_token_mode(self) -> None:
+        with patch.dict(
+            os.environ,
+            {
+                "AXON_WATCH_AUTH_MODE": "local_token",
+                "AXON_WATCH_OPERATOR_TOKEN": "terminal-secret-token",
+                "AXON_WATCH_AUTH_ALLOW_LOOPBACK": "0",
+            },
+            clear=False,
+        ):
+            with self.client.websocket_connect("/api/workspaces/workspace_alpha/terminal") as ws:
+                message = json.loads(ws.receive_text())
+                self.assertEqual("error", message["type"])
+                self.assertTrue(message["auth_required"])
+                self.assertIn("Authorization: Bearer", message["message"])
+                with self.assertRaises(WebSocketDisconnect):
+                    ws.receive_text()
+
+    def test_terminal_websocket_accepts_operator_bearer(self) -> None:
+        with patch.dict(
+            os.environ,
+            {
+                "AXON_WATCH_AUTH_MODE": "local_token",
+                "AXON_WATCH_OPERATOR_TOKEN": "terminal-secret-token",
+                "AXON_WATCH_AUTH_ALLOW_LOOPBACK": "0",
+            },
+            clear=False,
+        ):
+            with self.client.websocket_connect(
+                "/api/workspaces/workspace_alpha/terminal",
+                headers={"Authorization": "Bearer terminal-secret-token"},
+            ) as ws:
+                ready = json.loads(ws.receive_text())
+                self.assertEqual("ready", ready["type"])
+                self.assertEqual("workspace_alpha", ready["workspace_id"])
+                ws.send_text(json.dumps({"type": "close"}))
+
+    def test_terminal_websocket_accepts_desktop_session_header(self) -> None:
+        from app.auth.desktop_session import issue_session_token
+
+        with patch.dict(
+            os.environ,
+            {
+                "AXON_WATCH_AUTH_MODE": "local_token",
+                "AXON_WATCH_OPERATOR_TOKEN": "terminal-secret-token",
+                "AXON_WATCH_AUTH_ALLOW_LOOPBACK": "0",
+            },
+            clear=False,
+        ):
+            session_token = issue_session_token()
+            with self.client.websocket_connect(
+                "/api/workspaces/workspace_alpha/terminal",
+                headers={"x-axon-desktop-session": session_token},
+            ) as ws:
+                ready = json.loads(ws.receive_text())
+                self.assertEqual("ready", ready["type"])
+                self.assertEqual("workspace_alpha", ready["workspace_id"])
+                ws.send_text(json.dumps({"type": "close"}))
+
+    def test_terminal_websocket_loopback_bypass_is_deliberate_when_enabled(self) -> None:
+        with patch.dict(
+            os.environ,
+            {
+                "AXON_WATCH_AUTH_MODE": "local_token",
+                "AXON_WATCH_OPERATOR_TOKEN": "terminal-secret-token",
+                "AXON_WATCH_AUTH_ALLOW_LOOPBACK": "1",
+                "AXON_WATCH_REMOTELY_REACHABLE": "0",
+            },
+            clear=False,
+        ):
+            with patch.object(auth_middleware, "client_is_loopback", return_value=True):
+                with self.client.websocket_connect("/api/workspaces/workspace_alpha/terminal") as ws:
+                    ready = json.loads(ws.receive_text())
+                    self.assertEqual("ready", ready["type"])
+                    self.assertEqual("workspace_alpha", ready["workspace_id"])
+                    ws.send_text(json.dumps({"type": "close"}))
 
     def test_terminal_websocket_runs_real_shell_command(self) -> None:
         collected: list[str] = []
@@ -135,7 +220,7 @@ class ControlPlaneTerminalTests(unittest.TestCase):
         fake_runtime = Mock()
         fake_runtime.pty = fake_pty
 
-        with patch("app.terminal.session_handler.ensure_runtime", return_value=fake_runtime):
+        with patch.object(terminal_session_handler, "ensure_runtime", return_value=fake_runtime):
             with self.client.websocket_connect(
                 "/api/workspaces/workspace_alpha/terminal?session_id=terminal-agent-test&role=agent"
             ) as ws:
@@ -155,7 +240,7 @@ class ControlPlaneTerminalTests(unittest.TestCase):
         fake_runtime = Mock()
         fake_runtime.pty = fake_pty
 
-        with patch("app.terminal.session_handler.ensure_runtime", return_value=fake_runtime):
+        with patch.object(terminal_session_handler, "ensure_runtime", return_value=fake_runtime):
             with self.client.websocket_connect(
                 "/api/workspaces/workspace_alpha/terminal?session_id=terminal-agent-test&role=agent"
             ) as ws:
