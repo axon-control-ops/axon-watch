@@ -386,8 +386,7 @@ def validate_specialist_context(
 
     mismatch_reason: str | None = None
     if employee_id and employee is None:
-        mismatch_reason = f"employee_id not found in workspace roster: {employee_id}"
-        verified = False
+        raise ValueError(f"employee_id not found in workspace roster: {employee_id}")
     else:
         verified = bool(employee)
 

@@ -65,6 +65,7 @@ def build_instructions_system_prompt(context: SpecialistContext | None = None) -
         "The reply MUST begin with `# Instructions`. "
         f"{specialist_sections}"
         "The reply MUST include every section below, in this order, each with a non-empty body:\n"
+        "## Instruction interpretation\n"
         "## Assigned specialist (recognized specialists only)\n"
         "## Role mandate (recognized specialists only)\n"
         "## Ownership boundaries (recognized specialists only)\n"
@@ -79,6 +80,9 @@ def build_instructions_system_prompt(context: SpecialistContext | None = None) -
         "## Constraints\n"
         "Goal is 1-2 sentences stating the outcome only — no bullets, no step sequencing, "
         "and it must stand on its own without relying on the source request text. "
+        "Instruction interpretation must include exactly these bullet labels: Task type, "
+        "Selected role, Delivery, Required in this run, Delegation required, Workspace "
+        "changes required, Interpretation confidence, and Unverified assumptions. "
         "Context explains why the task exists, including any observed failure pattern, without "
         "claiming that files were already changed. "
         "Delivery mode must say whether the work should be a scoped workspace-delivery task, "
@@ -125,6 +129,16 @@ Specialist contract:
 
 Required output shape:
 # Instructions
+
+## Instruction interpretation
+- Task type: resolved task type
+- Selected role: verified selected role
+- Delivery: resolved delivery mode
+- Required in this run: clear immediate outcome
+- Delegation required: yes/no
+- Workspace changes required: yes/no
+- Interpretation confidence: X/10
+- Unverified assumptions: list or none
 
 ## Assigned specialist
 - Role: selected role display name
