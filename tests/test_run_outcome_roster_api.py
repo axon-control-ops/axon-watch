@@ -102,6 +102,84 @@ class RunOutcomeRosterApiTests(unittest.TestCase):
         self.assertIn("Connection refused", str(bridge.get("last_outcome_detail")))
         self.assertNotIn("Run failed", str(bridge.get("last_outcome_detail")))
 
+    def test_clear_employee_run_card_hides_failure_without_deleting_run(self) -> None:
+        with tempfile.TemporaryDirectory() as tempdir:
+            project_root = Path(tempdir) / "bound-project"
+            project_root.mkdir()
+            bindings_file = Path(tempdir) / "bindings.json"
+            agents_file = Path(tempdir) / "agents.json"
+            employee_id = "employee-workspace_bound_demo-backend-1"
+            bindings_file.write_text(
+                json.dumps(
+                    {
+                        "bindings": {
+                            "workspace_bound_demo": {
+                                "project_root": str(project_root),
+                                "display_name": "Bound demo",
+                            }
+                        }
+                    }
+                ),
+                encoding="utf-8",
+            )
+            agents_file.write_text(
+                json.dumps(
+                    {
+                        "companies": {
+                            "workspace_bound_demo": {
+                                "company_name": "Bound Co",
+                                "employees": [
+                                    {
+                                        "employee_id": employee_id,
+                                        "name": "Bound Backend",
+                                        "role": "backend",
+                                        "schedule": "continuous",
+                                    },
+                                ],
+                            }
+                        }
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            with patch.dict(
+                os.environ,
+                {
+                    "AXON_WATCH_WORKSPACE_BINDINGS_FILE": str(bindings_file),
+                    "AXON_WATCH_WORKSPACE_AGENTS_FILE": str(agents_file),
+                    "AXON_WATCH_PROJECT_ROOT_ALLOWLIST": str(tempdir),
+                },
+                clear=False,
+            ):
+                created = create_run(
+                    workspace_id="workspace_bound_demo",
+                    mode="agent",
+                    summary="Backend: continuous worker shift",
+                    employee_role="backend",
+                )
+                fail_run(
+                    created["run_id"],
+                    receipt_summary="implementation requested but worker produced no changed files",
+                )
+                response = self.client.post(
+                    "/api/workspaces/workspace_bound_demo/company/employees/"
+                    f"{employee_id}/clear-run-card"
+                )
+
+        self.assertEqual(200, response.status_code)
+        payload = response.json()
+        self.assertEqual([created["run_id"]], payload["dismissed_run_ids"])
+        backend = payload["company"]["employees"][0]
+        self.assertNotIn("last_outcome", backend)
+        stored = run_store.get_run(created["run_id"])
+        assert stored is not None
+        self.assertEqual("failed", stored["phase"])
+        self.assertEqual(
+            "Operator cleared stale agent-card outcome",
+            stored["dismiss_reason"],
+        )
+
     def test_company_roster_surfaces_active_run_id_for_executing_shift(self) -> None:
         with tempfile.TemporaryDirectory() as tempdir:
             project_root = Path(tempdir) / "bound-project"

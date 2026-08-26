@@ -137,7 +137,7 @@ const receiptsAction = computed(() =>
 const displayActions = computed(() =>
   employeeDockDisplayActions(props.actions, props.employee),
 );
-const dockPrimaryActionIds = new Set(['start_now', 'retry', 'talk', 'stop']);
+const dockPrimaryActionIds = new Set(['start_now', 'retry', 'clear_run_card', 'talk', 'stop']);
 const dockPrimaryActions = computed(() =>
   displayActions.value.filter((action) => dockPrimaryActionIds.has(action.id)),
 );
@@ -456,6 +456,7 @@ watch(
             'company-roster__action--receipts': action.id === 'receipts',
             'company-roster__action--control': action.kind === 'control',
             'company-roster__action--start-now': action.id === 'start_now',
+            'company-roster__action--clear-run': action.id === 'clear_run_card',
           }"
           :disabled="controlBusy && action.kind === 'control'"
           @click="emit('action', action)"
@@ -478,6 +479,7 @@ watch(
             'company-roster__action--receipts': action.id === 'receipts',
             'company-roster__action--control': action.kind === 'control',
             'company-roster__action--start-now': action.id === 'start_now',
+            'company-roster__action--clear-run': action.id === 'clear_run_card',
           }"
           :disabled="controlBusy && action.kind === 'control'"
           @click="emit('action', action)"

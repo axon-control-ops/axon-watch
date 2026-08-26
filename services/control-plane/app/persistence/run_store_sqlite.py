@@ -91,7 +91,8 @@ def ensure_schema(connection: sqlite3.Connection) -> None:
             can_review INTEGER NOT NULL,
             current_step TEXT,
             history_ref TEXT NOT NULL,
-            employee_role TEXT
+            employee_role TEXT,
+            dismiss_reason TEXT NOT NULL DEFAULT ''
         );
 
         CREATE INDEX IF NOT EXISTS idx_runs_updated_at
@@ -218,27 +219,33 @@ def ensure_schema(connection: sqlite3.Connection) -> None:
     _ensure_workspace_composer_prefs_runtime_target_column(connection)
     _ensure_workspace_composer_prefs_runtime_policy_columns(connection)
     _ensure_workspace_composer_prefs_per_runtime_model_columns(connection)
-    _ensure_runs_employee_role_column(connection)
-    _ensure_runs_task_id_column(connection)
+    _ensure_runs_auxiliary_columns(connection)
     _ensure_workspace_tasks_table(connection)
     _ensure_chat_attachments_table(connection)
     _ensure_operator_memory_reminder_columns(connection)
     _ensure_host_context_tables(connection)
 
 
-def _ensure_runs_task_id_column(connection: sqlite3.Connection) -> None:
+def _ensure_runs_auxiliary_columns(connection: sqlite3.Connection) -> None:
     columns = {
         str(row[1])
         for row in connection.execute("PRAGMA table_info(runs)").fetchall()
     }
-    if "task_id" in columns:
-        return
-    connection.execute("ALTER TABLE runs ADD COLUMN task_id TEXT")
+    for name, ddl in (
+        ("employee_role", "TEXT"),
+        ("task_id", "TEXT"),
+        ("dismiss_reason", "TEXT NOT NULL DEFAULT ''"),
+    ):
+        if name not in columns:
+            connection.execute(f"ALTER TABLE runs ADD COLUMN {name} {ddl}")
     connection.execute(
-        """
-        CREATE INDEX IF NOT EXISTS idx_runs_task_id
-            ON runs(task_id)
-        """
+        "CREATE INDEX IF NOT EXISTS idx_runs_employee_role "
+        "ON runs(workspace_id, employee_role)"
+    )
+    connection.execute("CREATE INDEX IF NOT EXISTS idx_runs_task_id ON runs(task_id)")
+    connection.execute(
+        "CREATE INDEX IF NOT EXISTS idx_runs_employee_dismiss "
+        "ON runs(workspace_id, employee_role, dismiss_reason)"
     )
     connection.commit()
 
@@ -322,23 +329,6 @@ def _ensure_workspace_tasks_table(connection: sqlite3.Connection) -> None:
         """
         CREATE INDEX IF NOT EXISTS idx_workspace_tasks_lease
             ON workspace_tasks(status, lease_expires_at)
-        """
-    )
-    connection.commit()
-
-
-def _ensure_runs_employee_role_column(connection: sqlite3.Connection) -> None:
-    columns = {
-        str(row[1])
-        for row in connection.execute("PRAGMA table_info(runs)").fetchall()
-    }
-    if "employee_role" in columns:
-        return
-    connection.execute("ALTER TABLE runs ADD COLUMN employee_role TEXT")
-    connection.execute(
-        """
-        CREATE INDEX IF NOT EXISTS idx_runs_employee_role
-            ON runs(workspace_id, employee_role)
         """
     )
     connection.commit()

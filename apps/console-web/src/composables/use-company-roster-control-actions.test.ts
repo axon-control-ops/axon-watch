@@ -2,8 +2,14 @@ import { ref } from 'vue';
 import { describe, expect, it, vi } from 'vitest';
 
 import type { WorkspaceTaskRecord } from '../api/tasks-api';
+import { clearWorkspaceEmployeeRunCard } from '../api/worker-scheduler-api';
 import type { CompanyEmployeeRecord } from '../contracts/canonical';
 import { useCompanyRosterControlActions } from './use-company-roster-control-actions';
+
+vi.mock('../api/worker-scheduler-api', () => ({
+  clearWorkspaceEmployeeRunCard: vi.fn().mockResolvedValue({}),
+  patchWorkspaceEmployeeEnabled: vi.fn().mockResolvedValue({}),
+}));
 
 const employee: CompanyEmployeeRecord = {
   employee_id: 'employee-soren',
@@ -48,6 +54,31 @@ function shellWithStart(result: {
 }
 
 describe('useCompanyRosterControlActions', () => {
+  it('clears a stale employee run card and refreshes roster state', async () => {
+    const shell = shellWithStart({ runId: 'run_active', runPhase: 'executing' });
+    const loadCompany = vi.fn().mockResolvedValue(undefined);
+    const actions = useCompanyRosterControlActions({
+      shell: shell as never,
+      currentWorkspaceId: ref('workspace_dashpro'),
+      loadCompany,
+    });
+
+    await actions.onControlAction(employee, {
+      id: 'clear_run_card',
+      label: 'Clear run',
+      kind: 'control',
+      control: 'clear_run_card',
+    });
+
+    expect(clearWorkspaceEmployeeRunCard).toHaveBeenCalledWith(
+      'workspace_dashpro',
+      'employee-soren',
+    );
+    expect(loadCompany).toHaveBeenCalledOnce();
+    expect(shell.loadRuns).toHaveBeenCalledWith({ sync: false });
+    expect(actions.controlError.value).toBeNull();
+  });
+
   it('does not claim success when Start leaves the handoff queued', async () => {
     const shell = shellWithStart({ runId: 'run_queued', runPhase: 'queued' });
     const loadCompany = vi.fn().mockResolvedValue(undefined);

@@ -10,6 +10,7 @@ from pydantic import BaseModel, Field
 from app.workspace_agents import WorkspaceAgentError, get_company_roster
 from app.workspace_agents.fleet_control import (
     build_scheduler_status,
+    clear_employee_run_card,
     hard_kill_scheduler,
     patch_scheduler_settings,
     resume_scheduler,
@@ -29,6 +30,33 @@ class WorkerSchedulerPatchRequest(BaseModel):
 
 class EmployeeEnabledPatchRequest(BaseModel):
     enabled: bool
+
+
+def _employee_role_for_id(workspace_id: str, employee_id: str) -> str:
+    try:
+        roster = get_company_roster(workspace_id)
+    except WorkspaceAgentError as exc:
+        status_code = 404 if "not found" in str(exc).lower() else 400
+        raise HTTPException(status_code=status_code, detail=str(exc)) from exc
+
+    company = roster.get("company") if isinstance(roster, dict) else None
+    employees = []
+    if isinstance(company, dict):
+        raw_employees = company.get("employees")
+        if isinstance(raw_employees, list):
+            employees = raw_employees
+
+    target_id = employee_id.strip()
+    for row in employees:
+        if not isinstance(row, dict):
+            continue
+        if str(row.get("employee_id") or "").strip() != target_id:
+            continue
+        role = str(row.get("role") or "").strip()
+        if not role:
+            raise HTTPException(status_code=400, detail="employee role missing")
+        return role
+    raise HTTPException(status_code=404, detail=f"employee not found: {target_id}")
 
 
 @router.get("/api/worker-scheduler")
@@ -67,34 +95,7 @@ def workspace_employee_patch(
     employee_id: str,
     body: EmployeeEnabledPatchRequest,
 ) -> dict[str, Any]:
-    try:
-        roster = get_company_roster(workspace_id)
-    except WorkspaceAgentError as exc:
-        status_code = 404 if "not found" in str(exc).lower() else 400
-        raise HTTPException(status_code=status_code, detail=str(exc)) from exc
-
-    company = roster.get("company") if isinstance(roster, dict) else None
-    employees = []
-    if isinstance(company, dict):
-        raw_employees = company.get("employees")
-        if isinstance(raw_employees, list):
-            employees = raw_employees
-
-    target_id = employee_id.strip()
-    match: dict[str, Any] | None = None
-    for row in employees:
-        if not isinstance(row, dict):
-            continue
-        if str(row.get("employee_id") or "").strip() == target_id:
-            match = row
-            break
-    if match is None:
-        raise HTTPException(status_code=404, detail=f"employee not found: {target_id}")
-
-    role = str(match.get("role") or "").strip()
-    if not role:
-        raise HTTPException(status_code=400, detail="employee role missing")
-
+    role = _employee_role_for_id(workspace_id, employee_id)
     updated = set_employee_enabled(
         workspace_id=workspace_id,
         role=role,
@@ -105,4 +106,17 @@ def workspace_employee_patch(
     return {
         **updated,
         **refreshed,
+    }
+
+
+@router.post("/api/workspaces/{workspace_id}/company/employees/{employee_id}/clear-run-card")
+def workspace_employee_clear_run_card(
+    workspace_id: str,
+    employee_id: str,
+) -> dict[str, Any]:
+    role = _employee_role_for_id(workspace_id, employee_id)
+    result = clear_employee_run_card(workspace_id=workspace_id, role=role)
+    return {
+        **result,
+        **get_company_roster(workspace_id),
     }
