@@ -183,6 +183,18 @@
   font-size: 0.64rem;
 }
 
+.workspace-add-form__toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  color: rgba(190, 220, 235, 0.82);
+  font-size: 0.68rem;
+}
+
+.workspace-add-form__toggle input {
+  accent-color: rgb(0, 242, 255);
+}
+
 .workspace-add-form__error {
   margin: 0;
   color: rgba(255, 140, 140, 0.92);

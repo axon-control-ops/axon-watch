@@ -20,6 +20,8 @@ const displayName = ref('');
 const busy = ref(false);
 const error = ref('');
 const displayNameTouchedByOperator = ref(false);
+const provisionWorkspace = ref(true);
+const createGithubRepo = ref(false);
 
 // Suggests a project_root from sibling directories of already-registered
 // workspaces, ranked against the workspace id as the operator types — the
@@ -105,6 +107,9 @@ async function submit(): Promise<void> {
       workspaceId: normalizedWorkspaceId.value,
       projectRoot: projectRoot.value.trim(),
       displayName: displayName.value.trim() || undefined,
+      provision: provisionWorkspace.value,
+      createGithubRepo: createGithubRepo.value,
+      githubRepo: normalizedWorkspaceId.value.replace(/^workspace[_-]?/i, '').replace(/_/g, '-'),
     });
     shell.setCurrentWorkspace(workspace.workspace_id);
     emit('registered', workspace.workspace_id);
@@ -178,6 +183,14 @@ async function submit(): Promise<void> {
         placeholder="My project"
         @input="displayNameTouchedByOperator = true"
       />
+    </label>
+    <label class="workspace-add-form__toggle">
+      <input v-model="provisionWorkspace" type="checkbox" name="provision" />
+      <span>Provision workspace repo files</span>
+    </label>
+    <label class="workspace-add-form__toggle">
+      <input v-model="createGithubRepo" type="checkbox" name="create_github_repo" />
+      <span>Create private GitHub repo</span>
     </label>
     <p v-if="error" class="workspace-add-form__error" role="alert">{{ error }}</p>
     <div class="workspace-add-form__actions">
