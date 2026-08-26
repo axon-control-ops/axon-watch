@@ -10,6 +10,7 @@ from app.workspace_agents.lead_task_plan import (
     should_execute_lead_fast_path,
 )
 from app.workspace_agents.named_assign_route import (
+    count_named_roster_members,
     match_named_assign_employee,
     named_assign_action_body,
 )
@@ -79,6 +80,11 @@ def maybe_post_lead_named_assign_message(
         company = build_company_roster(workspace_id)
         roster = roster_employees_from_company({"company": company})
     except Exception:
+        return None
+
+    # A staged brief that names several teammates belongs to Lead orchestration;
+    # do not collapse it into whichever single named assignment matches first.
+    if count_named_roster_members(content, roster) >= 2:
         return None
 
     named = match_named_assign_employee(content, roster)

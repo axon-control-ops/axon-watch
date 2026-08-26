@@ -250,6 +250,34 @@ class NamedAssignRouteTests(unittest.TestCase):
             )
         self.assertIsNone(response)
 
+    def test_lead_fast_path_skips_staged_multi_name_brief_without_fan_out_wording(self) -> None:
+        roster = _roster()
+        with patch(
+            "app.chat.lane_b_lead_named_assign_fast_path.build_company_roster",
+            return_value={"employees": [row.__dict__ for row in roster]},
+        ), patch(
+            "app.chat.lane_b_lead_named_assign_fast_path._create_named_handoff_task",
+        ) as create_task:
+            response = maybe_post_lead_named_assign_message(
+                workspace_id="workspace_test",
+                content=(
+                    "Imani owns the delivery diagnosis. Only after delivery works, "
+                    "assign Cole the minimum contracts. Then assign Lila the UI slice. "
+                    "Rowan verifies the completed slice."
+                ),
+                thread_id="thread_lead",
+                employee_role="lead",
+                lead_name="Imani",
+                composer_mode="agent",
+                created_at="2026-08-26T13:21:00Z",
+                save_message=Mock(),
+                new_message_id=lambda prefix: f"{prefix}_1",
+                bind_attachments=lambda _message_id: [],
+            )
+
+        self.assertIsNone(response)
+        create_task.assert_not_called()
+
     def test_lead_fast_path_does_not_misroute_build_plan_body(self) -> None:
         roster = _roster()
         with patch(

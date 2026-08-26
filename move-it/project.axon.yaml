@@ -3,7 +3,7 @@ version: 1
 project_id: MoveIT
 display_name: move-it
 stack: node
-certification_level: inspect_only
+certification_level: build
 environment:
   bootstrap:
     - npm ci

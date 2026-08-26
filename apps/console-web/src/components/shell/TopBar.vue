@@ -73,6 +73,14 @@ function openSettings(): void {
   navigateToAppSurface('settings');
 }
 
+function openIdeMode(): void {
+  if (shell.layoutMode === 'ide' && shell.ideWorkbenchCollapsed) {
+    shell.toggleIdeWorkbench();
+    return;
+  }
+  shell.setLayoutMode('ide');
+}
+
 async function openStandup(): Promise<void> {
   await openOperatorStandup(shell);
 }
@@ -204,7 +212,7 @@ async function openAttention(): Promise<void> {
             class="layout-toggle__button"
             :class="{ 'layout-toggle__button--active': shell.layoutMode === 'ide' }"
             :aria-pressed="shell.layoutMode === 'ide'"
-            @click="shell.setLayoutMode('ide')"
+            @click="openIdeMode"
           >
             IDE
           </button>

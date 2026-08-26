@@ -5,7 +5,7 @@ Lead: Jabulani
 ## Now
 
 1. Land ops baseline docs under `docs/ops/` (this retry).
-2. Unblock workspace delivery for MoveIT (handoff to Mira / Axon-X).
+2. Unblock workspace delivery for MoveIT — handoff `handoff-685af9e940944325` routed to Mira; awaiting her run `run_a1efb6fc824b`.
 3. Clear Remy’s waiting_approval decision about the failed lead shift once delivery is fixed or the retry is accepted.
 
 ## Next

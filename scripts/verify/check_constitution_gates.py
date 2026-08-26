@@ -44,6 +44,10 @@ STRING_RE = re.compile(r"['\"]([^'\"]+)['\"]")
 # bearer/session check. New entries here should be rare and accompanied by
 # source-specific auth such as signed webhooks.
 ALLOWED_MUTATING_EXEMPTIONS = {
+    # Browser/mobile session login/logout are self-authenticating: login
+    # validates the operator token/password, logout only clears the caller's
+    # session cookie. Covered by tests/test_desktop_session.py.
+    "/api/auth/session",
     "/api/desktop/bootstrap",
     "/api/desktop/bootstrap-code",
     "/api/webhooks/github/workflow-run",

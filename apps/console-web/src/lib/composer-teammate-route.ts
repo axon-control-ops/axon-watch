@@ -6,6 +6,7 @@
 import type { CompanyEmployeeRecord } from '../contracts/canonical';
 import { isBuildPlanImplementPrompt } from './build-plan-prompt';
 import {
+  countNamedRosterMembers,
   isVagueNamedAssignPrompt,
   matchNamedAssignEmployee,
   namedAssignRouteReason,
@@ -269,7 +270,7 @@ export function shouldSoftRouteToTeammate(
   if (isBuildPlanImplementPrompt(text)) {
     return { shouldRoute: false, reason: 'build_plan_implement', source: 'deterministic' };
   }
-  if (isLeadFanOutDirective(text)) {
+  if (isLeadFanOutDirective(text) || countNamedRosterMembers(text, employees) >= 2) {
     const currentId = currentEmployee?.employee_id?.trim() ?? '';
     return {
       shouldRoute: false,
@@ -277,7 +278,7 @@ export function shouldSoftRouteToTeammate(
       fromEmployeeId: currentId || undefined,
       fromName: currentEmployee?.name.trim() || undefined,
       source: 'deterministic',
-      routingReceipt: 'lead_fan_out;multi_specialist_directive',
+      routingReceipt: 'lead_fan_out;multi_specialist_directive_or_multi_name_brief',
     };
   }
 

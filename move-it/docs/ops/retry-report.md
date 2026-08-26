@@ -2,59 +2,58 @@
 
 | Field | Value |
 |---|---|
-| Retry run | `run_0d68a13b1896` |
-| Failed run retried | `run_eb27cfd30ee4` |
-| Prior same failure | `run_ca22fab42bbd` |
-| Failed task | `task-5b97d3a5c8bb47ee` (API now `404`) |
+| Retry run | `run_6c72a01d1632` |
+| Failed run retried | `run_5f7fd88f9487` |
+| Failed task | `task-be593ba8fe4442d0` |
 | Role | Lead (Jabulani) |
-| Date | 2026-08-25 |
+| Date | 2026-08-26 |
 
 ## What failed last time
 
-Continuous worker completed file work, completion-gate preflight passed, then publish failed:
+Continuous worker finished file work and completion-gate preflight passed, then publish failed:
 
-> Workspace delivery blocked: workspace delivery is not configured for MoveIT, so 3 changed path(s) cannot be published
+> Workspace delivery blocked: workspace delivery is not configured for MoveIT, so 6 changed path(s) cannot be published
 
-Changed paths from gate receipt:
+Changed paths from gate receipt (`run_5f7fd88f9487`):
 
-1. `docs/ops/retry-report.md`
-2. `docs/ops/service-connections.md`
-3. `docs/ops/workspace-baseline.md`
+1. `docs/ops/lead-handoff-node-manifests-2026-08-26.md`
+2. `docs/ops/mvp-verification-plan.md`
+3. `docs/ops/retry-report.md`
+4. `docs/ops/service-connections.md`
+5. `docs/ops/watcher-shift-report-2026-08-25.md`
+6. `docs/ops/workspace-baseline.md`
 
-Isolation checkout was preserved then cleaned up; content was not recoverable from `/tmp`.
+Isolation checkout path from failure receipt: `/tmp/axon-si-run_5f7fd88f-o916t63f/checkout` — **gone** on this retry (reads return not found).
 
-Acceptance checks on the failed run also reported `test` and `diff_budget` failures (mode=contract) before delivery block.
+Acceptance on that run also reported `test` fail (mode=contract) before delivery block.
 
 ## What this retry changed
 
-Rewrote the three blocked ops docs into the live project root write scope, plus a priorities plan:
+Recovered / refreshed Lead ops surface in the live project root write scope:
 
 | Path | Purpose |
 |---|---|
+| `docs/ops/retry-report.md` | This receipt |
 | `docs/ops/workspace-baseline.md` | Binding, team, disk shape, product direction |
 | `docs/ops/service-connections.md` | Control-plane / delivery posture |
-| `docs/ops/retry-report.md` | This receipt |
-| `plans/priorities-2026-08-25.md` | Bounded priority order |
+| `docs/ops/lead-handoff-node-manifests-2026-08-26.md` | Lost handoff note from failed run — rewritten |
+| `docs/ops/mvp-verification-plan.md` | P0 status refresh from live API |
+| `plans/priorities-2026-08-26.md` | Bounded priority order for today |
 
-## Verified facts used
+## Verified facts used (this turn)
 
-- Control-plane run history for `run_eb27cfd30ee4` / `run_ca22fab42bbd`
-- `GET /api/workspaces/MoveIT/company`
-- On-disk inventory of the MoveIT project root (no `.git`; empty scaffolds)
+| Check | Receipt |
+|---|---|
+| Company roster | `GET /api/workspaces/MoveIT/company` — Lead `last_run_id=run_5f7fd88f9487`, `active_run_id=run_6c72a01d1632` |
+| Failed run | `GET /api/runs/run_5f7fd88f9487` + `/history` — status `error`, delivery-not-configured |
+| Workspace | `GET /api/workspaces/MoveIT` — `connection_kind=project_path` |
+| Service connection | `GET .../service-connection` — `configured=true`, `ready=true` (operator `.env` still absent; vault unlocked) |
+| Tasks / handoffs | both empty (`items: []`) |
+| Handoff create | `POST .../handoffs` → `auth_required=true` (mutating API needs operator bearer token) |
+| Disk smoke | terminal job `agent-job-8c4b12008fde` exit 0 — `package.json` is a file; ops docs present |
 
 ## Still blocked
 
-Workspace delivery remains unconfigured. Continuous-worker publish will fail again until Mira/Axon-X configures delivery for MoveIT (or an operator gate enables an equivalent publish path). Remy is still `waiting_approval` on the prior lead failure decision.
+Workspace delivery remains unconfigured. Continuous-worker publish will fail again until Axon-X / host configures delivery for MoveIT. I could not file a new Mira handoff from this runtime — POST requires an operator bearer token.
 
-## Next step (filed)
-
-Handoff to Mira (`workspace_axon_watch`) created and routed:
-
-| Receipt | Id |
-|---|---|
-| Handoff | `handoff-c7c62d409f8f41cc` |
-| Target task | `task-d5094a05110d4a9f` |
-| Routed role | lead (Mira) |
-| Status | routed |
-
-Goal on that task: configure MoveIT workspace delivery so continuous runs can publish changed paths without the delivery-not-configured failure.
+Remy remains `waiting_approval` on decision about the failed lead shift (`auton-2fec2102d1fa4f74`).

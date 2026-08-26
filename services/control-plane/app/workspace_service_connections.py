@@ -262,9 +262,20 @@ def workspace_service_connection_posture(workspace_id: str) -> dict[str, object]
     project_root = str(binding.project_root) if binding else ""
     dotenv_path = str(binding.project_root / ".env") if binding else ""
     dotenv_present = binding is not None and (binding.project_root / ".env").is_file()
+    operator_env = parse_operator_dotenv(binding.project_root, connection.env_keys) if binding else {}
     resolved = resolve_workspace_live_env(workspace_id)
     key_status = {
         key: key in resolved
+        for key in connection.env_keys
+    }
+    key_sources = {
+        key: (
+            "operator_dotenv"
+            if key in operator_env
+            else "vault"
+            if key in resolved
+            else "missing"
+        )
         for key in connection.env_keys
     }
     service_key_predicates = {
@@ -281,18 +292,17 @@ def workspace_service_connection_posture(workspace_id: str) -> dict[str, object]
         for service in connection.required_services
     }
     services_ready = all(service_status.values()) if service_status else True
-    ready = dotenv_present and services_ready
+    ready = services_ready
     hint = "Live service bridge ready — fleet may run configured verify commands."
     if not binding:
         ready = False
         hint = "Bind a project_root in workspace-project-bindings.json first."
-    elif not dotenv_present:
-        ready = False
-        hint = "Materialize operator .env from .env.example on the bound project root."
     elif not services_ready:
         ready = False
         missing = ", ".join(service for service, ok in service_status.items() if not ok)
         hint = f"Add {missing} keys to operator .env or unlock /vault with matching keys."
+    elif not dotenv_present:
+        hint = "Live service bridge ready from unlocked /vault; operator .env is optional."
     return {
         "workspace_id": workspace_id,
         "configured": True,
@@ -305,6 +315,7 @@ def workspace_service_connection_posture(workspace_id: str) -> dict[str, object]
         "operator_dotenv_present": dotenv_present,
         "env_keys": list(connection.env_keys),
         "env_keys_resolved": key_status,
+        "env_key_sources": key_sources,
         "required_services": list(connection.required_services),
         "services_resolved": service_status,
         "live_verify_commands": [list(prefix) for prefix in connection.live_verify_command_prefixes],

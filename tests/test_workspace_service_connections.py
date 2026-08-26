@@ -12,6 +12,7 @@ CONTROL_PLANE_ROOT = Path(__file__).resolve().parents[1] / "services" / "control
 sys.path.insert(0, str(CONTROL_PLANE_ROOT))
 
 from app.workspace_agents.execution_policy import role_execution_policy  # noqa: E402
+from app.cli_runtime.sandbox_policy_adapter import workspace_service_bridge_env  # noqa: E402
 from app.workspace_agents.execution_policy_runtime import (  # noqa: E402
     resolve_worker_execution_policy,
 )
@@ -21,6 +22,7 @@ from app.workspace_service_connections import (  # noqa: E402
     apply_live_service_policy,
     load_workspace_service_connections,
     parse_operator_dotenv,
+    resolve_workspace_live_env,
     workspace_service_connection_posture,
 )
 
@@ -124,6 +126,35 @@ class WorkspaceServiceConnectionTests(unittest.TestCase):
 
     @patch.object(service_connections, "get_workspace_project_binding")
     @patch.object(service_connections, "resolve_workspace_live_env")
+    def test_moveit_posture_ready_from_vault_without_dotenv(
+        self,
+        mock_env: unittest.mock.MagicMock,
+        mock_binding: unittest.mock.MagicMock,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            mock_binding.return_value = unittest.mock.MagicMock(
+                project_root=Path(tmp),
+            )
+            mock_env.return_value = {
+                "GITHUB_TOKEN": "github-secret",
+                "SENTRY_AUTH_TOKEN": "sentry-secret",
+                "SUPABASE_URL": "https://example.supabase.co",
+            }
+            posture = workspace_service_connection_posture("MoveIT")
+        encoded = json.dumps(posture)
+        self.assertTrue(posture["ready"])
+        self.assertFalse(posture["operator_dotenv_present"])
+        self.assertEqual(
+            {"github": True, "sentry": True, "supabase": True},
+            posture["services_resolved"],
+        )
+        self.assertEqual("vault", posture["env_key_sources"]["GITHUB_TOKEN"])
+        self.assertEqual("vault", posture["env_key_sources"]["SENTRY_AUTH_TOKEN"])
+        self.assertNotIn("github-secret", encoded)
+        self.assertNotIn("sentry-secret", encoded)
+
+    @patch.object(service_connections, "get_workspace_project_binding")
+    @patch.object(service_connections, "resolve_workspace_live_env")
     def test_moveit_posture_reports_missing_service(
         self,
         mock_env: unittest.mock.MagicMock,
@@ -144,6 +175,42 @@ class WorkspaceServiceConnectionTests(unittest.TestCase):
             posture["services_resolved"],
         )
         self.assertIn("sentry", str(posture["hint"]))
+
+    @patch.object(service_connections, "get_workspace_project_binding")
+    @patch.object(service_connections, "runtime_vault_env")
+    def test_resolve_live_env_uses_vault_when_dotenv_missing(
+        self,
+        mock_vault_env: unittest.mock.MagicMock,
+        mock_binding: unittest.mock.MagicMock,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            mock_binding.return_value = unittest.mock.MagicMock(project_root=Path(tmp))
+            mock_vault_env.return_value = {
+                "GITHUB_TOKEN": "github-secret",
+                "SENTRY_AUTH_TOKEN": "sentry-secret",
+                "UNRELATED": "ignored",
+            }
+            resolved = resolve_workspace_live_env("MoveIT")
+        self.assertEqual("github-secret", resolved["GITHUB_TOKEN"])
+        self.assertEqual("sentry-secret", resolved["SENTRY_AUTH_TOKEN"])
+        self.assertNotIn("UNRELATED", resolved)
+
+    @patch.object(service_connections, "resolve_workspace_live_env")
+    def test_workspace_service_bridge_includes_declared_non_supabase_keys(
+        self,
+        mock_env: unittest.mock.MagicMock,
+    ) -> None:
+        mock_env.return_value = {
+            "GH_TOKEN": "github-secret",
+            "SENTRY_AUTH_TOKEN": "sentry-secret",
+            "SUPABASE_ACCESS_TOKEN": "supabase-secret",
+            "UNRELATED": "ignored",
+        }
+        bridge = workspace_service_bridge_env("MoveIT")
+        self.assertEqual("github-secret", bridge["GH_TOKEN"])
+        self.assertEqual("sentry-secret", bridge["SENTRY_AUTH_TOKEN"])
+        self.assertEqual("supabase-secret", bridge["SUPABASE_ACCESS_TOKEN"])
+        self.assertNotIn("UNRELATED", bridge)
 
     @patch("app.workspace_service_connections.apply_live_service_policy")
     @patch("app.workspace_agents.execution_policy_runtime.load_repo_contract")

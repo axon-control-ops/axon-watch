@@ -13,6 +13,7 @@ CONTROL_PLANE_ROOT = Path(__file__).resolve().parents[1] / "services" / "control
 sys.path.insert(0, str(CONTROL_PLANE_ROOT))
 
 from app.main import app  # noqa: E402
+from app.operator_fleet_health import build_operator_fleet_health  # noqa: E402
 from app.persistence import run_store  # noqa: E402
 
 
@@ -144,6 +145,28 @@ class OperatorFleetHealthTests(unittest.TestCase):
             if isinstance(item, dict)
         }
         self.assertNotIn("workspace_alpha", workspace_ids)
+
+    def test_fleet_health_does_not_crash_when_connected_watch_inbox_disappears(self) -> None:
+        with patch(
+            "app.operator_fleet_health.assemble_runtime_summary",
+            return_value={
+                "generated_at": "2026-07-07T20:00:00Z",
+                "watch": {"connected": True},
+                "connectors": {
+                    "configured": 2,
+                    "ok": 2,
+                    "degraded": 0,
+                    "unavailable": 0,
+                    "required_unavailable": 0,
+                },
+                "degraded": {"active": False, "reasons": []},
+            },
+        ):
+            payload = build_operator_fleet_health(inbox_fetcher=lambda: None)
+
+        self.assertTrue(payload["watch_connected"])
+        self.assertIn("items", payload)
+        self.assertGreater(payload["count"], 0)
 
     def test_briefing_workspace_scope_limits_review_ready_notice(self) -> None:
         alpha = self.client.post(

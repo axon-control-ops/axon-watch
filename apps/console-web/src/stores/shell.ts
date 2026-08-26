@@ -297,6 +297,7 @@ import {
   persistLayoutMode,
   readStoredAgentDockCollapsed,
   readStoredIdeExplorerCollapsed,
+  readStoredIdeWorkbenchCollapsed,
   readStoredLayoutMode,
 } from '../lib/ide-layout-prefs';
 import {
@@ -543,10 +544,12 @@ export const useShellStore = defineStore('shell', () => {
   const leftSidebarModeTouched = ref(Boolean(readStoredLeftSidebarMode()));
   const ideActivityView = ref(DEFAULT_IDE_ACTIVITY_VIEW);
   const ideExplorerCollapsed = ref(readStoredIdeExplorerCollapsed());
+  const ideWorkbenchCollapsed = ref(readStoredIdeWorkbenchCollapsed());
   const ideAttentionPanelOpen = ref(false);
   const ideBriefingPanelOpen = ref(false);
   const ideVaxonDockPinned = ref(false);
   const agentDockCollapsed = ref(readStoredAgentDockCollapsed());
+  if (ideWorkbenchCollapsed.value && agentDockCollapsed.value) { agentDockCollapsed.value = false; persistAgentDockCollapsed(false); }
   const ideTerminalRevealToken = ref(0);
   const ideTerminalProblemsRevealToken = ref(0);
   const ideTerminalToggleToken = ref(0);
@@ -2701,9 +2704,7 @@ export const useShellStore = defineStore('shell', () => {
     revealIdeWorkbenchProblems,
     toggleIdeTerminalPanel,
     focusIdeSidebarView,
-    setIdeActivityView,
-    toggleIdeExplorer,
-    toggleAgentDock,
+    setIdeActivityView, toggleIdeExplorer, toggleIdeWorkbench, toggleAgentDock,
     revealTeamRosterForActiveEmployee,
     requestIdeExplorerInlineCreate,
   } = createIdeWorkbenchChromeSlice({
@@ -2713,9 +2714,7 @@ export const useShellStore = defineStore('shell', () => {
     ideExplorerInlineCreateToken,
     ideExplorerInlineCreateKind,
     teamRosterRevealToken,
-    ideActivityView,
-    ideExplorerCollapsed,
-    agentDockCollapsed,
+    ideActivityView, ideExplorerCollapsed, ideWorkbenchCollapsed, agentDockCollapsed,
     ideAttentionPanelOpen,
     ideBriefingPanelOpen,
     ideVaxonDockPinned,
@@ -4026,10 +4025,7 @@ export const useShellStore = defineStore('shell', () => {
     streamingIdeThreadIds,
     agentReportEditorLink,
     focusAgentReportEditor,
-    agentDockCollapsed,
-    ideActivityView,
-    ideExplorerCollapsed,
-    ideAttentionPanelOpen,
+    agentDockCollapsed, ideActivityView, ideExplorerCollapsed, ideWorkbenchCollapsed, ideAttentionPanelOpen,
     closeIdeAttentionPanel,
     toggleIdeAttentionPanel,
     ideBriefingPanelOpen,
@@ -4182,8 +4178,7 @@ export const useShellStore = defineStore('shell', () => {
     setLayoutMode,
     setLeftSidebarMode,
     toggleCursorPickerVisibleModel,
-    toggleAgentDock,
-    toggleIdeExplorer,
+    toggleAgentDock, toggleIdeExplorer, toggleIdeWorkbench,
     signalClearError,
     signalClearState,
     signalViews,

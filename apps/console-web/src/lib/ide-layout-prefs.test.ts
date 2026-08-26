@@ -4,12 +4,15 @@ import {
   AGENT_DOCK_COLLAPSED_KEY,
   IDE_COLLAPSED_SIDEBAR_WIDTH_PX,
   IDE_EXPLORER_COLLAPSED_KEY,
+  IDE_WORKBENCH_COLLAPSED_KEY,
   LAYOUT_MODE_KEY,
   persistAgentDockCollapsed,
   persistIdeExplorerCollapsed,
+  persistIdeWorkbenchCollapsed,
   persistLayoutMode,
   readStoredAgentDockCollapsed,
   readStoredIdeExplorerCollapsed,
+  readStoredIdeWorkbenchCollapsed,
   readStoredLayoutMode,
   resolveIdeSidebarWidthPx,
 } from './ide-layout-prefs';
@@ -62,6 +65,16 @@ describe('ide layout prefs', () => {
     persistAgentDockCollapsed(false);
     expect(readStoredAgentDockCollapsed()).toBe(false);
     expect(window.localStorage.getItem(AGENT_DOCK_COLLAPSED_KEY)).toBe('0');
+  });
+
+  it('persists IDE workbench collapse', () => {
+    expect(readStoredIdeWorkbenchCollapsed()).toBe(false);
+    persistIdeWorkbenchCollapsed(true);
+    expect(readStoredIdeWorkbenchCollapsed()).toBe(true);
+    expect(window.localStorage.getItem(IDE_WORKBENCH_COLLAPSED_KEY)).toBe('1');
+    persistIdeWorkbenchCollapsed(false);
+    expect(readStoredIdeWorkbenchCollapsed()).toBe(false);
+    expect(window.localStorage.getItem(IDE_WORKBENCH_COLLAPSED_KEY)).toBe('0');
   });
 
   it('resolves collapsed IDE sidebar width to the activity bar width', () => {

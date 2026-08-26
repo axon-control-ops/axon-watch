@@ -92,15 +92,31 @@ def sandbox_agent_env(
     workspace_id: str,
     run_id: str,
 ) -> dict[str, str]:
-    from app.workspace_service_connections import resolve_workspace_live_env
-
-    bridge_env = resolve_workspace_live_env(workspace_id)
+    bridge_env = workspace_service_bridge_env(workspace_id)
     return {
         **env,
         **bridge_env,
         "AXON_AGENT_SOURCE_WORKSPACE_ID": workspace_id,
         "AXON_WATCH_WORKSPACE_ID": workspace_id,
         "AXON_WATCH_RUN_ID": run_id,
+    }
+
+
+def workspace_service_bridge_env(workspace_id: str) -> dict[str, str]:
+    from app.workspace_service_connections import (
+        get_workspace_service_connection,
+        resolve_workspace_live_env,
+    )
+
+    connection = get_workspace_service_connection(workspace_id)
+    if connection is None:
+        return {}
+    allowed = set(connection.env_keys)
+    resolved = resolve_workspace_live_env(workspace_id)
+    return {
+        key: value
+        for key, value in resolved.items()
+        if key in allowed and str(value).strip()
     }
 
 
@@ -116,11 +132,13 @@ def prepare_execution_sandbox(
 ) -> tuple[dict[str, str], AgentSandboxPolicy | None]:
     if policy is None:
         return env, None
-    sandbox_env = sandbox_agent_env(env, workspace_id=workspace_id, run_id=run_id)
-    bridge_env = {
-        key: value
-        for key, value in sandbox_env.items()
-        if key.startswith(("SUPABASE_", "YEDC_", "EXPO_PUBLIC_SUPABASE_"))
+    bridge_env = workspace_service_bridge_env(workspace_id)
+    sandbox_env = {
+        **env,
+        **bridge_env,
+        "AXON_AGENT_SOURCE_WORKSPACE_ID": workspace_id,
+        "AXON_WATCH_WORKSPACE_ID": workspace_id,
+        "AXON_WATCH_RUN_ID": run_id,
     }
     injected_env = tuple(sorted(bridge_env.items()))
     policy_value = adapt_execution_policy(
@@ -150,4 +168,5 @@ __all__ = [
     "adapt_execution_policy",
     "prepare_execution_sandbox",
     "sandbox_agent_env",
+    "workspace_service_bridge_env",
 ]

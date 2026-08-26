@@ -106,6 +106,59 @@ class ControlPlaneWorkspacesTests(unittest.TestCase):
         self.assertEqual(str(project_root.resolve()), record["project_root"])
         self.assertEqual("Bound demo", record["display_name"])
 
+    def test_workspaces_register_can_provision_new_repo_workspace(self) -> None:
+        with tempfile.TemporaryDirectory() as tempdir:
+            project_root = Path(tempdir) / "new-product"
+            bindings_file = Path(tempdir) / "bindings.json"
+            delivery_file = Path(tempdir) / "delivery.json"
+            with patch.dict(
+                os.environ,
+                {
+                    "AXON_WATCH_PROJECT_ROOT_ALLOWLIST": tempdir,
+                    "AXON_WATCH_WORKSPACE_BINDINGS_FILE": str(bindings_file),
+                    "AXON_WATCH_WORKSPACE_DELIVERY_FILE": str(delivery_file),
+                },
+                clear=False,
+            ), patch(
+                "app.workspace_agents.workspace_runtime_bootstrap.provision_workspace_runtime",
+                return_value={"status": "ready"},
+            ):
+                response = self.client.post(
+                    "/api/workspaces",
+                    json={
+                        "workspace_id": "workspace_new_product",
+                        "project_root": str(project_root),
+                        "display_name": "New Product",
+                        "provision": True,
+                        "github_repo": "new-product",
+                    },
+                )
+                self.assertEqual(200, response.status_code, response.text)
+                payload = response.json()
+                self.assertEqual("workspace_new_product", payload["workspace"]["workspace_id"])
+                self.assertEqual("ready", payload["provisioning"]["status"])
+                self.assertTrue((project_root / ".git").is_dir())
+                self.assertTrue((project_root / "project.axon.yaml").is_file())
+                self.assertTrue(delivery_file.is_file())
+                delivery = json.loads(delivery_file.read_text(encoding="utf-8"))
+                policies = {
+                    item["workspace_id"]: item
+                    for item in delivery["workspaces"]
+                    if isinstance(item, dict)
+                }
+                self.assertEqual("new-product", policies["workspace_new_product"]["github_repo"])
+
+    def test_workspace_delivery_status_reports_configured_policy(self) -> None:
+        response = self.client.get("/api/workspaces/MoveIT/delivery")
+        self.assertEqual(200, response.status_code, response.text)
+        payload = response.json()
+        self.assertTrue(payload["configured"])
+        self.assertEqual("MoveIT", payload["workspace_id"])
+        self.assertEqual("axon-control-ops", payload["policy"]["github_owner"])
+        self.assertEqual("move-it", payload["policy"]["github_repo"])
+        self.assertEqual("draft_pr", payload["policy"]["push_policy"])
+        self.assertNotIn("token", json.dumps(payload).lower())
+
     def test_operator_workspace_records_expose_auto_enabled_toggle(self) -> None:
         set_workspace_composer_prefs(
             "workspace_axon_watch",

@@ -10,9 +10,8 @@ export function formatSessionCookieDays(seconds: number | null | undefined): num
 
 export function operatorLoginBodyCopy(): string {
   return (
-    'There is no Axon-X username. Paste the host operator token ' +
-    '(AXON_WATCH_OPERATOR_TOKEN in ~/.config/axon-watch/deployment.env). ' +
-    'This page does not keep the token. The control plane exchanges it for an HttpOnly cookie.'
+    'Use the operator username and password configured for this host. ' +
+    'This page does not keep the password. The control plane exchanges it for an HttpOnly cookie.'
   );
 }
 
@@ -30,7 +29,7 @@ export function operatorLoginFooterCopy(input: {
     return `Trusted loopback can skip this page. ${persistence}`;
   }
   return (
-    'This host currently requires the operator token even on localhost ' +
+    'This host currently requires operator sign-in even on localhost ' +
     '(remote reachability or loopback bypass off). ' +
     persistence
   );

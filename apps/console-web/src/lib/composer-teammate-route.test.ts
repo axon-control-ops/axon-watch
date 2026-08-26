@@ -76,6 +76,54 @@ describe('composer-teammate-route', () => {
     expect(decision.reason).toBe('lead_fan_out');
   });
 
+  it('keeps a staged MoveIT unblock brief on Jabulani', () => {
+    const roster: TeammateRouteEmployee[] = [
+      {
+        employee_id: 'moveit-lead',
+        name: 'Jabulani',
+        role: 'lead',
+        role_label: 'Lead',
+        owns: 'priorities and handoffs',
+      },
+      {
+        employee_id: 'moveit-watcher',
+        name: 'Remy',
+        role: 'watcher',
+        role_label: 'Watcher',
+        owns: 'verification',
+      },
+      {
+        employee_id: 'moveit-frontend',
+        name: 'Ayesha',
+        role: 'frontend',
+        role_label: 'Frontend',
+        owns: 'UI/UX',
+      },
+      {
+        employee_id: 'moveit-backend',
+        name: 'Reed',
+        role: 'backend',
+        role_label: 'Backend',
+        owns: 'APIs',
+      },
+    ];
+    const decision = shouldSoftRouteToTeammate(
+      `Ayesha's planning is complete. Do NOT send her another planning task.
+Jabulani's immediate responsibility:
+1. Diagnose why the MoveIT workspace delivery route is missing.
+2. Fix the smallest control-plane/configuration issue.
+3. Only after delivery is confirmed, assign Reed the minimum contracts.
+4. Then assign Ayesha Customer Home and Job Confirmation.
+5. Remy verifies the complete first slice.`,
+      roster[0],
+      roster,
+    );
+
+    expect(decision.shouldRoute).toBe(false);
+    expect(decision.reason).toBe('lead_fan_out');
+    expect(decision.fromName).toBe('Jabulani');
+  });
+
   it('does not switch teammates for pronoun-only named assigns', () => {
     const dana = dashproRoster[0];
     const decision = shouldSoftRouteToTeammate(

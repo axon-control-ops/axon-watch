@@ -227,6 +227,10 @@ onUnmounted(() => {
           'dev-seams': shell.showDevSeams,
           'console-shell--mobile-compact': shell.mobileCompactLayout,
           'console-shell--ide': shell.layoutMode === 'ide',
+          'console-shell--ide-workbench-collapsed':
+            shell.layoutMode === 'ide' && shell.ideWorkbenchCollapsed,
+          'console-shell--agent-dock-collapsed':
+            shell.layoutMode === 'ide' && shell.agentDockCollapsed,
           'console-shell--operator': shell.layoutMode === 'operator',
           'console-shell--brain-galaxy':
             shell.layoutMode === 'operator' && shell.operatorBrainGalaxyActive,

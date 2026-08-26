@@ -130,6 +130,14 @@ class RegisterWorkspaceBindingRequest(BaseModel):
     workspace_id: str
     project_root: str
     display_name: str | None = None
+    provision: bool = False
+    initialize_git: bool = True
+    create_github_repo: bool = False
+    github_owner: str = "axon-control-ops"
+    github_repo: str | None = None
+    private_repo: bool = True
+    include_ci_workflow: bool = False
+    enable_delivery: bool = True
 
 
 class WatchCommandRequest(BaseModel):

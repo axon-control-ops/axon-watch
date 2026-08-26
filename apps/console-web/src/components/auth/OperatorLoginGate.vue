@@ -28,10 +28,11 @@ const emit = defineEmits<{
   retry: [];
 }>();
 
-const operatorToken = ref('');
+const username = ref('operator');
+const password = ref('');
 const submitting = ref(false);
 const submitError = ref<string | null>(null);
-const revealToken = ref(false);
+const revealPassword = ref(false);
 const bodyCopy = computed(() => operatorLoginBodyCopy());
 const footerCopy = computed(() =>
   operatorLoginFooterCopy({
@@ -42,15 +43,18 @@ const footerCopy = computed(() =>
 const feedback = computed(() => submitError.value ?? props.connectionError);
 
 async function submit(): Promise<void> {
-  const token = operatorToken.value.trim();
-  if (!token || submitting.value) {
+  const operatorPassword = password.value.trim();
+  if (!operatorPassword || submitting.value) {
     return;
   }
   submitting.value = true;
   submitError.value = null;
   try {
-    await loginOperatorSession(token);
-    operatorToken.value = '';
+    await loginOperatorSession({
+      username: username.value.trim(),
+      password: operatorPassword,
+    });
+    password.value = '';
     emit('authenticated');
   } catch (error) {
     submitError.value =
@@ -76,42 +80,44 @@ async function submit(): Promise<void> {
       </div>
 
       <form v-else class="operator-login__form" @submit.prevent="submit">
-        <label for="operator-token">Operator token</label>
-        <div class="operator-login__token-row">
+        <label for="operator-username">Username</label>
+        <input
+          id="operator-username"
+          v-model="username"
+          type="text"
+          name="username"
+          autocomplete="username"
+          autocapitalize="none"
+          spellcheck="false"
+          :disabled="submitting"
+          autofocus
+        />
+        <label for="operator-password">Password</label>
+        <div class="operator-login__password-row">
           <input
-            type="text"
-            name="username"
-            value="axon-x-operator"
-            autocomplete="username"
-            class="operator-login__username"
-            tabindex="-1"
-            aria-hidden="true"
-          />
-          <input
-            id="operator-token"
-            v-model="operatorToken"
-            :type="revealToken ? 'text' : 'password'"
+            id="operator-password"
+            v-model="password"
+            :type="revealPassword ? 'text' : 'password'"
             name="password"
             autocomplete="current-password"
             autocapitalize="none"
             spellcheck="false"
             :disabled="submitting"
-            autofocus
           />
           <button
             type="button"
             class="operator-login__reveal"
-            :aria-label="revealToken ? 'Hide token' : 'Show token'"
-            :aria-pressed="revealToken"
-            @click="revealToken = !revealToken"
+            :aria-label="revealPassword ? 'Hide password' : 'Show password'"
+            :aria-pressed="revealPassword"
+            @click="revealPassword = !revealPassword"
           >
-            {{ revealToken ? 'Hide' : 'Show' }}
+            {{ revealPassword ? 'Hide' : 'Show' }}
           </button>
         </div>
         <button
           type="submit"
           class="operator-login__submit"
-          :disabled="submitting || !operatorToken.trim()"
+          :disabled="submitting || !password.trim()"
         >
           {{ submitting ? 'Signing in…' : 'Sign in' }}
         </button>
@@ -188,24 +194,14 @@ async function submit(): Promise<void> {
   text-transform: uppercase;
 }
 
-.operator-login__token-row {
+.operator-login__password-row {
   display: flex;
   gap: 0.5rem;
   position: relative;
 }
 
-.operator-login__username {
-  height: 0;
-  left: 0;
-  margin: 0;
-  opacity: 0;
-  padding: 0;
-  pointer-events: none;
-  position: absolute;
-  width: 0;
-}
-
-.operator-login__token-row input {
+.operator-login__form > input,
+.operator-login__password-row input {
   background: #02080d;
   border: 1px solid rgba(0, 242, 255, 0.38);
   border-radius: 0.35rem;

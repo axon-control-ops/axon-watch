@@ -5,6 +5,7 @@ export const LAYOUT_MODE_KEY = 'axon-x-layout-mode-v1';
 export const IDE_EXPLORER_COLLAPSED_KEY = 'axon-x-ide-explorer-collapsed-v1';
 /** v2: default collapsed for quiet IDE coding (v1 force-expanded on every IDE entry). */
 export const AGENT_DOCK_COLLAPSED_KEY = 'axon-x-agent-dock-collapsed-v2';
+export const IDE_WORKBENCH_COLLAPSED_KEY = 'axon-x-ide-workbench-collapsed-v1';
 /** Activity bar width when the IDE explorer panel is fully collapsed (matches --ide-activity-width). */
 export const IDE_COLLAPSED_SIDEBAR_WIDTH_PX = 42;
 
@@ -90,4 +91,20 @@ export function persistAgentDockCollapsed(collapsed: boolean): void {
   }
 
   window.localStorage.setItem(AGENT_DOCK_COLLAPSED_KEY, collapsed ? '1' : '0');
+}
+
+export function readStoredIdeWorkbenchCollapsed(): boolean {
+  if (typeof window === 'undefined') {
+    return false;
+  }
+
+  return window.localStorage.getItem(IDE_WORKBENCH_COLLAPSED_KEY) === '1';
+}
+
+export function persistIdeWorkbenchCollapsed(collapsed: boolean): void {
+  if (typeof window === 'undefined') {
+    return;
+  }
+
+  window.localStorage.setItem(IDE_WORKBENCH_COLLAPSED_KEY, collapsed ? '1' : '0');
 }
