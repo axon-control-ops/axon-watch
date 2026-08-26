@@ -131,12 +131,16 @@ class Test0WorkspaceSmokeAcceptance(unittest.TestCase):
     def test_mission_control_view_helpers_present(self) -> None:
         view_path = REPO_ROOT / "apps/console-web/src/lib/operator-status-radar-view.ts"
         panel_path = REPO_ROOT / "apps/console-web/src/components/shell/OperatorStatusRadarPanel.vue"
+        terminal_view_path = REPO_ROOT / "apps/console-web/src/lib/workbench-terminal-panel-view.ts"
         self.assertTrue(view_path.is_file())
         self.assertTrue(panel_path.is_file())
+        self.assertTrue(terminal_view_path.is_file())
         panel_source = panel_path.read_text(encoding="utf-8")
+        terminal_view_source = terminal_view_path.read_text(encoding="utf-8")
         self.assertIn("Mission Control", panel_source)
         self.assertIn("operatorExecutionStage", panel_source)
-        self.assertIn("Open terminal", panel_source)
+        self.assertIn("operatorTerminalDockActionLabel", panel_source)
+        self.assertIn("Open terminal", terminal_view_source)
 
     def test_compact_layout_media_queries_present(self) -> None:
         shell_dir = REPO_ROOT / "apps/console-web/src/styles/shell"

@@ -14,6 +14,11 @@ from app.workspace_delivery.config import clear_config_cache_for_tests, default_
 from app.workspace_delivery.gh_cli import resolve_gh_cli
 from app.workspace_provisioning_scaffold import scaffold_workspace_files
 from app.workspace_project_bindings import project_root_allowlist
+from app.workspace_source_bootstrap import (
+    git_identity_issue,
+    inspect_source_workspace,
+    safe_stage_candidates,
+)
 
 
 class WorkspaceProvisioningError(ValueError):
@@ -142,32 +147,39 @@ def _ensure_git_repo(root: Path, created_files: list[Path]) -> dict[str, Any]:
     else:
         report["initialized"] = False
 
+    identity_issue = git_identity_issue(root, _run)
+    if identity_issue:
+        _run(["git", "config", "user.name", "AXON-X Workspace Provisioner"], cwd=root)
+        _run(["git", "config", "user.email", "workspace-provisioner@axon.local"], cwd=root)
+        identity_issue = git_identity_issue(root, _run)
+        if identity_issue:
+            raise WorkspaceProvisioningError(identity_issue)
+
+    head = _run(["git", "rev-parse", "--verify", "HEAD"], cwd=root)
     if created_files:
-        relative_files = [str(path.relative_to(root)) for path in created_files]
+        relative_files = [str(path.relative_to(root)) for path in created_files if path.is_file()]
+    elif head.returncode != 0:
+        relative_files = safe_stage_candidates(root)
+    else:
+        relative_files = []
+
+    if relative_files:
         completed = _run(["git", "add", "--", *relative_files], cwd=root)
         if completed.returncode != 0:
             raise WorkspaceProvisioningError(
                 "git add failed: " + _detail(completed, fallback="git add failed")
             )
-        completed = _run(
-            [
-                "git",
-                "-c",
-                "user.name=AXON-X Workspace Provisioner",
-                "-c",
-                "user.email=workspace-provisioner@axon.local",
-                "commit",
-                "-m",
-                "chore: bootstrap workspace",
-            ],
-            cwd=root,
-        )
+        completed = _run(["git", "commit", "-m", "chore: bootstrap workspace"], cwd=root)
         if completed.returncode == 0:
             report["created_initial_commit"] = True
         else:
             detail = _detail(completed, fallback="git commit failed")
             if "nothing to commit" not in detail.lower():
                 raise WorkspaceProvisioningError("git commit failed: " + detail)
+    elif head.returncode != 0:
+        raise WorkspaceProvisioningError(
+            "git repository has no initial commit and no safe starter files to stage"
+        )
     branch = _run(["git", "branch", "--show-current"], cwd=root)
     report["branch"] = (branch.stdout or "").strip() or "main"
     return report
@@ -223,10 +235,25 @@ def _ensure_github_repo(
         raise WorkspaceProvisioningError(
             "git push failed: " + _detail(push, fallback="git push failed")
         )
+    head = _run(["git", "rev-parse", "HEAD"], cwd=root)
+    commit_sha = (head.stdout or "").strip() if head.returncode == 0 else ""
+    remote_head = _run(["git", "ls-remote", "origin", "refs/heads/main"], cwd=root)
+    if remote_head.returncode != 0:
+        raise WorkspaceProvisioningError(
+            "git remote verification failed: "
+            + _detail(remote_head, fallback="git remote verification failed")
+        )
+    remote_sha = (remote_head.stdout or "").strip().split("\t", 1)[0]
+    if commit_sha and remote_sha and remote_sha != commit_sha:
+        raise WorkspaceProvisioningError(
+            f"git remote verification failed: remote main={remote_sha} local HEAD={commit_sha}"
+        )
     return {
         "status": "created" if created else "present",
         "full_name": full_name,
         "remote": remote,
+        "commit_sha": commit_sha,
+        "remote_sha": remote_sha,
         "pushed": True,
     }
 
@@ -318,6 +345,7 @@ def provision_workspace_project(spec: WorkspaceProvisioningSpec) -> dict[str, An
         )
         result["scaffold"] = scaffold
         result["created_files"] = [str(path.relative_to(root)) for path in created_files]
+    result["preflight"] = inspect_source_workspace(root).__dict__
     if spec.initialize_git or spec.create_github_repo:
         result["git"] = _ensure_git_repo(root, created_files)
     if spec.create_github_repo:

@@ -29,6 +29,7 @@ from app.routes import (
     vault_http,
     worker_scheduler,
     workspaces,
+    workspace_delivery_status,
     workspace_sandbox,
     workspaces_agent_jobs,
 )
@@ -49,6 +50,7 @@ def register_routes(app: FastAPI) -> None:
     app.include_router(plans.router)
     app.include_router(runs.router)
     app.include_router(workspaces.router)
+    app.include_router(workspace_delivery_status.router)
     app.include_router(workspace_sandbox.router)
     app.include_router(workspaces_agent_jobs.router)
     app.include_router(worker_scheduler.router)

@@ -28,6 +28,31 @@ function nameTokens(name: string): string[] {
   return tokens;
 }
 
+/** Count distinct roster members named anywhere in a prompt. */
+export function countNamedRosterMembers(
+  prompt: string,
+  roster: readonly TeammateRouteEmployee[] | null | undefined,
+): number {
+  const text = String(prompt || '');
+  if (!text.trim()) {
+    return 0;
+  }
+  const seen = new Set<string>();
+  for (const employee of roster ?? []) {
+    const employeeId = employee.employee_id?.trim();
+    if (!employeeId || !employee.name?.trim()) {
+      continue;
+    }
+    for (const token of nameTokens(employee.name)) {
+      if (new RegExp(String.raw`\b${escapeRegExp(token)}\b`, 'i').test(text)) {
+        seen.add(employeeId);
+        break;
+      }
+    }
+  }
+  return seen.size;
+}
+
 /**
  * Detect an explicit operator assign to a roster teammate by name.
  * Returns the longest matching name so "Sol" does not beat "Solomon".

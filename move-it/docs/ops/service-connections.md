@@ -32,11 +32,13 @@ Verified against: control-plane `GET /api/workspaces/MoveIT*`, company roster, r
 | Item | Status |
 |---|---|
 | Workspace delivery config | **missing** — publish blocked |
-| Evidence | `run_5f7fd88f9487` failed with: workspace delivery is not configured for MoveIT, so 6 changed path(s) cannot be published |
-| Isolation checkout | `/tmp/axon-si-run_5f7fd88f-o916t63f/checkout` — cleaned up before this retry |
-| `GET .../delivery` | `404 Not Found` |
-| Sandbox | off (`enabled=false`) |
-| Mutating handoff API | requires `Authorization: Bearer <operator token>` |
+| GET `/api/workspaces/MoveIT/delivery` | **404** — route not in control-plane OpenAPI v0.1.0 (not MoveIT-specific) |
+| Internal publish gate | **fail** — `workspace_delivery`: "delivery is not configured for MoveIT" (`run_9d5df8c46e62`) |
+| Sandbox posture | `bound_branch=main`, `root_dirty=true`; sandbox publish blocked on uncommitted root changes (2026-08-26 probe) |
+| Active Axon-X handoff | `handoff-fb7fd86e7d8f41e8` → Mira `task-ce8d797d404d408c` (routed) |
+| Evidence (prior) | `run_5f7fd88f9487` failed with delivery-not-configured |
+| Sandbox | off after probe discard |
+| Mutating handoff API | **works this turn** — handoff to Mira filed without bearer token |
 
 ## Project contract (`project.axon.yaml`)
 

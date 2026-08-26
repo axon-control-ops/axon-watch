@@ -2,20 +2,20 @@
 
 | Field | Value |
 |---|---|
-| Retry run | `run_6e2fe86938a4` |
-| Failed run retried | `run_6901f0b70267` |
-| Prior failed run | `run_acb4cf0554e8` (Gate 6) |
+| Retry run | `run_40c26f141654` |
+| Failed run retried | `run_6e2fe86938a4` |
+| Prior failed run | `run_6901f0b70267` (Gate 6 — missing Confidence line) |
 | Failed task | `task-fa560a831595468c` |
 | Role | Sol (Integrations) |
 | Date | 2026-08-26 |
 
 ## What failed last time
 
-Run `run_6901f0b70267` finished scaffold work but Gate 6 blocked on missing Critical Review Clause:
+Run `run_6e2fe86938a4` re-verified scaffold work but Gate 6 blocked again on missing Critical Review Clause:
 
 > Critical Review Clause missing: final reply must end with Confidence: N/10 (integer 1-10) after the rewritten summary.
 
-Earlier run `run_acb4cf0554e8` had also failed Gate 6 on acceptance (`test`, `security`, `diff_budget`). Scaffold artifacts from that attempt were already on disk; this retry re-verifies them and closes the completion gate.
+Earlier run `run_6901f0b70267` had the same Gate 6 failure after completing the service-bridge scaffold. Run `run_acb4cf0554e8` failed Gate 6 on acceptance (`test`, `security`, `diff_budget`). Scaffold artifacts were already on disk; this retry re-verifies them and closes the completion gate.
 
 ## What this retry changed
 
@@ -33,11 +33,12 @@ Earlier run `run_acb4cf0554e8` had also failed Gate 6 on acceptance (`test`, `se
 | Check | Receipt |
 |---|---|
 | Service connection | `GET .../service-connection` → `configured=true`, `ready=true`, `services_resolved` github/sentry/supabase all true |
-| npm test | exit 0 — 2 tests pass (smoke + env template), duration ~66ms |
+| npm test (full) | `agent-job-16df52c2ae91` exit 0 — 5 tests pass, duration ~84ms |
+| npm test (integrations) | `agent-job-6c4930950567` exit 0 — env template contract test pass |
 | Env keys covered | 10 keys match API `env_keys` list |
 | Vault partial | GH_TOKEN, SENTRY_AUTH_TOKEN, SUPABASE_ACCESS_TOKEN from vault; URL/org/project keys still missing |
 | Secret scan (test) | no `sk_`, `ghp_`, or JWT-like values in template |
-| Prior live verify | `agent-job-1a6fe87a180f` — gh + supabase PASS; sentry-cli FAIL (missing SENTRY_ORG/PROJECT in vault) |
+| Live verify | `agent-job-0465f358d9f4` exit 1 — gh + supabase PASS; sentry-cli FAIL (missing SENTRY_ORG/PROJECT in vault) |
 
 ## Blockers / Lead next
 

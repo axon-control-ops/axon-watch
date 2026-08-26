@@ -1,28 +1,36 @@
-# MoveIT priorities — 2026-08-26
+# MoveIT priorities — 2026-08-26 (implementation started)
 
 Lead: Jabulani
-Retry run: `run_6c72a01d1632` (failed prior: `run_5f7fd88f9487`)
+Run: implementation kickoff — first slice staged
 
-## Now
+## Now (dependency order)
 
-1. Land ops baseline / retry receipts under `docs/ops/` (this retry).
-2. Unblock workspace delivery for MoveIT — needs Axon-X / host config; Lead cannot create delivery policy; handoff POST needs operator bearer token.
-3. Clear Remy’s waiting_approval decision about the failed lead shift once delivery is fixed or Sir King accepts the blocker.
+1. **Promote staged code** — `sh output/deploy-first-slice.sh` when `services/`, `tests/`, `apps/` are writable (currently EROFS on Lead worker checkout).
+2. **Reed** — contracts already implemented in `output/contract-work/`; land at `services/api/` + contract tests (16/16 pass in staging).
+3. **Ayesha** — Expo app staged at `output/apps/customer/`; land at `apps/customer/`; wire mock getters to Reed modules after promote.
+4. **Remy** — run `output/verification/run-first-slice-verify.sh`; sign off C1–C3 subset when promote + delivery pass.
+5. **Sol** — no integration required for slice 1 (mock/local contracts only).
 
-## Next (only after delivery publishes)
+## Staged deliverables (verified this turn)
 
-1. First product slice: Reed schema/API + Ayesha thin shell — concrete acceptance criteria per assign.
-2. Sol wires minimum connectors against ready service bridge.
-3. Remy runs MVP verification plan (`docs/ops/mvp-verification-plan.md`).
+| Owner | Artifact | Status |
+|---|---|---|
+| Reed | `services/api/customer-home.js`, `job-confirmation.js`, `shared.js` | staged; 16/16 tests in mirror |
+| Ayesha | `apps/customer/` Expo scaffold + Home + Confirmation screens | staged; tsc clean |
+| Remy | `output/verification/first-slice-checklist.md` + verify script | prep in progress |
 
-## Done since last priorities note
+## Blocked
 
-- `package.json` / `package-lock.json` are real files (no longer empty directories).
-- Service connection reports `ready=true` (vault unlocked; operator `.env` still optional/absent).
+- **Canonical path write** — worker checkout read-only for `services/`, `tests/`, `apps/`, `lib/`.
+- **P0-1 delivery** — still not configured; publish gate blocks commit until Mira completes `task-ce8d797d404d408c`.
 
-## Explicit non-goals this turn
+## Done since last note
 
-- No commit/push.
-- No specialist implementation in foreign trees.
-- No fake “agents started” claims without new task/run ids.
-- No self-assigned Lead task.
+- First implementation slice **built in staging** (not planning-only).
+- Dependency order enforced: Reed contracts → Ayesha screens → Remy verify.
+
+## Explicit non-goals
+
+- Live Tracking, Driver Dashboard, Operations screens
+- External retailer integrations
+- Sol connector work unless slice genuinely needs it

@@ -157,6 +157,14 @@ class WorkspaceProvisioningTests(unittest.TestCase):
                     return subprocess.CompletedProcess(args=args, returncode=0, stdout='{"name":"move-it"}\n', stderr="")
                 if command[:3] == ["git", "push", "-u"]:
                     return subprocess.CompletedProcess(args=args, returncode=0, stdout="pushed\n", stderr="")
+                if command[:3] == ["git", "ls-remote", "origin"]:
+                    head = real_run(["git", "rev-parse", "HEAD"], cwd=cwd)
+                    return subprocess.CompletedProcess(
+                        args=args,
+                        returncode=0,
+                        stdout=f"{head.stdout.strip()}\trefs/heads/main\n",
+                        stderr="",
+                    )
                 return real_run(args, cwd=cwd, timeout=timeout)
 
             with patch.dict(
@@ -194,6 +202,172 @@ class WorkspaceProvisioningTests(unittest.TestCase):
             self.assertFalse(any(command[:3] == ["/usr/bin/gh", "repo", "create"] for command in commands))
             self.assertTrue(any(command[:3] == ["git", "remote", "add"] for command in commands))
             self.assertTrue(any(command[:3] == ["git", "push", "-u"] for command in commands))
+
+    def test_starter_workspace_without_git_gets_safe_initial_commit(self) -> None:
+        with tempfile.TemporaryDirectory() as tempdir:
+            root = Path(tempdir) / "starter"
+            root.mkdir()
+            (root / "README.md").write_text("# Starter\n", encoding="utf-8")
+            (root / ".env").write_text("SECRET=must-not-stage\n", encoding="utf-8")
+            (root / ".axon_terminal_history_terminal-operator").write_text("token-ish\n", encoding="utf-8")
+            delivery_file = Path(tempdir) / "workspace-delivery.json"
+
+            with patch.dict(
+                os.environ,
+                {
+                    "AXON_WATCH_PROJECT_ROOT_ALLOWLIST": tempdir,
+                    "AXON_WATCH_WORKSPACE_DELIVERY_FILE": str(delivery_file),
+                },
+                clear=False,
+            ):
+                report = provision_workspace_project(
+                    WorkspaceProvisioningSpec(
+                        workspace_id="workspace_starter",
+                        project_root=root,
+                        scaffold_files=False,
+                        enable_delivery=False,
+                    )
+                )
+
+            self.assertEqual("ready", report["status"])
+            committed = subprocess.run(
+                ["git", "show", "--name-only", "--pretty=format:", "HEAD"],
+                cwd=root,
+                check=True,
+                capture_output=True,
+                text=True,
+            ).stdout.splitlines()
+            self.assertEqual(["README.md"], [line for line in committed if line.strip()])
+
+    def test_empty_workspace_without_safe_files_reports_actionable_blocker(self) -> None:
+        with tempfile.TemporaryDirectory() as tempdir:
+            root = Path(tempdir) / "empty"
+            root.mkdir()
+            with patch.dict(
+                os.environ,
+                {"AXON_WATCH_PROJECT_ROOT_ALLOWLIST": tempdir},
+                clear=False,
+            ):
+                with self.assertRaisesRegex(WorkspaceProvisioningError, "no safe starter files"):
+                    provision_workspace_project(
+                        WorkspaceProvisioningSpec(
+                            workspace_id="workspace_empty",
+                            project_root=root,
+                            scaffold_files=False,
+                            enable_delivery=False,
+                        )
+                    )
+
+    def test_wrong_existing_origin_is_refused(self) -> None:
+        with tempfile.TemporaryDirectory() as tempdir:
+            root = Path(tempdir) / "wrong-origin"
+            root.mkdir()
+            subprocess.run(["git", "init", "-b", "main"], cwd=root, check=True, capture_output=True)
+            subprocess.run(["git", "config", "user.email", "test@example.invalid"], cwd=root, check=True)
+            subprocess.run(["git", "config", "user.name", "Axon Test"], cwd=root, check=True)
+            (root / "README.md").write_text("# Wrong\n", encoding="utf-8")
+            subprocess.run(["git", "add", "README.md"], cwd=root, check=True)
+            subprocess.run(["git", "commit", "-m", "initial"], cwd=root, check=True, capture_output=True)
+            subprocess.run(["git", "remote", "add", "origin", "https://github.com/other/repo.git"], cwd=root, check=True)
+
+            with patch.dict(
+                os.environ,
+                {
+                    "AXON_WATCH_PROJECT_ROOT_ALLOWLIST": tempdir,
+                    "AXON_WATCH_GITHUB_OWNER_ALLOWLIST": "axon-control-ops",
+                },
+                clear=False,
+            ), patch(
+                "app.workspace_provisioning.resolve_gh_cli",
+                return_value="/usr/bin/gh",
+            ), patch(
+                "app.workspace_provisioning._run",
+                side_effect=lambda args, *, cwd, timeout=60.0: (
+                    subprocess.CompletedProcess(args=args, returncode=0, stdout='{"name":"move-it"}\n', stderr="")
+                    if [str(item) for item in args][:3] == ["/usr/bin/gh", "repo", "view"]
+                    else subprocess.run(args, cwd=cwd, check=False, capture_output=True, text=True, timeout=timeout)
+                ),
+            ):
+                with self.assertRaisesRegex(WorkspaceProvisioningError, "refusing to overwrite"):
+                    provision_workspace_project(
+                        WorkspaceProvisioningSpec(
+                            workspace_id="workspace_wrong_origin",
+                            project_root=root,
+                            github_repo="move-it",
+                            create_github_repo=True,
+                            scaffold_files=False,
+                            enable_delivery=False,
+                        )
+                    )
+
+    def test_push_failure_is_not_reported_as_success(self) -> None:
+        with tempfile.TemporaryDirectory() as tempdir:
+            root = Path(tempdir) / "push-failure"
+            root.mkdir()
+            delivery_file = Path(tempdir) / "workspace-delivery.json"
+
+            def fake_run(args, *, cwd, timeout=60.0):
+                command = [str(item) for item in args]
+                if command[:3] == ["/usr/bin/gh", "repo", "view"]:
+                    return subprocess.CompletedProcess(args=args, returncode=0, stdout='{"name":"move-it"}\n', stderr="")
+                if command[:3] == ["git", "push", "-u"]:
+                    return subprocess.CompletedProcess(args=args, returncode=1, stdout="", stderr="denied")
+                return subprocess.run(args, cwd=cwd, check=False, capture_output=True, text=True, timeout=timeout)
+
+            with patch.dict(
+                os.environ,
+                {
+                    "AXON_WATCH_PROJECT_ROOT_ALLOWLIST": tempdir,
+                    "AXON_WATCH_WORKSPACE_DELIVERY_FILE": str(delivery_file),
+                },
+                clear=False,
+            ), patch("app.workspace_provisioning.resolve_gh_cli", return_value="/usr/bin/gh"), patch(
+                "app.workspace_provisioning._run",
+                side_effect=fake_run,
+            ):
+                with self.assertRaisesRegex(WorkspaceProvisioningError, "git push failed"):
+                    provision_workspace_project(
+                        WorkspaceProvisioningSpec(
+                            workspace_id="workspace_push_fail",
+                            project_root=root,
+                            github_repo="move-it",
+                            create_github_repo=True,
+                        )
+                    )
+            self.assertFalse(delivery_file.exists())
+
+    def test_remote_sha_must_match_local_head(self) -> None:
+        with tempfile.TemporaryDirectory() as tempdir:
+            root = Path(tempdir) / "remote-mismatch"
+            root.mkdir()
+
+            def fake_run(args, *, cwd, timeout=60.0):
+                command = [str(item) for item in args]
+                if command[:3] == ["/usr/bin/gh", "repo", "view"]:
+                    return subprocess.CompletedProcess(args=args, returncode=0, stdout='{"name":"move-it"}\n', stderr="")
+                if command[:3] == ["git", "push", "-u"]:
+                    return subprocess.CompletedProcess(args=args, returncode=0, stdout="pushed\n", stderr="")
+                if command[:3] == ["git", "ls-remote", "origin"]:
+                    return subprocess.CompletedProcess(args=args, returncode=0, stdout="deadbeef\trefs/heads/main\n", stderr="")
+                return subprocess.run(args, cwd=cwd, check=False, capture_output=True, text=True, timeout=timeout)
+
+            with patch.dict(
+                os.environ,
+                {"AXON_WATCH_PROJECT_ROOT_ALLOWLIST": tempdir},
+                clear=False,
+            ), patch("app.workspace_provisioning.resolve_gh_cli", return_value="/usr/bin/gh"), patch(
+                "app.workspace_provisioning._run",
+                side_effect=fake_run,
+            ):
+                with self.assertRaisesRegex(WorkspaceProvisioningError, "remote main=deadbeef"):
+                    provision_workspace_project(
+                        WorkspaceProvisioningSpec(
+                            workspace_id="workspace_remote_mismatch",
+                            project_root=root,
+                            github_repo="move-it",
+                            create_github_repo=True,
+                        )
+                    )
 
 
 if __name__ == "__main__":

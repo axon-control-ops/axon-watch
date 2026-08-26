@@ -106,8 +106,7 @@ def build_specialty_task_action(
         decision = route_teammate_decision(
             workspace_id=target_workspace_id,
             prompt=task,
-            use_model_tiebreak=True,
-            dispatch_runtime=dispatch_model_tiebreak,
+            use_model_tiebreak=False,
         )
     except Exception:
         return None
