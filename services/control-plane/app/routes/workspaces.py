@@ -39,7 +39,10 @@ from app.terminal.session_runtime import terminate_runtime
 from app.workspace_catalog import WorkspaceNotFoundError, get_workspace_record, list_workspace_records
 from app.workspace_project_bindings import (
     WorkspaceBindingError,
-    upsert_workspace_project_binding,
+)
+from app.workspace_provisioning import (
+    WorkspaceProvisioningError,
+    register_workspace_with_optional_provision,
 )
 from app.workspace_files import (
     WorkspaceFileConflictError,
@@ -99,17 +102,13 @@ def workspaces_index(scope: str = "") -> dict[str, Any]:
 @router.post("/api/workspaces")
 def workspaces_register(body: RegisterWorkspaceBindingRequest) -> dict[str, Any]:
     try:
-        binding = upsert_workspace_project_binding(
-            workspace_id=body.workspace_id,
-            project_root=body.project_root,
-            display_name=body.display_name,
-        )
-        record = get_workspace_record(binding.workspace_id)
+        return register_workspace_with_optional_provision(body)
+    except WorkspaceProvisioningError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     except WorkspaceBindingError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except WorkspaceNotFoundError as exc:
         raise HTTPException(status_code=500, detail=str(exc)) from exc
-    return {"workspace": record, "created": True}
 
 
 @router.get("/api/workspaces/project-root-suggestions")
