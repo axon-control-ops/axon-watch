@@ -9,7 +9,12 @@ from app.specialist_roles import (
     SPECIALIST_ROLE_IDS,
     SpecialistContext,
 )
-from app.instructions_fallback_builder import build_fallback_instructions_markdown
+from app.instructions_engine import extract_explicit_instruction_targets
+from app.instructions_fallback_builder import (
+    build_fallback_instructions_markdown,
+    infer_instruction_task_type,
+    infer_unverified_instruction_assumptions,
+)
 
 _INSTRUCTIONS_HEADING_RE = re.compile(r"^#\s*Instructions\b", re.IGNORECASE | re.MULTILINE)
 _ALT_INSTRUCTIONS_HEADING_RE = re.compile(r"^##\s*Instructions\b", re.IGNORECASE | re.MULTILINE)
@@ -164,6 +169,95 @@ def build_instructions_markdown_from_source(
     )
 
 
+def _replace_interpretation_bullet(markdown: str, label: str, value: str) -> str:
+    pattern = re.compile(
+        rf"^-\s*{re.escape(label)}:\s*.*$",
+        re.IGNORECASE | re.MULTILINE,
+    )
+    replacement = f"- {label}: {value}"
+    if pattern.search(markdown):
+        return pattern.sub(replacement, markdown, count=1)
+    return markdown
+
+
+def _normalize_instruction_facts(
+    markdown: str,
+    source: str,
+    context: SpecialistContext | None,
+) -> str:
+    """Enforce source-derived facts after model generation.
+
+    Model choice may improve wording, but cannot override task type, explicit
+    targets, truthful assumptions, or repository-relevant constraints.
+    """
+    ctx = context or SpecialistContext(role=GENERAL_ROLE_ID)
+    normalized = _replace_interpretation_bullet(
+        markdown,
+        "Task type",
+        infer_instruction_task_type(source, ctx),
+    )
+    assumptions = infer_unverified_instruction_assumptions(source, ctx)
+    targets = extract_explicit_instruction_targets(source)
+    explicit_repository = targets.get("repository")
+    ambient_workspace = (ctx.workspace_label or ctx.workspace_id or "").strip()
+    if (
+        explicit_repository
+        and ambient_workspace
+        and explicit_repository.lower().replace("_", "-")
+        not in ambient_workspace.lower().replace("_", "-")
+    ):
+        conflict = (
+            f"explicit repository {explicit_repository} differs from active workspace "
+            f"{ambient_workspace}; verify access and switch workspace before dispatch"
+        )
+        assumptions = conflict if assumptions == "none" else f"{assumptions}; {conflict}"
+    normalized = _replace_interpretation_bullet(
+        normalized,
+        "Unverified assumptions",
+        assumptions,
+    )
+    if explicit_repository:
+        assigned = _parse_sections(normalized).get("assigned_specialist", "")
+        if assigned:
+            updated = re.sub(
+                r"^-\s*Workspace:\s*.*$",
+                f"- Workspace: {explicit_repository}",
+                assigned,
+                count=1,
+                flags=re.IGNORECASE | re.MULTILINE,
+            )
+            normalized = normalized.replace(assigned, updated, 1)
+
+    normalized = re.sub(
+        r"^-\s*Follow only the steps listed above\s*$",
+        (
+            "- Follow the required objectives and safety boundaries; add evidence-based "
+            "diagnostic steps when necessary and record why they were added"
+        ),
+        normalized,
+        flags=re.IGNORECASE | re.MULTILINE,
+    )
+    repository_mentions_mobile = any(
+        token in source.lower() for token in ("native", "mobile", "ota", "android", "ios")
+    )
+    if not repository_mentions_mobile:
+        normalized = re.sub(
+            r"^-\s*Call out native-build-only gaps separately from OTA-safe fixes\s*\n?",
+            "",
+            normalized,
+            flags=re.IGNORECASE | re.MULTILINE,
+        )
+    if ctx.role == "lead":
+        normalized = normalized.replace(
+            "- Log, reproduce, and fix defects encountered during holistic testing",
+            (
+                "- Coordinate defect reproduction, assign confirmed fixes to owning specialists, "
+                "and review their implementation evidence"
+            ),
+        )
+    return normalized
+
+
 def compose_instructions_markdown(
     source: str,
     model_markdown: str | None = None,
@@ -172,7 +266,8 @@ def compose_instructions_markdown(
     fallback = build_instructions_markdown_from_source(source, context)
     extracted = extract_instructions_markdown(model_markdown or "")
     if extracted and instructions_markdown_is_complete(extracted, context):
-        return extracted if extracted.endswith("\n") else f"{extracted}\n"
+        normalized = _normalize_instruction_facts(extracted, source, context)
+        return normalized if normalized.endswith("\n") else f"{normalized}\n"
 
     if not extracted or (
         context is not None
@@ -258,7 +353,7 @@ def compose_instructions_markdown(
     if source_request:
         lines += ["", "## Source request", source_request]
     lines.append("")
-    return "\n".join(lines)
+    return _normalize_instruction_facts("\n".join(lines), source, context)
 
 
 def instructions_markdown_present(prompt: str) -> bool:
