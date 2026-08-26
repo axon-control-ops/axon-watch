@@ -129,6 +129,7 @@ describe('company-roster-actions', () => {
     expect(employeeQuickActions(failed).map((action) => action.id)).toEqual([
       'retry',
       'receipts',
+      'clear_run_card',
       'talk',
       'status',
       'assign',
@@ -139,6 +140,9 @@ describe('company-roster-actions', () => {
     );
     expect(employeeQuickActions(failed).find((action) => action.id === 'receipts')?.label).toBe(
       'Explain what happened',
+    );
+    expect(employeeQuickActions(failed).find((action) => action.id === 'clear_run_card')?.label).toBe(
+      'Clear run',
     );
     expect(employeeRetryDraft(failed)).toMatch(/My last continuous shift on .+ failed/);
     expect(employeeRetryDraft(failed)).not.toMatch(/^I am /);
@@ -171,6 +175,7 @@ describe('company-roster-actions', () => {
     });
     expect(employeeQuickActions(blocked).map((action) => action.id)).toEqual([
       'receipts',
+      'clear_run_card',
       'talk',
       'status',
       'assign',
@@ -190,6 +195,7 @@ describe('company-roster-actions', () => {
     expect(actions.map((action) => action.id)).toEqual([
       'retry',
       'receipts',
+      'clear_run_card',
       'talk',
       'status',
       'assign',
@@ -198,6 +204,7 @@ describe('company-roster-actions', () => {
     expect(actions.find((action) => action.id === 'retry')?.label).toBe('Try again');
     expect(employeeDockDisplayActions(actions, usageBlocked).map((action) => action.id)).toEqual([
       'retry',
+      'clear_run_card',
       'talk',
       'status',
       'assign',
@@ -337,6 +344,7 @@ describe('company-roster-actions', () => {
     expect(actions.map((action) => action.id)).toContain('receipts');
     expect(employeeDockDisplayActions(actions, failed).map((action) => action.id)).toEqual([
       'retry',
+      'clear_run_card',
       'talk',
       'status',
       'assign',
@@ -352,6 +360,7 @@ describe('company-roster-actions', () => {
     });
     expect(employeeQuickActions(failed).map((action) => action.id)).toEqual([
       'retry',
+      'clear_run_card',
       'talk',
       'status',
       'assign',

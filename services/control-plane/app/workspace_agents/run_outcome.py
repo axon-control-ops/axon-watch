@@ -172,6 +172,7 @@ def latest_role_run_outcome(workspace_id: str, role: str) -> dict[str, str] | No
         for run in list_runs()
         if str(run.get("workspace_id", "")).strip() == normalized_workspace
         and str(run.get("employee_role") or "").strip().lower() == cleaned_role
+        and not str(run.get("dismiss_reason") or "").strip()
     ]
     # Employee IDE retries historically omitted employee_role — recover via thread link.
     try:
@@ -195,6 +196,8 @@ def latest_role_run_outcome(workspace_id: str, role: str) -> dict[str, str] | No
             if not isinstance(linked, dict):
                 continue
             if str(linked.get("workspace_id") or "").strip() != normalized_workspace:
+                continue
+            if str(linked.get("dismiss_reason") or "").strip():
                 continue
             # Heal untagged IDE completions so roster stops clinging to older failures.
             if cleaned_role and not str(linked.get("employee_role") or "").strip():

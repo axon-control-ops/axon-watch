@@ -55,6 +55,41 @@ class RestartReconcileTests(unittest.TestCase):
             )
         )
 
+    def test_missing_task_reconcile_can_be_scoped_to_one_employee_role(self) -> None:
+        from app.runs.restart_reconcile import reconcile_employee_runs_missing_tasks
+
+        backend = create_run(
+            workspace_id="workspace_dashpro",
+            mode="agent",
+            summary="Marco: backend report",
+            employee_role="backend",
+        )
+        frontend = create_run(
+            workspace_id="workspace_dashpro",
+            mode="agent",
+            summary="Priya: frontend report",
+            employee_role="frontend",
+        )
+        backend["task_id"] = "task_missing_backend"
+        frontend["task_id"] = "task_missing_frontend"
+        run_store.save_run(backend)
+        run_store.save_run(frontend)
+
+        reconciled = reconcile_employee_runs_missing_tasks(
+            workspace_id="workspace_dashpro",
+            employee_role="backend",
+        )
+
+        self.assertEqual([str(backend["run_id"])], reconciled)
+        self.assertEqual(
+            "cancelled",
+            run_store.get_run(str(backend["run_id"]))["phase"],  # type: ignore[index]
+        )
+        self.assertEqual(
+            "executing",
+            run_store.get_run(str(frontend["run_id"]))["phase"],  # type: ignore[index]
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

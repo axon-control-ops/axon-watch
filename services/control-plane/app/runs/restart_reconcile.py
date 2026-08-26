@@ -167,16 +167,28 @@ def reconcile_orphaned_runs_on_startup(*, boot_id: str) -> list[str]:
     return reconciled
 
 
-def reconcile_employee_runs_missing_tasks() -> list[str]:
+def reconcile_employee_runs_missing_tasks(
+    *,
+    workspace_id: str | None = None,
+    employee_role: str | None = None,
+) -> list[str]:
     """Cancel active employee runs whose durable task row disappeared."""
     from app.persistence import task_store
     from app.runs.service import RunLifecycleError, RunNotFoundError, _transition_record
 
+    workspace_filter = str(workspace_id or "").strip()
+    role_filter = str(employee_role or "").strip().lower()
     reconciled: list[str] = []
     for record in run_store.list_runs():
         if is_terminal_phase(str(record.get("phase") or "")):
             continue
-        if not str(record.get("employee_role") or "").strip():
+        workspace = str(record.get("workspace_id") or "").strip()
+        role = str(record.get("employee_role") or "").strip().lower()
+        if not role:
+            continue
+        if workspace_filter and workspace != workspace_filter:
+            continue
+        if role_filter and role != role_filter:
             continue
         task_id = str(record.get("task_id") or "").strip()
         if not task_id or task_store.get_task(task_id) is not None:

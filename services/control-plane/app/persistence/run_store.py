@@ -30,6 +30,7 @@ _RUN_COLUMNS = (
     "history_ref",
     "employee_role",
     "task_id",
+    "dismiss_reason",
 )
 
 
@@ -54,6 +55,7 @@ def _row_to_record(row: Any) -> dict[str, Any]:
     keys = set(row.keys())
     employee_role = row["employee_role"] if "employee_role" in keys else None
     task_id = row["task_id"] if "task_id" in keys else None
+    dismiss_reason = row["dismiss_reason"] if "dismiss_reason" in keys else ""
     return {
         "run_id": row["run_id"],
         "workspace_id": row["workspace_id"],
@@ -74,6 +76,7 @@ def _row_to_record(row: Any) -> dict[str, Any]:
         "history_ref": row["history_ref"],
         "employee_role": (str(employee_role).strip() if employee_role else None) or None,
         "task_id": (str(task_id).strip() if task_id else None) or None,
+        "dismiss_reason": str(dismiss_reason or "").strip(),
     }
 
 
@@ -82,6 +85,7 @@ def _record_values(record: dict[str, Any]) -> tuple[Any, ...]:
     cleaned_role = str(employee_role).strip() if employee_role else None
     task_id = record.get("task_id")
     cleaned_task = str(task_id).strip() if task_id else None
+    dismiss_reason = str(record.get("dismiss_reason") or "").strip()
     return (
         record["run_id"],
         record["workspace_id"],
@@ -102,6 +106,7 @@ def _record_values(record: dict[str, Any]) -> tuple[Any, ...]:
         record["history_ref"],
         cleaned_role or None,
         cleaned_task or None,
+        dismiss_reason,
     )
 
 

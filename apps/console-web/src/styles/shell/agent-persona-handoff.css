@@ -76,6 +76,19 @@
   background: rgba(170, 100, 18, 0.55);
 }
 
+.company-roster__action--clear-run {
+  color: rgba(220, 230, 238, 0.95);
+  border-color: rgba(155, 175, 190, 0.34);
+  background: rgba(40, 52, 62, 0.58);
+}
+
+.company-roster__action--clear-run:hover,
+.company-roster__action--clear-run:focus-visible {
+  border-color: rgba(190, 215, 230, 0.5);
+  background: rgba(55, 70, 82, 0.78);
+  outline: none;
+}
+
 @keyframes presence-avatar-handoff-glow {
   0%,
   100% {
