@@ -22,7 +22,7 @@ def _summarize_goal(source: str) -> str:
     return cleaned[:220].rstrip(" ,.;") + ("..." if len(cleaned) > 220 else "")
 
 
-def _infer_task_type(source: str, context: SpecialistContext) -> str:
+def infer_instruction_task_type(source: str, context: SpecialistContext) -> str:
     lowered = source.lower()
     implementation = any(
         token in lowered for token in ("fix", "make", "build", "implement", "upgrade", "patch", "repair")
@@ -86,7 +86,7 @@ def _interpretation_confidence(source: str, context: SpecialistContext) -> int:
     return 8
 
 
-def _infer_unverified_assumptions(source: str, context: SpecialistContext) -> str:
+def infer_unverified_instruction_assumptions(source: str, context: SpecialistContext) -> str:
     if context.mismatch_reason:
         return context.mismatch_reason
     if not context.verified and context.role != GENERAL_ROLE_ID:
@@ -107,9 +107,9 @@ def _instruction_interpretation_bullets(source: str, context: SpecialistContext)
     changes_required = _workspace_changes_required(source, context)
     delegation_required = _delegation_required(source, context)
     profile = context.profile
-    unverified = _infer_unverified_assumptions(source, context)
+    unverified = infer_unverified_instruction_assumptions(source, context)
     return [
-        f"Task type: {_infer_task_type(source, context)}",
+        f"Task type: {infer_instruction_task_type(source, context)}",
         f"Selected role: {profile.display_name}",
         f"Delivery: {context.requested_delivery_mode or profile.preferred_delivery_mode}",
         "Required in this run: produce the selected specialist's executable instructions and required evidence plan",
