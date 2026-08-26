@@ -31,6 +31,7 @@ class Gate4TaskLedgerTests(unittest.TestCase):
             risk="normal",
             attempt_budget=2,
             allowed_paths=["apps/console-web/src/", "scripts/guardrails/"],
+            attachment_ids=["attachment_a", "attachment_b"],
         )
         self.assertTrue(created["task_id"].startswith("task-"))
         self.assertEqual("open", created["status"])
@@ -40,6 +41,7 @@ class Gate4TaskLedgerTests(unittest.TestCase):
             ["apps/console-web/src/", "scripts/guardrails/"],
             created["allowed_paths"],
         )
+        self.assertEqual(["attachment_a", "attachment_b"], created["attachment_ids"])
 
         listed = task_store.list_tasks(
             workspace_id="workspace_dashpro",
@@ -51,6 +53,7 @@ class Gate4TaskLedgerTests(unittest.TestCase):
             ["apps/console-web/src/", "scripts/guardrails/"],
             listed[0]["allowed_paths"],
         )
+        self.assertEqual(["attachment_a", "attachment_b"], listed[0]["attachment_ids"])
 
     def test_reopen_orphaned_leased_tasks_for_terminal_runs(self) -> None:
         created = task_store.create_task(

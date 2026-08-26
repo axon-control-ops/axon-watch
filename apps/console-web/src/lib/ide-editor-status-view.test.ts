@@ -59,42 +59,38 @@ describe('buildIdeEditorStatusConnectorChip', () => {
     ).toBe('1 REQ DOWN');
   });
 
-  it('shows a compact legacy-offline chip when optional Axon Local is down', () => {
+  it('does not show a glance chip when an optional connector is down', () => {
     expect(
       buildIdeEditorStatusConnectorChip({
         ...base,
         summary: { required_unavailable: 0 },
         items: [
           {
-            connector_id: 'axon_local',
-            display_name: 'Axon Local',
+            connector_id: 'github_api',
+            display_name: 'GitHub API',
             status: 'unavailable',
             required: false,
           },
         ],
       }),
-    ).toMatchObject({
-      id: 'connector-glance',
-      label: 'LEGACY OFFLINE',
-      tone: 'default',
-    });
+    ).toBeNull();
   });
 
-  it('labels degraded legacy status distinctly', () => {
+  it('does not label degraded retired legacy status distinctly', () => {
     expect(
       buildIdeEditorStatusConnectorChip({
         ...base,
         summary: { required_unavailable: 0 },
         items: [
           {
-            connector_id: 'axon_local',
-            display_name: 'Axon Local',
+            connector_id: 'github_api',
+            display_name: 'GitHub API',
             status: 'degraded',
             required: false,
           },
         ],
-      })?.label,
-    ).toBe('LEGACY DEGRADED');
+      }),
+    ).toBeNull();
   });
 
   it('hides the chip when connectors are healthy', () => {
@@ -104,8 +100,8 @@ describe('buildIdeEditorStatusConnectorChip', () => {
         summary: { required_unavailable: 0 },
         items: [
           {
-            connector_id: 'axon_local',
-            display_name: 'Axon Local',
+            connector_id: 'github_api',
+            display_name: 'GitHub API',
             status: 'ok',
             required: false,
           },
@@ -133,8 +129,8 @@ describe('buildIdeEditorStatusConnectorChip', () => {
         summary: { required_unavailable: 0 },
         items: [
           {
-            connector_id: 'axon_local',
-            display_name: 'Axon Local',
+            connector_id: 'github_api',
+            display_name: 'GitHub API',
             status: 'unavailable',
             required: false,
           },

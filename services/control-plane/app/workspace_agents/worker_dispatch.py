@@ -8,6 +8,10 @@ import threading
 from typing import Any
 
 from app.chat.lane_b_agent import LaneBContext, generate_lane_b_result
+from app.chat.attachment_paths import (
+    AttachmentPathError,
+    localized_attachment_paths_for_ids,
+)
 from app.chat.lane_b_stream_execute import finalize_lane_b_agent_run
 from app.workspace_agents.critical_review_clause import is_review_type_task
 from app.runs.service import (
@@ -194,6 +198,36 @@ def dispatch_continuous_worker_run(
             success=True,
             intent="worker_isolation",
         )
+        attachment_paths: tuple[str, ...] = ()
+        attachment_ids = [
+            str(item).strip()
+            for item in (task.get("attachment_ids") or [])
+            if str(item).strip()
+        ]
+        if attachment_ids:
+            try:
+                attachment_paths = localized_attachment_paths_for_ids(
+                    attachment_ids=attachment_ids,
+                    workspace_id=workspace_id,
+                    sandbox_workspace_root=agent_root,
+                    require_unbound=False,
+                )
+                append_run_execution_receipt(
+                    run_id,
+                    receipt_type="worker_attachments_localized",
+                    receipt_summary=(
+                        f"{len(attachment_paths)} attachment(s) copied into worker sandbox"
+                    ),
+                    actor="workspace_scheduler",
+                    success=True,
+                    intent="worker_attachments",
+                )
+            except AttachmentPathError as exc:
+                failed = fail_worker_run(
+                    run_id,
+                    receipt_summary=f"Dispatch refused: attachment unavailable: {exc}",
+                )
+                return False, failed
 
         def _enqueue_verify_jobs() -> None:
             try:
@@ -219,9 +253,14 @@ def dispatch_continuous_worker_run(
             employee=employee,
             task=task,
             execution_policy=execution_policy,
+            attachment_paths=attachment_paths,
         )
         ensure_agent_session(workspace_id=workspace_id, run_id=run_id)
-        context = LaneBContext(workspace_id=workspace_id, composer_mode="agent")
+        context = LaneBContext(
+            workspace_id=workspace_id,
+            composer_mode="agent",
+            image_paths=attachment_paths,
+        )
         # Honor the operator's Agent Dock runtime-target pick — without this,
         # continuous workers silently ignore it and fall back to the server's
         # default runtime regardless of what's selected in the composer.

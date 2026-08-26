@@ -68,6 +68,7 @@ def maybe_post_lead_fan_out_message(
     save_message: Callable[[dict[str, Any]], dict[str, Any]],
     new_message_id: Callable[[str], str],
     bind_attachments: Callable[[str], list[dict[str, object]]],
+    attachment_ids: list[str] | None = None,
 ) -> dict[str, object] | None:
     """When Lead hears assign-all intent, materialize fan-out instead of a Lane B essay."""
     role = str(employee_role or "").strip().lower()
@@ -83,6 +84,7 @@ def maybe_post_lead_fan_out_message(
             goal=content,
             mode="fan_out",
             create_runs=True,
+            attachment_ids=attachment_ids,
         )
     except LeadFanOutError:
         return None

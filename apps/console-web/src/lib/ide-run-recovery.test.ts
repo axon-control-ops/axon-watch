@@ -37,7 +37,7 @@ describe('IDE run recovery record', () => {
   it('persists an interrupted Debug run until that run completes', () => {
     const storage = memoryStorage();
     const record = baseRecovery({
-      workspaceId: 'workspace_axon_local',
+      workspaceId: 'workspace_axon_watch',
       threadId: 'thread_debug',
       runId: 'run_debug',
       mode: 'debug',

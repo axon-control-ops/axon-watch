@@ -31,6 +31,8 @@ if [[ -d "${legacy_stamp_dir}" ]]; then
   rmdir "${legacy_stamp_dir}" 2>/dev/null || true
 fi
 
+"${python_bin}" "${repo_root}/scripts/verify/check_python_bootstrap_stamp.py"
+
 read -r requirements_hash _ < <(sha256sum "${requirements_path}")
 watch_service_dist="$(find "${venv_root}/lib" -path '*/site-packages/__editable__.axon_watch_service-0.1.0.pth' -print -quit 2>/dev/null || true)"
 control_plane_dist="$(find "${venv_root}/lib" -path '*/site-packages/__editable__.axon_watch_control_plane-0.1.0.pth' -print -quit 2>/dev/null || true)"

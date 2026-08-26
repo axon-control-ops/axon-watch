@@ -86,7 +86,7 @@ class ConnectorInboxIntegrationTests(unittest.TestCase):
     @patch("app.signals.store.is_signal_acknowledged", return_value=False)
     @patch("app.signals.store.email_inbox_items", return_value=[])
     @patch("app.signals.store.probe_monitor_records", return_value=[])
-    def test_soft_cutover_tunnel_stays_out_of_inbox(
+    def test_stale_tunnel_ingress_appears_in_inbox(
         self, _monitors, _email, _acked
     ) -> None:
         payload = self.get_inbox_snapshot(
@@ -102,10 +102,9 @@ class ConnectorInboxIntegrationTests(unittest.TestCase):
                     "display_name": "Cloudflare tunnel",
                     "status": "degraded",
                     "required": False,
-                    "detail": "active soft cutover (public=axon-x control-plane)",
+                    "detail": "remote ingress still points at http://localhost:7734",
                     "tunnel": {
                         "ingress_matches_axon": False,
-                        "soft_origin_cutover": True,
                         "remote_ingress_service": "http://localhost:7734",
                     },
                 },
@@ -116,7 +115,7 @@ class ConnectorInboxIntegrationTests(unittest.TestCase):
             for item in payload.get("items", [])
             if isinstance(item, dict)
         ]
-        self.assertFalse(any(signal_id.startswith("signal_connector_") for signal_id in signal_ids))
+        self.assertIn("signal_connector_cloudflare_tunnel_degraded", signal_ids)
 
     @patch("app.signals.store.is_signal_acknowledged", return_value=False)
     @patch("app.signals.store.email_inbox_items", return_value=[])
@@ -139,8 +138,8 @@ class ConnectorInboxIntegrationTests(unittest.TestCase):
                     "required": True,
                 },
                 {
-                    "connector_id": "axon_local",
-                    "display_name": "axon-local (legacy)",
+                    "connector_id": "github_api",
+                    "display_name": "GitHub API",
                     "status": "unavailable",
                     "required": False,
                     "detail": "connection refused",

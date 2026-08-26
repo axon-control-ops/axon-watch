@@ -2,9 +2,6 @@ export function workspaceIconKind(workspaceId: string): string {
   if (workspaceId.includes('axon_watch') || workspaceId.includes('watch')) {
     return 'cube';
   }
-  if (workspaceId.includes('axon_local') || workspaceId.includes('local')) {
-    return 'tower';
-  }
   if (workspaceId.includes('dashpro') || workspaceId.includes('dash_pro')) {
     return 'building';
   }

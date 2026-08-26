@@ -6,7 +6,9 @@ from typing import Any
 
 from app.persistence import worker_scheduler_settings_store
 from app.runs.queries import list_active_employee_runs
+from app.runs.employee_dismissal import dismiss_employee_role_runs
 from app.runs.service import RunLifecycleError, RunNotFoundError, stop_run
+from app.runs.restart_reconcile import reconcile_employee_runs_missing_tasks
 from app.workspace_agents.scheduler import (
     DEFAULT_MAX_ACTIVE_EXECUTING,
     DEFAULT_MAX_STARTS_PER_TICK,
@@ -129,4 +131,28 @@ def set_employee_enabled(
         "role": role.strip().lower(),
         "enabled": bool(enabled),
         "key": key,
+    }
+
+
+def clear_employee_run_card(
+    *,
+    workspace_id: str,
+    role: str,
+) -> dict[str, Any]:
+    """Clear one teammate's stale failure card while preserving run evidence."""
+    reconciled = reconcile_employee_runs_missing_tasks(
+        workspace_id=workspace_id,
+        employee_role=role,
+    )
+    dismissed = dismiss_employee_role_runs(
+        workspace_id=workspace_id,
+        role=role,
+        reason="Operator cleared stale agent-card outcome",
+    )
+    return {
+        "workspace_id": workspace_id.strip(),
+        "role": role.strip().lower(),
+        "dismissed_run_ids": dismissed,
+        "dismissed_count": len(dismissed),
+        "reconciled_missing_task_run_ids": reconciled,
     }

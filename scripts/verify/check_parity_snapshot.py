@@ -37,7 +37,11 @@ REQUIRED_BEHAVIOR_IDS = {
 }
 
 ALLOWED_STATUSES = {"verified", "partially_verified"}
-ALLOWED_DECISIONS = {"bounded_cutover_approved", "full_retirement_approved"}
+ALLOWED_DECISIONS = {
+    "bounded_cutover_approved",
+    "full_retirement_approved",
+    "axon_local_runtime_retired",
+}
 
 
 def validate_snapshot() -> list[str]:
@@ -50,8 +54,11 @@ def validate_snapshot() -> list[str]:
     if decision not in ALLOWED_DECISIONS:
         errors.append(f"invalid decision: {decision!r}")
 
-    if payload.get("full_axon_local_retirement") is True and decision != "full_retirement_approved":
-        errors.append("full_axon_local_retirement=true requires full_retirement_approved decision")
+    if payload.get("full_axon_local_retirement") is True and decision not in {
+        "full_retirement_approved",
+        "axon_local_runtime_retired",
+    }:
+        errors.append("full_axon_local_retirement=true requires a retirement decision")
 
     behaviors = payload.get("behaviors")
     if not isinstance(behaviors, list):

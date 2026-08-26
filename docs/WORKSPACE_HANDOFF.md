@@ -41,8 +41,8 @@ Request:
 
 ```json
 {
-  "target_workspace_id": "workspace_axon_local",
-  "task": "Review axon-local after connection slice",
+  "target_workspace_id": "workspace_dashpro",
+  "task": "Review DashPro after connection slice",
   "reason": "Cross-repo follow-up"
 }
 ```
@@ -54,7 +54,7 @@ Response:
   "handoff": {
     "handoff_id": "handoff-…",
     "source_workspace_id": "workspace_smoke",
-    "target_workspace_id": "workspace_axon_local",
+    "target_workspace_id": "workspace_dashpro",
     "task": "…",
     "reason": "…",
     "status": "routed",
@@ -119,9 +119,9 @@ npm run verify:test2
 
 Live proof:
 
-1. `POST` handoff from `workspace_smoke` → `workspace_axon_local`
+1. `POST` handoff from `workspace_smoke` → `workspace_dashpro`
 2. Response includes `handoff_id`, `status: routed`, `target_task_id`, and target
-   summary with `project_root` ending in `axon-local`
+   summary with `project_root` ending in `dashpro`
 3. `GET /api/workspaces/workspace_smoke/handoffs` lists the same record
 4. Target workspace task board shows the routed ticket / handoff strip
 

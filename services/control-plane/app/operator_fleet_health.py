@@ -35,7 +35,7 @@ def build_operator_fleet_health(
     )
     watch_connected = bool(runtime_summary["watch"]["connected"])
     inbox_snapshot = (
-        build_inbox_response(inbox_fetcher=inbox_fetcher)
+        build_inbox_response(inbox_fetcher=inbox_fetcher, allow_empty_unavailable=True)
         if watch_connected
         else {"items": [], "count": 0, "updated_at": runtime_summary["generated_at"]}
     )

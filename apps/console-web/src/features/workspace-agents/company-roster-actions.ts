@@ -23,7 +23,11 @@ export type TeamMemberChatKind = 'talk' | 'status' | 'assign' | 'retry' | 'recei
 
 export type TeamMemberSurfaceAction = 'briefing' | 'attention';
 
-export type TeamMemberControlAction = 'toggle_enabled' | 'stop' | 'start_now';
+export type TeamMemberControlAction =
+  | 'toggle_enabled'
+  | 'stop'
+  | 'start_now'
+  | 'clear_run_card';
 
 export interface TeamMemberQuickAction {
   id: TeamMemberChatKind | TeamMemberSurfaceAction | TeamMemberControlAction;
@@ -286,6 +290,12 @@ export function employeeQuickActions(
     chatKind: 'receipts',
     composerMode: 'ask',
   };
+  const clearRunAction: TeamMemberQuickAction = {
+    id: 'clear_run_card',
+    label: 'Clear run',
+    kind: 'control',
+    control: 'clear_run_card',
+  };
   // Working-as-intended policy blocks (e.g. private-document paths) fail the
   // same way on every retry — offering "Try again" here just burns a shift.
   const blocksRetry = failed && employeeFailureBlocksRetry(employee);
@@ -294,6 +304,7 @@ export function employeeQuickActions(
       ? [
           ...(blocksRetry ? [] : [retryAction]),
           ...(employeeDockReceiptRunId(employee) ? [receiptsAction] : []),
+          clearRunAction,
           talkAction,
         ]
       : [talkAction]),
@@ -363,7 +374,7 @@ export function employeeQuickActions(
   } else if (surface === 'briefing') {
     actions.push({
       id: 'briefing',
-      label: 'Briefing',
+      label: 'Lead report',
       kind: 'surface',
       surface: 'briefing',
     });

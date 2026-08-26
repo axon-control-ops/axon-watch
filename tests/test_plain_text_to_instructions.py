@@ -8,6 +8,10 @@ from unittest.mock import patch
 CONTROL_PLANE_ROOT = Path(__file__).resolve().parents[1] / "services" / "control-plane"
 sys.path.insert(0, str(CONTROL_PLANE_ROOT))
 
+from app.instructions_engine import (  # noqa: E402
+    build_instruction_engine_user_prompt,
+    extract_explicit_instruction_targets,
+)
 from app.plain_text_to_instructions import (  # noqa: E402
     build_instructions_markdown_from_source,
     compose_instructions_markdown,
@@ -42,6 +46,36 @@ def specialist_context(role: str, name: str | None = None) -> SpecialistContext:
 
 
 class PlainTextToInstructionsTests(unittest.TestCase):
+    def test_explicit_repository_and_branch_are_binding_prompt_facts(self) -> None:
+        source = (
+            "in axon-watch repo - on the dev branch - audit the code and "
+            "find all bugs, then implement improvements"
+        )
+        self.assertEqual(
+            extract_explicit_instruction_targets(source),
+            {"repository": "axon-watch", "branch": "dev"},
+        )
+        prompt = build_instruction_engine_user_prompt(
+            source,
+            specialist_context("backend", "Marco"),
+        )
+        self.assertIn("- Repository: axon-watch", prompt)
+        self.assertIn("- Branch: dev", prompt)
+        self.assertIn("higher priority than active workspace context", prompt)
+        self.assertIn("never silently substitute it", prompt)
+
+    def test_audit_plus_implementation_is_not_monitoring_fallback(self) -> None:
+        source = (
+            "in axon-watch repo - the dev branch - audit the code and find all "
+            "bugs/errors/flaws/missing-logic and suggest and implement improvements"
+        )
+        built = build_instructions_markdown_from_source(
+            source,
+            specialist_context("lead", "Mira"),
+        )
+        self.assertIn("- Task type: Audit / Implementation / Remediation", built)
+        self.assertNotIn("- Task type: Monitoring / Validation", built)
+
     def test_negated_commit_mention_is_not_git_intent(self) -> None:
         prompt = (
             "Look at what Dashpro workspace said about the CI work and plan how the "
@@ -106,6 +140,8 @@ Make GIFs look like WhatsApp.
         context = specialist_context("frontend", "Lila")
         built = build_instructions_markdown_from_source(source, context)
         self.assertTrue(instructions_markdown_is_complete(built, context))
+        self.assertIn("## Instruction interpretation", built)
+        self.assertIn("- Task type:", built)
         self.assertIn("## Assigned specialist", built)
         self.assertIn("- Role: Frontend", built)
         self.assertIn("- Agent: Lila", built)
@@ -214,7 +250,7 @@ Make GIFs look like WhatsApp.
             specialist_context={
                 "role": "frontend",
                 "agent_name": "Lila",
-                "employee_id": "missing-lila",
+                "employee_id": "employee-workspace_young_eagles_day_care-frontend-2",
                 "composer_mode": "agent",
             },
         )
@@ -233,6 +269,21 @@ Make GIFs look like WhatsApp.
         self.assertEqual(response["specialist_role"], "frontend")
         self.assertIn("- Role: Frontend", content)
         self.assertIn("- Agent: Lila", content)
+
+    def test_route_rejects_missing_selected_employee_id(self) -> None:
+        body = GenerateInstructionsRequest(
+            workspace_id="workspace_young_eagles_day_care",
+            content="Fix the visible mobile layout.",
+            specialist_context={
+                "role": "frontend",
+                "agent_name": "Lila",
+                "employee_id": "missing-lila",
+                "composer_mode": "agent",
+            },
+        )
+        with self.assertRaises(Exception) as raised:
+            composer_instructions_generate(body)
+        self.assertIn("employee_id not found in workspace roster", str(raised.exception))
 
     def test_route_rejects_unknown_specialist_role(self) -> None:
         body = GenerateInstructionsRequest(
@@ -254,6 +305,15 @@ Make GIFs look like WhatsApp.
     def test_model_output_complete_without_source_request(self) -> None:
         model = (
             "# Instructions\n\n"
+            "## Instruction interpretation\n"
+            "- Task type: Implementation / Remediation\n"
+            "- Selected role: General\n"
+            "- Delivery: Scoped workspace-delivery task\n"
+            "- Required in this run: fix GIF rendering\n"
+            "- Delegation required: no\n"
+            "- Workspace changes required: yes\n"
+            "- Interpretation confidence: 8/10\n"
+            "- Unverified assumptions: none\n\n"
             "## Goal\nFix GIF rendering on mobile before OTA.\n\n"
             "## Context\nConvert the request into a delivery-ready task.\n\n"
             "## Delivery mode\n- Run as scoped workspace delivery\n\n"

@@ -2,6 +2,44 @@
 
 import type { AgentQuestionOption } from './agent-question-view';
 
+/** Mirrors recovery_decision.py's CardType — do not blur these. */
+export type RecoveryCardType =
+  | 'working'
+  | 'recovered'
+  | 'blocked'
+  | 'decision_required'
+  | 'completed'
+  | 'failed';
+
+export type RecoveryChoiceView = {
+  id: string;
+  label: string;
+  expectedResult: string;
+  risk: string;
+  recommended: boolean;
+  isPause: boolean;
+};
+
+export type RecoveryEvidenceView = { label: string; ref: string };
+
+/** Frontend mirror of recovery_decision.py's RecoveryDecision.to_payload() —
+ * the backend decides the card shape, this just carries it through unchanged. */
+export type RecoveryDecisionView = {
+  cardType: RecoveryCardType;
+  summary: string;
+  classification: string;
+  operatorActionRequired: boolean;
+  recommendedAction: string;
+  automaticNextAction: string | null;
+  actionsAttempted: string[];
+  evidence: RecoveryEvidenceView[];
+  confidence: number;
+  retryEligible: boolean;
+  recoveryEligible: boolean;
+  escalationReason: string | null;
+  choices: RecoveryChoiceView[];
+};
+
 export type LeadCheckinFindingView = {
   kind: string;
   kindLabel: string;
@@ -10,6 +48,7 @@ export type LeadCheckinFindingView = {
   escalate: boolean;
   summary: string;
   detail: string;
+  decision?: RecoveryDecisionView;
 };
 
 export type LeadCheckinCard = {
@@ -84,9 +123,53 @@ function kindLabel(kind: string): string {
   return KIND_LABELS[kind.trim().toLowerCase()] ?? kind.replace(/_/g, ' ');
 }
 
+function parseRecoveryDecisionFence(body: string): RecoveryDecisionView | undefined {
+  try {
+    const payload = JSON.parse(body) as Record<string, unknown>;
+    const choices = Array.isArray(payload.choices) ? payload.choices : [];
+    const evidence = Array.isArray(payload.evidence) ? payload.evidence : [];
+    return {
+      cardType: (String(payload.card_type || 'blocked')) as RecoveryCardType,
+      summary: String(payload.summary || ''),
+      classification: String(payload.classification || ''),
+      operatorActionRequired: Boolean(payload.operator_action_required),
+      recommendedAction: String(payload.recommended_action || ''),
+      automaticNextAction:
+        payload.automatic_next_action == null ? null : String(payload.automatic_next_action),
+      actionsAttempted: Array.isArray(payload.actions_attempted)
+        ? payload.actions_attempted.map((item) => String(item))
+        : [],
+      evidence: evidence
+        .filter((item): item is Record<string, unknown> => !!item && typeof item === 'object')
+        .map((item) => ({ label: String(item.label || ''), ref: String(item.ref || '') })),
+      confidence: Number(payload.confidence ?? 0.5),
+      retryEligible: Boolean(payload.retry_eligible),
+      recoveryEligible: Boolean(payload.recovery_eligible),
+      escalationReason:
+        payload.escalation_reason == null ? null : String(payload.escalation_reason),
+      choices: choices
+        .filter((item): item is Record<string, unknown> => !!item && typeof item === 'object')
+        .map((item) => ({
+          id: String(item.id || ''),
+          label: String(item.label || ''),
+          expectedResult: String(item.expected_result || ''),
+          risk: String(item.risk || ''),
+          recommended: Boolean(item.recommended),
+          isPause: Boolean(item.is_pause),
+        })),
+    };
+  } catch {
+    // Malformed fence (truncated stream, corrupted history) — fall back to
+    // the legacy prose-derived options rather than crash the transcript.
+    return undefined;
+  }
+}
+
 function parseFindingBlock(lines: string[]): LeadCheckinFindingView[] {
   const findings: LeadCheckinFindingView[] = [];
-  for (const line of lines) {
+  let index = 0;
+  while (index < lines.length) {
+    const line = lines[index];
     const match = line.match(FINDING_RE);
     if (match) {
       const kind = (match[2] || '').trim().toLowerCase();
@@ -103,6 +186,23 @@ function parseFindingBlock(lines: string[]): LeadCheckinFindingView[] {
         summary: title,
         detail: '',
       });
+      index += 1;
+      continue;
+    }
+    if (line.trimEnd() === ':::decision') {
+      const body: string[] = [];
+      index += 1;
+      while (index < lines.length && lines[index].trimEnd() !== ':::') {
+        body.push(lines[index]);
+        index += 1;
+      }
+      if (index < lines.length) {
+        index += 1; // consume the closing ':::'
+      }
+      const last = findings[findings.length - 1];
+      if (last) {
+        last.decision = parseRecoveryDecisionFence(body.join('\n'));
+      }
       continue;
     }
     const last = findings[findings.length - 1];
@@ -110,6 +210,7 @@ function parseFindingBlock(lines: string[]): LeadCheckinFindingView[] {
       const extra = line.trim();
       last.detail = last.detail ? `${last.detail} ${extra}` : extra;
     }
+    index += 1;
   }
   return findings.map((finding) => ({
     ...finding,
@@ -123,6 +224,13 @@ function nextStepsFor(findings: LeadCheckinFindingView[]): string[] {
   }
   const steps: string[] = [];
   for (const finding of findings.slice(0, 4)) {
+    if (finding.decision) {
+      // The control plane already inspected and decided — surface its actual
+      // recommendation instead of re-guessing one from the finding's flags.
+      const action = finding.decision.automaticNextAction || finding.decision.recommendedAction;
+      steps.push(action ? `${finding.title}: ${action}` : `Review ${finding.title}.`);
+      continue;
+    }
     if (finding.escalate) {
       steps.push(`Unblock ${finding.title} — this needs an operator gate, not another auto-retry.`);
       continue;
@@ -153,8 +261,19 @@ function optionsFor(findings: LeadCheckinFindingView[]): AgentQuestionOption[] {
   if (!findings.length) {
     return [];
   }
-  const options: AgentQuestionOption[] = [];
   const primary = findings[0];
+  if (primary?.decision) {
+    // The control plane already diagnosed and decided the card shape — only
+    // decision_required carries a real fork with competing options. Every
+    // other card type (working/recovered/blocked/completed/failed) is a
+    // single outcome or a single missing requirement, not a menu to invent.
+    if (primary.decision.cardType !== 'decision_required') {
+      return [];
+    }
+    return primary.decision.choices.map((choice) => ({ id: choice.id, label: choice.label }));
+  }
+  // Legacy fallback: prose-only history predating the structured fence.
+  const options: AgentQuestionOption[] = [];
   if (primary && !primary.escalate && primary.kind === 'failed_shift') {
     options.push({ id: '1', label: retryLabel(primary) });
   } else if (primary?.escalate) {
@@ -166,6 +285,14 @@ function optionsFor(findings: LeadCheckinFindingView[]): AgentQuestionOption[] {
   options.push({ id: String(options.length + 1), label: 'Open Recovery Center' });
   options.push({ id: String(options.length + 1), label: "Hold — I'll decide" });
   return options.slice(0, 5);
+}
+
+function promptFor(findings: LeadCheckinFindingView[]): string {
+  const primary = findings[0];
+  if (primary?.decision?.cardType === 'decision_required') {
+    return primary.decision.summary || LEAD_CHECKIN_PROMPT;
+  }
+  return LEAD_CHECKIN_PROMPT;
 }
 
 export function parseLeadCheckinReport(text: string): LeadCheckinCard | null {
@@ -194,7 +321,7 @@ export function parseLeadCheckinReport(text: string): LeadCheckinCard | null {
     assignmentCount,
     findings,
     nextSteps,
-    prompt: LEAD_CHECKIN_PROMPT,
+    prompt: promptFor(findings),
     options: optionsFor(findings),
   };
 }

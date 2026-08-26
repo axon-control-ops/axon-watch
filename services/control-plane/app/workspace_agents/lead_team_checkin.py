@@ -14,9 +14,8 @@ import os
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
-from uuid import uuid4
 
-from app.persistence import chat_store, task_store
+from app.persistence import task_store
 from app.workspace_agents.config_loader import load_workspace_agent_configs
 from app.workspace_agents.lead_checkin_assign import (
     ASSIGN_GOAL_PREFIX,
@@ -27,8 +26,10 @@ from app.workspace_agents.lead_checkin_assign import (
     assign_owner_role_for_failed_shift,
     assign_owner_role_for_monitor,
 )
-from app.workspace_agents.lead_checkin_report import format_lead_checkin_message
+from app.workspace_agents.lead_checkin_messaging import post_lead_checkin_message
 from app.workspace_agents.autonomous_attention_policy import attention_finding_auto_dispatches
+from app.workspace_agents.lead_failure_diagnosis import diagnose_lead_failure
+from app.workspace_agents.recovery_decision import render_decision_fence
 from app.workspace_agents.run_outcome import latest_role_run_outcome
 
 logger = logging.getLogger(__name__)
@@ -124,64 +125,6 @@ def mark_workspace_checked_in(
     _save_cooldown_state(state, state_path)
 
 
-def _employee_id_for_role(workspace_id: str, role: str) -> str | None:
-    from app.workspace_agents import build_company_roster
-
-    company = build_company_roster(workspace_id)
-    rows = company.get("employees") if isinstance(company, dict) else None
-    if not isinstance(rows, list):
-        return None
-    want = role.strip().lower()
-    for row in rows:
-        if not isinstance(row, dict):
-            continue
-        if str(row.get("role") or "").strip().lower() == want:
-            employee_id = str(row.get("employee_id") or "").strip()
-            return employee_id or None
-    return None
-
-
-def _post_lead_checkin_message(
-    *,
-    workspace_id: str,
-    findings: list[LeadCheckinFinding],
-    assigned: list[dict[str, Any]],
-) -> str | None:
-    employee_id = _employee_id_for_role(workspace_id, "lead")
-    if not employee_id:
-        return None
-    created_at = _utc_now_iso()
-    thread = chat_store.find_thread_for_employee(
-        workspace_id,
-        employee_id=employee_id,
-        thread_kind="ide",
-    )
-    if thread is None:
-        thread = chat_store.create_thread(
-            workspace_id=workspace_id,
-            run_id=None,
-            created_at=created_at,
-            thread_kind="ide",
-            title="Lead · team check-in",
-            employee_id=employee_id,
-            employee_role="lead",
-        )
-    thread_id = str(thread["thread_id"])
-    message_id = f"message_system_{uuid4().hex}"
-    chat_store.save_message(
-        {
-            "message_id": message_id,
-            "thread_id": thread_id,
-            "workspace_id": workspace_id,
-            "run_id": None,
-            "role": "agent",
-            "content": format_lead_checkin_message(findings, assigned),
-            "created_at": created_at,
-        }
-    )
-    return message_id
-
-
 def collect_failed_shift_findings(workspace_id: str) -> list[LeadCheckinFinding]:
     findings: list[LeadCheckinFinding] = []
     _configs, _defaults, companies, _staffing = load_workspace_agent_configs()
@@ -198,12 +141,25 @@ def collect_failed_shift_findings(workspace_id: str) -> list[LeadCheckinFinding]
         # latest_role_run_outcome already ran normalize_operator_failure_detail +
         # truncation — re-normalizing here was redundant work on already-clean text.
         detail = str(outcome.get("detail") or "")
-        if role == "lead":
-            owner_role, escalate_only = "watcher", True
-        else:
-            owner_role, escalate_only = assign_owner_role_for_failed_shift(role, detail)
         run_id = str(outcome.get("run_id") or "").strip() or "unknown"
         name = str(employee.name or role).strip() or role
+        decision_fence = ""
+        if role == "lead":
+            # Diagnose instead of unconditionally escalating: a Lead has no
+            # peer specialist of its own, so a routable/transient failure is
+            # sent to watcher to investigate; only a genuine operator-only
+            # gate (blocked/decision_required/failed) escalates. See
+            # lead_failure_diagnosis.py for the root-cause writeup.
+            decision = diagnose_lead_failure(
+                workspace_id=workspace_id,
+                run_id=run_id,
+                detail=detail,
+            )
+            owner_role = "watcher"
+            escalate_only = decision.operator_action_required
+            decision_fence = render_decision_fence(decision)
+        else:
+            owner_role, escalate_only = assign_owner_role_for_failed_shift(role, detail)
         # Soft key omits run_id so the same role failure does not stack Needs-you cards.
         findings.append(
             LeadCheckinFinding(
@@ -220,6 +176,7 @@ def collect_failed_shift_findings(workspace_id: str) -> list[LeadCheckinFinding]
                         if role == "lead"
                         else ""
                     )
+                    + decision_fence
                 ),
                 dedupe_key=f"failed_shift:{workspace_id}:{role}",
                 escalate_only=escalate_only,
@@ -522,7 +479,7 @@ def run_lead_team_checkin(
         message_id = None
         if post_lead_message and (findings or assigned):
             try:
-                message_id = _post_lead_checkin_message(
+                message_id = post_lead_checkin_message(
                     workspace_id=workspace,
                     findings=findings,
                     assigned=assigned,

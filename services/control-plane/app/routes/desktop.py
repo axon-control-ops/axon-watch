@@ -37,6 +37,7 @@ class DesktopBootstrapRequest(BaseModel):
 
 
 class OperatorSessionRequest(BaseModel):
+    operator_username: str | None = Field(default=None, min_length=1)
     operator_token: str | None = Field(default=None, min_length=1)
     operator_password: str | None = Field(default=None, min_length=1)
     return_session_token: bool = False

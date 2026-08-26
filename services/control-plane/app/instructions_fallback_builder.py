@@ -22,6 +22,93 @@ def _summarize_goal(source: str) -> str:
     return cleaned[:220].rstrip(" ,.;") + ("..." if len(cleaned) > 220 else "")
 
 
+def _infer_task_type(source: str, context: SpecialistContext) -> str:
+    lowered = source.lower()
+    implementation = any(
+        token in lowered for token in ("fix", "make", "build", "implement", "upgrade", "patch", "repair")
+    )
+    investigation = any(
+        token in lowered for token in ("review", "audit", "inspect", "diagnose", "find all bugs")
+    )
+    if implementation and investigation:
+        return "Audit / Implementation / Remediation"
+    if implementation:
+        return "Implementation / Remediation"
+    if context.role == "lead" and any(
+        token in lowered
+        for token in ("report", "monitor", "coordinate", "team", "agents", "handoff", "orchestr")
+    ):
+        return "Orchestration"
+    if context.role == "watcher" or any(
+        token in lowered for token in ("monitor", "watch", "verify", "check", "evidence")
+    ):
+        return "Monitoring / Validation"
+    if investigation:
+        return "Review / Investigation"
+    if "report" in lowered:
+        return "Reporting"
+    return "Planning"
+
+
+def _workspace_changes_required(source: str, context: SpecialistContext) -> bool:
+    lowered = source.lower()
+    if context.role in {"lead", "watcher"} and not any(
+        token in lowered for token in ("implement", "patch", "edit", "change file", "code")
+    ):
+        return False
+    return any(token in lowered for token in ("fix", "make", "build", "implement", "upgrade", "patch", "edit", "code"))
+
+
+def _delegation_required(source: str, context: SpecialistContext) -> bool:
+    if context.role == "lead":
+        return _workspace_changes_required(source, context)
+    if context.role == "watcher" and _workspace_changes_required(source, context):
+        return True
+    lowered = source.lower()
+    cross_role_tokens = {
+        "frontend": ("ui", "screen", "layout", "button", "mobile", "responsive"),
+        "backend": ("api", "database", "supabase", "migration", "server", "auth"),
+        "integrations": ("webhook", "oauth", "external", "provider", "sdk", "integration"),
+    }
+    for role, tokens in cross_role_tokens.items():
+        if role != context.role and any(token in lowered for token in tokens):
+            return True
+    return False
+
+
+def _interpretation_confidence(source: str, context: SpecialistContext) -> int:
+    if context.mismatch_reason:
+        return 5
+    if context.role == GENERAL_ROLE_ID:
+        return 6
+    if len(source.strip()) < 12:
+        return 5
+    return 8
+
+
+def _instruction_interpretation_bullets(source: str, context: SpecialistContext) -> list[str]:
+    changes_required = _workspace_changes_required(source, context)
+    delegation_required = _delegation_required(source, context)
+    profile = context.profile
+    unverified = "none"
+    if context.mismatch_reason:
+        unverified = context.mismatch_reason
+    elif not context.verified and context.role != GENERAL_ROLE_ID:
+        unverified = "specialist context was supplied but not verified against a roster employee"
+    elif context.role == GENERAL_ROLE_ID:
+        unverified = "specialist ownership was not supplied"
+    return [
+        f"Task type: {_infer_task_type(source, context)}",
+        f"Selected role: {profile.display_name}",
+        f"Delivery: {context.requested_delivery_mode or profile.preferred_delivery_mode}",
+        "Required in this run: produce the selected specialist's executable instructions and required evidence plan",
+        f"Delegation required: {'yes' if delegation_required else 'no'}",
+        f"Workspace changes required: {'yes' if changes_required else 'no'}",
+        f"Interpretation confidence: {_interpretation_confidence(source, context)}/10",
+        f"Unverified assumptions: {unverified}",
+    ]
+
+
 def _infer_scope_bullets(source: str, context: SpecialistContext) -> list[str]:
     lowered = source.lower()
     candidates: list[str] = []
@@ -87,7 +174,7 @@ def _infer_steps(source: str, context: SpecialistContext) -> list[str]:
     steps.extend(
         [
             "When Axon-X or the product fleet is part of the request, run the work through that workflow and record fixes or upgrades discovered.",
-            "Verify the requested outcomes on web and mobile where applicable; note any feature that requires a native rebuild instead of OTA.",
+            "Discover and run the repository-defined validation for each changed area; do not inject web, mobile, native-build, or OTA checks unless the target repository actually uses them.",
             "Create handoffs for any work outside the selected specialist's authority.",
             "Summarize implemented changes, validation evidence, handoffs, remaining gaps, and the next operator action without claiming git/release work that was not requested.",
         ]
@@ -247,6 +334,11 @@ def build_fallback_instructions_markdown(
     ]
 
     lines = ["# Instructions", ""]
+    lines += [
+        "## Instruction interpretation",
+        *[f"- {item}" for item in _instruction_interpretation_bullets(cleaned, context)],
+        "",
+    ]
     if context.role in SPECIALIST_ROLE_IDS:
         lines += [
             "## Assigned specialist",

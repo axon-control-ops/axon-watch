@@ -1,5 +1,4 @@
 import type { ConnectorProbeRecord } from '../api/control-plane';
-import { LEGACY_AXON_LOCAL_FALLBACK_URL } from '../api/connectors-api';
 
 import { effectiveRequiredConnectorsUnavailable } from './connector-glance-view';
 
@@ -18,8 +17,6 @@ export interface ConnectorRailRow {
   tone: ConnectorRailTone;
   required: boolean;
   detail: string;
-  isLegacyFallback: boolean;
-  fallbackUrl: string | null;
   isTunnelConnector: boolean;
   tunnelUrl: string | null;
   tunnelRunning: boolean;
@@ -146,7 +143,6 @@ export function connectorRailNeedsEmphasis(input: {
 export function buildConnectorRailRows(items: ConnectorProbeRecord[]): ConnectorRailRow[] {
   return items.map((item) => {
     const connectorId = String(item.connector_id ?? '').trim();
-    const isLegacy = connectorId === 'axon_local';
     const isTunnel = connectorId === 'cloudflare_tunnel';
     const tunnelMeta = item.tunnel;
     const tunnelUrl = String(tunnelMeta?.tunnel_url ?? '').trim() || null;
@@ -161,8 +157,6 @@ export function buildConnectorRailRows(items: ConnectorProbeRecord[]): Connector
       tone: connectorRailTone(displayStatus),
       required: Boolean(item.required),
       detail: connectorRailDisplayDetail(item),
-      isLegacyFallback: isLegacy,
-      fallbackUrl: isLegacy ? LEGACY_AXON_LOCAL_FALLBACK_URL : null,
       isTunnelConnector: isTunnel,
       tunnelUrl,
       tunnelRunning,

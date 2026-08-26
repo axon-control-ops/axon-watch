@@ -6,6 +6,8 @@ withDefaults(
       | 'close'
       | 'search'
       | 'split'
+      | 'panel-collapse'
+      | 'panel-restore'
       | 'new-file'
       | 'book'
       | 'more'
@@ -54,6 +56,16 @@ withDefaults(
     <template v-else-if="name === 'split'">
       <rect x="2.25" y="2.75" width="11.5" height="10.5" rx="1.1" />
       <path d="M8 2.75v10.5" />
+    </template>
+    <template v-else-if="name === 'panel-collapse'">
+      <rect x="2.25" y="3" width="11.5" height="10" rx="1.1" />
+      <path d="M5.25 3v10" />
+      <path d="M10.7 5.45 8.15 8l2.55 2.55" />
+    </template>
+    <template v-else-if="name === 'panel-restore'">
+      <rect x="2.25" y="3" width="11.5" height="10" rx="1.1" />
+      <path d="M5.25 3v10" />
+      <path d="M8.35 5.45 10.9 8l-2.55 2.55" />
     </template>
     <template v-else-if="name === 'new-file'">
       <path d="M4.25 2.25h4.4L12 5.6v8.15H4.25z" />

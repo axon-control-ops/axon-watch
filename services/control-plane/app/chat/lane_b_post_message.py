@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-import shutil
 from pathlib import Path
 
+from app.chat.attachment_paths import localize_attachment_paths_for_sandbox
 from app.chat.lane_b_agent import EditorSelectionContext, LaneBContext, generate_lane_b_result
 from app.chat.lane_b_fast_paths import post_image_redisplay_message, post_workspace_switch_message
 from app.chat.lane_b_generated_image_actions import (
@@ -56,24 +56,10 @@ def _localize_attachment_paths_for_sandbox(
     workspace root and never found the file). Copy each attachment into the
     sandbox and rewrite the path to the reachable copy instead.
     """
-    if not paths or sandbox_workspace_root is None:
-        return paths
-    dest_dir = sandbox_workspace_root / ".attachments"
-    localized: list[str] = []
-    for raw_path in paths:
-        source = Path(raw_path)
-        try:
-            if not source.is_file():
-                localized.append(raw_path)
-                continue
-            dest_dir.mkdir(parents=True, exist_ok=True)
-            dest = dest_dir / source.name
-            shutil.copy2(source, dest)
-            localized.append(str(dest))
-        except OSError:
-            # Fail open: worst case matches today's unreachable-path behavior.
-            localized.append(raw_path)
-    return tuple(localized)
+    return localize_attachment_paths_for_sandbox(
+        paths,
+        sandbox_workspace_root=sandbox_workspace_root,
+    )
 
 
 def post_lane_b_message(
@@ -227,6 +213,7 @@ def post_lane_b_message(
         save_message=chat_store.save_message,
         new_message_id=_new_message_id,
         bind_attachments=bind_lane_b_attachments,
+        attachment_ids=attachment_ids,
     )
     if lead_named_assign_response is not None:
         return lead_named_assign_response
@@ -241,6 +228,7 @@ def post_lane_b_message(
         save_message=chat_store.save_message,
         new_message_id=_new_message_id,
         bind_attachments=bind_lane_b_attachments,
+        attachment_ids=attachment_ids,
     )
     if lead_decompose_response is not None:
         return lead_decompose_response
@@ -255,6 +243,7 @@ def post_lane_b_message(
         save_message=chat_store.save_message,
         new_message_id=_new_message_id,
         bind_attachments=bind_lane_b_attachments,
+        attachment_ids=attachment_ids,
     )
     if lead_fan_out_response is not None:
         return lead_fan_out_response
@@ -342,6 +331,10 @@ def post_lane_b_message(
             workspace_id=workspace_id,
             message_id=str(operator_message["message_id"]),
             thread_id=thread_id,
+        )
+        image_paths = _localize_attachment_paths_for_sandbox(
+            image_paths,
+            sandbox_workspace_root=sandbox_workspace_root,
         )
         if operator_attachments:
             operator_message = {**operator_message, "attachments": operator_attachments}

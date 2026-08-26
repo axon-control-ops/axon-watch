@@ -22,10 +22,10 @@ const productionItems: WorkspaceRecord[] = [
     display_name: 'axon-watch',
   },
   {
-    workspace_id: 'workspace_axon_local',
+    workspace_id: 'workspace_dashpro',
     connection_kind: 'project_path',
-    project_root: '/home/edp/axon-nvme/repos/axon-local',
-    display_name: 'axon-local',
+    project_root: '/home/edp/Projectx/product/dashpro',
+    display_name: 'DashPro',
   },
   { workspace_id: 'workspace_smoke', connection_kind: 'isolated_root' },
 ];
@@ -55,28 +55,28 @@ describe('operator workspace catalog', () => {
     ).toEqual(['workspace_axon_watch', 'workspace_dashpro']);
   });
 
-  it('prefers axon-watch and axon-local when project bindings exist', () => {
+  it('prefers axon-watch and DashPro when project bindings exist', () => {
     expect(workspaceCatalogMode(productionItems)).toBe('production');
     expect(mergeOperatorWorkspaceCatalog(productionItems).map((item) => item.workspace_id)).toEqual([
       'workspace_axon_watch',
-      'workspace_axon_local',
+      'workspace_dashpro',
     ]);
   });
 
-  it('includes additional bound child workspaces after axon-watch and axon-local', () => {
+  it('includes additional bound child workspaces after axon-watch and DashPro', () => {
     const withChild: WorkspaceRecord[] = [
       ...productionItems,
       {
-        workspace_id: 'workspace_dashpro',
+        workspace_id: 'workspace_tps',
         connection_kind: 'project_path',
-        project_root: '/home/edp/Projectx/product/dashpro',
-        display_name: 'DashPro',
+        project_root: '/home/edp/Projectx/client/tps',
+        display_name: 'TPS',
       },
     ];
     expect(mergeOperatorWorkspaceCatalog(withChild).map((item) => item.workspace_id)).toEqual([
       'workspace_axon_watch',
-      'workspace_axon_local',
       'workspace_dashpro',
+      'workspace_tps',
     ]);
   });
 
@@ -88,6 +88,6 @@ describe('operator workspace catalog', () => {
 
   it('shows canonical labels for bound workspaces', () => {
     expect(workspaceDisplayLabel(productionItems[0]!)).toBe('Axon Watch');
-    expect(workspaceDisplayLabel(productionItems[1]!)).toBe('Axon Local');
+    expect(workspaceDisplayLabel(productionItems[1]!)).toBe('DashPro');
   });
 });

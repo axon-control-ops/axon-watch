@@ -35,7 +35,11 @@ def prior_failure_clause(*, workspace_id: str, role: str) -> str:
     """Surface the last terminal failure so a new shift can retry with context."""
     from app.workspace_agents.run_outcome import latest_role_run_outcome
 
-    outcome = latest_role_run_outcome(workspace_id, role)
+    try:
+        outcome = latest_role_run_outcome(workspace_id, role)
+    except Exception:  # noqa: BLE001 - stale evidence must not block prompt assembly
+        logger.debug("prior failure lookup failed for %s role=%s", workspace_id, role, exc_info=True)
+        return ""
     if not outcome or str(outcome.get("outcome") or "").strip().lower() != "failed":
         return ""
     detail = str(outcome.get("detail") or "").strip() or "open run history for receipts"

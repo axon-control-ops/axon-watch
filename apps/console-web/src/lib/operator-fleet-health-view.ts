@@ -55,7 +55,6 @@ export type FleetHealthGridCell = {
 
 const PRODUCTION_WORKSPACE_ORDER = [
   'workspace_axon_watch',
-  'workspace_axon_local',
   'workspace_dashpro',
 ] as const;
 

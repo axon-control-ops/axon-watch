@@ -42,6 +42,14 @@ export type EmployeeEnabledPatchResponse = CompanyRosterSnapshot & {
   key: string;
 };
 
+export type EmployeeClearRunCardResponse = CompanyRosterSnapshot & {
+  workspace_id: string;
+  role: string;
+  dismissed_run_ids: string[];
+  dismissed_count: number;
+  reconciled_missing_task_run_ids: string[];
+};
+
 export function fetchWorkerSchedulerStatus(): Promise<WorkerSchedulerStatus> {
   return fetchJson<WorkerSchedulerStatus>(
     '/api/worker-scheduler',
@@ -103,5 +111,18 @@ export function patchWorkspaceEmployeeEnabled(
       body: JSON.stringify({ enabled }),
     },
     'employee enabled patch failed',
+  );
+}
+
+export function clearWorkspaceEmployeeRunCard(
+  workspaceId: string,
+  employeeId: string,
+): Promise<EmployeeClearRunCardResponse> {
+  const encodedWorkspace = encodeURIComponent(workspaceId);
+  const encodedEmployee = encodeURIComponent(employeeId);
+  return fetchJson<EmployeeClearRunCardResponse>(
+    `/api/workspaces/${encodedWorkspace}/company/employees/${encodedEmployee}/clear-run-card`,
+    { method: 'POST' },
+    'clear agent run card failed',
   );
 }

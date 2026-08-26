@@ -4,7 +4,6 @@ import { normalizePersonaSttAliases } from './operator-persona-stt-aliases';
 
 const CANONICAL_WORKSPACE_LABELS: Record<string, string> = {
   workspace_axon_watch: 'Axon Watch',
-  workspace_axon_local: 'Axon Local',
   workspace_dashpro: 'DashPro',
   workspace_edudashpro_school: 'EDP Excellence',
   workspace_tps: 'TPS',
@@ -16,10 +15,6 @@ const WORKSPACE_ID_ALIASES: Record<string, string> = {
   axonwatch: 'workspace_axon_watch',
   'axon-watch': 'workspace_axon_watch',
   watch: 'workspace_axon_watch',
-  'axon local': 'workspace_axon_local',
-  axonlocal: 'workspace_axon_local',
-  'axon-local': 'workspace_axon_local',
-  local: 'workspace_axon_local',
   dashpro: 'workspace_dashpro',
   'dash pro': 'workspace_dashpro',
   'desk pro': 'workspace_dashpro',
@@ -49,8 +44,6 @@ const VOICE_TRANSCRIPT_REPLACEMENTS: Array<[RegExp, string]> = [
   [/\bdashpro\b/gi, 'DashPro'],
   [/\baxon\s*watch\b/gi, 'Axon Watch'],
   [/\baxon-watch\b/gi, 'Axon Watch'],
-  [/\baxon\s*local\b/gi, 'Axon Local'],
-  [/\baxon-local\b/gi, 'Axon Local'],
   [/\bschool\s+of\s+excellence\b/gi, 'EDP Excellence'],
   [/\bedudashpro\s+school\b/gi, 'EDP Excellence'],
   [/\bedp\s+excellence\b/gi, 'EDP Excellence'],
@@ -93,9 +86,6 @@ function normalizeEntityDisplayLabel(raw: string): string {
   }
   if (key === 'axon watch') {
     return 'Axon Watch';
-  }
-  if (key === 'axon local') {
-    return 'Axon Local';
   }
   if (key === 'kairo' || key === 'cairo' || key === 'x' || key === 'vaxon') {
     return OPERATOR_PERSONA_NAME;

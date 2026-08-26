@@ -138,6 +138,7 @@ def maybe_post_lead_decompose_message(
     save_message: Callable[[dict[str, Any]], dict[str, Any]],
     new_message_id: Callable[[str], str],
     bind_attachments: Callable[[str], list[dict[str, object]]],
+    attachment_ids: list[str] | None = None,
 ) -> dict[str, object] | None:
     """When Lead hears a multi-domain implement ask, materialize decompose plan."""
     role = str(employee_role or "").strip().lower()
@@ -175,6 +176,7 @@ def maybe_post_lead_decompose_message(
             mode="decompose",
             create_runs=True,
             use_model=True,
+            attachment_ids=attachment_ids,
         )
     except LeadFanOutError:
         return None

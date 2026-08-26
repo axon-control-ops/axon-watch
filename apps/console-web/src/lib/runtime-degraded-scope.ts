@@ -9,7 +9,6 @@ const REMOTE_INGRESS_MARKERS = [
   'tunnel process',
   'cloudflare',
   'trycloudflare',
-  'soft cutover',
   'http 530',
   'http 502',
   'http 503',

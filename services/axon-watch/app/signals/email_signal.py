@@ -7,12 +7,7 @@ import os
 import re
 from pathlib import Path
 from typing import Any
-from urllib.error import URLError
-from urllib.parse import urljoin, urlsplit
-from urllib.request import Request, urlopen
 
-from app.connectors.catalog import load_watch_connector_definitions
-from app.connectors.probe import probe_connector
 from app.signals.email_imap_poll import fetch_native_email_messages
 from app.signals.email_reply_suggest import suggest_email_reply
 from app.signals.email_triage import analyze_email_message
@@ -27,8 +22,6 @@ _DEFAULT_WORKSPACE_HINT_MAP: dict[str, str] = {
     "axon": "workspace_axon_watch",
     "axon watch": "workspace_axon_watch",
     "axon-watch": "workspace_axon_watch",
-    "axon local": "workspace_axon_local",
-    "axon-local": "workspace_axon_local",
 }
 
 
@@ -136,66 +129,9 @@ def _messages_from_stub(config: dict[str, Any]) -> list[dict[str, Any]]:
     return [dict(item) for item in messages if isinstance(item, dict)]
 
 
-def _axon_local_base_url() -> str | None:
-    definitions = load_watch_connector_definitions()
-    definition = definitions.get("axon_local")
-    if definition is None:
-        return None
-    record = probe_connector(definition)
-    if str(record.get("status") or "") != "ok":
-        return None
-    parts = urlsplit(definition.health_url)
-    if not parts.scheme or not parts.netloc:
-        return None
-    return f"{parts.scheme}://{parts.netloc}"
-
-
 def _messages_from_live_bridge() -> list[dict[str, Any]] | None:
-    if not _email_bridge_enabled():
-        return None
-    base_url = _axon_local_base_url()
-    if not base_url:
-        return None
-
-    workspace_id = os.environ.get("AXON_WATCH_EMAIL_BRIDGE_WORKSPACE_ID", "").strip()
-    if not workspace_id:
-        workspace_id = str(_load_operator_email_settings().get("bridge_workspace_id") or "7").strip() or "7"
-    url = urljoin(
-        base_url.rstrip("/") + "/",
-        f"api/connectors/email/workspaces/{workspace_id}/analysis?limit=10&force=false",
-    )
-    try:
-        request = Request(url, headers={"Accept": "application/json"})
-        with urlopen(request, timeout=1.5) as response:
-            body = response.read(256_000).decode("utf-8", errors="replace")
-            payload = json.loads(body)
-    except (URLError, TimeoutError, OSError, ValueError, json.JSONDecodeError):
-        return None
-
-    if not isinstance(payload, dict):
-        return None
-
-    messages: list[dict[str, Any]] = []
-    for entry in payload.get("analyses") or []:
-        if not isinstance(entry, dict):
-            continue
-        message = entry.get("message") if isinstance(entry.get("message"), dict) else {}
-        analysis = entry.get("analysis") if isinstance(entry.get("analysis"), dict) else {}
-        text = str(analysis.get("snippet") or "").strip()
-        if not text:
-            # Prefer recommended detail as fallback snippet when bridge omits body text.
-            text = str(analysis.get("recommended_detail") or "").strip()
-        messages.append(
-            {
-                "message_id": str(message.get("message_id") or analysis.get("message_id") or "").strip(),
-                "uid": str(message.get("uid") or "").strip(),
-                "from": str(message.get("from") or analysis.get("sender") or "").strip(),
-                "subject": str(message.get("subject") or analysis.get("subject") or "").strip(),
-                "text": text,
-                "snippet": text,
-            }
-        )
-    return messages
+    _email_bridge_enabled()
+    return None
 
 
 def load_email_messages(

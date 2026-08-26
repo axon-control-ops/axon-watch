@@ -2,6 +2,7 @@ import { describe, expect, it, vi, beforeEach } from 'vitest';
 
 import {
   canStartKairoSpeechCapture,
+  kairoCaptureError,
   setKairoSpeechPrivacyBlocked,
   setKairoSpeechSttMode,
   startKairoSpeechCapture,
@@ -83,5 +84,14 @@ describe('kairo-shared-speech-capture busy gating', () => {
     setKairoConversationPhase('speaking');
     expect(canStartKairoSpeechCapture()).toBe(false);
     expect(startKairoSpeechCapture('manual')).toBe(false);
+  });
+
+  it('keeps typing actions available in microphone permission guidance', () => {
+    expect(startKairoSpeechCapture('manual')).toBe(true);
+
+    captureCallbacks?.onError?.('not-allowed');
+
+    expect(kairoCaptureError.value).toContain('browser site controls');
+    expect(kairoCaptureError.value).toContain('Ask or Dispatch');
   });
 });

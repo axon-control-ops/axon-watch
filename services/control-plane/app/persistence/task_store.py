@@ -28,7 +28,7 @@ _TASK_COLUMNS = (
     "dependencies_json",
     "exclusive_paths_json",
     "allowed_paths_json",
-    "approval_receipt_id", "mission_id",
+    "attachment_ids_json", "approval_receipt_id", "mission_id",
     "status",
     "lease_holder",
     "lease_expires_at",
@@ -99,6 +99,7 @@ def ensure_task_ledger_schema(connection: Any) -> None:
             dependencies_json TEXT NOT NULL DEFAULT '[]',
             exclusive_paths_json TEXT NOT NULL DEFAULT '[]',
             allowed_paths_json TEXT NOT NULL DEFAULT '[]',
+            attachment_ids_json TEXT NOT NULL DEFAULT '[]',
             approval_receipt_id TEXT,
             mission_id TEXT,
             status TEXT NOT NULL,
@@ -118,8 +119,8 @@ def ensure_task_ledger_schema(connection: Any) -> None:
         for row in connection.execute("PRAGMA table_info(workspace_tasks)").fetchall()
     }
     optional_columns = (
-        ("exclusive_paths_json", "TEXT NOT NULL DEFAULT '[]'"),
-        ("allowed_paths_json", "TEXT NOT NULL DEFAULT '[]'"),
+        ("exclusive_paths_json", "TEXT NOT NULL DEFAULT '[]'"), ("allowed_paths_json", "TEXT NOT NULL DEFAULT '[]'"),
+        ("attachment_ids_json", "TEXT NOT NULL DEFAULT '[]'"),
         ("approval_receipt_id", "TEXT"), ("mission_id", "TEXT"),
     )
     for name, ddl in optional_columns:
@@ -150,17 +151,14 @@ def _parse_path_list(raw: Any) -> list[str]:
     return [str(item).strip() for item in parsed if str(item).strip()]
 
 
+def _row_list(row: Any, column: str) -> list[str]:
+    return _parse_path_list(row[column] if column in row.keys() else "[]")
+
 def _row_to_record(row: Any) -> dict[str, Any]:
-    dependencies_raw = row["dependencies_json"] if "dependencies_json" in row.keys() else "[]"
-    exclusive_paths_raw = (
-        row["exclusive_paths_json"] if "exclusive_paths_json" in row.keys() else "[]"
-    )
-    allowed_paths_raw = (
-        row["allowed_paths_json"] if "allowed_paths_json" in row.keys() else "[]"
-    )
-    dependencies = _parse_path_list(dependencies_raw)
-    exclusive_paths = _parse_path_list(exclusive_paths_raw)
-    allowed_paths = _parse_path_list(allowed_paths_raw)
+    dependencies = _row_list(row, "dependencies_json")
+    exclusive_paths = _row_list(row, "exclusive_paths_json")
+    allowed_paths = _row_list(row, "allowed_paths_json")
+    attachment_ids = _row_list(row, "attachment_ids_json")
     return {
         "task_id": row["task_id"],
         "workspace_id": row["workspace_id"],
@@ -171,6 +169,7 @@ def _row_to_record(row: Any) -> dict[str, Any]:
         "dependencies": dependencies,
         "exclusive_paths": exclusive_paths,
         "allowed_paths": allowed_paths,
+        "attachment_ids": attachment_ids,
         "approval_receipt_id": (
             row["approval_receipt_id"]
             if "approval_receipt_id" in row.keys()
@@ -253,7 +252,7 @@ def create_task(
     owner_role: str = "",
     dependencies: list[str] | None = None,
     exclusive_paths: list[str] | None = None,
-    allowed_paths: list[str] | None = None,
+    allowed_paths: list[str] | None = None, attachment_ids: list[str] | None = None,
     approval_receipt_id: str | None = None, mission_id: str | None = None,
     attempt_budget: int = DEFAULT_ATTEMPT_BUDGET,
 ) -> dict[str, Any]:
@@ -267,6 +266,7 @@ def create_task(
     deps = [str(item).strip() for item in (dependencies or []) if str(item).strip()]
     paths = [str(item).strip() for item in (exclusive_paths or []) if str(item).strip()]
     allowed = [str(item).strip() for item in (allowed_paths or []) if str(item).strip()]
+    attachments = [str(item).strip() for item in (attachment_ids or []) if str(item).strip()]
     if not allowed and owner_role.strip():
         # Record useful role-owned routing hints on otherwise unscoped tasks;
         # enforcement still comes from employee and repository policy.
@@ -286,6 +286,7 @@ def create_task(
         "dependencies_json": json.dumps(deps),
         "exclusive_paths_json": json.dumps(paths),
         "allowed_paths_json": json.dumps(allowed),
+        "attachment_ids_json": json.dumps(attachments),
         "approval_receipt_id": (
             str(approval_receipt_id).strip() if approval_receipt_id else None
         ),

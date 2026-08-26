@@ -32,7 +32,7 @@ describe('buildIdeRunPanelConnectorNotice', () => {
     expect(notice?.actionLabel).toBe('Open connectors');
   });
 
-  it('surfaces legacy connector guidance when optional Axon Local is offline', () => {
+  it('surfaces optional connector guidance when a non-required connector is offline', () => {
     const notice = buildIdeRunPanelConnectorNotice({
       watchConnected: true,
       requiredConnectorsUnavailable: 0,
@@ -40,7 +40,7 @@ describe('buildIdeRunPanelConnectorNotice', () => {
     });
 
     expect(notice?.tone).toBe('neutral');
-    expect(notice?.lines[0]).toContain('Legacy Axon Local');
+    expect(notice?.lines[0]).toContain('Optional connector');
     expect(notice?.actionLabel).toBe('Open connectors');
   });
 

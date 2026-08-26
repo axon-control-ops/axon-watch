@@ -62,8 +62,8 @@ function requiredConnectorActions(terminalVisible: boolean): OperatorQuickGuideA
 
 function legacyConnectorSteps(): string[] {
   return [
-    'Status bar chip LEGACY AXON LOCAL OFFLINE opens Mission Control connectors — optional; Axon-X is healthy.',
-    'Use Reprobe or Open :7734 fallback when you still need classic Axon Local.',
+    'Status bar connector chip opens Mission Control connectors — optional; Axon-X is healthy.',
+    'Use Reprobe after fixing credentials, network, or the downstream service.',
   ];
 }
 
@@ -225,13 +225,13 @@ export function buildOperatorQuickGuide(input: {
   if (!input.hasActiveRun) {
     if (legacyConnectorGlanceVisible) {
       return {
-        title: 'Legacy Axon Local is offline — Axon-X stack is healthy',
+        title: 'Optional connector is offline — Axon-X stack is healthy',
         tone: 'neutral',
         actions: idleActions(input.terminalVisible, true),
         steps: [
           ...legacyConnectorSteps(),
           ...(input.terminalVisible ? [] : terminalReopenSteps()),
-          'Left sidebar → pick axon-watch or axon-local.',
+          'Left sidebar → pick axon-watch or DashPro.',
           'Right dock → Command tab → try git status or health.',
           'Toggle IDE (top-right) when you need files, editor, or terminal.',
         ],
@@ -246,7 +246,7 @@ export function buildOperatorQuickGuide(input: {
       actions: idleActions(input.terminalVisible, false),
       steps: [
         ...(input.terminalVisible ? [] : terminalReopenSteps()),
-        'Left sidebar → pick axon-watch or axon-local.',
+        'Left sidebar → pick axon-watch or DashPro.',
         'Right dock → Command tab → try git status or health.',
         'Footer Commands lists every supported command with a Use button.',
         'Toggle IDE (top-right) when you need files, editor, or terminal.',

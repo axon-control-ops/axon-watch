@@ -27,13 +27,12 @@ from tests.support.live_chat_mutations import (
     live_chat_mutations_allowed,
 )
 
-WORKSPACE_AXON_LOCAL = "workspace_axon_local"
 WORKSPACE_AXON_WATCH = "workspace_axon_watch"
+WORKSPACE_DASHPRO = "workspace_dashpro"
 CONTROL_PLANE_BASE = os.environ.get(
     "AXON_WATCH_CONTROL_PLANE_BASE",
     "http://127.0.0.1:8787",
 )
-EXPECTED_AXON_LOCAL_ROOT = (REPO_ROOT.parent / "axon-local").resolve()
 
 
 def _request(method: str, url: str, body: dict | None = None) -> tuple[int, dict | list | str]:
@@ -79,31 +78,29 @@ class ParityD4MultiProjectTests(unittest.TestCase):
         verify_script = contract_verify_wiring_surface()
         self.assertIn("tests.test_parity_d4_multi_project", verify_script)
 
-    def test_default_bindings_include_watch_local_and_plans_workspaces(self) -> None:
+    def test_default_bindings_include_watch_and_dashpro_workspaces(self) -> None:
         bindings = json.loads(
             (REPO_ROOT / "config" / "workspace-project-bindings.json").read_text(encoding="utf-8")
         )
         bound = bindings["bindings"]
-        self.assertIn(WORKSPACE_AXON_LOCAL, bound)
         self.assertIn(WORKSPACE_AXON_WATCH, bound)
-        self.assertIn("workspace_dashpro", bound)
+        self.assertIn(WORKSPACE_DASHPRO, bound)
 
     def test_workspace_catalog_lists_both_bound_projects(self) -> None:
         response = self.client.get("/api/workspaces")
         self.assertEqual(200, response.status_code)
         items = response.json()["items"]
         by_id = {item["workspace_id"]: item for item in items}
-        self.assertIn(WORKSPACE_AXON_LOCAL, by_id)
         self.assertIn(WORKSPACE_AXON_WATCH, by_id)
-        self.assertIn("workspace_dashpro", by_id)
-        self.assertEqual("project_path", by_id[WORKSPACE_AXON_LOCAL]["connection_kind"])
+        self.assertIn(WORKSPACE_DASHPRO, by_id)
         self.assertEqual("project_path", by_id[WORKSPACE_AXON_WATCH]["connection_kind"])
+        self.assertEqual("project_path", by_id[WORKSPACE_DASHPRO]["connection_kind"])
 
     def test_handoff_from_watch_to_dashpro_returns_project_path_summary(self) -> None:
         response = self.client.post(
             f"/api/workspaces/{WORKSPACE_AXON_WATCH}/handoffs",
             json={
-                "target_workspace_id": "workspace_dashpro",
+                "target_workspace_id": WORKSPACE_DASHPRO,
                 "task": "Child-project handoff proof",
                 "reason": "multi-project contract",
             },
@@ -112,33 +109,11 @@ class ParityD4MultiProjectTests(unittest.TestCase):
         payload = response.json()
         handoff = payload["handoff"]
         self.assertEqual(WORKSPACE_AXON_WATCH, handoff["source_workspace_id"])
-        self.assertEqual("workspace_dashpro", handoff["target_workspace_id"])
+        self.assertEqual(WORKSPACE_DASHPRO, handoff["target_workspace_id"])
         summary = payload["target_workspace_summary"]
-        self.assertEqual("workspace_dashpro", summary["workspace_id"])
+        self.assertEqual(WORKSPACE_DASHPRO, summary["workspace_id"])
         self.assertEqual("project_path", summary["connection_kind"])
         self.assertTrue(str(summary.get("project_root", "")).endswith("dashpro"))
-
-    def test_handoff_from_watch_to_local_returns_project_path_summary(self) -> None:
-        response = self.client.post(
-            f"/api/workspaces/{WORKSPACE_AXON_WATCH}/handoffs",
-            json={
-                "target_workspace_id": WORKSPACE_AXON_LOCAL,
-                "task": "Cross-repo parity handoff",
-                "reason": "P-D4 multi-project proof",
-            },
-        )
-        self.assertEqual(200, response.status_code)
-        payload = response.json()
-        handoff = payload["handoff"]
-        self.assertEqual(WORKSPACE_AXON_WATCH, handoff["source_workspace_id"])
-        self.assertEqual(WORKSPACE_AXON_LOCAL, handoff["target_workspace_id"])
-        self.assertEqual("routed", handoff["status"])
-        self.assertTrue(str(handoff.get("target_task_id") or "").startswith("task-"))
-
-        summary = payload["target_workspace_summary"]
-        self.assertEqual(WORKSPACE_AXON_LOCAL, summary["workspace_id"])
-        self.assertEqual("project_path", summary["connection_kind"])
-        self.assertTrue(str(summary.get("project_root", "")).endswith("axon-local"))
 
     def test_multi_project_bindings_checker_passes(self) -> None:
         result = subprocess.run(
@@ -152,10 +127,6 @@ class ParityD4MultiProjectTests(unittest.TestCase):
 
 
 @unittest.skipUnless(_stack_available(), "dev stack not running on control-plane base URL")
-@unittest.skipUnless(
-    EXPECTED_AXON_LOCAL_ROOT.is_dir(),
-    "sibling axon-local repo not present for default bindings",
-)
 @unittest.skipUnless(live_chat_mutations_allowed(), LIVE_CHAT_MUTATION_SKIP_REASON)
 class ParityD4MultiProjectLiveAcceptance(unittest.TestCase):
     def test_git_status_runs_in_bound_axon_watch_project(self) -> None:
@@ -178,11 +149,11 @@ class ParityD4MultiProjectLiveAcceptance(unittest.TestCase):
             or "executed" in agent_copy
         )
 
-    def test_git_status_runs_in_bound_axon_local_project(self) -> None:
+    def test_git_status_runs_in_bound_dashpro_project(self) -> None:
         status, payload = _request(
             "POST",
             f"{CONTROL_PLANE_BASE}/api/chat/messages",
-            {"workspace_id": WORKSPACE_AXON_LOCAL, "content": "git status"},
+            {"workspace_id": WORKSPACE_DASHPRO, "content": "git status"},
         )
         self.assertEqual(200, status)
         self.assertIsInstance(payload, dict)
@@ -192,12 +163,12 @@ class ParityD4MultiProjectLiveAcceptance(unittest.TestCase):
         agent_copy = agent_messages[-1]["content"].lower()
         self.assertNotIn("unsupported command", agent_copy)
 
-    def test_live_handoff_from_watch_to_local(self) -> None:
+    def test_live_handoff_from_watch_to_dashpro(self) -> None:
         status, payload = _request(
             "POST",
             f"{CONTROL_PLANE_BASE}/api/workspaces/{WORKSPACE_AXON_WATCH}/handoffs",
             {
-                "target_workspace_id": WORKSPACE_AXON_LOCAL,
+                "target_workspace_id": WORKSPACE_DASHPRO,
                 "task": "Live multi-project handoff",
                 "reason": "P-D4 acceptance",
             },
@@ -208,7 +179,7 @@ class ParityD4MultiProjectLiveAcceptance(unittest.TestCase):
         self.assertIsInstance(handoff, dict)
         assert isinstance(handoff, dict)
         self.assertEqual(WORKSPACE_AXON_WATCH, handoff.get("source_workspace_id"))
-        self.assertEqual(WORKSPACE_AXON_LOCAL, handoff.get("target_workspace_id"))
+        self.assertEqual(WORKSPACE_DASHPRO, handoff.get("target_workspace_id"))
 
 
 if __name__ == "__main__":

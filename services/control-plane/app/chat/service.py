@@ -127,33 +127,22 @@ def _compose_lane_b_memory_appendix(
 
 
 def _coerce_attachment_ids(raw: list[str] | None) -> list[str]:
-    if not raw:
-        return []
-    seen: set[str] = set()
-    attachment_ids: list[str] = []
-    for item in raw:
-        clean = str(item or "").strip()
-        if not clean or clean in seen:
-            continue
-        seen.add(clean)
-        attachment_ids.append(clean)
-    return attachment_ids
+    from app.chat.attachment_paths import coerce_attachment_ids
+
+    return coerce_attachment_ids(raw)
 
 
 def _attachment_paths_for_ids(attachment_ids: list[str], workspace_id: str) -> tuple[str, ...]:
-    if not attachment_ids:
-        return ()
-    paths: list[str] = []
-    for attachment_id in attachment_ids:
-        record = attachment_store.get_attachment(attachment_id)
-        if record is None:
-            raise ChatValidationError(f"attachment not found: {attachment_id}")
-        if record["workspace_id"] != workspace_id:
-            raise ChatValidationError("attachment does not belong to workspace")
-        if record["message_id"]:
-            raise ChatValidationError("attachment is already linked to a message")
-        paths.append(str(record["storage_path"]))
-    return tuple(paths)
+    from app.chat.attachment_paths import AttachmentPathError, attachment_paths_for_ids
+
+    try:
+        return attachment_paths_for_ids(
+            attachment_ids=attachment_ids,
+            workspace_id=workspace_id,
+            require_unbound=True,
+        )
+    except AttachmentPathError as exc:
+        raise ChatValidationError(str(exc)) from exc
 
 
 def _bind_message_attachments(

@@ -54,10 +54,10 @@ class LeadBoardPickupTests(unittest.TestCase):
 
     def test_pickup_prefers_oldest_across_workspaces(self) -> None:
         companies = {
-            "workspace_axon_local": CompanyConfig(
-                company_name="axon-local",
+            "workspace_dashpro": CompanyConfig(
+                company_name="DashPro",
                 employees=(
-                    EmployeeConfig(name="Avery", role="lead", enabled=True, primary=True),
+                    EmployeeConfig(name="Dana", role="lead", enabled=True, primary=True),
                 ),
             ),
             "workspace_young_eagles_day_care": CompanyConfig(
@@ -68,15 +68,15 @@ class LeadBoardPickupTests(unittest.TestCase):
             ),
         }
         older_id = "task-older-ye"
-        newer_id = "task-newer-local"
+        newer_id = "task-newer-dashpro"
 
         def _list_tasks(*, workspace_id: str, status=None, owner_role=None, limit=100):
             del status, owner_role, limit
-            if workspace_id == "workspace_axon_local":
+            if workspace_id == "workspace_dashpro":
                 return [
                     {
                         "task_id": newer_id,
-                        "workspace_id": "workspace_axon_local",
+                        "workspace_id": "workspace_dashpro",
                         "updated_at": "2026-01-01T00:00:00Z",
                         "owner_role": "lead",
                         "status": "open",

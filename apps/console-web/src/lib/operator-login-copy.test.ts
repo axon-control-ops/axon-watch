@@ -8,11 +8,11 @@ import {
 } from './operator-login-copy';
 
 describe('operator login copy', () => {
-  it('states the token is a host secret, not an account, and is not stored in the page', () => {
+  it('states operator sign-in uses a username and password without storing the password', () => {
     const body = operatorLoginBodyCopy();
-    expect(body).toMatch(/no Axon-X username/i);
-    expect(body).toMatch(/AXON_WATCH_OPERATOR_TOKEN/);
-    expect(body).toMatch(/does not keep the token/i);
+    expect(body).toMatch(/operator username and password/i);
+    expect(body).toMatch(/does not keep the password/i);
+    expect(body).toMatch(/HttpOnly cookie/i);
   });
 
   it('does not claim localhost skips login when loopback bypass is off', () => {
@@ -21,7 +21,7 @@ describe('operator login copy', () => {
       cookieMaxAgeSeconds: DEFAULT_SESSION_COOKIE_MAX_AGE_SECONDS,
     });
     expect(footer).not.toMatch(/opens without this step/i);
-    expect(footer).toMatch(/requires the operator token even on localhost/i);
+    expect(footer).toMatch(/requires operator sign-in even on localhost/i);
     expect(footer).toMatch(/30 days/);
     expect(footer).toMatch(/localhost and 127\.0\.0\.1/);
     expect(footer).toMatch(/5173/);

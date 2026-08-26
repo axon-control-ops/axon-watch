@@ -53,9 +53,8 @@ const {
         <p class="email-settings-panel__vault-copy">
           Use the <strong>Axon-X Vault</strong> from this console (top bar
           <strong>VAULT</strong> or the button below) — the same vault for monitor keys and mailbox
-          passwords. This is <em>not</em> Thunderbird, cPanel, or the old Axon Signal (:7734)
-          settings vault. Mailboxes you saved only in Signal do not appear here unless you turn on
-          the bridge below.
+          passwords. This is <em>not</em> Thunderbird, cPanel, or the retired Axon Signal settings
+          vault. Mailboxes must be saved here to participate in Axon-X attention.
         </p>
       </div>
       <div class="email-settings-panel__vault-actions">
@@ -75,27 +74,15 @@ const {
       <header class="operator-settings-form__section-header">
         <h2>Ingest mode</h2>
         <p>
-          Axon-X polls IMAP mailboxes with Vault passwords. Optional :7734 bridge; stubs only when
-          no live credentials are available.
+          Axon-X polls IMAP mailboxes with Vault passwords. Stubs are only used when no live
+          credentials are available.
         </p>
       </header>
 
       <div v-if="snapshot" class="email-settings-panel__toggles">
         <label class="email-settings-panel__toggle">
-          <input v-model="snapshot.settings.bridge_enabled" type="checkbox" @change="saveBridgePrefs" />
-          <span>Enable Axon Signal email bridge (:7734)</span>
-        </label>
-        <label class="email-settings-panel__field">
-          <span>Bridge workspace id (axon-local project id)</span>
-          <input
-            v-model="snapshot.settings.bridge_workspace_id"
-            type="text"
-            @change="saveBridgePrefs"
-          />
-        </label>
-        <label class="email-settings-panel__toggle">
           <input v-model="snapshot.settings.stub_enabled" type="checkbox" @change="saveBridgePrefs" />
-          <span>Allow stub triage messages when bridge is offline</span>
+          <span>Allow stub triage messages when live credentials are unavailable</span>
         </label>
       </div>
 
@@ -107,10 +94,6 @@ const {
         <div>
           <dt>Axon-X Vault</dt>
           <dd>{{ auth.locked ? 'Locked' : 'Unlocked' }}</dd>
-        </div>
-        <div>
-          <dt>Signal bridge</dt>
-          <dd>{{ auth.bridge_enabled ? 'Enabled' : 'Off' }}</dd>
         </div>
       </dl>
     </section>

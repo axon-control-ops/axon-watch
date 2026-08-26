@@ -21,8 +21,7 @@ export function axonDebugSessionLog(event: AxonDebugSessionEvent): void {
     message: event.message,
     data: event.data ?? {},
     timestamp: event.timestamp ?? Date.now(),
-    // Prefer axon-local Cursor project root for this debug hunt unless overridden.
-    workspace_id: event.workspaceId ?? 'workspace_axon_local',
+    workspace_id: event.workspaceId ?? 'workspace_axon_watch',
   };
   void fetch(apiUrl('/api/dev/debug-session-log'), {
     method: 'POST',

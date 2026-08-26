@@ -60,6 +60,22 @@ def _runtime_provider_ids() -> dict[str, str]:
         return dict(module.RUNTIME_PROVIDER_IDS)
 
 
+def _allowed_import_keys() -> tuple[str, ...]:
+    """Load sibling import contract even when control-plane owns ``app``."""
+    try:
+        from app.vault.import_contract import ALLOWED_IMPORT_KEYS
+
+        return ALLOWED_IMPORT_KEYS
+    except ModuleNotFoundError:
+        path = Path(__file__).resolve().parent / "import_contract.py"
+        spec = importlib.util.spec_from_file_location("axon_watch_vault_import_contract", path)
+        if spec is None or spec.loader is None:
+            raise ImportError(f"unable to load vault import contract from {path}")
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        return tuple(module.ALLOWED_IMPORT_KEYS)
+
+
 def vault_runtime_env() -> dict[str, str]:
     """Resolve CLI runtime env keys from unlocked vault (internal control-plane use only)."""
     VaultSession = _vault_session()
@@ -80,6 +96,10 @@ def vault_runtime_env() -> dict[str, str]:
         value = vault_resolve_named_secret(env_name) or vault_resolve_provider_key(provider_id)
         if value:
             env[env_name] = value
+    for env_name in _allowed_import_keys():
+        value = vault_resolve_named_secret(env_name)
+        if value:
+            env.setdefault(env_name, value)
     if "CODEX_API_KEY" not in env and env.get("OPENAI_API_KEY"):
         env["CODEX_API_KEY"] = env["OPENAI_API_KEY"]
     azure_key_names = ("AZURE_SPEECH_KEY", "azure_speech_key")

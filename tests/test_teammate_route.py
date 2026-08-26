@@ -9,6 +9,14 @@ from unittest.mock import Mock, patch
 from fastapi.testclient import TestClient
 
 from tests.support.control_plane_db import isolate_control_plane_db
+from tests.support.kairo_conversation_fixtures import (
+    BRIEFING_PATCH,
+    FLEET_PATCH,
+    GRAPH_PATCH,
+    MOCK_BRIEFING,
+    MOCK_FLEET,
+    MOCK_GRAPH,
+)
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 CONTROL_PLANE_ROOT = REPO_ROOT / "services" / "control-plane"
@@ -223,7 +231,10 @@ class TeammateRouteEndpointTests(unittest.TestCase):
         )
         self.assertEqual(400, response.status_code)
 
-    def test_kairo_direct_task_emits_route_employee_action(self) -> None:
+    @patch(GRAPH_PATCH, return_value=MOCK_GRAPH)
+    @patch(FLEET_PATCH, return_value=MOCK_FLEET)
+    @patch(BRIEFING_PATCH, return_value=MOCK_BRIEFING)
+    def test_kairo_direct_task_emits_route_employee_action(self, *_mocks: object) -> None:
         response = self.client.post(
             "/api/kairo/converse",
             json={

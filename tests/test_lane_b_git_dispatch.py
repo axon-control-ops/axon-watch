@@ -343,11 +343,11 @@ class LaneBGitDispatchTests(unittest.TestCase):
             self.assertIsNone(payload.get("continue_prompt"))
 
     def test_consultative_role_thread_refuses_commit_even_with_operator_full_access(self) -> None:
-        """Regression: an operator message that lands in a watcher thread (write_paths=(),
+        """Regression: an operator message that lands in a consultative thread (write_paths=(),
         execution_access="consultative") must not inherit the operator's own Full Access
         toggle and run a real git add/commit/push. Reproduces the 2026-08-07 DashPro
-        incident where a "From the sandbox..." instruction meant for the Lead landed in
-        Cass (watcher)'s thread and still committed + pushed to the remote.
+        incident where a "From the sandbox..." instruction meant for the Lead landed in a
+        read-only thread and still committed + pushed to the remote.
         """
         with tempfile.TemporaryDirectory() as tempdir:
             root = Path(tempdir) / "workspace_alpha"
@@ -360,7 +360,7 @@ class LaneBGitDispatchTests(unittest.TestCase):
                     workspace_id="workspace_alpha",
                     user_prompt='commit these changes with message "Ship notes" and push',
                     execution_access="full",
-                    execution_policy=role_execution_policy("watcher"),
+                    execution_policy=role_execution_policy("observer"),
                 )
                 status_after = git_status("workspace_alpha")
 

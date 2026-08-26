@@ -135,6 +135,20 @@
     var(--shell-agent-dock-width, 380px);
 }
 
+.console-shell--mockup.console-shell--ide-workbench-collapsed[data-layout-mode='ide'] {
+  grid-template-columns:
+    var(--shell-left-sidebar-width, 280px)
+    2.625rem
+    minmax(var(--shell-agent-dock-width, 380px), 1fr);
+}
+
+.console-shell--mockup.console-shell--ide-workbench-collapsed.console-shell--agent-dock-collapsed[data-layout-mode='ide'] {
+  grid-template-columns:
+    minmax(var(--shell-left-sidebar-width, 280px), 1fr)
+    2.625rem
+    var(--shell-agent-dock-width, 36px);
+}
+
 .console-shell--mockup .region {
   border-radius: var(--radius-shell);
   backdrop-filter: blur(var(--glass-blur));
@@ -238,6 +252,52 @@
   gap: var(--shell-gutter);
   border-radius: 0;
   background: transparent;
+}
+
+.console-shell--mockup .region-center-workbench.center-workbench--collapsed {
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: 0.32rem;
+  background: rgba(8, 12, 18, 0.96);
+  border-left: 1px solid rgba(99, 102, 241, 0.2);
+  border-right: 1px solid rgba(99, 102, 241, 0.2);
+}
+
+.center-workbench-reopen {
+  position: relative;
+  display: inline-grid;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  width: 1.7rem;
+  height: 1.7rem;
+  padding: 0;
+  border: 0;
+  border-radius: 3px;
+  background: transparent;
+  color: rgba(148, 163, 184, 0.86);
+  cursor: pointer;
+  transition:
+    background 160ms ease,
+    color 160ms ease,
+    box-shadow 160ms ease;
+}
+
+.center-workbench-reopen__icon {
+  width: 1rem;
+  height: 1rem;
+}
+
+.center-workbench-reopen:hover,
+.center-workbench-reopen:focus-visible {
+  background: rgba(148, 163, 184, 0.14);
+  color: rgba(226, 232, 240, 0.96);
+}
+
+.center-workbench-reopen:focus-visible {
+  outline: 2px solid rgba(0, 242, 255, 0.45);
+  outline-offset: 1px;
 }
 
 .console-shell--mockup .region-status-bar {
@@ -424,4 +484,3 @@ body:has(.console-shell--mockup) {
   --hud-surface-fill: rgba(0, 8, 14, 0.92);
   isolation: isolate;
 }
-

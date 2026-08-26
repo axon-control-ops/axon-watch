@@ -18,10 +18,11 @@ _FENCED_MARKDOWN_RE = re.compile(
     re.IGNORECASE,
 )
 _SECTION_RE = re.compile(
-    r"^##\s*(Assigned specialist|Role mandate|Ownership boundaries|Goal|Context|Delivery mode|In scope|Out of scope|Steps|Acceptance criteria|Validation|Handoff|Constraints|Assumptions|Source request)\s*$",
+    r"^##\s*(Instruction interpretation|Assigned specialist|Role mandate|Ownership boundaries|Goal|Context|Delivery mode|In scope|Out of scope|Steps|Acceptance criteria|Validation|Handoff|Constraints|Assumptions|Source request)\s*$",
     re.IGNORECASE | re.MULTILINE,
 )
 _BASE_REQUIRED_SECTION_KEYS = (
+    "instruction_interpretation",
     "goal",
     "context",
     "delivery_mode",
@@ -97,6 +98,18 @@ def _section_nonempty(body: str, *, key: str) -> bool:
         return False
     if key == "ownership_boundaries":
         return "### Owned by this specialist" in text and "### Requires handoff" in text
+    if key == "instruction_interpretation":
+        required = (
+            "- Task type:",
+            "- Selected role:",
+            "- Delivery:",
+            "- Required in this run:",
+            "- Delegation required:",
+            "- Workspace changes required:",
+            "- Interpretation confidence:",
+            "- Unverified assumptions:",
+        )
+        return all(item in text for item in required)
     if key == "assigned_specialist":
         return "- Role:" in text and "- Workspace:" in text
     if key == "steps":
@@ -191,6 +204,9 @@ def compose_instructions_markdown(
 
     lines = [
         "# Instructions",
+        "",
+        "## Instruction interpretation",
+        merged["instruction_interpretation"],
         "",
     ]
     if context is not None and context.role in SPECIALIST_ROLE_IDS:

@@ -23,7 +23,7 @@ class InboxAssemblyTests(unittest.TestCase):
         records = [
             {"connector_id": "control_plane", "required": True, "status": "ok"},
             {"connector_id": "console_web", "required": True, "status": "ok"},
-            {"connector_id": "axon_local", "required": False, "status": "unavailable"},
+            {"connector_id": "github_api", "required": False, "status": "unavailable"},
         ]
         self.assertTrue(self.connectors_trusted(records))
 

@@ -110,6 +110,3 @@ export async function postWatchCommand(
     'watch command request failed',
   );
 }
-
-/** Explicit fallback URL when the axon_local connector row is shown. */
-export const LEGACY_AXON_LOCAL_FALLBACK_URL = 'http://127.0.0.1:7734';

@@ -6,8 +6,7 @@
   "workspace_hint_map": {
     "DashPro": "workspace_dashpro",
     "Axon": "workspace_axon_watch",
-    "Axon Watch": "workspace_axon_watch",
-    "Axon Local": "workspace_axon_local"
+    "Axon Watch": "workspace_axon_watch"
   },
   "messages": [
     {

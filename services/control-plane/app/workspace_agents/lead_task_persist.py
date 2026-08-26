@@ -14,6 +14,7 @@ def persist_lead_task_plan(
     workspace_id: str,
     plan: LeadTaskPlan,
     supersedes_plan_id: str | None = None,
+    attachment_ids: list[str] | None = None,
 ) -> dict[str, Any]:
     """Create ledger tasks for each plan item; map plan_key deps → task_id deps.
 
@@ -44,6 +45,7 @@ def persist_lead_task_plan(
             dependencies=dep_task_ids,
             exclusive_paths=item.exclusive_paths,
             allowed_paths=item.allowed_paths or item.exclusive_paths,
+            attachment_ids=attachment_ids,
         )
         plan_key_to_task_id[plan_key] = str(created["task_id"])
         tasks.append(

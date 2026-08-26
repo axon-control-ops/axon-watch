@@ -1,7 +1,6 @@
 """TEST-1 live acceptance for real project/workspace bindings on the dev stack.
 
-Requires `./scripts/dev/up.sh` (ports 4173 / 8787 / 8788) and sibling repo
-`../axon-local` when using the default bindings file.
+Requires `./scripts/dev/up.sh` (ports 4173 / 8787 / 8788).
 
 Run:
   python3 -m unittest tests.test_test1_workspace_project_connection_acceptance
@@ -22,14 +21,13 @@ from tests.support.live_chat_mutations import (
     live_chat_mutations_allowed,
 )
 
-WORKSPACE_AXON_LOCAL = "workspace_axon_local"
 WORKSPACE_AXON_WATCH = "workspace_axon_watch"
+WORKSPACE_DASHPRO = "workspace_dashpro"
 CONTROL_PLANE_BASE = os.environ.get(
     "AXON_WATCH_CONTROL_PLANE_BASE",
     "http://127.0.0.1:8787",
 )
 REPO_ROOT = Path(__file__).resolve().parents[1]
-EXPECTED_AXON_LOCAL_ROOT = (REPO_ROOT.parent / "axon-local").resolve()
 
 
 def _request(method: str, url: str, body: dict | None = None) -> tuple[int, dict | list | str]:
@@ -66,10 +64,6 @@ def _workspace_record(workspace_id: str) -> dict | None:
 
 
 @unittest.skipUnless(_stack_available(), "dev stack not running on control-plane base URL")
-@unittest.skipUnless(
-    EXPECTED_AXON_LOCAL_ROOT.is_dir(),
-    "sibling axon-local repo not present for default bindings",
-)
 class Test1WorkspaceProjectConnectionAcceptance(unittest.TestCase):
     def test_bound_workspaces_are_listed_with_project_metadata(self) -> None:
         status, payload = _request("GET", f"{CONTROL_PLANE_BASE}/api/workspaces")
@@ -78,25 +72,24 @@ class Test1WorkspaceProjectConnectionAcceptance(unittest.TestCase):
         self.assertIsInstance(items, list)
 
         by_id = {item["workspace_id"]: item for item in items}
-        self.assertIn(WORKSPACE_AXON_LOCAL, by_id)
         self.assertIn(WORKSPACE_AXON_WATCH, by_id)
-
-        axon_local = by_id[WORKSPACE_AXON_LOCAL]
-        self.assertEqual("project_path", axon_local.get("connection_kind"))
-        self.assertEqual(str(EXPECTED_AXON_LOCAL_ROOT), axon_local.get("project_root"))
-        self.assertEqual("axon-local", axon_local.get("display_name"))
+        self.assertIn(WORKSPACE_DASHPRO, by_id)
 
         axon_watch = by_id[WORKSPACE_AXON_WATCH]
         self.assertEqual("project_path", axon_watch.get("connection_kind"))
         self.assertEqual(str(REPO_ROOT.resolve()), axon_watch.get("project_root"))
 
+        dashpro = by_id[WORKSPACE_DASHPRO]
+        self.assertEqual("project_path", dashpro.get("connection_kind"))
+        self.assertEqual("DashPro", dashpro.get("display_name"))
+
     def test_workspace_show_returns_bound_project_root(self) -> None:
-        record = _workspace_record(WORKSPACE_AXON_LOCAL)
+        record = _workspace_record(WORKSPACE_AXON_WATCH)
         self.assertIsNotNone(record)
         assert record is not None
-        self.assertEqual(WORKSPACE_AXON_LOCAL, record["workspace_id"])
+        self.assertEqual(WORKSPACE_AXON_WATCH, record["workspace_id"])
         self.assertEqual("project_path", record.get("connection_kind"))
-        self.assertEqual(str(EXPECTED_AXON_LOCAL_ROOT), record.get("project_root"))
+        self.assertEqual(str(REPO_ROOT.resolve()), record.get("project_root"))
 
     def test_isolated_workspace_still_reports_isolated_root(self) -> None:
         record = _workspace_record("workspace_alpha")
@@ -106,11 +99,11 @@ class Test1WorkspaceProjectConnectionAcceptance(unittest.TestCase):
         self.assertNotIn("project_root", record)
 
     @unittest.skipUnless(live_chat_mutations_allowed(), LIVE_CHAT_MUTATION_SKIP_REASON)
-    def test_git_status_runs_in_bound_axon_local_project(self) -> None:
+    def test_git_status_runs_in_bound_axon_watch_project(self) -> None:
         status, payload = _request(
             "POST",
             f"{CONTROL_PLANE_BASE}/api/chat/messages",
-            {"workspace_id": WORKSPACE_AXON_LOCAL, "content": "git status"},
+            {"workspace_id": WORKSPACE_AXON_WATCH, "content": "git status"},
         )
         self.assertEqual(200, status)
         self.assertIsInstance(payload, dict)

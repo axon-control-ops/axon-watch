@@ -246,7 +246,7 @@ class ConnectorProbeCacheTests(unittest.TestCase):
                 "connector_id": "cloudflare_tunnel",
                 "status": "degraded",
                 "required": True,
-                "detail": "soft cutover",
+                "detail": "stale ingress",
             },
         ):
             execute_reprobe_connector(connector_id="cloudflare_tunnel")
@@ -325,7 +325,7 @@ class ConnectorProbeCacheTests(unittest.TestCase):
                 "connector_id": "cloudflare_tunnel",
                 "status": "degraded",
                 "required": True,
-                "detail": "soft cutover",
+                "detail": "stale ingress",
             },
         ):
             self.connector_summary.probe_all_connectors()

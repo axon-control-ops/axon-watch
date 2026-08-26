@@ -47,20 +47,20 @@ describe('connector glance view', () => {
     });
   });
 
-  it('builds a legacy glance chip when optional Axon Local is offline', () => {
+  it('does not build a glance chip for optional retired connectors', () => {
     const input = {
       ...baseInput,
       items: [
         {
-          connector_id: 'axon_local',
-          display_name: 'Legacy Axon Local',
+          connector_id: 'github_api',
+          display_name: 'GitHub API',
           required: false,
           status: 'unavailable',
         },
       ],
     };
-    expect(buildConnectorGlanceChip(input)?.label).toContain('OFFLINE');
-    expect(isLegacyConnectorGlanceVisible(input)).toBe(true);
+    expect(buildConnectorGlanceChip(input)).toBeNull();
+    expect(isLegacyConnectorGlanceVisible(input)).toBe(false);
   });
 
   it('keeps required connector alert visible while connectors refresh', () => {
@@ -89,8 +89,8 @@ describe('connector glance view', () => {
         summary: { required_unavailable: 2 },
         items: [
           {
-            connector_id: 'axon_local',
-            display_name: 'Legacy Axon Local',
+            connector_id: 'github_api',
+            display_name: 'GitHub API',
             required: false,
             status: 'unavailable',
           },
@@ -103,15 +103,15 @@ describe('connector glance view', () => {
     });
   });
 
-  it('prefers required-down over legacy glance in the status bar', () => {
+  it('prefers required-down over optional connector notices in the status bar', () => {
     expect(
       buildStatusBarConnectorChip({
         ...baseInput,
         summary: { required_unavailable: 1 },
         items: [
           {
-            connector_id: 'axon_local',
-            display_name: 'Legacy Axon Local',
+            connector_id: 'github_api',
+            display_name: 'GitHub API',
             required: false,
             status: 'unavailable',
           },
@@ -120,14 +120,14 @@ describe('connector glance view', () => {
     ).toBe('connector-required-alert');
   });
 
-  it('hides the legacy glance when required connectors are already alerting', () => {
+  it('hides the optional connector glance when required connectors are already alerting', () => {
     const input = {
       ...baseInput,
       summary: { required_unavailable: 1 },
       items: [
         {
-          connector_id: 'axon_local',
-          display_name: 'Legacy Axon Local',
+          connector_id: 'github_api',
+          display_name: 'GitHub API',
           required: false,
           status: 'unavailable',
         },

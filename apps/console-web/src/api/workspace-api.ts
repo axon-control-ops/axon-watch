@@ -130,6 +130,14 @@ export interface RegisterWorkspaceBindingRequest {
   workspace_id: string;
   project_root: string;
   display_name?: string | null;
+  provision?: boolean;
+  initialize_git?: boolean;
+  create_github_repo?: boolean;
+  github_owner?: string;
+  github_repo?: string | null;
+  private_repo?: boolean;
+  include_ci_workflow?: boolean;
+  enable_delivery?: boolean;
 }
 
 export interface RegisterWorkspaceBindingResponse {
@@ -149,6 +157,14 @@ export async function registerWorkspaceBinding(
         workspace_id: body.workspace_id,
         project_root: body.project_root,
         display_name: body.display_name ?? null,
+        provision: body.provision ?? false,
+        initialize_git: body.initialize_git ?? true,
+        create_github_repo: body.create_github_repo ?? false,
+        github_owner: body.github_owner ?? 'axon-control-ops',
+        github_repo: body.github_repo ?? null,
+        private_repo: body.private_repo ?? true,
+        include_ci_workflow: body.include_ci_workflow ?? false,
+        enable_delivery: body.enable_delivery ?? true,
       }),
     },
     'workspace register failed',

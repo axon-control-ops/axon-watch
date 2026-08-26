@@ -121,11 +121,21 @@ export function createCatalogLoadersSlice(input: CreateCatalogLoadersSliceInput)
     workspaceId: string;
     projectRoot: string;
     displayName?: string;
+    provision?: boolean;
+    createGithubRepo?: boolean;
+    githubOwner?: string;
+    githubRepo?: string;
+    includeCiWorkflow?: boolean;
   }): Promise<WorkspaceRecord> {
     const response = await registerWorkspaceBinding({
       workspace_id: options.workspaceId,
       project_root: options.projectRoot,
       display_name: options.displayName ?? null,
+      provision: options.provision ?? false,
+      create_github_repo: options.createGithubRepo ?? false,
+      github_owner: options.githubOwner ?? 'axon-control-ops',
+      github_repo: options.githubRepo ?? null,
+      include_ci_workflow: options.includeCiWorkflow ?? false,
     });
     await loadWorkspaces({ sync: false });
     return response.workspace;

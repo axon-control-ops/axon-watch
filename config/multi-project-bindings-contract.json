@@ -1,7 +1,6 @@
 {
   "schema_version": 1,
   "required_workspace_ids": [
-    "workspace_axon_local",
     "workspace_axon_watch",
     "workspace_dashpro"
   ],

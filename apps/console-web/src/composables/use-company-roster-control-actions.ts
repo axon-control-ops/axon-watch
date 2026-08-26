@@ -1,7 +1,10 @@
 import { ref, type Ref } from 'vue';
 
 import type { CompanyEmployeeRecord } from '../contracts/canonical';
-import { patchWorkspaceEmployeeEnabled } from '../api/worker-scheduler-api';
+import {
+  clearWorkspaceEmployeeRunCard,
+  patchWorkspaceEmployeeEnabled,
+} from '../api/worker-scheduler-api';
 import { stopRun } from '../api/runs-api';
 import type { TeamMemberQuickAction } from '../features/workspace-agents/company-roster-actions';
 import { resolveEmployeeManualHandoff } from '../features/workspace-agents/employee-manual-handoff';
@@ -63,6 +66,27 @@ export function useCompanyRosterControlActions(input: {
         await input.loadCompany();
       } catch (error) {
         controlError.value = error instanceof Error ? error.message : 'Could not stop job';
+      } finally {
+        controlBusyId.value = null;
+      }
+      return;
+    }
+    if (action.control === 'clear_run_card') {
+      const workspaceId = input.currentWorkspaceId.value?.trim();
+      if (!workspaceId) {
+        return;
+      }
+      controlBusyId.value = employee.employee_id;
+      controlError.value = null;
+      try {
+        await clearWorkspaceEmployeeRunCard(workspaceId, employee.employee_id);
+        await Promise.all([
+          input.loadCompany(),
+          input.shell.loadRuns({ sync: false }),
+        ]);
+      } catch (error) {
+        controlError.value =
+          error instanceof Error ? error.message : 'Could not clear agent run card';
       } finally {
         controlBusyId.value = null;
       }
