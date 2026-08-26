@@ -48,6 +48,17 @@ class WorkspaceDeliveryTests(unittest.TestCase):
         self.assertEqual("young-eagles-day-care", policy.github_repo)
         self.assertEqual(("Desktop Release",), policy.workflow_names)
 
+    def test_loads_moveit_standalone_delivery_policy(self) -> None:
+        policy = get_workspace_delivery_policy("MoveIT")
+        self.assertIsNotNone(policy)
+        assert policy is not None
+        self.assertTrue(policy.enabled)
+        self.assertEqual("main", policy.base_branch)
+        self.assertEqual("axon-control-ops", policy.github_owner)
+        self.assertEqual("move-it", policy.github_repo)
+        self.assertEqual((), policy.workflow_names)
+        self.assertEqual("draft_pr", policy.push_policy)
+
     def test_create_and_update_delivery(self) -> None:
         created = delivery_store.create_delivery(
             workspace_id="workspace_axon_watch",

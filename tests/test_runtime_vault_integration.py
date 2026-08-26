@@ -116,6 +116,37 @@ class RuntimeVaultIntegrationTests(unittest.TestCase):
             merged = vault_keys.runtime_subprocess_env(force_refresh=True)
         self.assertEqual("sbp_from_vault", merged["SUPABASE_ACCESS_TOKEN"])
 
+    def test_watch_runtime_env_exports_workspace_service_keys(self) -> None:
+        import importlib.util
+
+        path = WATCH_ROOT / "app" / "vault" / "runtime_env.py"
+        spec = importlib.util.spec_from_file_location("watch_runtime_env_test", path)
+        assert spec is not None
+        assert spec.loader is not None
+        module = importlib.util.module_from_spec(spec)
+
+        class FakeVaultSession:
+            @staticmethod
+            def is_unlocked() -> bool:
+                return True
+
+        secrets = {
+            "GH_TOKEN": "ghp_from_vault",
+            "SENTRY_AUTH_TOKEN": "sentry_from_vault",
+            "SUPABASE_ACCESS_TOKEN": "sbp_from_vault",
+        }
+
+        module.VaultSession = FakeVaultSession
+        module.vault_resolve_named_secret = lambda name: secrets.get(name, "")
+        module.vault_resolve_provider_key = lambda _provider_id: ""
+        module.vault_resolve_all_provider_keys = lambda: {}
+        spec.loader.exec_module(module)
+
+        env = module.vault_runtime_env()
+        self.assertEqual("ghp_from_vault", env["GH_TOKEN"])
+        self.assertEqual("sentry_from_vault", env["SENTRY_AUTH_TOKEN"])
+        self.assertEqual("sbp_from_vault", env["SUPABASE_ACCESS_TOKEN"])
+
     @patch("app.cli_runtime.auth_probes._run_command")
     def test_codex_prefers_chatgpt_session_over_vault_key(self, mock_run) -> None:
         mock_run.return_value = subprocess.CompletedProcess(
