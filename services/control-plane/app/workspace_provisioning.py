@@ -12,6 +12,7 @@ from typing import Any
 
 from app.workspace_delivery.config import clear_config_cache_for_tests, default_config_path
 from app.workspace_delivery.gh_cli import resolve_gh_cli
+from app.workspace_provisioning_scaffold import scaffold_workspace_files
 from app.workspace_project_bindings import project_root_allowlist
 
 
@@ -127,168 +128,6 @@ def _detail(completed: subprocess.CompletedProcess[str], *, fallback: str) -> st
     if len(compact) <= 500:
         return compact
     return compact[-500:]
-
-
-def _write_if_missing(path: Path, body: str, created: list[Path]) -> str:
-    if path.exists():
-        return "present"
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(body, encoding="utf-8")
-    created.append(path)
-    return "created"
-
-
-def _package_name(repo: str) -> str:
-    name = repo.lower()
-    name = re.sub(r"[^a-z0-9_.-]+", "-", name).strip("._-")
-    return name or "workspace"
-
-
-def _scaffold_files(spec: WorkspaceProvisioningSpec) -> tuple[dict[str, str], list[Path]]:
-    root = spec.project_root
-    workspace_id = _validate_workspace_id(spec.workspace_id)
-    display_name = (spec.display_name or workspace_id).strip() or workspace_id
-    repo = _validate_repo_name(spec.github_repo or _slug_from_workspace_id(workspace_id))
-    package_name = _package_name(repo)
-    created: list[Path] = []
-    statuses: dict[str, str] = {}
-
-    statuses["README.md"] = _write_if_missing(
-        root / "README.md",
-        f"# {display_name}\n\nThis workspace is provisioned for AXON-X worker delivery.\n",
-        created,
-    )
-    statuses[".gitignore"] = _write_if_missing(
-        root / ".gitignore",
-        "\n".join(
-            [
-                ".env",
-                ".env.*",
-                ".axon_terminal_history_*",
-                ".axon_zcompdump*",
-                ".cursor/",
-                "node_modules/",
-                "dist/",
-                "coverage/",
-                "npm-debug.log*",
-                "",
-            ]
-        ),
-        created,
-    )
-    package_json = {
-        "name": package_name,
-        "version": "1.0.0",
-        "private": True,
-        "scripts": {
-            "test": "node --test tests/smoke.test.js",
-        },
-    }
-    statuses["package.json"] = _write_if_missing(
-        root / "package.json",
-        json.dumps(package_json, indent=2, sort_keys=True) + "\n",
-        created,
-    )
-    package_lock = {
-        "name": package_name,
-        "version": "1.0.0",
-        "lockfileVersion": 3,
-        "requires": True,
-        "packages": {
-            "": {
-                "name": package_name,
-                "version": "1.0.0",
-            }
-        },
-    }
-    statuses["package-lock.json"] = _write_if_missing(
-        root / "package-lock.json",
-        json.dumps(package_lock, indent=2, sort_keys=True) + "\n",
-        created,
-    )
-    statuses["tests/smoke.test.js"] = _write_if_missing(
-        root / "tests" / "smoke.test.js",
-        "const test = require('node:test');\n"
-        "const assert = require('node:assert/strict');\n\n"
-        "test('workspace smoke baseline is wired', () => {\n"
-        f"  assert.equal(process.env.npm_package_name, '{package_name}');\n"
-        "});\n",
-        created,
-    )
-    statuses["scripts/guardrails/check-workspace-health.sh"] = _write_if_missing(
-        root / "scripts" / "guardrails" / "check-workspace-health.sh",
-        "#!/usr/bin/env bash\n"
-        "set -euo pipefail\n\n"
-        "root=\"$(cd \"$(dirname \"${BASH_SOURCE[0]}\")/../..\" && pwd)\"\n"
-        "cd \"$root\"\n\n"
-        "test -d .git\n"
-        "test -f project.axon.yaml\n"
-        "test -f package.json\n"
-        "npm test\n",
-        created,
-    )
-    if statuses["scripts/guardrails/check-workspace-health.sh"] == "created":
-        (root / "scripts" / "guardrails" / "check-workspace-health.sh").chmod(0o755)
-    contract = f"""# Auto-scaffolded by AXON-X workspace provisioning.
-version: 1
-project_id: {workspace_id}
-display_name: {display_name.replace('"', "'")}
-stack: node
-certification_level: build
-environment:
-  bootstrap:
-    - npm ci
-commands:
-  test:
-    - npm test
-allowed_paths:
-  - docs/
-  - scripts/
-  - tests/
-  - package.json
-  - package-lock.json
-  - README.md
-  - project.axon.yaml
-forbidden_path_globs:
-  - "**/.env"
-  - "**/.env.local"
-  - "**/secrets/**"
-verifier:
-  required_checks:
-    - test
-"""
-    statuses["project.axon.yaml"] = _write_if_missing(
-        root / "project.axon.yaml",
-        contract,
-        created,
-    )
-    if spec.include_ci_workflow:
-        workflow = f"""name: CI
-
-on:
-  pull_request:
-  push:
-    branches:
-      - main
-
-jobs:
-  test:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: npm
-      - run: npm ci
-      - run: npm test
-"""
-        statuses[".github/workflows/ci.yml"] = _write_if_missing(
-            root / ".github" / "workflows" / "ci.yml",
-            workflow,
-            created,
-        )
-    return statuses, created
 
 
 def _ensure_git_repo(root: Path, created_files: list[Path]) -> dict[str, Any]:
@@ -470,20 +309,12 @@ def provision_workspace_project(spec: WorkspaceProvisioningSpec) -> dict[str, An
     }
     created_files: list[Path] = []
     if spec.scaffold_files:
-        scaffold, created_files = _scaffold_files(
-            WorkspaceProvisioningSpec(
-                workspace_id=workspace_id,
-                project_root=root,
-                display_name=spec.display_name,
-                github_owner=owner,
-                github_repo=repo,
-                create_github_repo=spec.create_github_repo,
-                private_repo=spec.private_repo,
-                initialize_git=spec.initialize_git,
-                scaffold_files=spec.scaffold_files,
-                include_ci_workflow=spec.include_ci_workflow,
-                enable_delivery=spec.enable_delivery,
-            )
+        scaffold, created_files = scaffold_workspace_files(
+            root=root,
+            workspace_id=workspace_id,
+            display_name=spec.display_name,
+            github_repo=repo,
+            include_ci_workflow=spec.include_ci_workflow,
         )
         result["scaffold"] = scaffold
         result["created_files"] = [str(path.relative_to(root)) for path in created_files]
