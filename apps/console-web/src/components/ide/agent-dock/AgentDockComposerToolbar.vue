@@ -201,8 +201,8 @@ function runtimeStatusLine(record: AgentDockComposerRuntimeTarget): string {
         type="button"
         class="agent-dock-composer__tool"
         :class="{ 'is-thinking': instructionsGenerating }"
-        :title="instructionsGenerating ? `Creating ${instructionsSpecialistLabel || 'detailed Markdown instructions'}…` : `Expand this draft into ${instructionsSpecialistLabel || 'detailed Markdown instructions'}`"
-        :aria-label="instructionsGenerating ? `Creating ${instructionsSpecialistLabel || 'detailed Markdown instructions'}` : `Expand draft into ${instructionsSpecialistLabel || 'detailed Markdown instructions'}`"
+        :title="instructionsGenerating ? `Creating ${instructionsSpecialistLabel || 'detailed Markdown instructions'} with ${selectedModelLabel}…` : `Expand this draft into ${instructionsSpecialistLabel || 'detailed Markdown instructions'} using ${selectedModelLabel}`"
+        :aria-label="instructionsGenerating ? `Creating ${instructionsSpecialistLabel || 'detailed Markdown instructions'} with ${selectedModelLabel}` : `Expand draft into ${instructionsSpecialistLabel || 'detailed Markdown instructions'} using ${selectedModelLabel}`"
         :aria-busy="instructionsGenerating ? 'true' : 'false'"
         :disabled="!canConvertInstructions"
         @click="emit('convert-to-instructions')"
@@ -276,6 +276,9 @@ function runtimeStatusLine(record: AgentDockComposerRuntimeTarget): string {
         <span class="agent-dock-composer__tool-chevron" aria-hidden="true">▾</span>
       </button>
       <div v-if="showModelMenu" class="agent-dock-composer__menu agent-dock-composer__menu--runtime">
+        <p class="agent-dock-composer__menu-note agent-dock-composer__menu-note--status">
+          This selection is also used by the Instructions engine. Explicit targets and safety rules remain deterministic.
+        </p>
         <button
           type="button"
           class="agent-dock-composer__menu-section-toggle"
