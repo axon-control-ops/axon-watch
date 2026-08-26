@@ -18,7 +18,7 @@ _EXPLICIT_REPOSITORY_RE = re.compile(
     re.IGNORECASE,
 )
 _EXPLICIT_BRANCH_RE = re.compile(
-    r"\b(?:on|from|target(?:ing)?)\s+(?:the\s+)?"
+    r"(?:\b(?:on|from|target(?:ing)?)\s+|[-—,:]\s*)(?:the\s+)?"
     r"(?P<branch>[A-Za-z0-9._/-]+)\s+branch\b",
     re.IGNORECASE,
 )
