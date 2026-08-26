@@ -1,9 +1,0 @@
-.env
-.env.*
-.axon_terminal_history_*
-.axon_zcompdump*
-.cursor/
-node_modules/
-dist/
-coverage/
-npm-debug.log*

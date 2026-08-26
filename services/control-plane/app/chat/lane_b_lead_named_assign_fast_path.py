@@ -27,6 +27,7 @@ def _create_named_handoff_task(
     specialist_name: str,
     owner_role: str,
     body: str,
+    attachment_ids: list[str] | None = None,
 ) -> dict[str, Any]:
     from app.persistence import task_store
     from app.workspace_agents.operator_start_task import (
@@ -46,6 +47,7 @@ def _create_named_handoff_task(
         risk="normal",
         owner_role=owner_role,
         attempt_budget=2,
+        attachment_ids=attachment_ids,
     )
     try:
         started = operator_start_task(str(task["task_id"]))
@@ -66,6 +68,7 @@ def maybe_post_lead_named_assign_message(
     save_message: Callable[[dict[str, Any]], dict[str, Any]],
     new_message_id: Callable[[str], str],
     bind_attachments: Callable[[str], list[dict[str, object]]],
+    attachment_ids: list[str] | None = None,
 ) -> dict[str, object] | None:
     """When Lead is told to assign a named teammate, ack-and-stop (no Lane B essay)."""
     role = str(employee_role or "").strip().lower()
@@ -116,6 +119,7 @@ def maybe_post_lead_named_assign_message(
             specialist_name=named.name,
             owner_role=normalize_teammate_role(named.role),
             body=action_body,
+            attachment_ids=attachment_ids,
         )
         task = handoff_result.get("task") or {}
         run = handoff_result.get("run") or {}

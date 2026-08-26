@@ -35,7 +35,7 @@ from app.workspace_agents.worker_prompt_scope import (
     OUT_OF_SCOPE_GUARD_MARKER,
     task_scope_clause,
 )
-
+from app.workspace_agents.worker_prompt_attachments import format_task_attachment_clause
 _OUT_OF_SCOPE_GUARD_RE = re.compile(r"OUT_OF_SCOPE_GUARD:\s*(.+)", re.IGNORECASE)
 
 
@@ -257,14 +257,11 @@ def _current_task_packet(
     acceptance: str,
     allowed_paths: list[str],
     exclusive_paths: list[str] | None = None,
+    attachment_paths: list[str] | None = None,
 ) -> str:
-    # exclusive_paths (literal paths named in the goal, never backfilled) is the
-    # honest, task-specific file list for display. Do NOT fall back to
-    # allowed_paths here — that's the full role write-scope enforcement
-    # ceiling, backfilled to a static per-role default when the goal names no
-    # path, and showing it would present a generic template as task-specific.
     display_paths = exclusive_paths or []
     expected = ", ".join(f"`{path}`" for path in display_paths[:12]) or "role/task scoped files"
+    attachment_clause = format_task_attachment_clause(attachment_paths)
     return (
         " Current task packet (authoritative; ignore stale thread context): "
         f"workspace=`{workspace_id.strip() or 'unknown'}`; "
@@ -273,6 +270,7 @@ def _current_task_packet(
         f"objective=`{_truncate(goal, max_len=260)}`; "
         f"acceptance=`{_truncate(acceptance or 'Use receipts to prove the goal is met.', max_len=260)}`; "
         f"expected_files={expected}. "
+        f"{attachment_clause}"
         "If any prior conversation, previous run, tab title, or last-failure hint conflicts "
         "with this packet, this packet wins."
     )
@@ -315,6 +313,7 @@ def build_continuous_worker_prompt(
     employee: EmployeeConfig,
     task: dict[str, Any] | None = None,
     execution_policy: Any | None = None,
+    attachment_paths: tuple[str, ...] = (),
 ) -> str:
     role = str(employee.role or "").strip().lower() or "workspace_agent"
     owns = str(employee.owns or "").strip() or _DEFAULT_OWNS.get(role, "assigned workspace work")
@@ -472,6 +471,7 @@ def build_continuous_worker_prompt(
         acceptance=acceptance,
         allowed_paths=allowed_paths,
         exclusive_paths=exclusive_paths,
+        attachment_paths=list(attachment_paths),
     )
     write_scope_clause = _effective_write_scope_clause(execution_policy)
     roster_block = build_team_roster_context(workspace_id, viewer_role=role)

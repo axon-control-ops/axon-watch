@@ -524,9 +524,9 @@ def materialize_lead_fan_out(
     supersedes_plan_id: str | None = None,
     use_model: bool = True,
     target_role: str | None = None,
+    attachment_ids: list[str] | None = None,
 ) -> dict[str, Any]:
     """Build plan, persist tasks, and open leased runs for dependency-ready items.
-
     Does **not** start Lane B dispatch or enable the continuous scheduler.
     Ready runs stay **queued** (not fake-executing) so the operator sees assignment
     in specialist threads and the scheduler can dispatch without slot deadlock.
@@ -561,8 +561,7 @@ def materialize_lead_fan_out(
         return _materialize_existing_task_ids(
             workspace_id=workspace,
             goal=cleaned_goal,
-            task_ids=explicit_task_ids,
-            create_runs=create_runs,
+            task_ids=explicit_task_ids, create_runs=create_runs,
             supersedes_plan_id=supersedes_plan_id,
         )
 
@@ -614,6 +613,7 @@ def materialize_lead_fan_out(
         workspace_id=workspace,
         plan=plan,
         supersedes_plan_id=supersedes_plan_id,
+        attachment_ids=attachment_ids,
     )
     plan_id = str(persisted["plan_id"])
     tasks_by_id = {str(row["task_id"]): row for row in persisted["tasks"]}

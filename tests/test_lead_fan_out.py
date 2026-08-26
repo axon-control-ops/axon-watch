@@ -96,6 +96,21 @@ class LeadFanOutMaterializeTests(unittest.TestCase):
             assert task is not None
             self.assertEqual("leased", task["status"])
 
+    def test_fan_out_tasks_carry_operator_attachment_ids(self) -> None:
+        from app.workspace_agents.lead_fan_out import materialize_lead_fan_out
+
+        result = materialize_lead_fan_out(
+            workspace_id="workspace_axon_watch",
+            goal="Ask all teammates to inspect the two attached screenshots and improve the site",
+            mode="fan_out",
+            create_runs=False,
+            attachment_ids=["attachment_one", "attachment_two"],
+        )
+
+        self.assertGreaterEqual(len(result["tasks"]), 1)
+        for task in result["tasks"]:
+            self.assertEqual(["attachment_one", "attachment_two"], task["attachment_ids"])
+
     def test_path_overlap_defers_dependent_runs(self) -> None:
         from app.workspace_agents.lead_fan_out import materialize_lead_fan_out
 

@@ -24,3 +24,4 @@ config/email-operator-settings.json
 apps/console-desktop/src-tauri/binaries/
 apps/console-desktop/src-tauri/resources/console-web-dist/
 scripts/.cache/
+/move-it/
