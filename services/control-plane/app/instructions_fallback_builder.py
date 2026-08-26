@@ -24,6 +24,16 @@ def _summarize_goal(source: str) -> str:
 
 def _infer_task_type(source: str, context: SpecialistContext) -> str:
     lowered = source.lower()
+    implementation = any(
+        token in lowered for token in ("fix", "make", "build", "implement", "upgrade", "patch", "repair")
+    )
+    investigation = any(
+        token in lowered for token in ("review", "audit", "inspect", "diagnose", "find all bugs")
+    )
+    if implementation and investigation:
+        return "Audit / Implementation / Remediation"
+    if implementation:
+        return "Implementation / Remediation"
     if context.role == "lead" and any(
         token in lowered
         for token in ("report", "monitor", "coordinate", "team", "agents", "handoff", "orchestr")
@@ -33,9 +43,7 @@ def _infer_task_type(source: str, context: SpecialistContext) -> str:
         token in lowered for token in ("monitor", "watch", "verify", "check", "evidence")
     ):
         return "Monitoring / Validation"
-    if any(token in lowered for token in ("fix", "make", "build", "implement", "upgrade", "patch")):
-        return "Implementation / Remediation"
-    if any(token in lowered for token in ("review", "audit", "inspect")):
+    if investigation:
         return "Review / Investigation"
     if "report" in lowered:
         return "Reporting"
@@ -166,7 +174,7 @@ def _infer_steps(source: str, context: SpecialistContext) -> list[str]:
     steps.extend(
         [
             "When Axon-X or the product fleet is part of the request, run the work through that workflow and record fixes or upgrades discovered.",
-            "Verify the requested outcomes on web and mobile where applicable; note any feature that requires a native rebuild instead of OTA.",
+            "Discover and run the repository-defined validation for each changed area; do not inject web, mobile, native-build, or OTA checks unless the target repository actually uses them.",
             "Create handoffs for any work outside the selected specialist's authority.",
             "Summarize implemented changes, validation evidence, handoffs, remaining gaps, and the next operator action without claiming git/release work that was not requested.",
         ]
