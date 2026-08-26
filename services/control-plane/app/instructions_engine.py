@@ -2,11 +2,55 @@
 
 from __future__ import annotations
 
+import re
+
 from app.specialist_roles import (
     GENERAL_ROLE_ID,
     SpecialistContext,
     specialist_context_to_prompt_block,
 )
+
+
+_EXPLICIT_REPOSITORY_RE = re.compile(
+    r"\b(?:in|within|from|target(?:ing)?)\s+(?:the\s+)?"
+    r"(?P<repository>[A-Za-z0-9_.-]+(?:/[A-Za-z0-9_.-]+)?)\s+"
+    r"(?:git(?:hub\s+)?repo(?:sitory)?|repo(?:sitory)?)\b",
+    re.IGNORECASE,
+)
+_EXPLICIT_BRANCH_RE = re.compile(
+    r"\b(?:on|from|target(?:ing)?)\s+(?:the\s+)?"
+    r"(?P<branch>[A-Za-z0-9._/-]+)\s+branch\b",
+    re.IGNORECASE,
+)
+
+
+def extract_explicit_instruction_targets(source: str) -> dict[str, str]:
+    """Extract operator-named targets that outrank ambient workspace context."""
+    text = str(source or "").strip()
+    targets: dict[str, str] = {}
+    repository = _EXPLICIT_REPOSITORY_RE.search(text)
+    branch = _EXPLICIT_BRANCH_RE.search(text)
+    if repository:
+        targets["repository"] = repository.group("repository")
+    if branch:
+        targets["branch"] = branch.group("branch")
+    return targets
+
+
+def _explicit_target_prompt_block(source: str) -> str:
+    targets = extract_explicit_instruction_targets(source)
+    if not targets:
+        return (
+            "Explicit target facts:\n"
+            "- None detected. Active workspace context may be used, but must be described as inferred.\n"
+        )
+    lines = ["Explicit target facts (binding; higher priority than active workspace context):"]
+    lines.extend(f"- {key.title()}: {value}" for key, value in targets.items())
+    lines.append(
+        "- If an explicit target conflicts with the active workspace, preserve the explicit target "
+        "and require a workspace switch or clarification before dispatch; never silently substitute it."
+    )
+    return "\n".join(lines) + "\n"
 
 
 def _role_prompt_clause(context: SpecialistContext | None) -> str:
@@ -61,6 +105,11 @@ def build_instructions_system_prompt(context: SpecialistContext | None = None) -
         "Write for the selected specialist only. Respect that specialist's ownership "
         "boundaries, generate role-specific steps, require role-specific evidence, and "
         "create handoffs for unauthorized work instead of assigning it to the wrong role. "
+        "Explicit operator-named repositories, branches, workspaces, delivery requirements, and "
+        "implementation outcomes outrank the active workspace, selected tab, recent runs, watcher "
+        "signals, and historical receipts. If explicit and ambient context conflict, preserve the "
+        "explicit target and require a workspace switch or clarification before dispatch; never "
+        "silently substitute the active workspace. "
         "Return markdown only — no preamble, no :::thinking fences, no commentary. "
         "The reply MUST begin with `# Instructions`. "
         f"{specialist_sections}"
@@ -83,6 +132,10 @@ def build_instructions_system_prompt(context: SpecialistContext | None = None) -
         "Instruction interpretation must include exactly these bullet labels: Task type, "
         "Selected role, Delivery, Required in this run, Delegation required, Workspace "
         "changes required, Interpretation confidence, and Unverified assumptions. "
+        "Classify by the requested outcome: audit plus fix or implement is implementation/remediation, "
+        "not monitoring or validation. Monitoring signals may inform evidence but cannot redefine the "
+        "task. Never claim there are no unverified assumptions when a target, path, platform, or "
+        "validation detail was inferred. "
         "Context explains why the task exists, including any observed failure pattern, without "
         "claiming that files were already changed. "
         "Delivery mode must say whether the work should be a scoped workspace-delivery task, "
@@ -127,6 +180,7 @@ _INSTRUCTION_ENGINE_USER_PROMPT = """Expand the source request below into comple
 Specialist contract:
 {specialist_context}
 
+{explicit_targets}
 Required output shape:
 # Instructions
 
@@ -211,6 +265,7 @@ def build_instruction_engine_user_prompt(
     return (
         _INSTRUCTION_ENGINE_USER_PROMPT.format(
             specialist_context=specialist_context_to_prompt_block(context),
+            explicit_targets=_explicit_target_prompt_block(source),
         )
         + source.strip()
         + "\n"

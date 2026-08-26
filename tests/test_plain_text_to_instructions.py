@@ -8,6 +8,10 @@ from unittest.mock import patch
 CONTROL_PLANE_ROOT = Path(__file__).resolve().parents[1] / "services" / "control-plane"
 sys.path.insert(0, str(CONTROL_PLANE_ROOT))
 
+from app.instructions_engine import (  # noqa: E402
+    build_instruction_engine_user_prompt,
+    extract_explicit_instruction_targets,
+)
 from app.plain_text_to_instructions import (  # noqa: E402
     build_instructions_markdown_from_source,
     compose_instructions_markdown,
@@ -42,6 +46,36 @@ def specialist_context(role: str, name: str | None = None) -> SpecialistContext:
 
 
 class PlainTextToInstructionsTests(unittest.TestCase):
+    def test_explicit_repository_and_branch_are_binding_prompt_facts(self) -> None:
+        source = (
+            "in axon-watch repo - on the dev branch - audit the code and "
+            "find all bugs, then implement improvements"
+        )
+        self.assertEqual(
+            extract_explicit_instruction_targets(source),
+            {"repository": "axon-watch", "branch": "dev"},
+        )
+        prompt = build_instruction_engine_user_prompt(
+            source,
+            specialist_context("backend", "Marco"),
+        )
+        self.assertIn("- Repository: axon-watch", prompt)
+        self.assertIn("- Branch: dev", prompt)
+        self.assertIn("higher priority than active workspace context", prompt)
+        self.assertIn("never silently substitute it", prompt)
+
+    def test_audit_plus_implementation_is_not_monitoring_fallback(self) -> None:
+        source = (
+            "in axon-watch repo - the dev branch - audit the code and find all "
+            "bugs/errors/flaws/missing-logic and suggest and implement improvements"
+        )
+        built = build_instructions_markdown_from_source(
+            source,
+            specialist_context("lead", "Mira"),
+        )
+        self.assertIn("- Task type: Audit / Implementation / Remediation", built)
+        self.assertNotIn("- Task type: Monitoring / Validation", built)
+
     def test_negated_commit_mention_is_not_git_intent(self) -> None:
         prompt = (
             "Look at what Dashpro workspace said about the CI work and plan how the "
