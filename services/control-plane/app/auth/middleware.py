@@ -26,23 +26,28 @@ _SENSITIVE_GET_PREFIXES = (
     "/api/vault/export",
     "/api/vault/provider-keys",
 )
-_EXEMPT_PREFIXES = (
+_EXEMPT_EXACT_PATHS = (
     "/api/health",
-    # Browser login/logout must remain reachable before a session exists.
+    # Browser session status/login/logout are self-authenticating: login still
+    # verifies operator credentials and logout only clears the caller's cookie.
     "/api/auth/session",
     "/api/desktop/bootstrap",
     "/api/desktop/bootstrap-code",
     "/api/desktop/status",
-    # Gate 9: GitHub signs with X-Hub-Signature-256 (no operator bearer).
-    "/api/webhooks/github",
     "/docs",
     "/openapi.json",
     "/redoc",
 )
+_EXEMPT_PREFIXES = (
+    # Gate 9: GitHub signs with X-Hub-Signature-256 (no operator bearer).
+    "/api/webhooks/github",
+)
 
 
 def _is_exempt(path: str) -> bool:
-    return any(path == prefix or path.startswith(prefix + "/") for prefix in _EXEMPT_PREFIXES)
+    return path in _EXEMPT_EXACT_PATHS or any(
+        path == prefix or path.startswith(prefix + "/") for prefix in _EXEMPT_PREFIXES
+    )
 
 
 def _is_sensitive_get(path: str) -> bool:

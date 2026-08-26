@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import ast
 import re
 import sys
 from pathlib import Path
@@ -37,13 +38,13 @@ REQUIRED_CONSTITUTION_ENDPOINTS = (
 
 MUTATING_METHODS = {"post", "put", "patch", "delete"}
 ROUTE_DECORATOR_RE = re.compile(r"@router\.(get|post|put|patch|delete)\(\s*['\"]([^'\"]+)['\"]")
-EXEMPT_PREFIX_RE = re.compile(r"_EXEMPT_PREFIXES\s*=\s*\((?P<body>.*?)\)", re.DOTALL)
-STRING_RE = re.compile(r"['\"]([^'\"]+)['\"]")
-
+EXEMPT_EXACT_NAME = "_EXEMPT_EXACT_PATHS"
+EXEMPT_PREFIX_NAME = "_EXEMPT_PREFIXES"
 # These mutating routes are intentionally reachable before the normal operator
 # bearer/session check. New entries here should be rare and accompanied by
 # source-specific auth such as signed webhooks.
 ALLOWED_MUTATING_EXEMPTIONS = {
+    "/api/auth/session",
     "/api/desktop/bootstrap",
     "/api/desktop/bootstrap-code",
     "/api/webhooks/github/workflow-run",
@@ -64,16 +65,28 @@ def _route_paths() -> list[tuple[str, str, Path]]:
     return rows
 
 
-def _exempt_prefixes() -> list[str]:
+def _exempt_paths(name: str) -> list[str]:
     middleware = REPO_ROOT / "services" / "control-plane" / "app" / "auth" / "middleware.py"
     text = _read(middleware)
-    match = EXEMPT_PREFIX_RE.search(text)
-    if not match:
-        return []
-    return [item for item in STRING_RE.findall(match.group("body"))]
+    tree = ast.parse(text)
+    for node in tree.body:
+        if not isinstance(node, ast.Assign):
+            continue
+        if not any(isinstance(target, ast.Name) and target.id == name for target in node.targets):
+            continue
+        if not isinstance(node.value, (ast.Tuple, ast.List)):
+            return []
+        return [
+            item.value
+            for item in node.value.elts
+            if isinstance(item, ast.Constant) and isinstance(item.value, str)
+        ]
+    return []
 
 
-def _is_exempt(path: str, prefixes: list[str]) -> bool:
+def _is_exempt(path: str, exact_paths: list[str], prefixes: list[str]) -> bool:
+    if path in exact_paths:
+        return True
     return any(path == prefix or path.startswith(prefix + "/") for prefix in prefixes)
 
 
@@ -197,9 +210,10 @@ def _check_mutating_route_auth() -> list[CheckResult]:
     )
     routes = _route_paths()
     mutating = [(method, path, file) for method, path, file in routes if method in MUTATING_METHODS]
-    exempt_prefixes = _exempt_prefixes()
+    exact_exemptions = _exempt_paths(EXEMPT_EXACT_NAME)
+    exempt_prefixes = _exempt_paths(EXEMPT_PREFIX_NAME)
     exempt_mutating = [
-        path for _method, path, _file in mutating if _is_exempt(path, exempt_prefixes)
+        path for _method, path, _file in mutating if _is_exempt(path, exact_exemptions, exempt_prefixes)
     ]
     unexpected_exempt = sorted(
         path for path in exempt_mutating if path not in ALLOWED_MUTATING_EXEMPTIONS
