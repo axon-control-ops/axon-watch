@@ -3,6 +3,7 @@ import type { Ref } from 'vue';
 import {
   type IdeActivityView,
   persistAgentDockCollapsed,
+  persistIdeWorkbenchCollapsed,
   persistIdeExplorerCollapsed,
 } from '../../../lib/ide-layout-prefs';
 
@@ -15,6 +16,7 @@ interface CreateIdeWorkbenchChromeSliceInput {
   teamRosterRevealToken: Ref<number>;
   ideActivityView: Ref<IdeActivityView>;
   ideExplorerCollapsed: Ref<boolean>;
+  ideWorkbenchCollapsed: Ref<boolean>;
   agentDockCollapsed: Ref<boolean>;
   ideAttentionPanelOpen: Ref<boolean>;
   ideBriefingPanelOpen: Ref<boolean>;
@@ -67,6 +69,15 @@ export function createIdeWorkbenchChromeSlice(input: CreateIdeWorkbenchChromeSli
     }
   }
 
+  function toggleIdeWorkbench(): void {
+    input.ideWorkbenchCollapsed.value = !input.ideWorkbenchCollapsed.value;
+    persistIdeWorkbenchCollapsed(input.ideWorkbenchCollapsed.value);
+    if (input.ideWorkbenchCollapsed.value && input.agentDockCollapsed.value) {
+      input.agentDockCollapsed.value = false;
+      persistAgentDockCollapsed(false);
+    }
+  }
+
   function toggleAgentDock(): void {
     input.agentDockCollapsed.value = !input.agentDockCollapsed.value;
     persistAgentDockCollapsed(input.agentDockCollapsed.value);
@@ -92,6 +103,7 @@ export function createIdeWorkbenchChromeSlice(input: CreateIdeWorkbenchChromeSli
     focusIdeSidebarView,
     setIdeActivityView,
     toggleIdeExplorer,
+    toggleIdeWorkbench,
     toggleAgentDock,
     revealTeamRosterForActiveEmployee,
     requestIdeExplorerInlineCreate,

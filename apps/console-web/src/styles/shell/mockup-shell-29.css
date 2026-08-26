@@ -37,6 +37,20 @@
       var(--shell-agent-dock-width, 300px);
   }
 
+  .console-shell--mockup.console-shell--ide-workbench-collapsed[data-layout-mode='ide'] {
+    grid-template-columns:
+      var(--shell-left-sidebar-width, 220px)
+      2.625rem
+      minmax(var(--shell-agent-dock-width, 300px), 1fr);
+  }
+
+  .console-shell--mockup.console-shell--ide-workbench-collapsed.console-shell--agent-dock-collapsed[data-layout-mode='ide'] {
+    grid-template-columns:
+      minmax(var(--shell-left-sidebar-width, 220px), 1fr)
+      2.625rem
+      var(--shell-agent-dock-width, 36px);
+  }
+
   .dock-hero-panel__toggle-button {
     padding: 0.28rem 0.55rem;
     font-size: 0.58rem;
@@ -72,6 +86,20 @@
       var(--shell-left-sidebar-width, 188px)
       minmax(0, 1fr)
       var(--shell-agent-dock-width, 248px);
+  }
+
+  .console-shell--mockup.console-shell--ide-workbench-collapsed[data-layout-mode='ide'] {
+    grid-template-columns:
+      var(--shell-left-sidebar-width, 188px)
+      2.625rem
+      minmax(var(--shell-agent-dock-width, 248px), 1fr);
+  }
+
+  .console-shell--mockup.console-shell--ide-workbench-collapsed.console-shell--agent-dock-collapsed[data-layout-mode='ide'] {
+    grid-template-columns:
+      minmax(var(--shell-left-sidebar-width, 188px), 1fr)
+      2.625rem
+      var(--shell-agent-dock-width, 36px);
   }
 
   .topbar-mockup__subtitle,
@@ -150,4 +178,3 @@
     animation: none;
   }
 }
-

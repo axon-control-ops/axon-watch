@@ -297,6 +297,7 @@ import {
   persistLayoutMode,
   readStoredAgentDockCollapsed,
   readStoredIdeExplorerCollapsed,
+  readStoredIdeWorkbenchCollapsed,
   readStoredLayoutMode,
 } from '../lib/ide-layout-prefs';
 import {
@@ -543,10 +544,15 @@ export const useShellStore = defineStore('shell', () => {
   const leftSidebarModeTouched = ref(Boolean(readStoredLeftSidebarMode()));
   const ideActivityView = ref(DEFAULT_IDE_ACTIVITY_VIEW);
   const ideExplorerCollapsed = ref(readStoredIdeExplorerCollapsed());
+  const ideWorkbenchCollapsed = ref(readStoredIdeWorkbenchCollapsed());
   const ideAttentionPanelOpen = ref(false);
   const ideBriefingPanelOpen = ref(false);
   const ideVaxonDockPinned = ref(false);
   const agentDockCollapsed = ref(readStoredAgentDockCollapsed());
+  if (ideWorkbenchCollapsed.value && agentDockCollapsed.value) {
+    agentDockCollapsed.value = false;
+    persistAgentDockCollapsed(false);
+  }
   const ideTerminalRevealToken = ref(0);
   const ideTerminalProblemsRevealToken = ref(0);
   const ideTerminalToggleToken = ref(0);
@@ -2703,6 +2709,7 @@ export const useShellStore = defineStore('shell', () => {
     focusIdeSidebarView,
     setIdeActivityView,
     toggleIdeExplorer,
+    toggleIdeWorkbench,
     toggleAgentDock,
     revealTeamRosterForActiveEmployee,
     requestIdeExplorerInlineCreate,
@@ -2715,6 +2722,7 @@ export const useShellStore = defineStore('shell', () => {
     teamRosterRevealToken,
     ideActivityView,
     ideExplorerCollapsed,
+    ideWorkbenchCollapsed,
     agentDockCollapsed,
     ideAttentionPanelOpen,
     ideBriefingPanelOpen,
@@ -4029,6 +4037,7 @@ export const useShellStore = defineStore('shell', () => {
     agentDockCollapsed,
     ideActivityView,
     ideExplorerCollapsed,
+    ideWorkbenchCollapsed,
     ideAttentionPanelOpen,
     closeIdeAttentionPanel,
     toggleIdeAttentionPanel,
@@ -4184,6 +4193,7 @@ export const useShellStore = defineStore('shell', () => {
     toggleCursorPickerVisibleModel,
     toggleAgentDock,
     toggleIdeExplorer,
+    toggleIdeWorkbench,
     signalClearError,
     signalClearState,
     signalViews,

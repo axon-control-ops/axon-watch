@@ -85,6 +85,7 @@ function createChromeSlice(
     teamRosterRevealToken: ref(0),
     ideActivityView: ref('explorer'),
     ideExplorerCollapsed: ref(false),
+    ideWorkbenchCollapsed: ref(false),
     agentDockCollapsed: ref(false),
     ideAttentionPanelOpen: ref(false),
     ideBriefingPanelOpen: ref(false),
@@ -138,6 +139,7 @@ describe('createIdeWorkbenchChromeSlice sidebar focus', () => {
   function createSlice(overrides: Partial<Parameters<typeof createIdeWorkbenchChromeSlice>[0]> = {}) {
     return createChromeSlice({
       ideExplorerCollapsed: ref(true),
+      ideWorkbenchCollapsed: ref(false),
       agentDockCollapsed: ref(true),
       ...overrides,
     });
@@ -235,5 +237,23 @@ describe('createIdeWorkbenchChromeSlice sidebar focus', () => {
     expect(ideExplorerCollapsed.value).toBe(false);
     expect(ideExplorerInlineCreateToken.value).toBe(1);
     expect(ideExplorerInlineCreateKind.value).toBe('file');
+  });
+
+  it('toggles and persists the center IDE workbench collapsed state', () => {
+    const ideWorkbenchCollapsed = ref(false);
+    const agentDockCollapsed = ref(true);
+    const slice = createSlice({ ideWorkbenchCollapsed, agentDockCollapsed });
+
+    slice.toggleIdeWorkbench();
+
+    expect(ideWorkbenchCollapsed.value).toBe(true);
+    expect(agentDockCollapsed.value).toBe(false);
+    expect(localStorage.getItem('axon-x-ide-workbench-collapsed-v1')).toBe('1');
+    expect(localStorage.getItem('axon-x-agent-dock-collapsed-v2')).toBe('0');
+
+    slice.toggleIdeWorkbench();
+
+    expect(ideWorkbenchCollapsed.value).toBe(false);
+    expect(localStorage.getItem('axon-x-ide-workbench-collapsed-v1')).toBe('0');
   });
 });

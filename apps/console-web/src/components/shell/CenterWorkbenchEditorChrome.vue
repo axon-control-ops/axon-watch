@@ -25,6 +25,7 @@ const emit = defineEmits<{
   closeDocument: [documentId: string];
   createFile: [];
   renameFile: [];
+  collapseWorkbench: [];
   breadcrumbClick: [segment: EditorBreadcrumbSegment];
 }>();
 
@@ -139,6 +140,15 @@ function handleEditorTabsWheel(event: WheelEvent): void {
         </button>
         <button type="button" class="editor-tabbar__tool-button" title="Split editor" aria-label="Split editor">
           <WorkbenchIcon name="split" class="editor-tabbar__tool" />
+        </button>
+        <button
+          type="button"
+          class="editor-tabbar__tool-button"
+          title="Minimize IDE"
+          aria-label="Minimize IDE"
+          @click="emit('collapseWorkbench')"
+        >
+          <WorkbenchIcon name="panel-collapse" class="editor-tabbar__tool" />
         </button>
         <button
           type="button"

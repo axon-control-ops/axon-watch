@@ -9,6 +9,8 @@ export type OperatorSessionStatus = {
   auth_mode?: string;
   loopback_bypass?: boolean;
   cookie_max_age_seconds?: number;
+  password_enabled?: boolean;
+  token_enabled?: boolean;
 };
 
 export function fetchOperatorSession(): Promise<OperatorSessionStatus> {
@@ -19,14 +21,20 @@ export function fetchOperatorSession(): Promise<OperatorSessionStatus> {
   );
 }
 
-export async function loginOperatorSession(operatorToken: string): Promise<OperatorSessionStatus> {
+export async function loginOperatorSession(input: {
+  username?: string;
+  password: string;
+}): Promise<OperatorSessionStatus> {
   await fetchJson<OperatorSessionStatus>(
     '/api/auth/session',
     {
       method: 'POST',
       credentials: 'include',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ operator_token: operatorToken }),
+      body: JSON.stringify({
+        operator_username: input.username,
+        operator_password: input.password,
+      }),
     },
     'Operator sign-in failed',
   );

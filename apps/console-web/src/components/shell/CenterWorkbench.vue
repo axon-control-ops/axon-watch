@@ -71,6 +71,7 @@ const shell = useShellStore();
 const { activePlanId, buildingPlan, buildPlanError, buildActivePlan } = useEditorPlanBuild(shell);
 const hideOperatorEditor = computed(() => shell.layoutMode === 'operator');
 const isIdeMode = computed(() => shell.layoutMode === 'ide');
+const ideWorkbenchMinimized = computed(() => isIdeMode.value && shell.ideWorkbenchCollapsed);
 const showGalaxySpeechCaptions = computed(() => shouldShowGalaxySpeechCaptions({ layoutMode: shell.layoutMode, operatorBrainGalaxyActive: shell.operatorBrainGalaxyActive }));
 const workbenchLayoutMode = computed((): 'operator' | 'ide' =>
   hideOperatorEditor.value ? 'operator' : 'ide',
@@ -567,9 +568,25 @@ watch(
   <main
     ref="workbenchRef"
     class="region region-center-workbench center-workbench center-workbench--mockup"
-    :class="{ 'center-workbench--resizing': resizing, 'center-workbench--operator': hideOperatorEditor, 'center-workbench--terminal-collapsed': !terminalPanelVisible }"
+    :class="{
+      'center-workbench--resizing': resizing,
+      'center-workbench--operator': hideOperatorEditor,
+      'center-workbench--terminal-collapsed': !terminalPanelVisible,
+      'center-workbench--collapsed': ideWorkbenchMinimized,
+    }"
   >
-    <section v-if="!hideOperatorEditor" class="center-workbench__editor-stack center-workbench__editor-stack--surface">
+    <button
+      v-if="ideWorkbenchMinimized"
+      type="button"
+      class="center-workbench-reopen"
+      aria-label="Restore IDE editor"
+      title="Restore IDE editor"
+      @click="shell.toggleIdeWorkbench()"
+    >
+      <WorkbenchIcon name="panel-restore" class="center-workbench-reopen__icon" />
+    </button>
+
+    <section v-else-if="!hideOperatorEditor" class="center-workbench__editor-stack center-workbench__editor-stack--surface">
       <CenterWorkbenchEditorChrome
         :active-editor-document-id="shell.activeEditorDocumentId"
         :editor-tab-documents="editorTabDocuments"
@@ -579,6 +596,7 @@ watch(
         @close-document="shell.closeEditorDocument"
         @create-file="shell.createWorkspaceFile()"
         @rename-file="shell.renameActiveWorkspaceFile()"
+        @collapse-workbench="shell.toggleIdeWorkbench()"
         @breadcrumb-click="handleBreadcrumbSegmentClick"
       />
 
@@ -694,8 +712,8 @@ watch(
       </section>
     </section>
 
-    <OperatorStatusRadarPanel v-if="hideOperatorEditor" :terminal-visible="terminalPanelVisible" @toggle-terminal="toggleTerminalPanel" />
-    <GalaxySpeechCaptions v-if="showGalaxySpeechCaptions" />
-    <WorkbenchTerminalDock v-if="showTerminalDock" :hide-operator-editor="hideOperatorEditor" :log-lines="logLines" :output-lines="outputLines" :problem-items="problemItems" :terminal-height="terminalHeight" @hide="hideTerminalPanel" @start-resize="startTerminalResize" />
+    <OperatorStatusRadarPanel v-if="!ideWorkbenchMinimized && hideOperatorEditor" :terminal-visible="terminalPanelVisible" @toggle-terminal="toggleTerminalPanel" />
+    <GalaxySpeechCaptions v-if="!ideWorkbenchMinimized && showGalaxySpeechCaptions" />
+    <WorkbenchTerminalDock v-if="!ideWorkbenchMinimized && showTerminalDock" :hide-operator-editor="hideOperatorEditor" :log-lines="logLines" :output-lines="outputLines" :problem-items="problemItems" :terminal-height="terminalHeight" @hide="hideTerminalPanel" @start-resize="startTerminalResize" />
   </main>
 </template>
