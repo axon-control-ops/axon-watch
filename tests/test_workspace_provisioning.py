@@ -141,6 +141,60 @@ class WorkspaceProvisioningTests(unittest.TestCase):
                     )
             self.assertFalse(delivery_file.exists())
 
+    def test_existing_empty_github_repo_is_connected_and_pushed(self) -> None:
+        with tempfile.TemporaryDirectory() as tempdir:
+            root = Path(tempdir) / "move-it"
+            delivery_file = Path(tempdir) / "workspace-delivery.json"
+            commands: list[list[str]] = []
+            from app import workspace_provisioning
+
+            real_run = workspace_provisioning._run
+
+            def fake_run(args, *, cwd, timeout=60.0):
+                command = [str(item) for item in args]
+                commands.append(command)
+                if command[:3] == ["/usr/bin/gh", "repo", "view"]:
+                    return subprocess.CompletedProcess(args=args, returncode=0, stdout='{"name":"move-it"}\n', stderr="")
+                if command[:3] == ["git", "push", "-u"]:
+                    return subprocess.CompletedProcess(args=args, returncode=0, stdout="pushed\n", stderr="")
+                return real_run(args, cwd=cwd, timeout=timeout)
+
+            with patch.dict(
+                os.environ,
+                {
+                    "AXON_WATCH_PROJECT_ROOT_ALLOWLIST": tempdir,
+                    "AXON_WATCH_WORKSPACE_DELIVERY_FILE": str(delivery_file),
+                    "AXON_WATCH_GITHUB_OWNER_ALLOWLIST": "axon-control-ops",
+                },
+                clear=False,
+            ), patch(
+                "app.workspace_provisioning.resolve_gh_cli",
+                return_value="/usr/bin/gh",
+            ), patch(
+                "app.workspace_provisioning._run",
+                side_effect=fake_run,
+            ):
+                report = provision_workspace_project(
+                    WorkspaceProvisioningSpec(
+                        workspace_id="workspace_move_it",
+                        project_root=root,
+                        display_name="MoveIT",
+                        github_repo="move-it",
+                        create_github_repo=True,
+                    )
+                )
+
+            self.assertEqual("ready", report["status"])
+            self.assertEqual("present", report["github"]["status"])
+            self.assertEqual("created", report["github"]["remote"]["status"])
+            self.assertEqual(
+                "https://github.com/axon-control-ops/move-it.git",
+                report["github"]["remote"]["url"],
+            )
+            self.assertFalse(any(command[:3] == ["/usr/bin/gh", "repo", "create"] for command in commands))
+            self.assertTrue(any(command[:3] == ["git", "remote", "add"] for command in commands))
+            self.assertTrue(any(command[:3] == ["git", "push", "-u"] for command in commands))
+
 
 if __name__ == "__main__":
     unittest.main()
