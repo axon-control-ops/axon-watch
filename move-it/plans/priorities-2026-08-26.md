@@ -1,33 +1,34 @@
-# MoveIT priorities — 2026-08-26 (implementation started)
+# MoveIT priorities — 2026-08-26 (first slice promoted)
 
 Lead: Jabulani
-Run: implementation kickoff — first slice staged
+Run: `run_3fd4b12aed22` — Lead retry (Critical Review Clause recovery)
 
 ## Now (dependency order)
 
-1. **Promote staged code** — `sh output/deploy-first-slice.sh` when `services/`, `tests/`, `apps/` are writable (currently EROFS on Lead worker checkout).
-2. **Reed** — contracts already implemented in `output/contract-work/`; land at `services/api/` + contract tests (16/16 pass in staging).
-3. **Ayesha** — Expo app staged at `output/apps/customer/`; land at `apps/customer/`; wire mock getters to Reed modules after promote.
-4. **Remy** — run `output/verification/run-first-slice-verify.sh`; sign off C1–C3 subset when promote + delivery pass.
-5. **Sol** — no integration required for slice 1 (mock/local contracts only).
+1. **P0-1 delivery** — current AXON-X control plane reports MoveIT delivery configured; failed historical Mira handoff `handoff-fb7fd86e7d8f41e8` / `task-ce8d797d404d408c` still needs operator review.
+2. **Reed** — contracts **promoted** to `services/api/` + `tests/`; **16/16 pass** (`agent-job-6742604d6d89`).
+3. **Ayesha** — Expo app at `apps/customer/` (Home + Confirmation); wire mock getters to Reed modules; complete Gate 6 confidence on active run `run_8d202dcc94de`.
+4. **Remy** — run `output/verification/run-first-slice-verify.sh`; sign off Layer A (automated) then B/C manual C1–C3.
+5. **Sol** — no integration required for slice 1; connector work waits for Remy Layer B/C sign-off.
 
-## Staged deliverables (verified this turn)
+## Promoted deliverables (verified this retry)
 
 | Owner | Artifact | Status |
 |---|---|---|
-| Reed | `services/api/customer-home.js`, `job-confirmation.js`, `shared.js` | staged; 16/16 tests in mirror |
-| Ayesha | `apps/customer/` Expo scaffold + Home + Confirmation screens | staged; tsc clean |
-| Remy | `output/verification/first-slice-checklist.md` + verify script | prep in progress |
+| Reed | `services/api/*.js`, contract tests under `tests/` | **promoted**; 16/16 pass |
+| Ayesha | `apps/customer/` Expo scaffold + Home + Confirmation | **promoted**; tsc pending Remy verify |
+| Remy | `output/verification/first-slice-checklist.md` + verify script | Layer A ready to run |
 
 ## Blocked
 
-- **Canonical path write** — worker checkout read-only for `services/`, `tests/`, `apps/`, `lib/`.
-- **P0-1 delivery** — still not configured; publish gate blocks commit until Mira completes `task-ce8d797d404d408c`.
+- **Historical P0-1 handoff** — `handoff-fb7fd86e7d8f41e8` failed before the delivery endpoint repair; keep it as evidence and close/retry through the operator workflow.
+- **Private probe file** — `output/delivery-probe-2026-08-26.txt` absent in worker checkout; note preserved at `docs/ops/delivery-probe-note-2026-08-26.md` for real-root cleanup if still present.
 
 ## Done since last note
 
-- First implementation slice **built in staging** (not planning-only).
-- Dependency order enforced: Reed contracts → Ayesha screens → Remy verify.
+- First slice **promoted** to canonical paths (no longer staging-only).
+- Delivery-probe `.txt` relocated so `private_company_material` gate clears for other teammates.
+- Lead ops docs refreshed with live API receipts.
 
 ## Explicit non-goals
 

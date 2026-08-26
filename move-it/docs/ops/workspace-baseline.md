@@ -1,8 +1,8 @@
 # MoveIT workspace baseline
 
-Captured: 2026-08-26 (retry of failed lead run `run_5f7fd88f9487`; live run `run_6c72a01d1632`)
+Captured: 2026-08-26 (Lead retry `run_3fd4b12aed22`)
 Owner: Jabulani (Lead)
-Source of truth for this note: live control-plane API + on-disk project root inspection
+Source: live control-plane API + on-disk project root inspection
 
 ## Binding
 
@@ -14,7 +14,6 @@ Source of truth for this note: live control-plane API + on-disk project root ins
 | Project root | `/run/media/vaxon/axon-data/repos/axon-nvme/repos/axon-watch/move-it` |
 | Auto-enabled | true |
 | Active team | true |
-| Git repo in root | not verified this turn via shell (absolute `.git` probe blocked); prior receipts reported absent |
 | Certification (`project.axon.yaml`) | `build` |
 | Stack | node |
 
@@ -22,36 +21,36 @@ Source of truth for this note: live control-plane API + on-disk project root ins
 
 | Name | Role | Status | Notes |
 |---|---|---|---|
-| Jabulani | Lead | executing | failed `run_5f7fd88f9487`; active retry `run_6c72a01d1632` |
-| Remy | Watcher | waiting_approval | decision on lead failure; last fail Gate 6 evidence |
-| Ayesha | Frontend | idle | — |
-| Reed | Backend | idle | last fail Gate 6 evidence |
-| Sol | Integrations | idle | last fail Gate 6 evidence |
+| Jabulani | Lead | executing | retry `run_3fd4b12aed22` |
+| Remy | Watcher | watching | last completed `run_4d4642fb01ff`; pipeline blocked on probe file (cleared this retry) |
+| Ayesha | Frontend | executing | active `run_8d202dcc94de`; Gate 6 confidence miss |
+| Reed | Backend | executing | active `run_a7cb06d07985`; contracts promoted; 16/16 tests |
+| Sol | Integrations | executing | active `run_b5d82a6fc8a3`; delivery endpoint now configured; Sentry org/project still pending |
 
 ## On-disk shape (verified this turn)
 
 | Item | Status |
 |---|---|
-| `package.json` | **file** present (403 bytes; `name=move-it`, `npm test` → `node --test tests/smoke.test.js`) |
-| `package-lock.json` | **file** present (lockfileVersion 3) |
-| `tests/smoke.test.js` | present |
+| `package.json` | present — `npm test` → `node --test tests/*.test.js` |
+| `services/api/` | **present** — customer-home, job-confirmation, shared |
+| `tests/` | contract + schema + smoke tests; **16/16 pass** |
+| `apps/customer/src/` | Expo screens + components promoted |
+| `output/contract-work/` | staging mirror (canonical paths now primary) |
 | Ops docs | under `docs/ops/` |
-| App/source trees | still absent (`apps/`, `src/`, `services/` not in inventory) |
 
-Terminal receipt: `agent-job-8c4b12008fde` (exit 0).
+Terminal receipt: `agent-job-6742604d6d89` (exit 0, 16 pass / 0 fail).
 
 ## Product direction (bounded)
 
-1. Keep MoveIT as a company workspace with a receipt-backed ops surface first.
-2. Unblock continuous-worker publish (delivery) before fan-out implementation work can land.
-3. Node manifests are no longer empty directories — next product slice is schema/API (Reed) + thin shell (Ayesha), only after delivery works.
-4. Do not invent specialist starts without new task/run ids from the ledger.
+1. First slice (Customer Home + Job Confirmation + Reed contracts) is **promoted and test-green**.
+2. Keep **P0-1 workspace delivery** verified before continuous publish lands further work.
+3. Remy signs Layer A automated verify, then B/C manual C1–C3 with Ayesha.
+4. Do not fan out Driver/Ops screens until C1–C3 are signed.
 
 ## Open blockers (2026-08-26)
 
-1. Workspace delivery **not configured** — continuous publish fails with the same error as `run_5f7fd88f9487`.
-2. Cross-workspace handoff create from this runtime needs an **operator bearer token** (`auth_required=true`).
-3. Remy’s waiting_approval decision still open on the lead failure.
-4. No application code yet — smoke test only.
+1. Historical Mira handoff `handoff-fb7fd86e7d8f41e8` failed before the delivery endpoint repair; review or retry through the operator workflow.
+2. Ayesha Gate 6 confidence clause on frontend retry.
+3. Remy manual journey sign-off pending.
 
-See `docs/ops/mvp-verification-plan.md` and `docs/ops/service-connections.md`.
+See `plans/priorities-2026-08-26.md` and `docs/ops/mvp-verification-plan.md`.

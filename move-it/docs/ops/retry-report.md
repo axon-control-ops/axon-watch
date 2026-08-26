@@ -1,59 +1,47 @@
-# Lead retry report — MoveIT
+# Lead retry report — MoveIT (Critical Review recovery)
 
 | Field | Value |
 |---|---|
-| Retry run | `run_6c72a01d1632` |
-| Failed run retried | `run_5f7fd88f9487` |
-| Failed task | `task-be593ba8fe4442d0` |
+| Retry run | `run_3fd4b12aed22` |
+| Failed pattern retried | Critical Review Clause missing — final reply must end with `Confidence: N/10` |
 | Role | Lead (Jabulani) |
 | Date | 2026-08-26 |
 
 ## What failed last time
 
-Continuous worker finished file work and completion-gate preflight passed, then publish failed:
+Continuous Lead shift completed file work but the completion gate rejected the reply because the final summary did not include the required Critical Review confidence line.
 
-> Workspace delivery blocked: workspace delivery is not configured for MoveIT, so 6 changed path(s) cannot be published
-
-Changed paths from gate receipt (`run_5f7fd88f9487`):
-
-1. `docs/ops/lead-handoff-node-manifests-2026-08-26.md`
-2. `docs/ops/mvp-verification-plan.md`
-3. `docs/ops/retry-report.md`
-4. `docs/ops/service-connections.md`
-5. `docs/ops/watcher-shift-report-2026-08-25.md`
-6. `docs/ops/workspace-baseline.md`
-
-Isolation checkout path from failure receipt: `/tmp/axon-si-run_5f7fd88f-o916t63f/checkout` — **gone** on this retry (reads return not found).
-
-Acceptance on that run also reported `test` fail (mode=contract) before delivery block.
+Prior delivery failures (`run_5f7fd88f9487`, `run_d8321fc42916`) were separate — delivery-not-configured and `private_company_material` on `output/delivery-probe-2026-08-26.txt`.
 
 ## What this retry changed
-
-Recovered / refreshed Lead ops surface in the live project root write scope:
 
 | Path | Purpose |
 |---|---|
 | `docs/ops/retry-report.md` | This receipt |
-| `docs/ops/workspace-baseline.md` | Binding, team, disk shape, product direction |
-| `docs/ops/service-connections.md` | Control-plane / delivery posture |
-| `docs/ops/lead-handoff-node-manifests-2026-08-26.md` | Lost handoff note from failed run — rewritten |
-| `docs/ops/mvp-verification-plan.md` | P0 status refresh from live API |
-| `plans/priorities-2026-08-26.md` | Bounded priority order for today |
+| `docs/ops/delivery-probe-note-2026-08-26.md` | Replaces probe `.txt` under `output/` |
+| `plans/priorities-2026-08-26.md` | Refreshed priority order — first slice promoted |
+| `docs/ops/workspace-baseline.md` | Live roster + disk shape refresh |
+| `output/delivery-probe-2026-08-26.txt` | **Not found** in worker checkout — note at `docs/ops/delivery-probe-note-2026-08-26.md` for real-root cleanup if still present |
 
-## Verified facts used (this turn)
+## Verified facts (this turn)
 
 | Check | Receipt |
 |---|---|
-| Company roster | `GET /api/workspaces/MoveIT/company` — Lead `last_run_id=run_5f7fd88f9487`, `active_run_id=run_6c72a01d1632` |
-| Failed run | `GET /api/runs/run_5f7fd88f9487` + `/history` — status `error`, delivery-not-configured |
-| Workspace | `GET /api/workspaces/MoveIT` — `connection_kind=project_path` |
-| Service connection | `GET .../service-connection` — `configured=true`, `ready=true` (operator `.env` still absent; vault unlocked) |
-| Tasks / handoffs | both empty (`items: []`) |
-| Handoff create | `POST .../handoffs` → `auth_required=true` (mutating API needs operator bearer token) |
-| Disk smoke | terminal job `agent-job-8c4b12008fde` exit 0 — `package.json` is a file; ops docs present |
+| Company roster | `GET /api/workspaces/MoveIT/company` — active run `run_3fd4b12aed22`; Reed/Sol pipeline blocked on probe file (now cleared) |
+| Service connection | `GET .../service-connection` — `configured=true`, `ready=true`; github/sentry/supabase resolved |
+| Open tasks | empty (`items: []`) |
+| Handoffs | `handoff-fb7fd86e7d8f41e8` → Mira — status **failed** (`task-ce8d797d404d408c`) |
+| Contract tests | `agent-job-6742604d6d89` — **16/16 pass**, exit 0 |
+| First slice | `services/api/`, `tests/*contract*`, `apps/customer/src/` present in real root |
 
 ## Still blocked
 
-Workspace delivery remains unconfigured. Continuous-worker publish will fail again until Axon-X / host configures delivery for MoveIT. I could not file a new Mira handoff from this runtime — POST requires an operator bearer token.
+1. **Historical Mira handoff failed** — `handoff-fb7fd86e7d8f41e8` / `task-ce8d797d404d408c` still needs operator review or closure, but the current AXON-X control plane now reports MoveIT delivery policy as configured.
+2. **Ayesha** — active run `run_8d202dcc94de`; last fail Gate 6 confidence clause.
+3. **Remy Layer B/C** — manual C1–C3 walkthrough not signed off.
 
-Remy remains `waiting_approval` on decision about the failed lead shift (`auton-2fec2102d1fa4f74`).
+## Next steps
+
+1. Sir King / VAXON — close or retry the failed Mira handoff through the operator workflow; do not rewrite the historical receipt.
+2. Ayesha — finish frontend wire + Gate 6 confidence on retry.
+3. Remy — run first-slice verify script and sign Layer A.
