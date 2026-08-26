@@ -276,9 +276,6 @@ function runtimeStatusLine(record: AgentDockComposerRuntimeTarget): string {
         <span class="agent-dock-composer__tool-chevron" aria-hidden="true">▾</span>
       </button>
       <div v-if="showModelMenu" class="agent-dock-composer__menu agent-dock-composer__menu--runtime">
-        <p class="agent-dock-composer__menu-note agent-dock-composer__menu-note--status">
-          This selection is also used by the Instructions engine. Explicit targets and safety rules remain deterministic.
-        </p>
         <button
           type="button"
           class="agent-dock-composer__menu-section-toggle"
