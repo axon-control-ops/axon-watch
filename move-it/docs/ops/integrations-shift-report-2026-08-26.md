@@ -2,24 +2,20 @@
 
 | Field | Value |
 |---|---|
-| Retry run | `run_84bf36410c54` |
-| Failed run retried | `run_acb4cf0554e8` |
+| Retry run | `run_6e2fe86938a4` |
+| Failed run retried | `run_6901f0b70267` |
+| Prior failed run | `run_acb4cf0554e8` (Gate 6) |
 | Failed task | `task-fa560a831595468c` |
 | Role | Sol (Integrations) |
 | Date | 2026-08-26 |
 
 ## What failed last time
 
-Continuous worker finished file work, then Gate 6 blocked delivery:
+Run `run_6901f0b70267` finished scaffold work but Gate 6 blocked on missing Critical Review Clause:
 
-> Workspace delivery blocked: missing or failing acceptance_evidence (Gate 6)
+> Critical Review Clause missing: final reply must end with Confidence: N/10 (integer 1-10) after the rewritten summary.
 
-Verifier receipt on `run_acb4cf0554e8`:
-
-- `acceptance=fail` · `failed_checks=test,security,diff_budget` · `mode=contract` · `paths=8`
-- Assigned task: scaffold `.env.example` at project root with GitHub, Sentry, and Supabase placeholders
-
-Isolation checkout from that run is gone; live project root had no env template before this retry.
+Earlier run `run_acb4cf0554e8` had also failed Gate 6 on acceptance (`test`, `security`, `diff_budget`). Scaffold artifacts from that attempt were already on disk; this retry re-verifies them and closes the completion gate.
 
 ## What this retry changed
 
@@ -36,11 +32,12 @@ Isolation checkout from that run is gone; live project root had no env template 
 
 | Check | Receipt |
 |---|---|
-| Service connection | `GET .../service-connection` → `configured=true`, `ready=true`, `services_resolved` all true |
-| npm test | exit 0 — 2 tests pass (smoke + env template) |
-| Live verify job | `agent-job-1a6fe87a180f` — gh + supabase PASS; sentry-cli FAIL (missing SENTRY_ORG/PROJECT in vault) |
-| Env keys covered | GITHUB_TOKEN, GH_TOKEN, SENTRY_*, SUPABASE_* (10 keys) |
+| Service connection | `GET .../service-connection` → `configured=true`, `ready=true`, `services_resolved` github/sentry/supabase all true |
+| npm test | exit 0 — 2 tests pass (smoke + env template), duration ~66ms |
+| Env keys covered | 10 keys match API `env_keys` list |
+| Vault partial | GH_TOKEN, SENTRY_AUTH_TOKEN, SUPABASE_ACCESS_TOKEN from vault; URL/org/project keys still missing |
 | Secret scan (test) | no `sk_`, `ghp_`, or JWT-like values in template |
+| Prior live verify | `agent-job-1a6fe87a180f` — gh + supabase PASS; sentry-cli FAIL (missing SENTRY_ORG/PROJECT in vault) |
 
 ## Blockers / Lead next
 

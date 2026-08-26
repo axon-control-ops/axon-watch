@@ -565,27 +565,8 @@ watch(
 </script>
 
 <template>
-  <main
-    ref="workbenchRef"
-    class="region region-center-workbench center-workbench center-workbench--mockup"
-    :class="{
-      'center-workbench--resizing': resizing,
-      'center-workbench--operator': hideOperatorEditor,
-      'center-workbench--terminal-collapsed': !terminalPanelVisible,
-      'center-workbench--collapsed': ideWorkbenchMinimized,
-    }"
-  >
-    <button
-      v-if="ideWorkbenchMinimized"
-      type="button"
-      class="center-workbench-reopen"
-      aria-label="Restore IDE editor"
-      title="Restore IDE editor"
-      @click="shell.toggleIdeWorkbench()"
-    >
-      <WorkbenchIcon name="panel-restore" class="center-workbench-reopen__icon" />
-    </button>
-
+  <main ref="workbenchRef" class="region region-center-workbench center-workbench center-workbench--mockup" :class="{ 'center-workbench--resizing': resizing, 'center-workbench--operator': hideOperatorEditor, 'center-workbench--terminal-collapsed': !terminalPanelVisible, 'center-workbench--collapsed': ideWorkbenchMinimized }">
+    <button v-if="ideWorkbenchMinimized" type="button" class="center-workbench-reopen" aria-label="Restore IDE editor" title="Restore IDE editor" @click="shell.toggleIdeWorkbench()"><WorkbenchIcon name="panel-restore" class="center-workbench-reopen__icon" /></button>
     <section v-else-if="!hideOperatorEditor" class="center-workbench__editor-stack center-workbench__editor-stack--surface">
       <CenterWorkbenchEditorChrome
         :active-editor-document-id="shell.activeEditorDocumentId"

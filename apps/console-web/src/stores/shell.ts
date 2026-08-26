@@ -549,10 +549,7 @@ export const useShellStore = defineStore('shell', () => {
   const ideBriefingPanelOpen = ref(false);
   const ideVaxonDockPinned = ref(false);
   const agentDockCollapsed = ref(readStoredAgentDockCollapsed());
-  if (ideWorkbenchCollapsed.value && agentDockCollapsed.value) {
-    agentDockCollapsed.value = false;
-    persistAgentDockCollapsed(false);
-  }
+  if (ideWorkbenchCollapsed.value && agentDockCollapsed.value) { agentDockCollapsed.value = false; persistAgentDockCollapsed(false); }
   const ideTerminalRevealToken = ref(0);
   const ideTerminalProblemsRevealToken = ref(0);
   const ideTerminalToggleToken = ref(0);
@@ -2707,10 +2704,7 @@ export const useShellStore = defineStore('shell', () => {
     revealIdeWorkbenchProblems,
     toggleIdeTerminalPanel,
     focusIdeSidebarView,
-    setIdeActivityView,
-    toggleIdeExplorer,
-    toggleIdeWorkbench,
-    toggleAgentDock,
+    setIdeActivityView, toggleIdeExplorer, toggleIdeWorkbench, toggleAgentDock,
     revealTeamRosterForActiveEmployee,
     requestIdeExplorerInlineCreate,
   } = createIdeWorkbenchChromeSlice({
@@ -2720,10 +2714,7 @@ export const useShellStore = defineStore('shell', () => {
     ideExplorerInlineCreateToken,
     ideExplorerInlineCreateKind,
     teamRosterRevealToken,
-    ideActivityView,
-    ideExplorerCollapsed,
-    ideWorkbenchCollapsed,
-    agentDockCollapsed,
+    ideActivityView, ideExplorerCollapsed, ideWorkbenchCollapsed, agentDockCollapsed,
     ideAttentionPanelOpen,
     ideBriefingPanelOpen,
     ideVaxonDockPinned,
@@ -4034,11 +4025,7 @@ export const useShellStore = defineStore('shell', () => {
     streamingIdeThreadIds,
     agentReportEditorLink,
     focusAgentReportEditor,
-    agentDockCollapsed,
-    ideActivityView,
-    ideExplorerCollapsed,
-    ideWorkbenchCollapsed,
-    ideAttentionPanelOpen,
+    agentDockCollapsed, ideActivityView, ideExplorerCollapsed, ideWorkbenchCollapsed, ideAttentionPanelOpen,
     closeIdeAttentionPanel,
     toggleIdeAttentionPanel,
     ideBriefingPanelOpen,
@@ -4191,9 +4178,7 @@ export const useShellStore = defineStore('shell', () => {
     setLayoutMode,
     setLeftSidebarMode,
     toggleCursorPickerVisibleModel,
-    toggleAgentDock,
-    toggleIdeExplorer,
-    toggleIdeWorkbench,
+    toggleAgentDock, toggleIdeExplorer, toggleIdeWorkbench,
     signalClearError,
     signalClearState,
     signalViews,
