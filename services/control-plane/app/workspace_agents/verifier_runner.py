@@ -139,6 +139,7 @@ def execute_check_plan(
         if skip_frontend_heavy and name in _FRONTEND_HEAVY_CHECKS:
             results[name] = {
                 "passed": True,
+                "executed": False,
                 "output_excerpt": (
                     f"skipped: no {_CONSOLE_WEB_PREFIX.rstrip('/')} changes in dirty set"
                 ),
@@ -147,12 +148,14 @@ def execute_check_plan(
         if not command or command.startswith("<missing command:"):
             results[name] = {
                 "passed": False,
+                "executed": False,
                 "output_excerpt": f"missing command for check '{name}'",
             }
             continue
         if not root.is_dir():
             results[name] = {
                 "passed": False,
+                "executed": False,
                 "output_excerpt": f"workspace root missing: {root}",
             }
             continue
@@ -169,27 +172,31 @@ def execute_check_plan(
             excerpt = (completed.stdout or "") + (completed.stderr or "")
             results[name] = {
                 "passed": completed.returncode == 0,
+                "executed": True,
                 "output_excerpt": excerpt.strip()[:2000] or f"exit={completed.returncode}",
             }
         except subprocess.TimeoutExpired:
             results[name] = {
                 "passed": False,
+                "executed": True,
                 "output_excerpt": f"timed out after {timeout:.0f}s: {command}",
             }
         except OSError as exc:
             results[name] = {
                 "passed": False,
+                "executed": False,
                 "output_excerpt": f"failed to start: {exc}",
             }
     return results
 
 
-def inspect_fallback_contract() -> dict[str, Any]:
+def inspect_fallback_contract(reason: str = "project_contract_unavailable") -> dict[str, Any]:
     """When a workspace has no project.axon.yaml, still apply secret/path policy."""
     return {
         "project_id": "inspect_fallback",
         "certification_level": "inspect_only",
         "inspect_only": True,
+        "verification_unavailable_reason": reason,
         "adapters": [],
         "unsupported_adapters": [],
         "commands": {},

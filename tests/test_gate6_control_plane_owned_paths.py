@@ -101,15 +101,17 @@ class Gate6AcceptanceWithControlPlanePathsTests(unittest.TestCase):
         "commands": {},
     }
 
-    def test_control_plane_paths_alone_no_longer_fail_acceptance(self) -> None:
+    def test_control_plane_paths_alone_are_inconclusive_not_verified(self) -> None:
         # Before the fix this produced acceptance=fail policy=out_of_scope —
-        # the exact live failure, on a run where the agent wrote nothing.
+        # the exact live failure, on a run where the agent wrote nothing. It
+        # should not become VERIFIED without executable checks.
         verdict = evaluate_acceptance(
             contract=self.CONTRACT,
             check_results={},
             changed_paths=strip_control_plane_owned_paths(_OBSERVED_CONTROL_PLANE_PATHS),
         )
-        self.assertTrue(verdict.passed, verdict.summary)
+        self.assertFalse(verdict.passed, verdict.summary)
+        self.assertIn("proof=INCONCLUSIVE", verdict.summary)
         self.assertEqual([], verdict.policy_findings)
 
     def test_genuine_out_of_scope_change_still_fails(self) -> None:
@@ -125,7 +127,7 @@ class Gate6AcceptanceWithControlPlanePathsTests(unittest.TestCase):
         self.assertFalse(verdict.passed)
         self.assertTrue(any(f.code == "out_of_scope" for f in verdict.policy_findings))
 
-    def test_in_scope_agent_work_mixed_with_control_plane_noise_passes(self) -> None:
+    def test_in_scope_agent_work_mixed_with_control_plane_noise_needs_checks(self) -> None:
         # Task paths are routing hints. Gate 6 enforces the repository contract,
         # while the sandbox and publication gate enforce the role-owned lane.
         verdict = evaluate_acceptance(
@@ -136,19 +138,23 @@ class Gate6AcceptanceWithControlPlanePathsTests(unittest.TestCase):
             ),
             task_allowed_paths=["apps/console-web/"],
         )
-        self.assertTrue(verdict.passed, verdict.summary)
+        self.assertFalse(verdict.passed, verdict.summary)
+        self.assertIn("proof=INCONCLUSIVE", verdict.summary)
+        self.assertEqual([], verdict.policy_findings)
 
-    def test_control_plane_noise_passes_even_for_an_unscoped_task(self) -> None:
+    def test_control_plane_noise_is_inconclusive_for_an_unscoped_task(self) -> None:
         # The live failures were unscoped consultative runs. Stripping the
-        # control-plane paths leaves nothing to police, which is the point —
-        # the agent genuinely changed nothing.
+        # control-plane paths leaves nothing to police. That is not a verified
+        # acceptance proof by itself.
         verdict = evaluate_acceptance(
             contract=self.CONTRACT,
             check_results={},
             changed_paths=strip_control_plane_owned_paths(_OBSERVED_CONTROL_PLANE_PATHS),
             task_allowed_paths=[],
         )
-        self.assertTrue(verdict.passed, verdict.summary)
+        self.assertFalse(verdict.passed, verdict.summary)
+        self.assertIn("proof=INCONCLUSIVE", verdict.summary)
+        self.assertEqual([], verdict.policy_findings)
 
 
 if __name__ == "__main__":

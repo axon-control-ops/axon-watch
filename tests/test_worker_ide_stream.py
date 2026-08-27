@@ -84,7 +84,7 @@ class WorkerIdeStreamTests(unittest.TestCase):
             append_run_execution_receipt(
                 run_id,
                 receipt_type="acceptance_evidence",
-                receipt_summary="acceptance=pass · IDE mirror backend implementation verified",
+                receipt_summary="acceptance=pass · proof=VERIFIED · IDE mirror backend implementation verified",
                 actor="test",
                 success=True,
                 intent="acceptance",

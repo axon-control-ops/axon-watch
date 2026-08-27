@@ -134,7 +134,7 @@ class WorkerOpsDeliveryTests(unittest.TestCase):
         append_run_execution_receipt(
             run_id,
             receipt_type="acceptance_evidence",
-            receipt_summary="acceptance=pass · diagnostic evidence captured",
+            receipt_summary="acceptance=pass · proof=VERIFIED · diagnostic evidence captured",
             actor="verifier",
             success=True,
             intent="gate6_acceptance",
