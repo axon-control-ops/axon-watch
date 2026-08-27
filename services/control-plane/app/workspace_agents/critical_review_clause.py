@@ -38,6 +38,11 @@ CRITICAL_REVIEW_CLAUSE = (
     "with 20+ years of experience: suggest improvements or precise next-step "
     "recommendations. Then rewrite the answer to correct those issues and make it more "
     "precise and reliable. Never invent facts in the rewrite. "
+    "Confidence is an evidence-backed assessment of task completion, not confidence in "
+    "your writing. If any required check, acceptance condition, delivery gate, or external "
+    "dependency is failing, missing, blocked, or unverified, state Outcome: BLOCKED and do "
+    "not score Confidence above 4/10. Reserve 8-10 for outcomes whose acceptance conditions "
+    "are all proven by receipts. The score never overrides an AXON-X lifecycle or acceptance gate. "
     f"{CRITICAL_REVIEW_MARKER}"
 )
 
@@ -159,9 +164,13 @@ def critical_review_receipt_summary(confidence: int, *, auto_recovered: bool) ->
     if auto_recovered:
         return (
             f"Critical Review Confidence: {confidence}/10 "
-            "(auto-recovered — closing Confidence line was missing)"
+            "(agent self-assessment; not acceptance · auto-recovered because the closing "
+            "Confidence line was missing)"
         )
-    return f"Critical Review Confidence: {confidence}/10"
+    return (
+        f"Critical Review Confidence: {confidence}/10 "
+        "(agent self-assessment; not acceptance)"
+    )
 
 
 __all__ = [

@@ -487,7 +487,6 @@ async function recoverSelectedEmployeeFailure(): Promise<void> {
   // silently re-queuing a doomed retry.
   await startChat(target, employeeFailureBlocksRetry(target) ? 'talk' : 'retry');
 }
-
 async function onPresenceSelect(employee: CompanyEmployeeRecord): Promise<void> {
   selectEmployee(employee);
   // Busy fan-out specialists write into their own IDE thread — selecting them must
@@ -516,6 +515,7 @@ async function onPresenceSelect(employee: CompanyEmployeeRecord): Promise<void> 
               :class="{
                 'company-roster__alert-badge--interrupted':
                   rosterAlertBadge.tone === 'interrupted',
+                'company-roster__alert-badge--blocked': rosterAlertBadge.tone === 'blocked',
                 'company-roster__alert-badge--mixed': rosterAlertBadge.tone === 'mixed',
               }"
               :title="rosterAlertBadge.title"

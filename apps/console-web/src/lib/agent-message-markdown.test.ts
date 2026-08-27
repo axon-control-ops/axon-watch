@@ -5,6 +5,7 @@ import {
   isInterimAgentStatus,
   extractReadMarkdownFilePath,
   isMarkdownFileAgentResponse,
+  labelAgentConfidenceMarkdown,
   renderAgentMessageMarkdown,
   shouldAutoOpenAgentReportInEditor,
   shouldOfferMarkdownPreview,
@@ -23,6 +24,15 @@ describe('agent-message-markdown', () => {
   it('renders markdown to html', () => {
     const html = renderAgentMessageMarkdown('**Health** check complete.');
     expect(html).toContain('<strong>Health</strong>');
+  });
+
+  it('labels confidence as self-review rather than authoritative acceptance', () => {
+    const html = renderAgentMessageMarkdown('Work reported complete.\n\nConfidence: 9/10');
+    expect(html).toContain('Agent self-review confidence:');
+    expect(html).toContain('not an AXON-X acceptance result');
+    expect(labelAgentConfidenceMarkdown('```\nConfidence: 9/10\n```')).toContain(
+      'Confidence: 9/10',
+    );
   });
 
   it('wraps markdown tables for Cursor-style scrolling', () => {

@@ -308,6 +308,19 @@ describe('buildIdeQuickGuide', () => {
     expect(guide?.steps.join(' ')).toContain('Continue');
   });
 
+  it('explains Gate 6 blocks without presenting them as generic failures', () => {
+    const guide = buildIdeQuickGuide({
+      ...base,
+      failedEmployeeCount: 1,
+      failedEmployeesHint: 'Alex — delivery blocked by Gate 6.',
+      rosterAlertTone: 'blocked',
+    });
+
+    expect(guide?.title).toContain('delivery is blocked');
+    expect(guide?.steps.join(' ')).toContain('Gate 6 evidence');
+    expect(guide?.steps.join(' ')).not.toContain('who failed');
+  });
+
   it('uses mixed roster copy when teammates have both failed and interrupted jobs', () => {
     const guide = buildIdeQuickGuide({
       ...base,
