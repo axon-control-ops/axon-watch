@@ -12,6 +12,7 @@ import {
   isRestartInterruptedFailure,
   isRuntimeAuthFailure,
   isCompletionGateFailure,
+  isGate6AcceptanceFailure,
   isNonRetriableWorkspaceBlockFailure,
   isRuntimeAuthProbeFailure,
   isShiftContinuationFailure,
@@ -113,6 +114,13 @@ export function employeeFailureLine(
         'not Composer Sandbox. Tap Try again with a narrower task, or reassign as report-only audit.'
       );
     }
+    if (isGate6AcceptanceFailure(employee.last_outcome_detail)) {
+      return (
+        'Delivery blocked by AXON-X: acceptance evidence did not pass (Gate 6). ' +
+        "The agent's Confidence score is a self-assessment, not a pass signal. " +
+        'Review the failed receipt before retrying.'
+      );
+    }
     if (isNonRetriableWorkspaceBlockFailure(employee.last_outcome_detail)) {
       return (
         `Last job blocked (working as intended): ${truncateFailureDetail(detail)} ` +
@@ -162,6 +170,12 @@ export function employeeFailureDetailTooltip(
   }
   if (isMissingConfidenceFailure(employee.last_outcome_detail)) {
     return 'The agent runtime produced a reply, but Gate 6/Critical Review rejected it because the final line was not `Confidence: N/10`. Retry should only close the report format.';
+  }
+  if (isGate6AcceptanceFailure(employee.last_outcome_detail)) {
+    return (
+      'AXON-X Gate 6 is authoritative: delivery remains blocked until acceptance evidence passes. ' +
+      "The agent's Confidence score only describes its own assessment and cannot override this gate."
+    );
   }
   const detail = employeeResolvedFailureDetail(employee);
   return detail || undefined;
@@ -288,6 +302,9 @@ export function employeeFailureBlocksRetry(employee: CompanyEmployeeRecord): boo
 /** Status chip value: surfaces failed when the last job failed and the teammate is idle. */
 export function employeeDisplayStatus(employee: CompanyEmployeeRecord): string {
   if (employeeFailureLine(employee)) {
+    if (isGate6AcceptanceFailure(employee.last_outcome_detail)) {
+      return 'blocked';
+    }
     return employeeShiftNeedsContinuation(employee) ? 'interrupted' : 'failed';
   }
   const status = (employee.status ?? '').trim();
@@ -336,13 +353,21 @@ export function companyFailedEmployeesHint(
         return `${name} — ${line}`;
       }
       // Keep the alert scannable in narrow team rails — full detail stays in title/tooltip.
-      const compact = `${name} — last job needs attention. Tap to open dock and Try again.`;
+      const compact = isGate6AcceptanceFailure(row.last_outcome_detail)
+        ? `${name} — delivery blocked by Gate 6. Open the dock to review acceptance evidence.`
+        : `${name} — last job needs attention. Tap to open dock and Try again.`;
       if (line.length > 96) {
         return compact;
       }
       return `${name} — ${line} Tap to open their dock and Try again.`;
     }
     return `${name}'s last job failed — tap to open their dock and Try again.`;
+  }
+  if (failed.every((row) => isGate6AcceptanceFailure(row.last_outcome_detail))) {
+    return `${failed.length} teammates have delivery blocked by Gate 6 — open a blocked dock to review acceptance evidence.`;
+  }
+  if (failed.some((row) => isGate6AcceptanceFailure(row.last_outcome_detail))) {
+    return `${failed.length} teammates need attention after a failed or blocked job — open a teammate's dock to review.`;
   }
   return `${failed.length} teammates need attention after a failed job — tap to open a failed teammate's dock and Try again.`;
 }
@@ -368,7 +393,7 @@ export function companyFailedEmployeesHintTooltip(
   return `${name} — ${detail}`;
 }
 
-export type CompanyRosterAlertBadgeTone = 'failure' | 'interrupted' | 'mixed';
+export type CompanyRosterAlertBadgeTone = 'failure' | 'blocked' | 'interrupted' | 'mixed';
 
 export type CompanyRosterAlertBadge = {
   label: string;
@@ -391,7 +416,10 @@ export function buildCompanyRosterAlertBadge(
   const interruptedCount = needsAttention.filter((row) =>
     employeeShiftNeedsContinuation(row),
   ).length;
-  const failedCount = count - interruptedCount;
+  const blockedCount = needsAttention.filter((row) =>
+    isGate6AcceptanceFailure(row.last_outcome_detail),
+  ).length;
+  const failedCount = count - interruptedCount - blockedCount;
 
   if (count === 1) {
     if (interruptedCount === 1) {
@@ -400,6 +428,15 @@ export function buildCompanyRosterAlertBadge(
         title: '1 teammate has an interrupted job — select them and tap Continue',
         ariaLabel: 'Jump to 1 interrupted teammate',
         tone: 'interrupted',
+      };
+    }
+
+    if (blockedCount === 1) {
+      return {
+        label: '1 blocked',
+        title: '1 teammate has delivery blocked by Gate 6 — review acceptance evidence',
+        ariaLabel: 'Open blocked teammate dock to review Gate 6 evidence',
+        tone: 'blocked',
       };
     }
 
@@ -412,6 +449,22 @@ export function buildCompanyRosterAlertBadge(
   }
 
   if (failedCount === 0) {
+    if (blockedCount === count) {
+      return {
+        label: `${count} blocked`,
+        title: `${count} teammates have delivery blocked by Gate 6 — review acceptance evidence`,
+        ariaLabel: `Open blocked teammate dock to review Gate 6 evidence (${count})`,
+        tone: 'blocked',
+      };
+    }
+    if (interruptedCount !== count) {
+      return {
+        label: `${count} need attention`,
+        title: `${count} teammates have blocked or interrupted jobs`,
+        ariaLabel: `Jump to ${count} teammates needing attention`,
+        tone: 'mixed',
+      };
+    }
     return {
       label: `${count} interrupted`,
       title: `${count} teammates have interrupted jobs — select one and tap Continue`,

@@ -286,6 +286,24 @@ describe('buildIdeEditorStatusTeamChip', () => {
     });
     expect(mixed?.ariaLabel).toContain('Team sidebar');
   });
+
+  it('labels Gate 6 delivery blocks separately from failed jobs', () => {
+    expect(
+      buildIdeEditorStatusTeamChip({
+        employees: [
+          employee({
+            last_outcome: 'failed',
+            last_outcome_detail: 'acceptance_evidence did not pass (Gate 6)',
+          }),
+        ],
+        teamExpanded: false,
+      }),
+    ).toMatchObject({
+      label: '1 BLOCKED',
+      tone: 'blocked',
+      count: 1,
+    });
+  });
 });
 
 describe('buildIdeEditorStatusTerminalChip', () => {

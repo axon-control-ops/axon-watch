@@ -115,7 +115,9 @@ function rosterFailureQuickGuideTitle(
   tone: CompanyRosterAlertBadgeTone | null | undefined,
 ): string {
   if (count === 1) {
-    return tone === 'interrupted'
+    return tone === 'blocked'
+      ? "Teammate's delivery is blocked — open Team to review Gate 6"
+      : tone === 'interrupted'
       ? "Teammate's job was interrupted — open Team to continue"
       : "Teammate's last job failed — open Team to review";
   }
@@ -123,6 +125,8 @@ function rosterFailureQuickGuideTitle(
   if (tone === 'interrupted') {
     return `${count} interrupted jobs — open Team to continue`;
   }
+
+  if (tone === 'blocked') return `${count} deliveries blocked — open Team to review Gate 6`;
 
   return `${count} teammates need attention — open Team to review`;
 }
@@ -132,7 +136,9 @@ function rosterFailureQuickGuideFallbackStep(
   tone: CompanyRosterAlertBadgeTone | null | undefined,
 ): string {
   if (count === 1) {
-    return tone === 'interrupted'
+    return tone === 'blocked'
+      ? 'A teammate has delivery blocked because acceptance evidence did not pass.'
+      : tone === 'interrupted'
       ? 'A teammate has an interrupted job that can be continued.'
       : 'A teammate needs attention after a failed job.';
   }
@@ -140,6 +146,8 @@ function rosterFailureQuickGuideFallbackStep(
   if (tone === 'interrupted') {
     return `${count} teammates have interrupted jobs that can be continued.`;
   }
+
+  if (tone === 'blocked') return `${count} teammates have delivery blocked because acceptance evidence did not pass.`;
 
   if (tone === 'mixed') {
     return `${count} teammates need attention after failed or interrupted jobs.`;
@@ -155,6 +163,7 @@ function rosterFailureRecoveryStep(
     return `Team in the left activity bar shows who was interrupted and offers ${operatorFailureRetryLabel(true)}.`;
   }
 
+  if (tone === 'blocked') return 'Team shows whose Gate 6 evidence needs review before retrying.';
   if (tone === 'mixed') {
     return (
       'Team in the left activity bar shows who needs attention and offers '

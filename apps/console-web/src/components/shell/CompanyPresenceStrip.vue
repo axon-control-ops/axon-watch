@@ -7,6 +7,7 @@ import {
   adjacentPresenceStripEmployee,
   COMPANY_ROSTER_DOCK_ID,
   employeeFailureLine,
+  employeeDisplayStatus,
   employeePresenceSelectAriaLabel,
   employeePresenceStripHoverTitle,
   employeeShiftNeedsContinuation,
@@ -38,6 +39,7 @@ const items = computed(() => {
     const liveBusy = liveBusySet.value.has(employee.employee_id);
     const handoffWaiting = !liveBusy && handoffWaitingSet.value.has(employee.employee_id);
     const failed = Boolean(employeeFailureLine(employee, { liveBusy }));
+    const blocked = failed && employeeDisplayStatus(employee) === 'blocked';
     const avatar = buildEmployeeAvatar(employee, { liveBusy, handoffWaiting });
     const interrupted = failed && employeeShiftNeedsContinuation(employee);
     const paused = !employee.enabled && !failed && !liveBusy;
@@ -53,6 +55,8 @@ const items = computed(() => {
       presenceLabel = 'Handoff';
     } else if (interrupted) {
       presenceLabel = 'Retry';
+    } else if (blocked) {
+      presenceLabel = 'Blocked';
     } else if (failed) {
       presenceLabel = 'Failed';
     } else if (paused) {

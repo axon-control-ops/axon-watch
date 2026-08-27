@@ -193,6 +193,10 @@ function teamChipLabel(count: number, tone: CompanyRosterAlertBadgeTone): string
     return count === 1 ? '1 FAILED' : `${count} FAILED`;
   }
 
+  if (tone === 'blocked') {
+    return count === 1 ? '1 BLOCKED' : `${count} BLOCKED`;
+  }
+
   return `${count} NEED ATTENTION`;
 }
 

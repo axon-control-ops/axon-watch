@@ -93,6 +93,27 @@ export function normalizeAgentProseMarkdown(markdown: string): string {
   return out.join('\n');
 }
 
+/** Make the model-authored score visibly distinct from authoritative acceptance state. */
+export function labelAgentConfidenceMarkdown(markdown: string): string {
+  let fenced = false;
+  return String(markdown || '')
+    .split('\n')
+    .map((line) => {
+      if (/^\s*```/.test(line)) {
+        fenced = !fenced;
+        return line;
+      }
+      if (fenced) return line;
+      const match = line.match(
+        /^\s*(?:\*\*)?Confidence:\s*([1-9]|10)\s*\/\s*10(?:\*\*)?\s*$/i,
+      );
+      return match
+        ? `> **Agent self-review confidence:** ${match[1]}/10 — not an AXON-X acceptance result.`
+        : line;
+    })
+    .join('\n');
+}
+
 const MARKDOWN_HINT_PATTERN =
   /(^|\n)\s{0,3}(#{1,6}\s|[-*+]\s|\d+\.\s|```|>\s|\|.+\|)|(\*\*|__|`[^`]+`|\[[^\]]+\]\([^)]+\))/;
 
@@ -190,7 +211,7 @@ export function renderAgentMessageMarkdown(
 ): string {
   const parts = splitAgentMessageForPreview(content);
   const normalized = normalizeEmptyHeaderMarkdownTables(
-    normalizeAgentProseMarkdown(parts.markdownSource),
+    normalizeAgentProseMarkdown(labelAgentConfidenceMarkdown(parts.markdownSource)),
   );
   const linked = linkifyWorkspacePathsInMarkdown(normalized);
   const html = marked.parse(linked, { async: false }) as string;

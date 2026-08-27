@@ -19,6 +19,7 @@ from app.workspace_agents.critical_review_clause import (  # noqa: E402
     CRITICAL_REVIEW_CLAUSE,
     CRITICAL_REVIEW_MARKER,
     append_critical_review_clause,
+    critical_review_receipt_summary,
     parse_confidence,
     resolve_critical_review_confidence,
 )
@@ -37,6 +38,9 @@ class CriticalReviewClauseHelperTests(unittest.TestCase):
         self.assertIn("never hallucinate", once.lower())
         self.assertIn("20+ years", once)
         self.assertIn("Confidence: X/10", once)
+        self.assertIn("not confidence in your writing", once)
+        self.assertIn("Outcome: BLOCKED", once)
+        self.assertIn("not score Confidence above 4/10", once)
         twice = append_critical_review_clause(once)
         self.assertEqual(once, twice)
 
@@ -47,6 +51,11 @@ class CriticalReviewClauseHelperTests(unittest.TestCase):
         self.assertIsNone(parse_confidence("no score here"))
         self.assertIsNone(parse_confidence("Confidence: 0/10"))
         self.assertIsNone(parse_confidence("Confidence: 11/10"))
+
+    def test_receipt_labels_confidence_as_self_assessment_not_acceptance(self) -> None:
+        summary = critical_review_receipt_summary(9, auto_recovered=False)
+        self.assertIn("Confidence: 9/10", summary)
+        self.assertIn("self-assessment; not acceptance", summary)
 
     def test_resolve_auto_recovers_substantive_reply_without_score(self) -> None:
         long_reply = (
