@@ -76,6 +76,58 @@ class PlainTextToInstructionsTests(unittest.TestCase):
         self.assertIn("- Task type: Audit / Implementation / Remediation", built)
         self.assertNotIn("- Task type: Monitoring / Validation", built)
 
+    def test_exact_operator_wording_extracts_dash_prefixed_branch(self) -> None:
+        source = (
+            "in axon-watch repo - the dev branch - audit the code and find all "
+            "bugs/errors/flaws/missing-logic and suggest and implement improvements"
+        )
+        self.assertEqual(
+            extract_explicit_instruction_targets(source),
+            {"repository": "axon-watch", "branch": "dev"},
+        )
+
+    def test_model_cannot_reintroduce_inconsistent_instruction_facts(self) -> None:
+        source = (
+            "in axon-watch repo - the dev branch - audit the code and find all "
+            "bugs/errors/flaws/missing-logic and suggest and implement improvements"
+        )
+        context = specialist_context("lead", "Mira")
+        model = build_instructions_markdown_from_source(source, context)
+        model = model.replace(
+            "- Task type: Audit / Implementation / Remediation",
+            "- Task type: Monitoring / Validation",
+        )
+        model = model.replace(
+            "- Unverified assumptions: Exact affected paths, reproducible defects, repository state, "
+            "branch synchronization, and applicable validation commands must be verified during preflight",
+            "- Unverified assumptions: none",
+        )
+        model = model.replace(
+            "## Constraints\n",
+            (
+                "## Constraints\n"
+                "- Follow only the steps listed above\n"
+                "- Call out native-build-only gaps separately from OTA-safe fixes\n"
+            ),
+        )
+
+        composed = compose_instructions_markdown(source, model, context)
+
+        self.assertIn("- Task type: Audit / Implementation / Remediation", composed)
+        self.assertNotIn("- Task type: Monitoring / Validation", composed)
+        self.assertIn("- Workspace: axon-watch", composed)
+        self.assertIn("differs from active workspace Young Eagles Day Care", composed)
+        self.assertIn("must be verified during preflight", composed)
+        self.assertNotIn("Unverified assumptions: none", composed)
+        self.assertNotIn("native-build-only", composed)
+        self.assertNotIn("Follow only the steps listed above", composed)
+        self.assertIn("add evidence-based diagnostic steps", composed)
+        self.assertIn("Coordinate defect reproduction", composed)
+        self.assertNotIn(
+            "- Log, reproduce, and fix defects encountered during holistic testing",
+            composed,
+        )
+
     def test_negated_commit_mention_is_not_git_intent(self) -> None:
         prompt = (
             "Look at what Dashpro workspace said about the CI work and plan how the "

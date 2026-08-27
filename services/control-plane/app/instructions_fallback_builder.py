@@ -22,7 +22,7 @@ def _summarize_goal(source: str) -> str:
     return cleaned[:220].rstrip(" ,.;") + ("..." if len(cleaned) > 220 else "")
 
 
-def _infer_task_type(source: str, context: SpecialistContext) -> str:
+def infer_instruction_task_type(source: str, context: SpecialistContext) -> str:
     lowered = source.lower()
     implementation = any(
         token in lowered for token in ("fix", "make", "build", "implement", "upgrade", "patch", "repair")
@@ -86,19 +86,30 @@ def _interpretation_confidence(source: str, context: SpecialistContext) -> int:
     return 8
 
 
+def infer_unverified_instruction_assumptions(source: str, context: SpecialistContext) -> str:
+    if context.mismatch_reason:
+        return context.mismatch_reason
+    if not context.verified and context.role != GENERAL_ROLE_ID:
+        return "specialist context was supplied but not verified against a roster employee"
+    if context.role == GENERAL_ROLE_ID:
+        return "specialist ownership was not supplied"
+    lowered = source.lower()
+    broad_audit = any(token in lowered for token in ("audit", "all bugs", "all errors", "all flaws", "missing-logic"))
+    if broad_audit:
+        return (
+            "Exact affected paths, reproducible defects, repository state, branch synchronization, "
+            "and applicable validation commands must be verified during preflight"
+        )
+    return "none"
+
+
 def _instruction_interpretation_bullets(source: str, context: SpecialistContext) -> list[str]:
     changes_required = _workspace_changes_required(source, context)
     delegation_required = _delegation_required(source, context)
     profile = context.profile
-    unverified = "none"
-    if context.mismatch_reason:
-        unverified = context.mismatch_reason
-    elif not context.verified and context.role != GENERAL_ROLE_ID:
-        unverified = "specialist context was supplied but not verified against a roster employee"
-    elif context.role == GENERAL_ROLE_ID:
-        unverified = "specialist ownership was not supplied"
+    unverified = infer_unverified_instruction_assumptions(source, context)
     return [
-        f"Task type: {_infer_task_type(source, context)}",
+        f"Task type: {infer_instruction_task_type(source, context)}",
         f"Selected role: {profile.display_name}",
         f"Delivery: {context.requested_delivery_mode or profile.preferred_delivery_mode}",
         "Required in this run: produce the selected specialist's executable instructions and required evidence plan",
@@ -129,7 +140,14 @@ def _infer_scope_bullets(source: str, context: SpecialistContext) -> list[str]:
         ("bug", "Log, reproduce, and fix defects encountered during holistic testing"),
     ]
     for needle, bullet in mappings:
-        if needle in lowered and bullet not in candidates:
+        if needle not in lowered:
+            continue
+        if context.role == "lead" and bullet == "Log, reproduce, and fix defects encountered during holistic testing":
+            bullet = (
+                "Coordinate defect reproduction, assign confirmed fixes to owning specialists, "
+                "and review their implementation evidence"
+            )
+        if bullet not in candidates:
             candidates.append(bullet)
     if not candidates:
         for sentence in re.split(r"(?<=[.!?])\s+", source.strip()):
@@ -323,15 +341,22 @@ def build_fallback_instructions_markdown(
     if git_actions_requested:
         out_of_scope = [item for item in out_of_scope if "Committing" not in item]
     constraints = [
-        "Follow only the steps listed above",
+        (
+            "Follow the required objectives and safety boundaries; add evidence-based diagnostic "
+            "steps when necessary and record why they were added"
+        ),
         "Treat Out of scope as binding",
         "Preserve every explicit requirement from the source request",
         "Do not infer specialist authority from agent names",
         *profile.restricted_actions,
-        "Call out native-build-only gaps separately from OTA-safe fixes",
         "Do not deploy, publish, or notify external parties unless explicitly requested",
         "Do not claim work was implemented, tested, or verified without evidence",
     ]
+    if any(token in cleaned.lower() for token in ("native", "mobile", "ota", "android", "ios")):
+        constraints.insert(
+            -2,
+            "Call out native-build-only gaps separately from OTA-safe fixes",
+        )
 
     lines = ["# Instructions", ""]
     lines += [
