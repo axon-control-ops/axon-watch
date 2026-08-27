@@ -66,6 +66,123 @@ class VaultSensitiveGetTests(unittest.TestCase):
         self.assertEqual([], response.json())
 
 
+class OperatorSensitiveGetTests(unittest.TestCase):
+    def setUp(self) -> None:
+        prepare_control_plane_imports()
+        self._tmpdir = tempfile.TemporaryDirectory()
+        self.addCleanup(self._tmpdir.cleanup)
+        self._env = patch.dict(
+            os.environ,
+            {
+                "AXON_WATCH_CONTROL_PLANE_DB": str(Path(self._tmpdir.name) / "cp.sqlite3"),
+                "AXON_WATCH_WORKER_SCHEDULER": "0",
+                "AXON_WATCH_AUTH_MODE": "local_token",
+                "AXON_WATCH_OPERATOR_TOKEN": "gate2-secret-token",
+                "AXON_WATCH_AUTH_ALLOW_LOOPBACK": "0",
+                "AXON_WATCH_STATE_DIR": self._tmpdir.name,
+            },
+            clear=False,
+        )
+        self._env.start()
+        self.addCleanup(self._env.stop)
+        self.app = load_control_plane_app()
+        self.client = TestClient(self.app)
+
+    def _auth_headers(self) -> dict[str, str]:
+        return {"Authorization": "Bearer gate2-secret-token"}
+
+    def test_operator_run_recovery_and_evidence_reads_deny_anonymous(self) -> None:
+        for path in (
+            "/api/runs",
+            "/api/recovery/center",
+            "/api/recovery/circuits",
+            "/api/platform/doctor",
+            "/api/operator/evidence?node_id=core_kairo",
+            "/api/data/snapshot",
+            "/api/workspaces",
+            "/api/inbox",
+        ):
+            with self.subTest(path=path):
+                response = self.client.get(path)
+                self.assertEqual(401, response.status_code)
+                self.assertTrue(response.json().get("auth_required"))
+
+    def test_bearer_token_allows_operator_run_and_recovery_reads(self) -> None:
+        for path in (
+            "/api/runs",
+            "/api/recovery/center",
+            "/api/operator/evidence?node_id=core_kairo",
+            "/api/workspaces",
+        ):
+            with self.subTest(path=path):
+                response = self.client.get(path, headers=self._auth_headers())
+                self.assertNotEqual(401, response.status_code)
+                self.assertNotEqual(403, response.status_code)
+
+    def test_run_history_and_task_reads_require_operator_identity(self) -> None:
+        created = self.client.post(
+            "/api/workspaces/workspace_axon_watch/tasks",
+            json={
+                "goal": "Repair sensitive GET auth.",
+                "acceptance_criteria": "Authorization regression tests pass.",
+                "owner_role": "backend",
+            },
+            headers=self._auth_headers(),
+        ).json()
+        run = self.client.post(
+            "/api/runs",
+            json={
+                "workspace_id": "workspace_axon_watch",
+                "summary": "auth-sensitive run",
+                "mode": "agent",
+            },
+            headers=self._auth_headers(),
+        ).json()
+
+        for path in (
+            f"/api/runs/{run['run_id']}",
+            f"/api/runs/{run['run_id']}/history",
+            f"/api/tasks/{created['task_id']}",
+            "/api/workspaces/workspace_axon_watch/tasks",
+        ):
+            with self.subTest(path=path):
+                denied = self.client.get(path)
+                self.assertEqual(401, denied.status_code)
+                allowed = self.client.get(path, headers=self._auth_headers())
+                self.assertNotEqual(401, allowed.status_code)
+
+    def test_health_remains_public_but_readiness_redacts_without_identity(self) -> None:
+        health = self.client.get("/api/health")
+        self.assertEqual(200, health.status_code)
+
+        anonymous = self.client.get("/api/readiness")
+        self.assertEqual(200, anonymous.status_code)
+        self.assertEqual("redacted", anonymous.json().get("detail"))
+        self.assertNotIn("state_dir", anonymous.json())
+        self.assertNotIn("control_plane_db", anonymous.json())
+
+        authenticated = self.client.get("/api/readiness", headers=self._auth_headers())
+        self.assertEqual(200, authenticated.status_code)
+        self.assertEqual("full", authenticated.json().get("detail"))
+        self.assertIn("state_dir", authenticated.json())
+        self.assertIn("control_plane_db", authenticated.json())
+
+    def test_local_loopback_bypass_remains_deliberate_when_enabled(self) -> None:
+        with patch.dict(
+            os.environ,
+            {
+                "AXON_WATCH_AUTH_ALLOW_LOOPBACK": "1",
+                "AXON_WATCH_REMOTELY_REACHABLE": "0",
+                "AXON_WATCH_PUBLIC_BASE_URL": "http://127.0.0.1:4173",
+            },
+            clear=False,
+        ):
+            loopback_client = TestClient(self.app, client=("127.0.0.1", 50000))
+            self.addCleanup(loopback_client.close)
+            response = loopback_client.get("/api/runs")
+        self.assertEqual(200, response.status_code)
+
+
 class WatchConfidentialGetTests(unittest.TestCase):
     def setUp(self) -> None:
         isolate_watch_db(self)
